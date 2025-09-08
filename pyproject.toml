@@ -1,0 +1,11 @@
+[project]
+name = "Lacus-Log"
+optional-dependencies.dev = [ "yapf", "pylint" ]
+
+[tool.yapf]
+based_on_style = "pep8"
+COLUMN_LIMIT = 160
+
+[tool.pylint.'MESSAGES CONTROL']
+max-line-length = 160
+disable = "too-many-lines,invalid-name,wrong-import-order,global-statement,broad-exception-caught,broad-exception-raised,missing-module-docstring,missing-class-docstring,missing-function-docstring,logging-fstring-interpolation,import-outside-toplevel"
