@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% block title %}机师管理 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="pilot-management">
+  <!-- 页面头部 -->
+  <div class="page-header">
+    <h1 class="page-title">机师管理</h1>
+  </div>
+
+  <!-- 筛选器（默认折叠） -->
+  <div class="filter-bar">
+    {% set selected_items = [] %}
+    {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
+    {% if status_filter %}{% set _ = selected_items.append(status_filter) %}{% endif %}
+    {% if owner_filter %}
+      {% if owner_filter == 'none' %}
+        {% set _ = selected_items.append('无所属') %}
+      {% else %}
+        {% for value, display in user_choices %}
+          {% if value and owner_filter == value %}{% set _ = selected_items.append(display) %}{% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endif %}
+    {% if days_filter %}
+      {% if days_filter == 7 %}{% set _ = selected_items.append('最近7天') %}
+      {% elif days_filter == 14 %}{% set _ = selected_items.append('最近14天') %}
+      {% elif days_filter == 30 %}{% set _ = selected_items.append('最近30天') %}
+      {% endif %}
+    {% endif %}
+    {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
+    <button type="button" class="filter-toggle" onclick="toggleFilters()">
+      <span id="filter-summary">{{ filter_summary }}</span>
+      <span class="toggle-icon" id="filter-toggle-icon">▼</span>
+    </button>
+    <form class="filter-form is-collapsed" id="filter-form" method="get">
+      <div class="filter-group">
+        <label class="filter-label">阶级筛选</label>
+        <select class="filter-select" name="rank" onchange="this.form.submit()">
+          <option value="">全部阶级</option>
+          {% for value, display in rank_choices %}
+          <option value="{{ value }}" {% if rank_filter==value %}selected{% endif %}>{{ display }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      <div class="filter-group">
+        <label class="filter-label">状态筛选</label>
+        <select class="filter-select" name="status" onchange="this.form.submit()">
+          <option value="">全部状态</option>
+          {% for value, display in status_choices %}
+          <option value="{{ value }}" {% if status_filter==value %}selected{% endif %}>{{ display }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      
+      {% if current_user.has_role('gicho') %}
+      <div class="filter-group">
+        <label class="filter-label">所属筛选</label>
+        <select class="filter-select" name="owner" onchange="this.form.submit()">
+          <option value="">全部所属</option>
+          <option value="none" {% if owner_filter=='none' %}selected{% endif %}>无所属</option>
+          {% for value, display in user_choices %}
+          {% if value %}
+          <option value="{{ value }}" {% if owner_filter==value %}selected{% endif %}>{{ display }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      
+      <div class="filter-group">
+        <label class="filter-label">时间筛选</label>
+        <select class="filter-select" name="days" onchange="this.form.submit()">
+          <option value="">全部时间</option>
+          <option value="7" {% if days_filter==7 %}selected{% endif %}>最近7天</option>
+          <option value="14" {% if days_filter==14 %}selected{% endif %}>最近14天</option>
+          <option value="30" {% if days_filter==30 %}selected{% endif %}>最近30天</option>
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <!-- 机师列表 -->
+  <div class="pilot-list">
+    {% if pilots %}
+      <!-- 机师卡片列表 -->
+      <div class="pilot-cards">
+        {% for pilot in pilots %}
+        <a href="{{ url_for('pilot.pilot_detail', pilot_id=(pilot.id|string)) }}" class="pilot-card">
+          <div class="card-header">
+            <div class="pilot-info">
+              <div class="pilot-name">{{ pilot.nickname }}</div>
+              <div class="pilot-real-name">{{ pilot.real_name or '未填写姓名' }}</div>
+            </div>
+            <div class="pilot-meta">
+              <div class="meta-inline">
+                <span class="gender-icon">
+                  {% if pilot.gender.value == 0 %}♂{% elif pilot.gender.value == 1 %}♀{% else %}?{% endif %}
+                </span>
+                <span class="age">{{ pilot.age or '未知' }}岁</span>
+                <span class="meta-break"></span>
+                <span class="owner">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无' }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div class="badges">
+              <span class="rank-badge rank-{{ pilot.rank.value.replace(' ', '') }}">{{ pilot.rank.value }}</span>
+              <span class="status-badge status-{{ pilot.status.value.replace(' ', '') }}">{{ pilot.status.value }}</span>
+            </div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">👩‍✈️</div>
+        <div class="empty-title">暂无机师</div>
+        <div class="empty-description">点击上方"新机师"按钮创建第一个机师</div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- 底部footbar：新机师按钮 -->
+<div class="footbar">
+  <div class="inner">
+    <a class="btn btn-primary" href="{{ url_for('pilot.new_pilot') }}">
+      <span class="btn-icon">+</span>
+      新机师
+    </a>
+  </div>
+</div>
+
+<style>
+/* 机师卡片样式 */
+.pilot-cards {
+  display: block;
+}
+
+/* 筛选器折叠样式 */
+.filter-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.filter-form.is-collapsed { display: none; }
+.filter-form { margin-bottom: 12px; }
+
+.pilot-card {
+  display: block;
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.pilot-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+  border-color: var(--brand);
+}
+
+.pilot-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.pilot-info {
+  flex: 1;
+}
+
+.pilot-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.pilot-real-name {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pilot-meta { display: flex; align-items: center; }
+.meta-inline { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+.meta-break { flex-basis: 100%; height: 0; }
+
+.gender-icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.pilot-card .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 8px; }
+.badges { display: flex; gap: 10px; font-size: 12px; }
+
+/* 阶级徽章样式 */
+.rank-候补机师 { color: var(--muted); }
+.rank-训练机师 { color: #FFA500; }
+.rank-实习机师 { color: var(--green); }
+.rank-正式机师 { color: var(--brand); }
+
+/* 状态徽章样式 */
+.status-未征召 { color: var(--muted); }
+.status-不征召 { color: var(--error); }
+.status-已征召 { color: var(--warn); }
+.status-已签约 { color: var(--hud-green); }
+.status-已阵亡 { color: var(--error); }
+
+.pilot-card:hover .card-arrow {
+  color: var(--brand);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .filter-form {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .pilot-card .card-header { flex-direction: row; align-items: flex-start; gap: 8px; }
+  .pilot-meta { justify-content: flex-end; }
+}
+</style>
+<style>
+/* 底部footbar（固定吸附） */
+.footbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid var(--table-header);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
+  z-index: 100;
+}
+.footbar .inner { display: flex; justify-content: center; }
+.container { padding-bottom: 88px; }
+</style>
+<script>
+function toggleFilters() {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  const collapsed = form.classList.toggle('is-collapsed');
+  icon.textContent = collapsed ? '▼' : '▲';
+}
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  const hasQuery = window.location.search.length > 1;
+  if (!hasQuery) {
+    if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
+    icon.textContent = '▼';
+  } else {
+    form.classList.remove('is-collapsed');
+    icon.textContent = '▲';
+  }
+});
+</script>
+{% endblock %}

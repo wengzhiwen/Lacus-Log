@@ -2,8 +2,7 @@ import uuid
 from datetime import datetime
 
 from flask_security.utils import verify_password
-from mongoengine import (BooleanField, DateTimeField, Document, IntField,
-                         ListField, ReferenceField, StringField)
+from mongoengine import (BooleanField, DateTimeField, Document, IntField, ListField, ReferenceField, StringField)
 
 # pylint: disable=R0903
 
@@ -28,6 +27,12 @@ class Role(Document):
     def get_permissions(self):  # pragma: no cover - 简单返回集合
         return set(self.permissions or [])
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return f'<Role {self.name}>'
+
 
 class User(Document):
     """用户模型，兼容 Flask-Security-Too MongoEngineUserDatastore。
@@ -41,9 +46,7 @@ class User(Document):
     active = BooleanField(default=True)
     created_at = DateTimeField(default=datetime.utcnow)
     # Flask-Security-Too 要求：全局唯一标识
-    fs_uniquifier = StringField(required=True,
-                                unique=True,
-                                default=lambda: uuid.uuid4().hex)
+    fs_uniquifier = StringField(required=True, unique=True, default=lambda: uuid.uuid4().hex)
 
     # Trackable（开启 SECURITY_TRACKABLE=True 时建议具备）
     last_login_at = DateTimeField()
@@ -56,8 +59,7 @@ class User(Document):
     roles = ListField(ReferenceField(Role), default=list)
 
     meta = {
-        'collection':
-        'users',
+        'collection': 'users',
         'indexes': [
             {
                 'fields': ['username'],
@@ -71,8 +73,7 @@ class User(Document):
     }
 
     # ---- Flask-Security 期望的方法 ----
-    def verify_and_update_password(
-            self, password: str) -> bool:  # pragma: no cover - 简单委托
+    def verify_and_update_password(self, password: str) -> bool:  # pragma: no cover - 简单委托
         """校验明文密码与存储的哈希。
 
         由于采用稳定的哈希方案（pbkdf2_sha512），本方法不涉及升级更新，仅校验返回布尔值。
@@ -81,11 +82,18 @@ class User(Document):
 
     def has_role(self, role) -> bool:  # pragma: no cover - 简单逻辑
         """判断用户是否具备某角色（支持字符串或Role对象）。"""
-        role_name = role if isinstance(role, str) else getattr(
-            role, 'name', None)
+        role_name = role if isinstance(role, str) else getattr(role, 'name', None)
         if not role_name:
             return False
         return any(r.name == role_name for r in self.roles)
+
+    def get_roles(self):
+        """Flask-Security-Too需要的角色获取方法"""
+        return self.roles
+
+    def has_permission(self, permission):
+        """Flask-Security-Too需要的权限检查方法"""
+        return False  # 暂时不实现权限系统
 
     # ---- Flask-Login 期望的属性/方法 ----
     @property

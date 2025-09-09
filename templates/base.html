@@ -20,6 +20,9 @@
       {% if current_user.roles | selectattr('name', 'equalto', 'gicho') | list | length > 0 %}
       <a class="navlink" href="{{ url_for('admin.users_list') }}">舰长管理</a>
       {% endif %}
+      {% if current_user.has_role('gicho') or current_user.has_role('kancho') %}
+      <a class="navlink" href="{{ url_for('pilot.list_pilots') }}">机师管理</a>
+      {% endif %}
       <a class="navlink" href="{{ url_for('main.change_password') }}">修改密码</a>
       <a class="navlink" href="{{ url_for_security('logout') }}">登出</a>
     </nav>

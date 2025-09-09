@@ -30,8 +30,44 @@
   - `username` 唯一索引
   - `fs_uniquifier` 唯一索引
 
+### pilots
+- 字段：
+  - `nickname` 昵称，唯一，最大20字符
+  - `real_name` 真实姓名，最大20字符
+  - `gender` 性别枚举（0=男，1=女，2=不明确）
+  - `birth_year` 出生年份
+  - `owner` 所属舰长/议长（关联到users集合）
+  - `platform` 战区枚举（快手/抖音/其他/未知）
+  - `work_mode` 参战形式枚举（线下/线上/未知）
+  - `rank` 阶级枚举（候补机师/训练机师/实习机师/正式机师）
+  - `status` 状态枚举（未征召/不征召/已征召/已签约/已阵亡）
+  - `created_at` 创建时间
+  - `updated_at` 最后修改时间
+- 索引：
+  - `nickname` 唯一索引
+  - `owner` 索引
+  - `rank` 索引
+  - `status` 索引
+  - `platform` 索引
+  - `created_at` 降序索引
+
+### pilot_change_logs
+- 字段：
+  - `pilot_id` 关联机师ID（关联到pilots集合）
+  - `user_id` 操作用户ID（关联到users集合）
+  - `field_name` 变更字段名
+  - `old_value` 变更前值
+  - `new_value` 变更后值
+  - `change_time` 变更时间
+  - `ip_address` 操作IP地址
+- 索引：
+  - `pilot_id + change_time` 复合索引（降序）
+  - `user_id` 索引
+  - `change_time` 索引
+
 ## 说明
 - 启动时自动创建缺失的角色（gicho/kancho）与默认议长
 - 使用Flask-Security-Too的MongoEngineUserDatastore
 - 支持会话跟踪和登录统计
+- 机师管理系统包含完整的CRUD操作和变更记录
 - 预计后续将为审计日志、登录日志、业务数据增加索引

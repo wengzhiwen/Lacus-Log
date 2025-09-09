@@ -8,6 +8,7 @@ from mongoengine import connect
 
 from routes.admin import admin_bp
 from routes.main import main_bp
+from routes.pilot import pilot_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
@@ -29,19 +30,13 @@ def create_app() -> Flask:
     # 初始化日志（最早进行，便于后续记录）
     init_logging()
 
-    flask_app = Flask(__name__,
-                      template_folder="templates",
-                      static_folder="static")
+    flask_app = Flask(__name__, template_folder="templates", static_folder="static")
 
     # 基础配置
-    flask_app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or os.getenv(
-        'FLASK_SECRET_KEY', 'dev-secret-key')
-    flask_app.config['SECURITY_PASSWORD_SALT'] = os.getenv(
-        'SECURITY_PASSWORD_SALT', 'dev-password-salt')
-    flask_app.config['SECURITY_REMEMBER_SALT'] = os.getenv(
-        'SECURITY_REMEMBER_SALT', 'dev-remember-salt')
-    flask_app.config['SECURITY_DEFAULT_REMEMBER_ME'] = os.getenv(
-        'SECURITY_DEFAULT_REMEMBER_ME', 'True') == 'True'
+    flask_app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
+    flask_app.config['SECURITY_PASSWORD_SALT'] = os.getenv('SECURITY_PASSWORD_SALT', 'dev-password-salt')
+    flask_app.config['SECURITY_REMEMBER_SALT'] = os.getenv('SECURITY_REMEMBER_SALT', 'dev-remember-salt')
+    flask_app.config['SECURITY_DEFAULT_REMEMBER_ME'] = os.getenv('SECURITY_DEFAULT_REMEMBER_ME', 'True') == 'True'
     # 会话时长
     lifetime = int(os.getenv('PERMANENT_SESSION_LIFETIME', '36000'))
     flask_app.permanent_session_lifetime = timedelta(seconds=lifetime)
@@ -58,6 +53,8 @@ def create_app() -> Flask:
         SECURITY_PASSWORD_HASH='pbkdf2_sha512',  # 避免对外部加密库的额外依赖
         WTF_CSRF_ENABLED=True,
         SECURITY_FLASH_MESSAGES=True,
+        # 角色相关配置
+        SECURITY_ROLES_ENABLED=True,  # 启用角色功能
         # 修改密码相关配置
         SECURITY_CHANGE_PASSWORD_TEMPLATE='security/change_password.html',
         SECURITY_POST_CHANGE_VIEW='/',  # 修改密码后重定向到首页
@@ -84,29 +81,24 @@ def create_app() -> Flask:
 
     # 初始化安全组件
     user_datastore = create_user_datastore()
-    init_security(flask_app, user_datastore)
+    security = init_security(flask_app, user_datastore)
 
     # 注册蓝图
     flask_app.register_blueprint(main_bp)
     flask_app.register_blueprint(admin_bp, url_prefix='/admin')
+    flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
 
     # 注册Jinja2过滤器
     @flask_app.template_filter('role_display_name')
     def role_display_name(role_name):
         """将角色英文代码转换为中文显示名称"""
-        role_mapping = {
-            'gicho': '议长',
-            'kancho': '舰长'
-        }
+        role_mapping = {'gicho': '议长', 'kancho': '舰长'}
         return role_mapping.get(role_name, role_name)
 
     @flask_app.template_filter('roles_display_names')
     def roles_display_names(roles):
         """将角色列表转换为中文显示名称列表"""
-        role_mapping = {
-            'gicho': '议长',
-            'kancho': '舰长'
-        }
+        role_mapping = {'gicho': '议长', 'kancho': '舰长'}
         if isinstance(roles, list):
             return [role_mapping.get(role.name if hasattr(role, 'name') else role, role.name if hasattr(role, 'name') else role) for role in roles]
         return [role_mapping.get(roles, roles)]

@@ -1,0 +1,456 @@
+{% extends 'base.html' %}
+{% block title %}机师详情 - {{ pilot.nickname }} - Lacus-Log{% endblock %}
+{% block content %}
+<section class="pilot-detail">
+  <div class="back-nav">
+    <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
+      <span>←</span>
+      返回机师列表
+    </a>
+  </div>
+
+  <div class="pilot-info-card">
+    <div class="card-header">
+      <div class="pilot-avatar">
+        <span class="avatar-icon">
+          {% if pilot.gender.value == 0 %}♂{% elif pilot.gender.value == 1 %}♀{% else %}?{% endif %}
+        </span>
+      </div>
+      <div class="pilot-main-info">
+        <div class="pilot-name">{{ pilot.nickname }}</div>
+        <div class="pilot-real-name">{{ pilot.real_name or '未填写姓名' }}</div>
+        <div class="pilot-badges">
+          <span class="rank-badge rank-{{ pilot.rank.value.replace(' ', '') }}">{{ pilot.rank.value }}</span>
+          <span class="status-badge status-{{ pilot.status.value.replace(' ', '') }}">{{ pilot.status.value }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 基础信息 -->
+    <div class="info-section">
+      <h3 class="section-title">基础信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">昵称</div>
+          <div class="info-value">{{ pilot.nickname }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">姓名</div>
+          <div class="info-value">{{ pilot.real_name or '未填写' }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">性别</div>
+          <div class="info-value">{{ pilot.gender_display }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">年龄</div>
+          <div class="info-value">
+            {% if pilot.age %}{{ pilot.age }}岁{% else %}未知{% endif %}
+            {% if pilot.birth_year %}({{ pilot.birth_year }}年){% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 业务信息 -->
+    <div class="info-section">
+      <h3 class="section-title">业务信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">所属</div>
+          <div class="info-value">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无' }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">战区</div>
+          <div class="info-value">{{ pilot.platform.value }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">参战形式</div>
+          <div class="info-value">{{ pilot.work_mode.value }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">阶级</div>
+          <div class="info-value rank-{{ pilot.rank.value.replace(' ', '') }}">{{ pilot.rank.value }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">状态</div>
+          <div class="info-value status-{{ pilot.status.value.replace(' ', '') }}">{{ pilot.status.value }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 系统信息 -->
+    <div class="info-section">
+      <h3 class="section-title">系统信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">创建时间</div>
+          <div class="info-value">{{ pilot.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">最后修改</div>
+          <div class="info-value">{{ pilot.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="action-section">
+    <h3 class="section-title">操作</h3>
+    <div class="action-buttons">
+      <a class="btn btn-primary" href="{{ url_for('pilot.edit_pilot', pilot_id=(pilot.id|string)) }}">
+        <span class="btn-icon">✏️</span>
+        编辑
+      </a>
+      <button class="btn btn-secondary" onclick="showChanges()">
+        <span class="btn-icon">📜</span>
+        变更记录
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- 变更记录模态框 -->
+<div id="changesModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>变更记录</h3>
+      <button class="modal-close" onclick="hideChanges()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="changesLoading" class="loading">加载中...</div>
+      <div id="changesList" style="display: none;"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* 机师详情页面样式 */
+.pilot-detail {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.pilot-info-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+}
+
+.pilot-info-card .card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--table-header);
+}
+
+.pilot-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--table-header);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.pilot-main-info {
+  flex: 1;
+}
+
+.pilot-main-info .pilot-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.pilot-main-info .pilot-real-name {
+  color: var(--muted);
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.pilot-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.rank-badge, .status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 阶级徽章样式 */
+.rank-候补机师 { background: var(--table-header); color: var(--muted); }
+.rank-训练机师 { background: #FFF3CD; color: #856404; }
+.rank-实习机师 { background: #D4EDDA; color: #155724; }
+.rank-正式机师 { background: var(--brand); color: #fff; }
+
+/* 状态徽章样式 */
+.status-未征召 { background: var(--table-header); color: var(--muted); }
+.status-不征召 { background: #F8D7DA; color: #721C24; }
+.status-已征召 { background: #FFF3CD; color: #856404; }
+.status-已签约 { background: #D1ECF1; color: #0C5460; }
+.status-已阵亡 { background: #F8D7DA; color: #721C24; }
+
+.info-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--brand);
+  border-bottom: 1px solid var(--table-header);
+  padding-bottom: 8px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.action-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 模态框样式 */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--table-header);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.loading {
+  text-align: center;
+  color: var(--muted);
+  padding: 20px;
+}
+
+.change-item {
+  background: var(--table-header);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.change-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.change-content {
+  font-size: 14px;
+}
+
+.change-field {
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.change-values {
+  margin-top: 4px;
+}
+
+.old-value, .new-value {
+  font-family: monospace;
+  background: #fff;
+  padding: 2px 4px;
+  border-radius: 3px;
+  margin: 0 2px;
+}
+
+.old-value {
+  text-decoration: line-through;
+  color: var(--error);
+}
+
+.new-value {
+  color: var(--hud-green);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .pilot-info-card .card-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .pilot-badges {
+    justify-content: center;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons .btn {
+    width: 100%;
+  }
+
+  .modal-content {
+    width: 95%;
+    margin: 0 10px;
+  }
+}
+</style>
+
+<script>
+async function showChanges() {
+  const modal = document.getElementById('changesModal');
+  const loading = document.getElementById('changesLoading');
+  const changesList = document.getElementById('changesList');
+  
+  modal.style.display = 'flex';
+  loading.style.display = 'block';
+  changesList.style.display = 'none';
+  changesList.innerHTML = '';
+  
+  try {
+    const response = await fetch('{{ url_for("pilot.pilot_changes", pilot_id=(pilot.id|string)) }}');
+    const data = await response.json();
+    
+    if (data.success) {
+      if (data.changes.length === 0) {
+        changesList.innerHTML = '<div class="empty-state"><div class="empty-title">暂无变更记录</div></div>';
+      } else {
+        const changesHtml = data.changes.map(change => `
+          <div class="change-item">
+            <div class="change-header">
+              <span>操作人：${change.user_name}</span>
+              <span>${change.change_time}</span>
+            </div>
+            <div class="change-content">
+              <span class="change-field">${change.field_name}</span>
+              <div class="change-values">
+                <span class="old-value">${change.old_value || '空'}</span>
+                →
+                <span class="new-value">${change.new_value || '空'}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+        changesList.innerHTML = changesHtml;
+      }
+    } else {
+      changesList.innerHTML = '<div class="empty-state"><div class="empty-title">加载失败</div></div>';
+    }
+  } catch (error) {
+    changesList.innerHTML = '<div class="empty-state"><div class="empty-title">加载失败</div></div>';
+  }
+  
+  loading.style.display = 'none';
+  changesList.style.display = 'block';
+}
+
+function hideChanges() {
+  const modal = document.getElementById('changesModal');
+  modal.style.display = 'none';
+}
+
+// 点击模态框外部关闭
+document.getElementById('changesModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    hideChanges();
+  }
+});
+</script>
+{% endblock %}

@@ -1,10 +1,10 @@
 """
 测试配置和工具函数
 """
+import logging
 import os
 import sys
 import tempfile
-import logging
 from typing import Generator
 
 # 添加项目根目录到 Python 路径
@@ -30,6 +30,9 @@ def test_config():
         'MONGODB_URI': 'mongodb://localhost:27017/test_lacus',
         'LOG_LEVEL': 'DEBUG',
         'PYMONGO_LOG_LEVEL': 'WARNING',
+        'SERVER_NAME': 'localhost:5000',
+        'APPLICATION_ROOT': '/',
+        'PREFERRED_URL_SCHEME': 'http',
     }
 
 
@@ -51,17 +54,17 @@ def app(test_config) -> Generator[Flask, None, None]:
         disconnect()
     except:
         pass
-    
+
     # 设置测试环境变量
     for key, value in test_config.items():
         os.environ[key] = str(value)
-    
+
     app = create_app()
     app.config.update(test_config)
-    
+
     with app.app_context():
         yield app
-    
+
     # 清理
     try:
         disconnect()
