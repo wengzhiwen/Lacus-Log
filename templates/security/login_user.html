@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}登录 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="auth">
+  <h1 class="title">登录</h1>
+  {# 显示由 Flask-Security 产生的通用提示（如凭据错误） #}
+  {% include 'security/_messages.html' %}
+  <form action="{{ url_for_security('login') }}" method="POST" name="login_user_form" class="form" novalidate>
+    {{ login_user_form.hidden_tag() }}
+
+    {% if login_user_form.identity is defined %}
+      <label>用户名</label>
+      {{ login_user_form.identity(class='input', placeholder='用户名', type='text', autocomplete='username', required=true) }}
+      {% for e in login_user_form.identity.errors %}
+        <div class="field-error">{{ e }}</div>
+      {% endfor %}
+    {% elif login_user_form.username is defined %}
+      <label>用户名</label>
+      {{ login_user_form.username(class='input', placeholder='用户名', type='text', autocomplete='username', required=true) }}
+      {% for e in login_user_form.username.errors %}
+        <div class="field-error">{{ e }}</div>
+      {% endfor %}
+    {% elif login_user_form.email is defined %}
+      <label>用户名</label>
+      {{ login_user_form.email(class='input', placeholder='用户名', type='text', autocomplete='username', required=true) }}
+      {% for e in login_user_form.email.errors %}
+        <div class="field-error">{{ e }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <label>密码</label>
+    {{ login_user_form.password(class='input', placeholder='密码', required=true, autocomplete='current-password') }}
+    {% for e in login_user_form.password.errors %}
+      <div class="field-error">{{ e }}</div>
+    {% endfor %}
+
+    <div class="form-check">
+      {{ login_user_form.remember }} 记住我
+    </div>
+    {{ login_user_form.next }}
+    <div class="form-actions">
+      <input class="btn btn-primary" type="submit" value="登录" />
+    </div>
+  </form>
+</section>
+{% endblock %}

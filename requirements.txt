@@ -6,3 +6,12 @@ psutil>=5.9.8
 pymongo>=4.0.0
 Flask-JWT-Extended>=4.0.0
 cachetools>=5.0.0
+Flask-Security-Too>=5.0.0
+mongoengine>=0.27.0
+Flask-WTF>=1.2.0
+bleach>=6.1.0
+
+# 测试依赖
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0

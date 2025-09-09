@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}用户详情 - {{ user.username }} - Lacus-Log{% endblock %}
+{% block content %}
+<section class="user-detail">
+  <!-- 返回按钮 -->
+  <div class="back-nav">
+    <a href="{{ url_for('admin.users_list') }}" class="btn btn-secondary">
+      ← 返回用户列表
+    </a>
+  </div>
+
+  <!-- 用户信息卡片 -->
+  <div class="user-info-card">
+    <div class="card-header">
+      <div class="user-avatar">
+        <div class="avatar-icon">👤</div>
+      </div>
+      <div class="user-main-info">
+        <h1 class="user-name">{{ user.username }}</h1>
+        <div class="user-nickname">{{ user.nickname or '未设置昵称' }}</div>
+        <div class="user-badges">
+          <span class="role-badge role-{{ (user.roles | map(attribute='name') | list) | first or 'unknown' }}">
+            {{ ((user.roles | map(attribute='name') | list) | first or 'unknown') | role_display_name }}
+          </span>
+          <span class="status-badge status-{{ 'active' if user.active else 'inactive' }}">
+            {{ '启用' if user.active else '停用' }}
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">用户名</div>
+          <div class="info-value">{{ user.username }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">昵称</div>
+          <div class="info-value">{{ user.nickname or '未设置' }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">角色</div>
+          <div class="info-value">{{ (user.roles | map(attribute='name') | list) | map('role_display_name') | join(', ') }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">状态</div>
+          <div class="info-value">
+            <span class="status-badge status-{{ 'active' if user.active else 'inactive' }}">
+              {{ '启用' if user.active else '停用' }}
+            </span>
+          </div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">创建时间</div>
+          <div class="info-value">{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '未知' }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">最后登录</div>
+          <div class="info-value">{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else '从未登录' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="action-section">
+    <h2 class="section-title">用户操作</h2>
+    <div class="action-buttons">
+      <form method="post" action="{{ url_for('admin.users_toggle_active', user_id=(user.id|string)) }}" class="action-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button class="btn btn-secondary" type="submit">
+          {{ '停用用户' if user.active else '启用用户' }}
+        </button>
+      </form>
+      
+      <form method="post" action="{{ url_for('admin.users_reset_password', user_id=(user.id|string)) }}" class="action-form" onsubmit="return confirm('确定重置密码为 123456？')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button class="btn btn-warning" type="submit">
+          重置密码
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 登录历史 -->
+  {% if user.last_login_at %}
+  <div class="login-history">
+    <h2 class="section-title">登录信息</h2>
+    <div class="history-card">
+      <div class="history-item">
+        <div class="history-label">最后登录时间</div>
+        <div class="history-value">{{ user.last_login_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+      </div>
+      {% if user.last_login_ip %}
+      <div class="history-item">
+        <div class="history-label">最后登录IP</div>
+        <div class="history-value">{{ user.last_login_ip }}</div>
+      </div>
+      {% endif %}
+      {% if user.login_count %}
+      <div class="history-item">
+        <div class="history-label">登录次数</div>
+        <div class="history-value">{{ user.login_count }} 次</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

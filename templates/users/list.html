@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}用户管理 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="user-management">
+  <!-- 页面头部 -->
+  <div class="page-header">
+    <h1 class="page-title">用户管理</h1>
+    <a class="btn btn-primary" href="{{ url_for('admin.users_new') }}">
+      <span class="btn-icon">+</span>
+      新增舰长
+    </a>
+  </div>
+
+  <!-- 筛选器 -->
+  <div class="filter-bar">
+    <form class="filter-form" method="get">
+      <div class="filter-group">
+        <label class="filter-label">角色筛选</label>
+        <select class="filter-select" name="role" onchange="this.form.submit()">
+          <option value="">全部用户</option>
+          <option value="gicho" {% if selected_role=='gicho' %}selected{% endif %}>议长</option>
+          <option value="kancho" {% if selected_role=='kancho' %}selected{% endif %}>舰长</option>
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <!-- 用户列表 -->
+  <div class="user-list">
+    {% if users %}
+      <!-- 用户卡片列表 -->
+      <div class="user-cards">
+        {% for u in users %}
+        <a href="{{ url_for('admin.users_detail', user_id=(u.id|string)) }}" class="user-card">
+          <div class="card-header">
+            <div class="user-info">
+              <div class="user-name">{{ u.username }}</div>
+              <div class="user-nickname">{{ u.nickname or '未设置昵称' }}</div>
+            </div>
+            <div class="user-badges">
+              <span class="role-badge role-{{ (u.roles | map(attribute='name') | list) | first or 'unknown' }}">
+                {{ ((u.roles | map(attribute='name') | list) | first or 'unknown') | role_display_name }}
+              </span>
+              <span class="status-badge status-{{ 'active' if u.active else 'inactive' }}">
+                {{ '启用' if u.active else '停用' }}
+              </span>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <div class="empty-title">暂无用户</div>
+        <div class="empty-description">点击上方"新增舰长"按钮创建第一个用户</div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

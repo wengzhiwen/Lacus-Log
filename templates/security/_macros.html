@@ -1,0 +1,14 @@
+{# Flask-Security-Too 宏模板 #}
+{% macro render_field_with_errors(field, class='') %}
+  <label>{{ field.label.text }}</label>
+  {{ field(class=class, **kwargs) }}
+  {% if field.errors %}
+    {% for error in field.errors %}
+      <div class="field-error">{{ error }}</div>
+    {% endfor %}
+  {% endif %}
+{% endmacro %}
+
+{% macro render_field(field, class='') %}
+  {{ field(class=class, **kwargs) }}
+{% endmacro %}

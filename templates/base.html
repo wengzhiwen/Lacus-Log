@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Lacus-Log{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Lacus-Log 拉克斯日志</div>
+    {% if current_user.is_authenticated %}
+    <button class="menu-toggle" id="menuToggle" aria-label="打开菜单">
+      <span class="hamburger"></span>
+      <span class="hamburger"></span>
+      <span class="hamburger"></span>
+    </button>
+    <nav class="topnav" id="topNav">
+      <a class="navlink" href="{{ url_for('main.home') }}">首页</a>
+      {% if current_user.roles | selectattr('name', 'equalto', 'gicho') | list | length > 0 %}
+      <a class="navlink" href="{{ url_for('admin.users_list') }}">舰长管理</a>
+      {% endif %}
+      <a class="navlink" href="{{ url_for('main.change_password') }}">修改密码</a>
+      <a class="navlink" href="{{ url_for_security('logout') }}">登出</a>
+    </nav>
+    {% endif %}
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <ul class="flash">
+      {% for category, message in messages %}
+      <li class="{{ category }}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    // 移动端菜单切换
+    document.addEventListener('DOMContentLoaded', function() {
+      const menuToggle = document.getElementById('menuToggle');
+      const topNav = document.getElementById('topNav');
+      
+      if (menuToggle && topNav) {
+        menuToggle.addEventListener('click', function() {
+          topNav.classList.toggle('active');
+          menuToggle.classList.toggle('active');
+        });
+        
+        // 点击菜单外部关闭菜单
+        document.addEventListener('click', function(event) {
+          if (!menuToggle.contains(event.target) && !topNav.contains(event.target)) {
+            topNav.classList.remove('active');
+            menuToggle.classList.remove('active');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
