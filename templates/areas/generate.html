@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}批量生成战斗区域 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="area-generate">
+  <div class="page-header"><h1 class="page-title">批量生成战斗区域</h1></div>
+
+  <div class="info-card">
+    <div class="row"><span class="label">源 X</span><span class="value">{{ src.x_coord }}</span></div>
+    <div class="row"><span class="label">源 Y</span><span class="value">{{ src.y_coord }}</span></div>
+  </div>
+
+  <form method="post" class="form-card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group">
+      <label>Z坐标开始</label>
+      <input type="number" name="z_start" required>
+    </div>
+    <div class="form-group">
+      <label>Z坐标结束</label>
+      <input type="number" name="z_end" required>
+    </div>
+
+    <div class="footbar">
+      <div class="inner">
+        <button class="btn btn-primary" type="submit">生成</button>
+        <a class="btn" href="{{ url_for('battle_area.area_detail', area_id=src.id) }}">返回</a>
+      </div>
+    </div>
+  </form>
+
+  {% if duplicates %}
+  <div class="info-card" style="margin-top:12px;">
+    <strong>以下项目已存在，未生成：</strong>
+    <ul>
+      {% for d in duplicates %}
+      <li>{{ d.x }} - {{ d.y }} - {{ d.z }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+
+<style>
+.info-card, .form-card { background: #fff; border: 1px solid var(--table-header); border-radius: 8px; padding: 14px; }
+.info-card .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--table-header); }
+.info-card .row:last-child { border-bottom: none; }
+.info-card .label { color: var(--muted); font-size: 12px; }
+.info-card .value { color: var(--text); font-size: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.form-group label { font-size: 12px; color: var(--muted); }
+.form-group input { padding: 10px; border: 1px solid var(--table-header); border-radius: 6px; }
+.footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
+.footbar .inner { display: flex; gap: 12px; justify-content: center; }
+.container { padding-bottom: 88px; }
+</style>
+{% endblock %}

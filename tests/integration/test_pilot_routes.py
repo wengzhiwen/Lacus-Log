@@ -1,13 +1,11 @@
 """
 机师路由集成测试
 """
-import json
-
 # pylint: disable=import-error,no-member
 import pytest
 from mongoengine import connect, disconnect
 
-from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank, Status, WorkMode)
+from models.pilot import (Pilot, PilotChangeLog)
 from models.user import Role, User
 
 
@@ -74,7 +72,7 @@ class TestPilotRoutes:
             print(f"User roles: {[r.name for r in gicho_user.roles]}")
             print(f"User has_role('gicho'): {gicho_user.has_role('gicho')}")
             print(f"User has_role('kancho'): {gicho_user.has_role('kancho')}")
-            
+
             # 议长可以访问 - 直接设置会话
             with client.session_transaction() as sess:
                 sess['_user_id'] = users["gicho"].fs_uniquifier
@@ -82,7 +80,7 @@ class TestPilotRoutes:
 
             response = client.get('/pilots/')
             print(f"Pilots response status: {response.status_code}")
-            
+
             # 暂时接受403状态码，因为Flask-Security-Too的角色验证有问题
             # TODO: 修复Flask-Security-Too的角色验证机制
             assert response.status_code in [200, 403]  # 接受两种状态码

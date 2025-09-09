@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}生成结果 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="area-generate-result">
+  <div class="page-header"><h1 class="page-title">生成结果</h1></div>
+
+  <div class="info-card">
+    <div class="row"><span class="label">源 X</span><span class="value">{{ src.x_coord }}</span></div>
+    <div class="row"><span class="label">源 Y</span><span class="value">{{ src.y_coord }}</span></div>
+    <div class="row"><span class="label">生成数量</span><span class="value">{{ created|length }}</span></div>
+  </div>
+
+  <ul class="result-list">
+    {% for a in created %}
+    <li class="result-item">{{ a.x_coord }} - {{ a.y_coord }} - {{ a.z_coord }}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<div class="footbar">
+  <div class="inner">
+    <a class="btn btn-primary" href="{{ url_for('battle_area.list_areas') }}">确认</a>
+  </div>
+</div>
+
+<style>
+.info-card { background: #fff; border: 1px solid var(--table-header); border-radius: 8px; padding: 14px; }
+.info-card .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--table-header); }
+.info-card .row:last-child { border-bottom: none; }
+.result-list { margin-top: 12px; background: #fff; border: 1px solid var(--table-header); border-radius: 8px; padding: 12px; }
+.result-item { padding: 8px 0; border-bottom: 1px solid var(--table-header); }
+.result-item:last-child { border-bottom: none; }
+.footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
+.footbar .inner { display: flex; justify-content: center; }
+.container { padding-bottom: 88px; }
+</style>
+{% endblock %}

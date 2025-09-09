@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}新建战斗区域 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="area-form">
+  <div class="page-header"><h1 class="page-title">新建战斗区域</h1></div>
+  <form id="area-create-form" method="post" class="form-card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group">
+      <label>X坐标</label>
+      <input type="text" name="x_coord" value="{{ (form and form.get('x_coord')) or '' }}" required>
+    </div>
+    <div class="form-group">
+      <label>Y坐标</label>
+      <input type="text" name="y_coord" value="{{ (form and form.get('y_coord')) or '' }}" required>
+    </div>
+    <div class="form-group">
+      <label>Z坐标</label>
+      <input type="text" name="z_coord" value="{{ (form and form.get('z_coord')) or '' }}" required>
+    </div>
+    <div class="form-group">
+      <label>可用性</label>
+      <select name="availability">
+        <option value="可用" {% if form and form.get('availability')=='可用' %}selected{% endif %}>可用</option>
+        <option value="禁用" {% if form and form.get('availability')=='禁用' %}selected{% endif %}>禁用</option>
+      </select>
+    </div>
+  </form>
+</section>
+
+<div class="footbar">
+  <div class="inner">
+    <button class="btn btn-primary" type="submit" form="area-create-form">创建</button>
+    <a class="btn" href="{{ url_for('battle_area.list_areas') }}">返回列表</a>
+  </div>
+</div>
+
+<style>
+.form-card { background: #fff; border: 1px solid var(--table-header); border-radius: 8px; padding: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.form-group label { font-size: 12px; color: var(--muted); }
+.form-group input, .form-group select { padding: 10px; border: 1px solid var(--table-header); border-radius: 6px; }
+.footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
+.footbar .inner { display: flex; gap: 12px; justify-content: center; }
+.container { padding-bottom: 88px; }
+</style>
+{% endblock %}

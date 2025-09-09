@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}战斗区域详情 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="area-detail">
+  <div class="page-header"><h1 class="page-title">战斗区域详情</h1></div>
+
+  <div class="area-card-detail">
+    <div class="row"><span class="label">X坐标</span><span class="value">{{ area.x_coord }}</span></div>
+    <div class="row"><span class="label">Y坐标</span><span class="value">{{ area.y_coord }}</span></div>
+    <div class="row"><span class="label">Z坐标</span><span class="value">{{ area.z_coord }}</span></div>
+    <div class="row"><span class="label">可用性</span><span class="value">{{ area.availability.value }}</span></div>
+    <div class="row"><span class="label">创建时间</span><span class="value">{{ area.created_at }}</span></div>
+    <div class="row"><span class="label">更新时间</span><span class="value">{{ area.updated_at }}</span></div>
+  </div>
+</section>
+
+<div class="footbar">
+  <div class="inner">
+    <a class="btn" href="{{ url_for('battle_area.edit_area', area_id=area.id) }}">编辑</a>
+    <a class="btn btn-primary" href="{{ url_for('battle_area.generate_areas', area_id=area.id) }}">生成更多</a>
+  </div>
+</div>
+
+<style>
+.area-card-detail { background: #fff; border: 1px solid var(--table-header); border-radius: 8px; padding: 14px; }
+.area-card-detail .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--table-header); }
+.area-card-detail .row:last-child { border-bottom: none; }
+.area-card-detail .label { color: var(--muted); font-size: 12px; }
+.area-card-detail .value { color: var(--text); font-size: 14px; }
+
+.footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
+.footbar .inner { display: flex; gap: 12px; justify-content: center; }
+.container { padding-bottom: 88px; }
+</style>
+{% endblock %}

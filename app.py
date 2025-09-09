@@ -7,6 +7,7 @@ from flask_wtf import CSRFProtect
 from mongoengine import connect
 
 from routes.admin import admin_bp
+from routes.battle_area import battle_area_bp
 from routes.main import main_bp
 from routes.pilot import pilot_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
@@ -81,12 +82,13 @@ def create_app() -> Flask:
 
     # 初始化安全组件
     user_datastore = create_user_datastore()
-    security = init_security(flask_app, user_datastore)
+    _security = init_security(flask_app, user_datastore)
 
     # 注册蓝图
     flask_app.register_blueprint(main_bp)
     flask_app.register_blueprint(admin_bp, url_prefix='/admin')
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
+    flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')
 
     # 注册Jinja2过滤器
     @flask_app.template_filter('role_display_name')
