@@ -1,5 +1,7 @@
 # pylint: disable=no-member
+import calendar
 import json
+from datetime import datetime, timedelta
 
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
                    request, url_for)
@@ -889,12 +891,9 @@ def get_pilot_filters():
         owner_choices = sorted(list(owners), key=lambda x: x[1])
         owner_options = [{'id': owner_id, 'name': owner_name} for owner_id, owner_name in owner_choices]
 
-        # 阶级选项（按枚举顺序）
-        ranks = set()
-        for pilot in pilots:
-            ranks.add(pilot.rank.value)
-
-        rank_options = list(ranks)
+        # 阶级选项（显示所有阶级枚举，按枚举顺序）
+        from models.pilot import Rank
+        rank_options = [rank.value for rank in Rank]
 
         return jsonify({'success': True, 'owners': owner_options, 'ranks': rank_options})
     except Exception as e:
@@ -936,3 +935,172 @@ def get_pilots_filtered():
     except Exception as e:
         logger.error('获取筛选机师失败：%s', str(e))
         return jsonify({'success': False, 'error': '获取筛选机师失败'}), 500
+
+
+# 导出功能路由
+@announcement_bp.route('/export', methods=['GET', 'POST'])
+@roles_accepted('gicho', 'kancho')
+def export_page():
+    """通告导出页面"""
+    if request.method == 'POST':
+        try:
+            # 获取表单参数
+            pilot_id = request.form.get('pilot_id')
+            year = request.form.get('year', type=int)
+            month = request.form.get('month', type=int)
+
+            # 验证参数
+            if not pilot_id:
+                flash('请选择机师', 'error')
+                return render_template('announcements/export.html')
+
+            if not year or not month:
+                flash('请选择年月', 'error')
+                return render_template('announcements/export.html')
+
+            # 获取机师信息
+            try:
+                pilot = Pilot.objects.get(id=pilot_id)
+            except DoesNotExist:
+                flash('机师不存在', 'error')
+                return render_template('announcements/export.html')
+
+            # 生成导出表格数据
+            table_data, venue_info = generate_export_table(pilot, year, month)
+
+            return render_template('announcements/export_table.html', pilot=pilot, year=year, month=month, table_data=table_data, venue_info=venue_info)
+
+        except Exception as e:
+            logger.error('生成导出表格失败：%s', str(e))
+            flash(f'生成失败：{str(e)}', 'error')
+            return render_template('announcements/export.html')
+
+    return render_template('announcements/export.html')
+
+
+def get_pilot_choices():
+    """获取机师选择列表（用于导出页面）"""
+    pilots = Pilot.objects(status__in=['已征召', '已签约']).order_by('owner', 'rank', 'nickname')
+
+    # 按所属分组
+    owner_groups = {}
+    no_owner_pilots = []
+
+    for pilot in pilots:
+        if pilot.owner:
+            owner_key = pilot.owner.nickname or pilot.owner.username
+            if owner_key not in owner_groups:
+                owner_groups[owner_key] = []
+            owner_groups[owner_key].append(pilot)
+        else:
+            no_owner_pilots.append(pilot)
+
+    choices = []
+
+    # 添加有所属的机师（按所属排序）
+    for owner_name in sorted(owner_groups.keys()):
+        pilots_in_group = owner_groups[owner_name]
+        # 按阶级、昵称排序
+        pilots_in_group.sort(key=lambda p: (p.rank.value, p.nickname))
+        for pilot in pilots_in_group:
+            choices.append({'id': str(pilot.id), 'nickname': pilot.nickname, 'real_name': pilot.real_name or '', 'owner': owner_name, 'rank': pilot.rank.value})
+
+    # 添加无所属的机师
+    if no_owner_pilots:
+        no_owner_pilots.sort(key=lambda p: (p.rank.value, p.nickname))
+        for pilot in no_owner_pilots:
+            choices.append({'id': str(pilot.id), 'nickname': pilot.nickname, 'real_name': pilot.real_name or '', 'owner': '无所属', 'rank': pilot.rank.value})
+
+    return choices
+
+
+def get_monthly_announcements(pilot_id, year, month):
+    """获取指定机师在指定月份的通告数据"""
+    # 计算月份的开始和结束时间（UTC）
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+
+    # 转换为UTC时间进行查询
+    start_utc = local_to_utc(start_date)
+    end_utc = local_to_utc(end_date)
+
+    # 查询通告
+    announcements = Announcement.objects(pilot=pilot_id, start_time__gte=start_utc, start_time__lt=end_utc).order_by('start_time')
+
+    return list(announcements)
+
+
+def generate_export_table(pilot, year, month):
+    """生成导出表格数据"""
+    # 获取该月的通告数据
+    announcements = get_monthly_announcements(pilot.id, year, month)
+
+    # 收集场地信息（X坐标）
+    venue_coords = set()
+
+    # 创建按日期索引的通告字典
+    announcements_by_date = {}
+    for announcement in announcements:
+        # 收集场地坐标
+        if announcement.x_coord:
+            venue_coords.add(announcement.x_coord)
+
+        # 转换为本地时间获取日期
+        local_time = utc_to_local(announcement.start_time)
+        date_key = local_time.date()
+        if date_key not in announcements_by_date:
+            announcements_by_date[date_key] = []
+        announcements_by_date[date_key].append(announcement)
+
+    # 生成场地信息字符串
+    venue_info = ', '.join(sorted(venue_coords)) if venue_coords else None
+
+    # 生成完整月份的表格数据
+    table_data = []
+    days_in_month = calendar.monthrange(year, month)[1]
+
+    for day in range(1, days_in_month + 1):
+        date_obj = datetime(year, month, day).date()
+        weekday_names = ['一', '二', '三', '四', '五', '六', '日']
+        weekday = weekday_names[date_obj.weekday()]
+
+        # 格式化日期为 mm/dd 格式
+        date_str = f"{month:02d}/{day:02d} 星期{weekday}"
+
+        # 获取当天的通告
+        day_announcements = announcements_by_date.get(date_obj, [])
+
+        if day_announcements:
+            # 合并当天的多个通告
+            start_times = []
+            durations = []
+            equipments = []
+
+            for ann in day_announcements:
+                local_start = utc_to_local(ann.start_time)
+                start_times.append(local_start.strftime('%H:%M'))
+                durations.append(f"{ann.duration_hours}小时")
+
+                # Y-Z坐标组合作为设备
+                equipment = f"{ann.y_coord}-{ann.z_coord}"
+                if equipment not in equipments:
+                    equipments.append(equipment)
+
+            # 组装表格行数据
+            row_data = {
+                'date': date_str,
+                'time': ', '.join(start_times),  # 通告时间
+                'equipment': ', '.join(equipments),  # 设备（Y-Z坐标）
+                'duration': ', '.join(durations),  # 通告时长
+                'work_content': '弹幕游戏直播'  # 固定工作内容
+            }
+        else:
+            # 空行
+            row_data = {'date': date_str, 'time': '', 'equipment': '', 'duration': '', 'work_content': ''}
+
+        table_data.append(row_data)
+
+    return table_data, venue_info

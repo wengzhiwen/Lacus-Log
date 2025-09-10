@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% block title %}机师-作战计划导出 - Lacus-Log{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
+            <span class="separator">></span>
+            <span>作战计划导出</span>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <form method="POST" id="exportForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            
+            <!-- 机师选择 -->
+            <div class="form-section">
+                <h3>机师选择</h3>
+                
+                <!-- 机师筛选器 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="owner_filter">所属筛选：</label>
+                        <select id="owner_filter">
+                            <option value="">全部所属</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rank_filter">阶级筛选：</label>
+                        <select id="rank_filter">
+                            <option value="">全部阶级</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pilot_id" class="required">机师：</label>
+                        <select name="pilot_id" id="pilot_id" required>
+                            <option value="">请选择机师</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 时间选择 -->
+            <div class="form-section">
+                <h3>时间选择</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="year" class="required">年份：</label>
+                        <select name="year" id="year" required>
+                            <!-- 年份选项会通过JavaScript设置 -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="month" class="required">月份：</label>
+                        <select name="month" id="month" required>
+                            <!-- 月份选项会通过JavaScript设置 -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 表单操作 -->
+            <div class="form-actions">
+                <div class="button-row">
+                    <button type="submit" class="btn btn-primary">生成通告预定表</button>
+                    <a href="{{ url_for('announcement.list_announcements') }}" class="btn btn-outline">取消</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #666;
+}
+
+.breadcrumb a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.separator {
+    color: #ccc;
+}
+
+.form-container {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-section {
+    margin-bottom: 40px;
+}
+
+.form-section:last-of-type {
+    margin-bottom: 30px;
+}
+
+.form-section h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 8px;
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-row:last-child {
+    margin-bottom: 0;
+}
+
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-group label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-group input,
+.form-group select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.form-group input:disabled,
+.form-group select:disabled {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+.form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+    padding-top: 30px;
+    border-top: 1px solid #eee;
+}
+
+.button-row {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #6c757d;
+    border: 1px solid #6c757d;
+}
+
+.btn-outline:hover {
+    background: #6c757d;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ownerSelect = document.getElementById('owner_filter');
+    const rankSelect = document.getElementById('rank_filter');
+    const pilotSelect = document.getElementById('pilot_id');
+    const yearSelect = document.getElementById('year');
+    const monthSelect = document.getElementById('month');
+    
+    // 设置年月选项
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    // 填充年份选项
+    for (let year = currentYear - 1; year <= currentYear + 1; year++) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year + '年';
+        if (year === currentYear) option.selected = true;
+        yearSelect.appendChild(option);
+    }
+    
+    // 填充月份选项
+    for (let month = 1; month <= 12; month++) {
+        const option = document.createElement('option');
+        option.value = month;
+        option.textContent = month + '月';
+        if (month === currentMonth) option.selected = true;
+        monthSelect.appendChild(option);
+    }
+    
+    // 机师筛选功能（复用作战计划页面的逻辑）
+    function loadPilotFilters(callback) {
+        // 加载所属和阶级选项
+        fetch('/announcements/api/pilot-filters')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 填充所属选项
+                    data.owners.forEach(owner => {
+                        const option = document.createElement('option');
+                        option.value = owner.id;
+                        option.textContent = owner.name;
+                        ownerSelect.appendChild(option);
+                    });
+                    
+                    // 填充阶级选项
+                    data.ranks.forEach(rank => {
+                        const option = document.createElement('option');
+                        option.value = rank;
+                        option.textContent = rank;
+                        rankSelect.appendChild(option);
+                    });
+                    
+                    // 加载所有机师（默认显示所有已征召/已签约的机师）
+                    loadPilots('', '', callback);
+                }
+            })
+            .catch(error => console.error('Error loading filters:', error));
+    }
+
+    function loadPilots(ownerId = '', rank = '', callback) {
+        const pilotSelect = document.getElementById('pilot_id');
+        pilotSelect.innerHTML = '<option value="">请选择机师</option>';
+        
+        let url = '/announcements/api/pilots-filtered?';
+        if (ownerId) url += `owner=${ownerId}&`;
+        if (rank) url += `rank=${rank}&`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    data.pilots.forEach(pilot => {
+                        const option = document.createElement('option');
+                        option.value = pilot.id;
+                        option.textContent = `${pilot.nickname}[${pilot.real_name || ''}] - ${pilot.owner || '无所属'}`;
+                        pilotSelect.appendChild(option);
+                    });
+                    
+                    // 如果有回调函数，执行它
+                    if (callback) {
+                        callback();
+                    }
+                }
+            })
+            .catch(error => console.error('Error loading pilots:', error));
+    }
+
+    // 筛选器事件监听
+    ownerSelect.addEventListener('change', function() {
+        const ownerId = this.value;
+        const rank = rankSelect.value;
+        loadPilots(ownerId, rank);
+    });
+
+    rankSelect.addEventListener('change', function() {
+        const rank = this.value;
+        const ownerId = ownerSelect.value;
+        loadPilots(ownerId, rank);
+    });
+    
+    // 初始化时加载筛选器和机师列表
+    loadPilotFilters();
+});
+</script>
+{% endblock %}

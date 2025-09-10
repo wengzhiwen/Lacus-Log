@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% block title %}{{ pilot.nickname }} 通告预定表（{{ month }}月） - Lacus-Log{% endblock %}
+
+{% block content %}
+<div class="export-table-container">
+  <div class="table-header">
+    <h1 class="table-title">{{ pilot.nickname }} 通告预定表（{{ month }}月）</h1>
+    <div class="pilot-info">
+      <div class="info-row">
+        <span class="label">艺名：</span>
+        <span class="value">{{ pilot.nickname }}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">姓名：</span>
+        <span class="value">{{ pilot.real_name or '' }}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">运营：</span>
+        <span class="value">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无所属' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场地信息 -->
+  {% if venue_info %}
+  <div class="venue-info">
+    <div class="venue-row">
+      <span class="venue-label">场地：</span>
+      <span class="venue-value">{{ venue_info }}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="schedule-table-wrapper">
+    <table class="schedule-table">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>通告时间</th>
+          <th>设备</th>
+          <th>通告时长</th>
+          <th>工作内容</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table_data %}
+        <tr {% if row.time %}class="has-announcement"{% else %}class="empty-day"{% endif %}>
+          <td class="date-cell">{{ row.date }}</td>
+          <td class="time-cell">{{ row.time }}</td>
+          <td class="equipment-cell">{{ row.equipment }}</td>
+          <td class="duration-cell">{{ row.duration }}</td>
+          <td class="content-cell">{{ row.work_content }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="notice-section">
+    <h3 class="notice-title">开播注意事项</h3>
+    <ol class="notice-list">
+      <li>
+        <strong>提前到达：</strong>请每日合理提前到达通告指定场地，通告开始时间为正式工作的开始时间。
+      </li>
+      <li>
+        <strong>签到沟通：</strong>到达通告场地后请先到值班运营处签到，与运营沟通本次通告的计划与准备情况，以及非通告期间个人社交账号的维护情况。
+      </li>
+      <li>
+        <strong>完成确认：</strong>通告规定任务结束后请到值班运营处确认通告完成情况后再离开通告场地。
+      </li>
+    </ol>
+  </div>
+
+  <div class="action-buttons no-print">
+    <button onclick="window.print()" class="btn btn-primary">打印表格</button>
+    <a href="{{ url_for('announcement.export_page') }}" class="btn btn-secondary">返回导出页面</a>
+  </div>
+</div>
+
+<style>
+/* 屏幕显示样式 */
+.export-table-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.table-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.table-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.pilot-info {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+}
+
+.info-row .label {
+  font-weight: bold;
+  color: #555;
+  margin-right: 5px;
+}
+
+.info-row .value {
+  color: #333;
+}
+
+.venue-info {
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+}
+
+.venue-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.venue-label {
+  font-weight: bold;
+  color: #555;
+  margin-right: 10px;
+}
+
+.venue-value {
+  color: #333;
+  font-size: 16px;
+}
+
+.schedule-table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 30px;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2px solid #333;
+  font-size: 14px;
+}
+
+.schedule-table th,
+.schedule-table td {
+  border: 1px solid #333;
+  padding: 8px 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.schedule-table th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.schedule-table .date-cell {
+  width: 25%;
+  font-weight: bold;
+}
+
+.schedule-table .time-cell {
+  width: 20%;
+}
+
+.schedule-table .equipment-cell {
+  width: 20%;
+}
+
+.schedule-table .duration-cell {
+  width: 15%;
+}
+
+.schedule-table .content-cell {
+  width: 20%;
+}
+
+.has-announcement {
+  background-color: #fff;
+}
+
+.empty-day {
+  background-color: #f9f9f9;
+}
+
+.empty-day td {
+  color: #999;
+}
+
+.notice-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+}
+
+.notice-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.notice-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.notice-list li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.action-buttons {
+  text-align: center;
+  gap: 15px;
+  display: flex;
+  justify-content: center;
+}
+
+.action-buttons .btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  text-decoration: none;
+  display: inline-block;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+/* 打印样式 */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  /* 隐藏页面基础元素 */
+  header.topbar {
+    display: none !important;
+  }
+  
+  .container {
+    padding-bottom: 0 !important;
+  }
+  
+  .export-table-container {
+    max-width: none;
+    padding: 0;
+    font-size: 10px;
+  }
+  
+  .table-header {
+    margin-bottom: 8px;
+  }
+  
+  .table-title {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  
+  .pilot-info {
+    margin-bottom: 8px;
+    gap: 15px;
+    flex-wrap: nowrap;
+  }
+  
+  .info-row {
+    font-size: 10px;
+  }
+  
+  .venue-info {
+    margin-bottom: 8px;
+    padding: 5px;
+    font-size: 10px;
+  }
+  
+  .venue-value {
+    font-size: 12px;
+  }
+  
+  .schedule-table-wrapper {
+    margin-bottom: 10px;
+  }
+  
+  .schedule-table {
+    font-size: 9px;
+    border: 1.5px solid #000;
+  }
+  
+  .schedule-table th,
+  .schedule-table td {
+    border: 1px solid #000;
+    padding: 2px 1px;
+    line-height: 1.2;
+  }
+  
+  .schedule-table th {
+    background-color: #e0e0e0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 9px;
+  }
+  
+  .notice-section {
+    margin-bottom: 0;
+    padding: 8px;
+    background-color: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    break-inside: avoid;
+  }
+  
+  .notice-title {
+    font-size: 11px;
+    margin-bottom: 5px;
+  }
+  
+  .notice-list {
+    padding-left: 12px;
+  }
+  
+  .notice-list li {
+    margin-bottom: 3px;
+    line-height: 1.2;
+    font-size: 8px;
+  }
+  
+  /* 避免表格跨页断裂 */
+  .schedule-table {
+    page-break-inside: avoid;
+  }
+  
+  .schedule-table tr {
+    break-inside: avoid;
+  }
+  
+  /* 确保内容在一页内 */
+  .export-table-container {
+    height: auto;
+    max-height: 95vh;
+  }
+}
+
+/* 移动设备样式 */
+@media (max-width: 768px) {
+  .pilot-info {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .schedule-table {
+    font-size: 12px;
+  }
+  
+  .schedule-table th,
+  .schedule-table td {
+    padding: 6px 4px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .action-buttons .btn {
+    width: 100%;
+    max-width: 200px;
+  }
+}
+</style>
+{% endblock %}
