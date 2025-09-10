@@ -144,12 +144,12 @@ def run_dev() -> None:
     """开发环境启动入口。
 
     仅用于本地调试，不用于生产环境。
-    读取 `FLASK_APP_PORT` 作为端口，默认 5080。
     """
     port = int(os.getenv('FLASK_APP_PORT', '5080'))
-    # 使用 127.0.0.1 防止非本机访问
+    is_debug = os.getenv('LOG_LEVEL', 'DEBUG') == 'DEBUG'
+
     app.logger.info('以开发模式启动，端口：%s', port)
-    app.run(host='127.0.0.1', port=port, debug=True, use_reloader=True)
+    app.run(host='0.0.0.0', port=port, debug=is_debug, use_reloader=True)
 
 
 if __name__ == '__main__':
