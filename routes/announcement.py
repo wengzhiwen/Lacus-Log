@@ -424,8 +424,22 @@ def edit_announcement(announcement_id):
                 # 获取表单数据
                 pilot_id = request.form.get('pilot')
                 battle_area_id = request.form.get('battle_area')
-                start_time_str = request.form.get('start_time')
                 duration_hours = request.form.get('duration_hours', type=float)
+
+                # 根据编辑范围处理时间输入
+                if edit_scope == 'future_all':
+                    # 编辑未来所有循环：分别获取日期、小时和分钟
+                    start_date_str = request.form.get('start_date')
+                    start_hour = request.form.get('start_hour')
+                    start_minute = request.form.get('start_minute')
+                    if not start_date_str or not start_hour or not start_minute:
+                        flash('请填写所有必填项', 'error')
+                        return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
+                    # 组合成完整的日期时间字符串
+                    start_time_str = f"{start_date_str}T{start_hour}:{start_minute}"
+                else:
+                    # 编辑单次通告：直接获取日期时间
+                    start_time_str = request.form.get('start_time')
 
                 # Debug日志：记录接收到的表单数据
                 logger.debug('编辑通告表单数据 - pilot_id: %s, battle_area_id: %s, start_time: %s, duration_hours: %s', pilot_id, battle_area_id, start_time_str,
@@ -459,6 +473,12 @@ def edit_announcement(announcement_id):
                     # 编辑未来所有循环：先分割循环组，然后更新所有未来通告
                     future_announcements = announcement.split_recurrence_group_from_current()
 
+                    # 解析新的时间（只取时间部分）
+                    parsed_start_time = parse_local_datetime(start_time_str)
+                    if parsed_start_time is None:
+                        flash('时间格式错误', 'error')
+                        return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
+
                     # 更新所有未来通告的数据
                     for ann in future_announcements:
                         ann.pilot = pilot
@@ -468,12 +488,14 @@ def edit_announcement(announcement_id):
                         ann.z_coord = battle_area.z_coord
                         ann.duration_hours = duration_hours
 
-                        # 对非首个通告，计算相对于首个通告的时间差
+                        # 编辑未来所有循环时，只更新时间部分，保持日期不变
                         if ann.id != announcement.id:
-                            time_diff = ann.start_time - announcement.start_time
-                            ann.start_time = start_time + time_diff
+                            # 对于非首个通告，保持原日期，只更新时间部分
+                            new_time = parsed_start_time.time()
+                            ann.start_time = ann.start_time.replace(hour=new_time.hour, minute=new_time.minute, second=new_time.second)
                         else:
-                            ann.start_time = start_time
+                            # 对于首个通告，使用新的完整时间
+                            ann.start_time = parsed_start_time
 
                     # 检查所有未来通告的冲突
                     all_conflicts = []
@@ -593,6 +615,7 @@ def check_conflicts():
         start_time_str = data.get('start_time')
         duration_hours = data.get('duration_hours')
         exclude_id = data.get('exclude_id')  # 编辑时排除自身
+        edit_scope = data.get('edit_scope', 'this_only')  # 编辑范围：this_only 或 future_all
 
         # 重复规则参数
         recurrence_type = data.get('recurrence_type', 'NONE')
@@ -639,26 +662,89 @@ def check_conflicts():
         if exclude_id:
             temp_announcement.id = exclude_id
 
-        # 如果有重复规则，生成所有实例
-        if recurrence_type != 'NONE':
-            instances = Announcement.generate_recurrence_instances(temp_announcement)
+        # 根据编辑范围确定要检查的实例
+        instances = []
+        planned_instances = []
+
+        if edit_scope == 'future_all' and exclude_id:
+            # 编辑未来所有循环：获取原通告并生成所有未来通告实例
+            try:
+                original_announcement = Announcement.objects.get(id=exclude_id)
+                if original_announcement.is_in_recurrence_group:
+                    # 获取所有未来通告
+                    future_announcements = original_announcement.get_future_announcements_in_group(include_self=True)
+
+                    # 为每个未来通告创建更新后的实例
+                    for ann in future_announcements:
+                        # 创建更新后的实例
+                        updated_instance = Announcement(
+                            pilot=pilot,
+                            battle_area=battle_area,
+                            start_time=ann.start_time,  # 保持原时间
+                            duration_hours=duration_hours,
+                            x_coord=battle_area.x_coord,
+                            y_coord=battle_area.y_coord,
+                            z_coord=battle_area.z_coord)
+
+                        # 更新时间
+                        parsed_start_time = parse_local_datetime(start_time_str)
+                        if parsed_start_time:
+                            if ann.id != original_announcement.id:
+                                # 对于非首个通告，只更新时间部分，保持日期不变
+                                new_time = parsed_start_time.time()
+                                updated_instance.start_time = ann.start_time.replace(hour=new_time.hour, minute=new_time.minute, second=new_time.second)
+                            else:
+                                # 对于首个通告，使用新的完整时间
+                                updated_instance.start_time = parsed_start_time
+
+                        instances.append(updated_instance)
+
+                        # 记录计划信息
+                        planned_instances.append({
+                            'pilot_name': updated_instance.pilot.nickname,
+                            'start_time': format_local_datetime(updated_instance.start_time, '%Y-%m-%d %H:%M'),
+                            'duration': f"{updated_instance.duration_hours}小时",
+                            'coords': f"{updated_instance.x_coord} - {updated_instance.y_coord} - {updated_instance.z_coord}"
+                        })
+                else:
+                    # 不是循环事件，只检查当前通告
+                    instances = [temp_announcement]
+                    planned_instances.append({
+                        'pilot_name': temp_announcement.pilot.nickname,
+                        'start_time': format_local_datetime(temp_announcement.start_time, '%Y-%m-%d %H:%M'),
+                        'duration': f"{temp_announcement.duration_hours}小时",
+                        'coords': f"{temp_announcement.x_coord} - {temp_announcement.y_coord} - {temp_announcement.z_coord}"
+                    })
+            except DoesNotExist:
+                # 原通告不存在，按普通情况处理
+                instances = [temp_announcement]
+                planned_instances.append({
+                    'pilot_name': temp_announcement.pilot.nickname,
+                    'start_time': format_local_datetime(temp_announcement.start_time, '%Y-%m-%d %H:%M'),
+                    'duration': f"{temp_announcement.duration_hours}小时",
+                    'coords': f"{temp_announcement.x_coord} - {temp_announcement.y_coord} - {temp_announcement.z_coord}"
+                })
         else:
-            instances = [temp_announcement]
+            # 普通情况：如果有重复规则，生成所有实例
+            if recurrence_type != 'NONE':
+                instances = Announcement.generate_recurrence_instances(temp_announcement)
+            else:
+                instances = [temp_announcement]
+
+            # 记录计划信息
+            for instance in instances:
+                planned_instances.append({
+                    'pilot_name': instance.pilot.nickname,
+                    'start_time': format_local_datetime(instance.start_time, '%Y-%m-%d %H:%M'),
+                    'duration': f"{instance.duration_hours}小时",
+                    'coords': f"{instance.x_coord} - {instance.y_coord} - {instance.z_coord}"
+                })
 
         # 检查所有实例的冲突
         all_conflicts = []
-        planned_instances = []
 
         for instance in instances:
             conflicts = instance.check_conflicts(exclude_self=bool(exclude_id))
-
-            # 记录这个实例的计划信息
-            planned_instances.append({
-                'pilot_name': instance.pilot.nickname,
-                'start_time': format_local_datetime(instance.start_time, '%Y-%m-%d %H:%M'),
-                'duration': f"{instance.duration_hours}小时",
-                'coords': f"{instance.x_coord} - {instance.y_coord} - {instance.z_coord}"
-            })
 
             # 收集冲突信息
             for conflict in conflicts['area_conflicts']:

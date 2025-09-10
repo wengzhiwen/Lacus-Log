@@ -182,6 +182,44 @@ def compare_time_in_local(utc_dt1: Optional[datetime], utc_dt2: Optional[datetim
         return 0
 
 
+def get_local_date_for_input(utc_dt: Optional[datetime]) -> str:
+    """将UTC时间转换为适合HTML date输入框的格式
+    
+    Args:
+        utc_dt: UTC时间
+        
+    Returns:
+        str: 适合date输入框的GMT+8日期字符串，格式为YYYY-MM-DD
+    """
+    if utc_dt is None:
+        return ''
+
+    local_dt = utc_to_local(utc_dt)
+    if local_dt is None:
+        return ''
+
+    return local_dt.strftime('%Y-%m-%d')
+
+
+def get_local_time_for_input(utc_dt: Optional[datetime]) -> str:
+    """将UTC时间转换为适合HTML time输入框的格式
+    
+    Args:
+        utc_dt: UTC时间
+        
+    Returns:
+        str: 适合time输入框的GMT+8时间字符串，格式为HH:MM
+    """
+    if utc_dt is None:
+        return ''
+
+    local_dt = utc_to_local(utc_dt)
+    if local_dt is None:
+        return ''
+
+    return local_dt.strftime('%H:%M')
+
+
 def get_local_datetime_for_input(utc_dt: Optional[datetime]) -> str:
     """将UTC时间转换为适合HTML datetime-local输入框的格式
     

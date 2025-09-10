@@ -83,8 +83,39 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="start_time" class="required">开始时间：</label>
+                        {% set edit_scope = request.args.get('edit_scope', 'this_only') %}
+                        {% if edit_scope == 'future_all' %}
+                        <div class="time-input-group">
+                            <input type="date" name="start_date" id="start_date" readonly
+                                   value="{{ announcement.start_time | local_date_for_input }}"
+                                   style="background-color: #f8f9fa; color: #6c757d;">
+                            <div class="time-selectors">
+                                <select name="start_hour" id="start_hour" required>
+                                    <option value="">时</option>
+                                    {% for hour in range(0, 24) %}
+                                    <option value="{{ '%02d'|format(hour) }}" 
+                                            {% if announcement.start_time and announcement.start_time.hour == hour %}selected{% endif %}>
+                                        {{ '%02d'|format(hour) }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <span class="time-separator">:</span>
+                                <select name="start_minute" id="start_minute" required>
+                                    <option value="">分</option>
+                                    {% for minute in range(0, 60, 15) %}
+                                    <option value="{{ '%02d'|format(minute) }}" 
+                                            {% if announcement.start_time and announcement.start_time.minute == minute %}selected{% endif %}>
+                                        {{ '%02d'|format(minute) }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <small class="form-text">编辑未来所有循环时，日期不可修改，只能修改时间</small>
+                        {% else %}
                         <input type="datetime-local" name="start_time" id="start_time" required
                                value="{{ announcement.start_time | local_datetime_for_input }}">
+                        {% endif %}
                     </div>
 
                     <div class="form-group">
@@ -124,7 +155,6 @@
                 
                 <!-- 冲突检查结果 -->
                 <div id="conflict_results" class="conflict-section" style="display: none;">
-                    <h3>冲突检查结果</h3>
                     <div id="conflict_content"></div>
                 </div>
                 
@@ -242,6 +272,51 @@
     background-color: #f8f9fa;
     color: #6c757d;
     cursor: not-allowed;
+}
+
+.time-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.time-input-group input[type="date"] {
+    flex: 1;
+}
+
+.time-selectors {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+}
+
+.time-selectors select {
+    flex: 1;
+    padding: 10px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+}
+
+.time-selectors select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.time-separator {
+    font-weight: bold;
+    color: #333;
+    font-size: 16px;
+}
+
+.form-text {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 5px;
+    font-style: italic;
 }
 
 .repeat-notice {
@@ -585,10 +660,29 @@ document.getElementById('check_btn').addEventListener('click', function() {
     // 验证必填字段
     const pilot = formData.get('pilot');
     const battleArea = formData.get('battle_area');
-    const startTime = formData.get('start_time');
     const duration = formData.get('duration_hours');
 
-    if (!pilot || !battleArea || !startTime || !duration) {
+    // 处理时间输入（根据编辑范围不同）
+    let startTime;
+    {% set edit_scope = request.args.get('edit_scope', 'this_only') %}
+    {% if edit_scope == 'future_all' %}
+    const startDate = formData.get('start_date');
+    const startHour = formData.get('start_hour');
+    const startMinute = formData.get('start_minute');
+    if (!startDate || !startHour || !startMinute) {
+        alert('请填写所有必填字段');
+        return;
+    }
+    startTime = startDate + 'T' + startHour + ':' + startMinute;
+    {% else %}
+    startTime = formData.get('start_time');
+    if (!startTime) {
+        alert('请填写所有必填字段');
+        return;
+    }
+    {% endif %}
+
+    if (!pilot || !battleArea || !duration) {
         alert('请填写所有必填字段');
         return;
     }
@@ -599,7 +693,8 @@ document.getElementById('check_btn').addEventListener('click', function() {
         battle_area_id: battleArea,
         start_time: startTime,
         duration_hours: parseFloat(duration),
-        exclude_id: '{{ announcement.id }}'
+        exclude_id: '{{ announcement.id }}',
+        edit_scope: '{{ request.args.get("edit_scope", "this_only") }}'
     };
 
     fetch('/announcements/check-conflicts', {
@@ -677,7 +772,30 @@ document.getElementById('announcementForm').addEventListener('submit', function(
     if (submitBtn.disabled) {
         e.preventDefault();
         alert('请先通过冲突检查');
+        return;
     }
+
+    // 编辑未来所有循环时的额外验证
+    {% set edit_scope = request.args.get('edit_scope', 'this_only') %}
+    {% if edit_scope == 'future_all' %}
+    const startDateInput = document.getElementById('start_date');
+    const startHourInput = document.getElementById('start_hour');
+    const startMinuteInput = document.getElementById('start_minute');
+    
+    if (!startDateInput.value || !startHourInput.value || !startMinuteInput.value) {
+        e.preventDefault();
+        alert('请填写完整的日期和时间信息');
+        return;
+    }
+    
+    // 确保日期部分没有被修改（通过比较原始值）
+    const originalDate = '{{ announcement.start_time | local_date_for_input }}';
+    if (startDateInput.value !== originalDate) {
+        e.preventDefault();
+        alert('编辑未来所有循环时，日期不可修改');
+        return;
+    }
+    {% endif %}
 });
 </script>
 {% endblock %}
