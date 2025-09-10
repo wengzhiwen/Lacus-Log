@@ -377,6 +377,117 @@ class Announcement(Document):
 
         return instances
 
+    def split_recurrence_group_from_current(self):
+        """从当前通告开始分割循环组，创建新的循环组
+        
+        将原循环组分为两部分：
+        1. 当前通告之前的保持原样
+        2. 从当前通告开始的创建新循环组
+        
+        Returns:
+            list: 从当前通告开始的新循环组通告列表（包含当前通告）
+        """
+        if not self.parent_announcement and self.recurrence_type == RecurrenceType.NONE:
+            # 不是循环事件，直接返回当前通告
+            return [self]
+
+        # 确定父通告和所有子通告
+        if self.parent_announcement:
+            parent = self.parent_announcement
+        else:
+            parent = self
+
+        # 获取所有相关通告（包括父通告）
+        all_related = [parent] + list(Announcement.objects(parent_announcement=parent))
+
+        # 按开始时间排序
+        all_related.sort(key=lambda x: x.start_time)
+
+        # 找到当前通告在序列中的位置
+        current_index = -1
+        for i, announcement in enumerate(all_related):
+            if announcement.id == self.id:
+                current_index = i
+                break
+
+        if current_index == -1:
+            # 找不到当前通告，返回单个通告
+            return [self]
+
+        # 分割：current_index之前的保持原样，从current_index开始创建新组
+        future_announcements = all_related[current_index:]
+
+        if len(future_announcements) <= 1:
+            # 只有当前一个通告，无需分割
+            return future_announcements
+
+        # 创建新的父通告（当前通告）
+        new_parent = future_announcements[0]
+        new_parent.parent_announcement = None
+
+        # 重新设置重复规则（基于原父通告的规则）
+        if parent.recurrence_type != RecurrenceType.NONE and parent.recurrence_pattern:
+            new_parent.recurrence_type = parent.recurrence_type
+            new_parent.recurrence_pattern = parent.recurrence_pattern
+            new_parent.recurrence_end = parent.recurrence_end
+        else:
+            new_parent.recurrence_type = RecurrenceType.NONE
+            new_parent.recurrence_pattern = None
+            new_parent.recurrence_end = None
+
+        new_parent.save()
+
+        # 更新后续通告的父引用
+        for announcement in future_announcements[1:]:
+            announcement.parent_announcement = new_parent
+            announcement.save()
+
+        return future_announcements
+
+    def get_future_announcements_in_group(self, include_self=True):
+        """获取循环组中从当前通告开始的未来通告
+        
+        Args:
+            include_self: 是否包含当前通告
+            
+        Returns:
+            list: 未来通告列表
+        """
+        if not self.parent_announcement and self.recurrence_type == RecurrenceType.NONE:
+            return [self] if include_self else []
+
+        # 确定父通告
+        if self.parent_announcement:
+            parent = self.parent_announcement
+        else:
+            parent = self
+
+        # 获取所有相关通告
+        all_related = [parent] + list(Announcement.objects(parent_announcement=parent))
+
+        # 按开始时间排序
+        all_related.sort(key=lambda x: x.start_time)
+
+        # 找到当前通告的位置
+        current_index = -1
+        for i, announcement in enumerate(all_related):
+            if announcement.id == self.id:
+                current_index = i
+                break
+
+        if current_index == -1:
+            return [self] if include_self else []
+
+        # 返回从当前开始的未来通告
+        start_index = current_index if include_self else current_index + 1
+        return all_related[start_index:]
+
+    @property
+    def is_in_recurrence_group(self):
+        """判断是否在循环组中"""
+        return self.parent_announcement is not None or (self.recurrence_type != RecurrenceType.NONE
+                                                        and Announcement.objects(parent_announcement=self).count() > 0)
+
 
 class AnnouncementChangeLog(Document):
     """通告变更记录模型"""

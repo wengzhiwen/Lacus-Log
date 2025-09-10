@@ -17,17 +17,32 @@
     <div class="form-container">
         <form method="POST" id="announcementForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="edit_scope" value="{{ request.args.get('edit_scope', 'this_only') }}"/>
             <!-- 基础信息 -->
             <div class="form-section">
                 <h3>基础信息</h3>
                 
+                <!-- 机师筛选器（参照新建页三联动） -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="owner_filter">所属筛选：</label>
+                        <select id="owner_filter">
+                            <option value="">全部所属</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rank_filter">阶级筛选：</label>
+                        <select id="rank_filter">
+                            <option value="">全部阶级</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="pilot" class="required">机师：</label>
                         <select name="pilot" id="pilot" required>
-                            {% for value, label in pilot_choices %}
-                            <option value="{{ value }}" {% if announcement.pilot and str(announcement.pilot.id) == value %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
+                            <option value="">请选择机师</option>
                         </select>
                     </div>
                 </div>
@@ -55,6 +70,8 @@
                         <select name="z_coord" id="z_coord" required>
                             <option value="">请选择Z坐标</option>
                         </select>
+                        <!-- 隐藏字段用于后端验证 -->
+                        <input type="hidden" name="battle_area" id="battle_area" value="{{ announcement.battle_area.id if announcement.battle_area else '' }}">
                     </div>
                 </div>
             </div>
@@ -84,14 +101,18 @@
                 </div>
             </div>
 
-            {% if announcement.parent_announcement or (announcement.recurrence_type.value != '无重复') %}
+            {% if announcement.is_in_recurrence_group %}
             <!-- 循环事件提示 -->
             <div class="form-section">
                 <div class="repeat-notice">
                     <h4>⚠️ 循环事件编辑说明</h4>
-                    <p>这是一个循环事件。编辑此通告只会修改当前这一次通告，不会影响其他循环事件。</p>
-                    {% if announcement.parent_announcement %}
-                    <p>如需修改整个循环组，请编辑 <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.parent_announcement.id) }}">父通告</a>。</p>
+                    {% set edit_scope = request.args.get('edit_scope', 'this_only') %}
+                    {% if edit_scope == 'future_all' %}
+                    <p>编辑范围：<strong>未来所有循环</strong></p>
+                    <p>此次修改将影响从当前通告开始的所有未来循环事件。</p>
+                    {% else %}
+                    <p>编辑范围：<strong>仅这一次</strong></p>
+                    <p>此次修改只会影响当前这个通告，不会影响其他循环事件。</p>
                     {% endif %}
                 </div>
             </div>
@@ -255,44 +276,28 @@
 
 .conflict-section {
     margin-bottom: 30px;
-    padding: 20px;
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 4px;
 }
 
 .conflict-section h3 {
-    margin: 0 0 15px 0;
-    color: #856404;
-    border-bottom: 1px solid #ffeaa7;
-    padding-bottom: 8px;
+    margin: 20px 0 15px 0;
+    color: #333;
+    font-size: 18px;
 }
 
 .conflict-item {
-    padding: 10px;
-    margin-bottom: 10px;
-    background: white;
-    border: 1px solid #dc3545;
-    border-radius: 4px;
-}
-
-.conflict-item.area-conflict {
-    border-color: #dc3545;
-}
-
-.conflict-item.pilot-conflict {
-    border-color: #fd7e14;
+    margin-bottom: 15px;
 }
 
 .conflict-type {
     font-weight: 500;
     color: #dc3545;
+    margin-bottom: 5px;
 }
 
 .conflict-details {
-    margin-top: 5px;
-    color: #666;
     font-size: 14px;
+    line-height: 1.8;
+    color: #333;
 }
 
 .no-conflicts {
@@ -300,6 +305,27 @@
     font-weight: 500;
     text-align: center;
     padding: 20px;
+}
+
+.plan-content {
+    margin-top: 10px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #333;
+}
+
+.plan-summary {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: var(--brand);
+}
+
+.plan-instance {
+    margin-bottom: 8px;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid var(--brand);
 }
 
 .form-actions {
@@ -389,6 +415,7 @@
 const currentX = '{{ announcement.x_coord }}';
 const currentY = '{{ announcement.y_coord }}';
 const currentBattleAreaId = '{{ announcement.battle_area.id }}';
+const currentPilotId = '{{ announcement.pilot.id if announcement.pilot else '' }}';
 
 // 坐标联动选择
 document.getElementById('x_coord').addEventListener('change', function() {
@@ -454,6 +481,12 @@ document.getElementById('y_coord').addEventListener('change', function() {
     }
 });
 
+// 当Z坐标选择改变时，更新隐藏的battle_area字段
+document.getElementById('z_coord').addEventListener('change', function() {
+    const battleAreaInput = document.getElementById('battle_area');
+    battleAreaInput.value = this.value;
+});
+
 // 页面加载时初始化坐标选择
 window.addEventListener('load', function() {
     if (currentX) {
@@ -461,22 +494,105 @@ window.addEventListener('load', function() {
     }
 });
 
-// 冲突检查
+// 机师筛选功能（与新建页保持一致）
+function loadPilotFilters(callback) {
+    fetch('/announcements/api/pilot-filters')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const ownerSelect = document.getElementById('owner_filter');
+                const rankSelect = document.getElementById('rank_filter');
+
+                // 填充所属选项
+                data.owners.forEach(owner => {
+                    const option = document.createElement('option');
+                    option.value = owner.id;
+                    option.textContent = owner.name;
+                    ownerSelect.appendChild(option);
+                });
+
+                // 填充阶级选项
+                data.ranks.forEach(rank => {
+                    const option = document.createElement('option');
+                    option.value = rank;
+                    option.textContent = rank;
+                    rankSelect.appendChild(option);
+                });
+
+                // 加载所有机师
+                loadPilots('', '', callback);
+            }
+        })
+        .catch(error => console.error('Error loading filters:', error));
+}
+
+function loadPilots(ownerId = '', rank = '', callback) {
+    const pilotSelect = document.getElementById('pilot');
+    pilotSelect.innerHTML = '<option value="">请选择机师</option>';
+
+    let url = '/announcements/api/pilots-filtered?';
+    if (ownerId) url += `owner=${ownerId}&`;
+    if (rank) url += `rank=${rank}&`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                data.pilots.forEach(pilot => {
+                    const option = document.createElement('option');
+                    option.value = pilot.id;
+                    option.textContent = `${pilot.nickname}[${pilot.real_name || ''}] - ${pilot.owner || '无所属'}`;
+                    pilotSelect.appendChild(option);
+                });
+
+                // 如果有回调函数，执行它
+                if (callback) {
+                    callback();
+                }
+            }
+        })
+        .catch(error => console.error('Error loading pilots:', error));
+}
+
+// 筛选器事件监听
+document.getElementById('owner_filter').addEventListener('change', function() {
+    const ownerId = this.value;
+    const rank = document.getElementById('rank_filter').value;
+    loadPilots(ownerId, rank);
+});
+
+document.getElementById('rank_filter').addEventListener('change', function() {
+    const rank = this.value;
+    const ownerId = document.getElementById('owner_filter').value;
+    loadPilots(ownerId, rank);
+});
+
+// 页面加载时初始化机师筛选并回填当前机师
+window.addEventListener('load', function() {
+    loadPilotFilters(function() {
+        if (currentPilotId) {
+            const pilotSelect = document.getElementById('pilot');
+            pilotSelect.value = currentPilotId;
+        }
+    });
+});
+
+// 冲突检查（与新建页保持一致的展示逻辑）
 document.getElementById('check_btn').addEventListener('click', function() {
     const form = document.getElementById('announcementForm');
     const formData = new FormData(form);
-    
+
     // 验证必填字段
     const pilot = formData.get('pilot');
-    const battleArea = document.getElementById('z_coord').value;
+    const battleArea = formData.get('battle_area');
     const startTime = formData.get('start_time');
     const duration = formData.get('duration_hours');
-    
+
     if (!pilot || !battleArea || !startTime || !duration) {
         alert('请填写所有必填字段');
         return;
     }
-    
+
     // 发送冲突检查请求
     const checkData = {
         pilot_id: pilot,
@@ -485,7 +601,7 @@ document.getElementById('check_btn').addEventListener('click', function() {
         duration_hours: parseFloat(duration),
         exclude_id: '{{ announcement.id }}'
     };
-    
+
     fetch('/announcements/check-conflicts', {
         method: 'POST',
         headers: {
@@ -498,24 +614,51 @@ document.getElementById('check_btn').addEventListener('click', function() {
     .then(data => {
         const resultsDiv = document.getElementById('conflict_results');
         const contentDiv = document.getElementById('conflict_content');
-        
+
         if (data.success) {
             resultsDiv.style.display = 'block';
-            
+
             if (data.has_conflicts) {
-                let html = '';
+                let html = '<h3>冲突检查结果</h3>';
                 data.conflicts.forEach(conflict => {
                     html += `<div class="conflict-item ${conflict.type === '区域冲突' ? 'area-conflict' : 'pilot-conflict'}">`;
                     html += `<div class="conflict-type">${conflict.type}</div>`;
                     html += `<div class="conflict-details">`;
-                    html += `机师：${conflict.pilot_name}，时间：${conflict.start_time} - ${conflict.end_time}，`;
-                    html += `时长：${conflict.duration}，区域：${conflict.coords}`;
+                    html += `${conflict.pilot_name}<br>`;
+                    html += `${conflict.start_time} 起 ${conflict.duration}<br>`;
+                    html += `${conflict.coords}`;
                     html += `</div></div>`;
                 });
                 contentDiv.innerHTML = html;
                 document.getElementById('submit_btn').disabled = true;
             } else {
-                contentDiv.innerHTML = '<div class="no-conflicts">✓ 检查通过，无冲突</div>';
+                // 无冲突时显示所有计划实例
+                let html = '<div class="no-conflicts">✓ 检查通过，无冲突</div>';
+                html += '<h3>计划详情</h3>';
+
+                if (data.planned_instances && data.planned_instances.length > 0) {
+                    html += '<div class="plan-content">';
+
+                    if (data.planned_instances.length === 1) {
+                        const instance = data.planned_instances[0];
+                        html += `${instance.pilot_name}<br>`;
+                        html += `${instance.start_time} 起 ${instance.duration}<br>`;
+                        html += `${instance.coords}`;
+                    } else {
+                        html += `<div class="plan-summary">共 ${data.planned_instances.length} 个事件：</div>`;
+                        data.planned_instances.forEach((instance, index) => {
+                            html += `<div class="plan-instance">`;
+                            html += `${index + 1}. ${instance.pilot_name}<br>`;
+                            html += `${instance.start_time} 起 ${instance.duration}<br>`;
+                            html += `${instance.coords}`;
+                            html += `</div>`;
+                        });
+                    }
+
+                    html += '</div>';
+                }
+
+                contentDiv.innerHTML = html;
                 document.getElementById('submit_btn').disabled = false;
             }
         } else {

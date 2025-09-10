@@ -129,17 +129,6 @@
                     <label>创建用户：</label>
                     <div class="value">{{ announcement.created_by.nickname or announcement.created_by.username }}</div>
                 </div>
-
-                {% if announcement.parent_announcement %}
-                <div class="info-item">
-                    <label>父通告：</label>
-                    <div class="value">
-                        <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.parent_announcement.id) }}">
-                            查看父通告
-                        </a>
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -148,35 +137,71 @@
 <!-- 底部操作栏 -->
 <div class="footbar">
     <div class="inner">
+        {% if announcement.is_in_recurrence_group %}
+        <!-- 循环组中的通告：提供两个编辑选项 -->
+        <button type="button" class="btn btn-primary" onclick="showEditModal()">编辑</button>
+        <button type="button" class="btn btn-danger" onclick="showDeleteModal()">删除</button>
+        {% else %}
+        <!-- 单独通告：直接编辑 -->
         <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}" class="btn btn-primary">编辑</a>
         <button type="button" class="btn btn-danger" onclick="showDeleteModal()">删除</button>
+        {% endif %}
         <button type="button" class="btn btn-outline" onclick="showChangesModal()">变更记录</button>
     </div>
 </div>
+
+<!-- 编辑选项模态框（循环组通告） -->
+{% if announcement.is_in_recurrence_group %}
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h4>选择编辑范围</h4>
+        <p>请选择要编辑的范围：</p>
+        <div class="edit-options">
+            <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}?edit_scope=this_only" class="option-link">
+                <div class="option-card">
+                    <h5>仅编辑这一次</h5>
+                    <p>只修改当前这个通告，不影响其他循环事件</p>
+                </div>
+            </a>
+            <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}?edit_scope=future_all" class="option-link">
+                <div class="option-card">
+                    <h5>编辑未来所有</h5>
+                    <p>修改从当前开始的所有未来循环事件</p>
+                </div>
+            </a>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" onclick="hideEditModal()">取消</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- 删除确认模态框 -->
 <div id="deleteModal" class="modal">
     <div class="modal-content">
         <h4>确认删除</h4>
-        {% if announcement.parent_announcement or (announcement.recurrence_type.value != '无重复' and related_announcements) %}
-        <p>这是一个重复事件，请选择删除范围：</p>
-        <form method="POST" action="{{ url_for('announcement.delete_announcement', announcement_id=announcement.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <div class="delete-options">
-                <label class="radio-option">
-                    <input type="radio" name="delete_type" value="single" checked>
-                    <span>只删除当前通告</span>
-                </label>
-                <label class="radio-option">
-                    <input type="radio" name="delete_type" value="all">
-                    <span>删除整个循环组</span>
-                </label>
-            </div>
-            <div class="modal-actions">
-                <button type="submit" class="btn btn-danger">确认删除</button>
-                <button type="button" class="btn btn-outline" onclick="hideDeleteModal()">取消</button>
-            </div>
-        </form>
+        {% if announcement.is_in_recurrence_group %}
+        <p>请选择删除范围：</p>
+        <div class="delete-option-buttons">
+            <form method="POST" action="{{ url_for('announcement.delete_announcement', announcement_id=announcement.id) }}" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="delete_scope" value="this_only"/>
+                <button type="submit" class="btn btn-warning" onclick="return confirm('确定只删除当前这一次通告吗？')">
+                    只删除这一次
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('announcement.delete_announcement', announcement_id=announcement.id) }}" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="delete_scope" value="future_all"/>
+                <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除从当前开始的所有未来循环通告吗？此操作不可恢复。')">
+                    删除未来所有
+                </button>
+            </form>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" onclick="hideDeleteModal()">取消</button>
+        </div>
         {% else %}
         <p>确定要删除这个通告吗？此操作不可恢复。</p>
         <form method="POST" action="{{ url_for('announcement.delete_announcement', announcement_id=announcement.id) }}">
@@ -518,6 +543,64 @@
     color: white;
 }
 
+.btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+    color: #212529;
+}
+
+.edit-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.option-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.option-card {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.option-card:hover {
+    border-color: #007bff;
+    background: #f8f9ff;
+}
+
+.option-card h5 {
+    margin: 0 0 8px 0;
+    color: #007bff;
+    font-size: 16px;
+}
+
+.option-card p {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.delete-option-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.delete-option-buttons .btn {
+    width: 100%;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -572,6 +655,14 @@
 </style>
 
 <script>
+function showEditModal() {
+    document.getElementById('editModal').style.display = 'block';
+}
+
+function hideEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
 function showDeleteModal() {
     document.getElementById('deleteModal').style.display = 'block';
 }
@@ -627,9 +718,13 @@ function hideChangesModal() {
 
 // 点击模态框外部关闭
 window.onclick = function(event) {
+    const editModal = document.getElementById('editModal');
     const deleteModal = document.getElementById('deleteModal');
     const changesModal = document.getElementById('changesModal');
     
+    if (editModal && event.target === editModal) {
+        hideEditModal();
+    }
     if (event.target === deleteModal) {
         hideDeleteModal();
     }

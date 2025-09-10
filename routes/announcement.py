@@ -1,17 +1,24 @@
 # pylint: disable=no-member
 import json
 
-from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
-from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
+from models.announcement import (Announcement, AnnouncementChangeLog,
+                                 RecurrenceType)
 from models.battle_area import BattleArea
 from models.pilot import Pilot
 from models.user import User
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_local_datetime_for_input, get_current_local_time, get_current_month_last_day_for_input, local_to_utc,
-                                   parse_local_date_to_end_datetime, parse_local_datetime, utc_to_local)
+from utils.timezone_helper import (format_local_datetime,
+                                   get_current_local_datetime_for_input,
+                                   get_current_local_time,
+                                   get_current_month_last_day_for_input,
+                                   local_to_utc,
+                                   parse_local_date_to_end_datetime,
+                                   parse_local_datetime, utc_to_local)
 
 logger = get_logger('announcement')
 
@@ -396,6 +403,9 @@ def edit_announcement(announcement_id):
         # （根据技术设计文档权限矩阵，舰长权限与议长相同）
 
         if request.method == 'POST':
+            # 获取编辑范围：this_only（仅这一次） 或 future_all（未来所有）
+            edit_scope = request.form.get('edit_scope', 'this_only')
+
             # 记录原始数据用于变更记录
             old_data = {
                 'pilot': str(announcement.pilot.id) if announcement.pilot else None,
@@ -417,8 +427,14 @@ def edit_announcement(announcement_id):
                 start_time_str = request.form.get('start_time')
                 duration_hours = request.form.get('duration_hours', type=float)
 
+                # Debug日志：记录接收到的表单数据
+                logger.debug('编辑通告表单数据 - pilot_id: %s, battle_area_id: %s, start_time: %s, duration_hours: %s', pilot_id, battle_area_id, start_time_str,
+                             duration_hours)
+
                 # 基础验证
                 if not pilot_id or not battle_area_id or not start_time_str or not duration_hours:
+                    logger.debug('必填项验证失败 - pilot_id: %s, battle_area_id: %s, start_time: %s, duration_hours: %s', pilot_id, battle_area_id, start_time_str,
+                                 duration_hours)
                     flash('请填写所有必填项', 'error')
                     return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
 
@@ -439,33 +455,78 @@ def edit_announcement(announcement_id):
                     flash('时间格式错误', 'error')
                     return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
 
-                # 更新通告数据
-                announcement.pilot = pilot
-                announcement.battle_area = battle_area
-                announcement.x_coord = battle_area.x_coord
-                announcement.y_coord = battle_area.y_coord
-                announcement.z_coord = battle_area.z_coord
-                announcement.start_time = start_time
-                announcement.duration_hours = duration_hours
+                if edit_scope == 'future_all' and announcement.is_in_recurrence_group:
+                    # 编辑未来所有循环：先分割循环组，然后更新所有未来通告
+                    future_announcements = announcement.split_recurrence_group_from_current()
 
-                # 检查冲突
-                conflicts = announcement.check_conflicts(exclude_self=True)
-                if conflicts['area_conflicts'] or conflicts['pilot_conflicts']:
-                    flash('存在时间冲突，无法保存修改', 'error')
-                    all_conflicts = conflicts['area_conflicts'] + conflicts['pilot_conflicts']
-                    return render_template('announcements/edit.html',
-                                           announcement=announcement,
-                                           battle_area_choices=_get_battle_area_choices(),
-                                           conflicts=all_conflicts)
+                    # 更新所有未来通告的数据
+                    for ann in future_announcements:
+                        ann.pilot = pilot
+                        ann.battle_area = battle_area
+                        ann.x_coord = battle_area.x_coord
+                        ann.y_coord = battle_area.y_coord
+                        ann.z_coord = battle_area.z_coord
+                        ann.duration_hours = duration_hours
 
-                # 保存通告
-                announcement.save()
+                        # 对非首个通告，计算相对于首个通告的时间差
+                        if ann.id != announcement.id:
+                            time_diff = ann.start_time - announcement.start_time
+                            ann.start_time = start_time + time_diff
+                        else:
+                            ann.start_time = start_time
 
-                # 记录变更
-                _record_changes(announcement, old_data, current_user, _get_client_ip())
+                    # 检查所有未来通告的冲突
+                    all_conflicts = []
+                    for ann in future_announcements:
+                        conflicts = ann.check_conflicts(exclude_self=True)
+                        all_conflicts.extend(conflicts['area_conflicts'])
+                        all_conflicts.extend(conflicts['pilot_conflicts'])
 
-                flash('更新通告成功', 'success')
-                logger.info('用户%s更新通告：%s', current_user.username, announcement.id)
+                    if all_conflicts:
+                        flash('存在时间冲突，无法保存修改', 'error')
+                        return render_template('announcements/edit.html',
+                                               announcement=announcement,
+                                               battle_area_choices=_get_battle_area_choices(),
+                                               conflicts=all_conflicts)
+
+                    # 保存所有未来通告
+                    for ann in future_announcements:
+                        ann.save()
+                        # 记录变更
+                        _record_changes(ann, old_data, current_user, _get_client_ip())
+
+                    flash('更新未来循环通告成功', 'success')
+                    logger.info('用户%s更新未来循环通告：%s（共%d个）', current_user.username, announcement.id, len(future_announcements))
+
+                else:
+                    # 仅编辑这一次
+                    announcement.pilot = pilot
+                    announcement.battle_area = battle_area
+                    announcement.x_coord = battle_area.x_coord
+                    announcement.y_coord = battle_area.y_coord
+                    announcement.z_coord = battle_area.z_coord
+                    announcement.start_time = start_time
+                    announcement.duration_hours = duration_hours
+
+                    # 检查冲突
+                    conflicts = announcement.check_conflicts(exclude_self=True)
+                    if conflicts['area_conflicts'] or conflicts['pilot_conflicts']:
+                        flash('存在时间冲突，无法保存修改', 'error')
+                        all_conflicts = conflicts['area_conflicts'] + conflicts['pilot_conflicts']
+                        return render_template('announcements/edit.html',
+                                               announcement=announcement,
+                                               battle_area_choices=_get_battle_area_choices(),
+                                               conflicts=all_conflicts)
+
+                    # 保存通告
+                    announcement.save()
+
+                    # 记录变更
+                    _record_changes(announcement, old_data, current_user, _get_client_ip())
+
+                    flash('更新通告成功', 'success')
+                    logger.info('用户%s更新通告：%s', current_user.username, announcement.id)
+
                 return redirect(url_for('announcement.announcement_detail', announcement_id=announcement_id))
 
             except (ValueError, ValidationError) as e:
@@ -491,26 +552,19 @@ def delete_announcement(announcement_id):
         # 权限检查：议长和舰长都可以删除所有通告
         # （根据技术设计文档权限矩阵，舰长权限与议长相同）
 
-        # 检查是否需要删除关联的重复事件
-        delete_type = request.form.get('delete_type', 'single')
+        # 获取删除范围：this_only（仅这一次） 或 future_all（未来所有）
+        delete_scope = request.form.get('delete_scope', 'this_only')
 
-        if delete_type == 'all' and announcement.parent_announcement:
-            # 删除整个循环组
-            parent = announcement.parent_announcement
-            children = Announcement.objects(parent_announcement=parent)
-            for child in children:
-                child.delete()
-            parent.delete()
-            flash('删除循环通告组成功', 'success')
-            logger.info('用户%s删除重复通告组：%s', current_user.username, parent.id)
-        elif delete_type == 'all' and announcement.recurrence_type != RecurrenceType.NONE:
-            # 删除所有子事件
-            children = Announcement.objects(parent_announcement=announcement)
-            for child in children:
-                child.delete()
-            announcement.delete()
-            flash('删除循环通告组成功', 'success')
-            logger.info('用户%s删除重复通告组：%s', current_user.username, announcement.id)
+        if delete_scope == 'future_all' and announcement.is_in_recurrence_group:
+            # 删除未来所有循环：先获取未来通告，然后删除
+            future_announcements = announcement.get_future_announcements_in_group(include_self=True)
+
+            count = len(future_announcements)
+            for ann in future_announcements:
+                ann.delete()
+
+            flash(f'删除未来循环通告成功（共{count}个）', 'success')
+            logger.info('用户%s删除未来循环通告：%s（共%d个）', current_user.username, announcement.id, count)
         else:
             # 只删除当前通告
             announcement.delete()
@@ -601,7 +655,7 @@ def check_conflicts():
             # 记录这个实例的计划信息
             planned_instances.append({
                 'pilot_name': instance.pilot.nickname,
-                'start_time': instance.start_time.strftime('%Y-%m-%d %H:%M'),
+                'start_time': format_local_datetime(instance.start_time, '%Y-%m-%d %H:%M'),
                 'duration': f"{instance.duration_hours}小时",
                 'coords': f"{instance.x_coord} - {instance.y_coord} - {instance.z_coord}"
             })
@@ -610,10 +664,10 @@ def check_conflicts():
             for conflict in conflicts['area_conflicts']:
                 all_conflicts.append({
                     'type': '区域冲突',
-                    'instance_time': instance.start_time.strftime('%Y-%m-%d %H:%M'),
+                    'instance_time': format_local_datetime(instance.start_time, '%Y-%m-%d %H:%M'),
                     'announcement_id': str(conflict['announcement'].id),
                     'pilot_name': conflict['announcement'].pilot.nickname,
-                    'start_time': conflict['announcement'].start_time.strftime('%Y-%m-%d %H:%M'),
+                    'start_time': format_local_datetime(conflict['announcement'].start_time, '%Y-%m-%d %H:%M'),
                     'duration': conflict['announcement'].duration_display,
                     'coords': f"{conflict['announcement'].x_coord} - {conflict['announcement'].y_coord} - {conflict['announcement'].z_coord}"
                 })
@@ -621,10 +675,10 @@ def check_conflicts():
             for conflict in conflicts['pilot_conflicts']:
                 all_conflicts.append({
                     'type': '机师冲突',
-                    'instance_time': instance.start_time.strftime('%Y-%m-%d %H:%M'),
+                    'instance_time': format_local_datetime(instance.start_time, '%Y-%m-%d %H:%M'),
                     'announcement_id': str(conflict['announcement'].id),
                     'pilot_name': conflict['announcement'].pilot.nickname,
-                    'start_time': conflict['announcement'].start_time.strftime('%Y-%m-%d %H:%M'),
+                    'start_time': format_local_datetime(conflict['announcement'].start_time, '%Y-%m-%d %H:%M'),
                     'duration': conflict['announcement'].duration_display,
                     'coords': f"{conflict['announcement'].x_coord} - {conflict['announcement'].y_coord} - {conflict['announcement'].z_coord}"
                 })
