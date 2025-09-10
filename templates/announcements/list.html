@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+
+{% block title %}作战计划管理{% endblock %}
+
+{% block content %}
+<section class="announcement-management">
+    <!-- 页面头部 -->
+    <div class="page-header">
+        <h1 class="page-title">作战计划管理</h1>
+    </div>
+
+    <!-- 筛选器（默认折叠） -->
+    <div class="filter-bar">
+        {% set selected_items = [] %}
+        {% if owner_filter %}
+            {% for value, display in owner_choices %}
+                {% if value and owner_filter == value %}{% set _ = selected_items.append(display) %}{% endif %}
+            {% endfor %}
+        {% endif %}
+        {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
+        {% if x_filter %}{% set _ = selected_items.append('X:' + x_filter) %}{% endif %}
+        {% if y_filter %}{% set _ = selected_items.append('Y:' + y_filter) %}{% endif %}
+        {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
+        
+        <button type="button" class="filter-toggle" onclick="toggleFilters()">
+            <span id="filter-summary">{{ filter_summary }}</span>
+            <span class="toggle-icon" id="filter-toggle-icon">▼</span>
+        </button>
+        
+        <form class="filter-form is-collapsed" id="filter-form" method="GET">
+            <div class="filter-group">
+                <label class="filter-label">所属筛选</label>
+                <select class="filter-select" name="owner" onchange="this.form.submit()">
+                    {% for value, label in owner_choices %}
+                    <option value="{{ value }}" {% if owner_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">阶级筛选</label>
+                <select class="filter-select" name="rank" onchange="this.form.submit()">
+                    {% for value, label in rank_choices %}
+                    <option value="{{ value }}" {% if rank_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">X坐标筛选</label>
+                <select class="filter-select" name="x" onchange="this.form.submit()">
+                    {% for value, label in x_choices %}
+                    <option value="{{ value }}" {% if x_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Y坐标筛选</label>
+                <select class="filter-select" name="y" onchange="this.form.submit()">
+                    {% for value, label in y_choices %}
+                    <option value="{{ value }}" {% if y_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- 通告列表 -->
+    <div class="announcement-list">
+        {% if announcements %}
+            <!-- 通告卡片列表 -->
+            <div class="announcement-cards">
+                {% for announcement in announcements %}
+                <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}" class="announcement-card">
+                    <div class="card-header">
+                        <div class="pilot-info">
+                            <div class="pilot-name">{{ announcement.pilot.nickname }}</div>
+                            <div class="pilot-details">
+                                {% if announcement.pilot.real_name %}
+                                <span class="real-name">[{{ announcement.pilot.real_name }}]</span>
+                                {% endif %}
+                                <span class="rank">{{ announcement.pilot.rank.value }}</span>
+                                {% if announcement.pilot.owner %}
+                                <span class="owner">- {{ announcement.pilot.owner.nickname or announcement.pilot.owner.username }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="time-info">
+                            <span class="start-time">{{ announcement.start_time.strftime('%m-%d %H:%M') }}</span>
+                            <span class="duration">{{ announcement.duration_display }}</span>
+                        </div>
+                    </div>
+
+                    <div class="announcement-body">
+                        <div class="coords">
+                            <span class="coord-label">作战区域：</span>
+                            <span class="coords-value">{{ announcement.x_coord }}-{{ announcement.y_coord }}-{{ announcement.z_coord }}</span>
+                        </div>
+                        {% if announcement.recurrence_type.value != '无重复' %}
+                        <div class="recurrence">
+                            <span class="recurrence-label">循环：</span>
+                            <span class="recurrence-value">{{ announcement.recurrence_display }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="card-footer">
+                        <div class="announcement-meta">
+                            <span class="created-time">创建：{{ announcement.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            {% if announcement.parent_announcement %}
+                            <span class="parent-indicator">循环事件</span>
+                            {% elif announcement.recurrence_type.value != '无重复' %}
+                            <span class="parent-indicator">重复组</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-arrow">→</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <div class="empty-title">暂无通告数据</div>
+                <div class="empty-description">点击下方"新建通告"按钮创建第一个通告</div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- 底部footbar：新建通告按钮 -->
+<div class="footbar">
+    <div class="inner">
+        <a class="btn btn-primary" href="{{ url_for('announcement.new_announcement') }}">
+            <span class="btn-icon">+</span>
+            新建通告
+        </a>
+    </div>
+</div>
+
+<style>
+/* 通告管理页面样式 - 符合基础-UI风格规范 */
+
+/* 筛选器折叠样式 */
+.filter-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.filter-form.is-collapsed { 
+    display: none; 
+}
+
+.filter-form { 
+    margin-bottom: 12px; 
+    background: var(--table-header);
+    padding: 16px;
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.filter-label {
+    font-weight: 500;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.filter-select {
+    padding: 8px 12px;
+    border: 1px solid var(--gray);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    width: 100%;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* 通告卡片样式 */
+.announcement-cards {
+    display: block;
+}
+
+.announcement-card {
+    display: block;
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid var(--table-header);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.announcement-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+    border-color: var(--brand);
+}
+
+.announcement-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+}
+
+.pilot-info {
+    flex: 1;
+}
+
+.pilot-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.pilot-details {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.pilot-details .real-name {
+    color: var(--muted);
+    margin-right: 8px;
+}
+
+.pilot-details .rank {
+    background: var(--table-header);
+    color: var(--brand);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-right: 8px;
+    display: inline-block;
+}
+
+.pilot-details .owner {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.time-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.time-info .start-time {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.time-info .duration {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.announcement-body {
+    margin-bottom: 8px;
+}
+
+.coords, .recurrence {
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.coord-label, .recurrence-label {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.coords-value {
+    color: var(--text);
+    font-family: monospace;
+    background: var(--table-header);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.recurrence-value {
+    color: var(--hud-green);
+    font-weight: 500;
+}
+
+.announcement-card .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--table-header);
+    padding-top: 8px;
+}
+
+.announcement-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.created-time {
+    color: var(--muted);
+}
+
+.parent-indicator {
+    background: var(--warn);
+    color: #856404;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.card-arrow {
+    color: var(--muted);
+    font-size: 18px;
+    font-weight: bold;
+    transition: color 0.2s ease;
+}
+
+.announcement-card:hover .card-arrow {
+    color: var(--brand);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+}
+
+.empty-state p {
+    font-size: 18px;
+    margin-bottom: 20px;
+    color: var(--text);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .filter-form {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .filter-actions {
+        grid-column: 1 / -1;
+        justify-content: center;
+    }
+    
+    .announcement-card .card-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    
+    .time-info {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .filter-form {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .filter-group {
+        width: 100%;
+    }
+}
+</style>
+
+<style>
+/* 底部footbar（固定吸附） */
+.footbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid var(--table-header);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
+    z-index: 100;
+}
+
+.footbar .inner {
+    display: flex;
+    justify-content: center;
+}
+
+.container {
+    padding-bottom: 88px;
+}
+</style>
+
+<script>
+function toggleFilters() {
+    const form = document.getElementById('filter-form');
+    const icon = document.getElementById('filter-toggle-icon');
+    const collapsed = form.classList.toggle('is-collapsed');
+    icon.textContent = collapsed ? '▼' : '▲';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('filter-form');
+    const icon = document.getElementById('filter-toggle-icon');
+    const hasQuery = window.location.search.length > 1;
+    if (!hasQuery) {
+        if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
+        icon.textContent = '▼';
+    } else {
+        form.classList.remove('is-collapsed');
+        icon.textContent = '▲';
+    }
+});
+</script>
+{% endblock %}

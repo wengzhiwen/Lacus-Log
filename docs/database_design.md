@@ -65,9 +65,64 @@
   - `user_id` 索引
   - `change_time` 索引
 
+### battle_areas
+- 字段：
+  - `x_coord` X坐标，字符串，必填，最大50字符
+  - `y_coord` Y坐标，字符串，必填，最大50字符
+  - `z_coord` Z坐标，字符串，必填，最大50字符
+  - `availability` 可用性枚举（可用/禁用），默认可用
+  - `created_at` 创建时间
+  - `updated_at` 最后修改时间
+- 索引：
+  - `x_coord + y_coord + z_coord` 复合唯一索引
+  - `x_coord` 索引
+  - `y_coord` 索引
+  - `availability` 索引
+  - `x_coord + y_coord` 复合索引
+  - `x_coord + y_coord + z_coord` 复合降序索引
+
+### announcements
+- 字段：
+  - `pilot` 关联机师（关联到pilots集合）
+  - `battle_area` 关联战斗区域（关联到battle_areas集合）
+  - `x_coord` X坐标快照，字符串，必填
+  - `y_coord` Y坐标快照，字符串，必填
+  - `z_coord` Z坐标快照，字符串，必填
+  - `start_time` 开始时间，UTC时间戳
+  - `duration_hours` 计划时长，浮点数（1.0-16.0小时，0.5步进）
+  - `recurrence_type` 重复类型枚举（无重复/每日/每周/自定义）
+  - `recurrence_pattern` 重复模式，JSON格式字符串
+  - `recurrence_end` 重复结束时间，UTC时间戳
+  - `parent_announcement` 父通告ID（关联到自身，用于重复事件组）
+  - `created_at` 创建时间
+  - `updated_at` 最后修改时间
+  - `created_by` 创建用户（关联到users集合）
+- 索引：
+  - `pilot + start_time` 复合索引
+  - `battle_area + start_time` 复合索引
+  - `start_time` 索引
+  - `parent_announcement` 索引
+  - `created_by` 索引
+  - `start_time` 降序索引
+
+### announcement_change_logs
+- 字段：
+  - `announcement_id` 关联通告ID（关联到announcements集合）
+  - `user_id` 操作用户ID（关联到users集合）
+  - `field_name` 变更字段名
+  - `old_value` 变更前值
+  - `new_value` 变更后值
+  - `change_time` 变更时间
+  - `ip_address` 操作IP地址
+- 索引：
+  - `announcement_id + change_time` 复合索引（降序）
+  - `user_id` 索引
+  - `change_time` 索引
+
 ## 说明
 - 启动时自动创建缺失的角色（gicho/kancho）与默认议长
 - 使用Flask-Security-Too的MongoEngineUserDatastore
 - 支持会话跟踪和登录统计
 - 机师管理系统包含完整的CRUD操作和变更记录
+- 作战计划管理系统支持重复事件、冲突检查、变更记录等功能
 - 预计后续将为审计日志、登录日志、业务数据增加索引

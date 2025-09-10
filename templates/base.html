@@ -22,6 +22,7 @@
       {% endif %}
       {% if current_user.has_role('gicho') or current_user.has_role('kancho') %}
       <a class="navlink" href="{{ url_for('pilot.list_pilots') }}">机师管理</a>
+      <a class="navlink" href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
       {% endif %}
       {% if current_user.has_role('gicho') %}
       <a class="navlink" href="{{ url_for('battle_area.list_areas') }}">战斗区域管理</a>

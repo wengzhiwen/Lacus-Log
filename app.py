@@ -7,6 +7,7 @@ from flask_wtf import CSRFProtect
 from mongoengine import connect
 
 from routes.admin import admin_bp
+from routes.announcement import announcement_bp
 from routes.battle_area import battle_area_bp
 from routes.main import main_bp
 from routes.pilot import pilot_bp
@@ -89,6 +90,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(admin_bp, url_prefix='/admin')
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
     flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')
+    flask_app.register_blueprint(announcement_bp, url_prefix='/announcements')
 
     # 注册Jinja2过滤器
     @flask_app.template_filter('role_display_name')

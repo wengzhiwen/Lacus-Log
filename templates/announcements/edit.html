@@ -1,0 +1,520 @@
+{% extends "base.html" %}
+
+{% block title %}编辑通告{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
+            <span class="separator">></span>
+            <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}">通告详情</a>
+            <span class="separator">></span>
+            <span>编辑通告</span>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <form method="POST" id="announcementForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <!-- 基础信息 -->
+            <div class="form-section">
+                <h3>基础信息</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pilot" class="required">机师：</label>
+                        <select name="pilot" id="pilot" required>
+                            {% for value, label in pilot_choices %}
+                            <option value="{{ value }}" {% if announcement.pilot and str(announcement.pilot.id) == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="x_coord" class="required">X坐标：</label>
+                        <select name="x_coord" id="x_coord" required>
+                            <option value="">请选择X坐标</option>
+                            {% for x_coord in battle_area_choices.keys()|sort %}
+                            <option value="{{ x_coord }}" {% if announcement.x_coord == x_coord %}selected{% endif %}>{{ x_coord }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="y_coord" class="required">Y坐标：</label>
+                        <select name="y_coord" id="y_coord" required>
+                            <option value="">请选择Y坐标</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="z_coord" class="required">Z坐标：</label>
+                        <select name="z_coord" id="z_coord" required>
+                            <option value="">请选择Z坐标</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 时间信息 -->
+            <div class="form-section">
+                <h3>时间信息</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="start_time" class="required">开始时间：</label>
+                        <input type="datetime-local" name="start_time" id="start_time" required
+                               value="{{ announcement.start_time.strftime('%Y-%m-%dT%H:%M') if announcement.start_time else '' }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="duration_hours" class="required">时长（小时）：</label>
+                        <select name="duration_hours" id="duration_hours" required>
+                            <option value="">请选择时长</option>
+                            {% for hours in [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0] %}
+                            <option value="{{ hours }}" {% if announcement.duration_hours == hours %}selected{% endif %}>
+                                {% if hours == hours|int %}{{ hours|int }}{% else %}{{ hours }}{% endif %}小时
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {% if announcement.parent_announcement or (announcement.recurrence_type.value != '无重复') %}
+            <!-- 循环事件提示 -->
+            <div class="form-section">
+                <div class="repeat-notice">
+                    <h4>⚠️ 循环事件编辑说明</h4>
+                    <p>这是一个循环事件。编辑此通告只会修改当前这一次通告，不会影响其他循环事件。</p>
+                    {% if announcement.parent_announcement %}
+                    <p>如需修改整个循环组，请编辑 <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.parent_announcement.id) }}">父通告</a>。</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 冲突检查结果 -->
+            <div id="conflict_results" class="conflict-section" style="display: none;">
+                <h3>冲突检查结果</h3>
+                <div id="conflict_content"></div>
+            </div>
+
+            <!-- 表单操作 -->
+            <div class="form-actions">
+                <button type="button" id="check_btn" class="btn btn-secondary">检查冲突</button>
+                <button type="submit" id="submit_btn" class="btn btn-primary" disabled>保存修改</button>
+                <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}" class="btn btn-outline">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #666;
+}
+
+.breadcrumb a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.separator {
+    color: #ccc;
+}
+
+.form-container {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-section {
+    margin-bottom: 40px;
+}
+
+.form-section:last-of-type {
+    margin-bottom: 30px;
+}
+
+.form-section h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 18px;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 8px;
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-row:last-child {
+    margin-bottom: 0;
+}
+
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-group label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-group input,
+.form-group select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.form-group input:disabled,
+.form-group select:disabled {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+.repeat-notice {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.repeat-notice h4 {
+    margin: 0 0 10px 0;
+    color: #856404;
+}
+
+.repeat-notice p {
+    margin: 0 0 10px 0;
+    color: #856404;
+}
+
+.repeat-notice p:last-child {
+    margin-bottom: 0;
+}
+
+.repeat-notice a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.repeat-notice a:hover {
+    text-decoration: underline;
+}
+
+.conflict-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+}
+
+.conflict-section h3 {
+    margin: 0 0 15px 0;
+    color: #856404;
+    border-bottom: 1px solid #ffeaa7;
+    padding-bottom: 8px;
+}
+
+.conflict-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    background: white;
+    border: 1px solid #dc3545;
+    border-radius: 4px;
+}
+
+.conflict-item.area-conflict {
+    border-color: #dc3545;
+}
+
+.conflict-item.pilot-conflict {
+    border-color: #fd7e14;
+}
+
+.conflict-type {
+    font-weight: 500;
+    color: #dc3545;
+}
+
+.conflict-details {
+    margin-top: 5px;
+    color: #666;
+    font-size: 14px;
+}
+
+.no-conflicts {
+    color: #28a745;
+    font-weight: 500;
+    text-align: center;
+    padding: 20px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    padding-top: 30px;
+    border-top: 1px solid #eee;
+}
+
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #6c757d;
+    border: 1px solid #6c757d;
+}
+
+.btn-outline:hover {
+    background: #6c757d;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+// 初始化坐标选择
+const currentX = '{{ announcement.x_coord }}';
+const currentY = '{{ announcement.y_coord }}';
+const currentBattleAreaId = '{{ announcement.battle_area.id }}';
+
+// 坐标联动选择
+document.getElementById('x_coord').addEventListener('change', function() {
+    const x = this.value;
+    const ySelect = document.getElementById('y_coord');
+    const zSelect = document.getElementById('z_coord');
+    
+    ySelect.innerHTML = '<option value="">请选择Y坐标</option>';
+    zSelect.innerHTML = '<option value="">请先选择Y坐标</option>';
+    ySelect.disabled = !x;
+    zSelect.disabled = true;
+    
+    if (x) {
+        fetch(`/announcements/api/areas/${x}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    data.y_coords.forEach(y => {
+                        const option = document.createElement('option');
+                        option.value = y;
+                        option.textContent = y;
+                        if (y === currentY) {
+                            option.selected = true;
+                        }
+                        ySelect.appendChild(option);
+                    });
+                    
+                    // 如果选中了Y坐标，自动加载Z坐标
+                    if (ySelect.value) {
+                        ySelect.dispatchEvent(new Event('change'));
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+});
+
+document.getElementById('y_coord').addEventListener('change', function() {
+    const x = document.getElementById('x_coord').value;
+    const y = this.value;
+    const zSelect = document.getElementById('z_coord');
+    
+    zSelect.innerHTML = '<option value="">请选择Z坐标</option>';
+    zSelect.disabled = !y;
+    
+    if (x && y) {
+        fetch(`/announcements/api/areas/${x}/${y}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    data.areas.forEach(area => {
+                        const option = document.createElement('option');
+                        option.value = area.id;
+                        option.textContent = area.z_coord;
+                        if (area.id === currentBattleAreaId) {
+                            option.selected = true;
+                        }
+                        zSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+});
+
+// 页面加载时初始化坐标选择
+window.addEventListener('load', function() {
+    if (currentX) {
+        document.getElementById('x_coord').dispatchEvent(new Event('change'));
+    }
+});
+
+// 冲突检查
+document.getElementById('check_btn').addEventListener('click', function() {
+    const form = document.getElementById('announcementForm');
+    const formData = new FormData(form);
+    
+    // 验证必填字段
+    const pilot = formData.get('pilot');
+    const battleArea = document.getElementById('z_coord').value;
+    const startTime = formData.get('start_time');
+    const duration = formData.get('duration_hours');
+    
+    if (!pilot || !battleArea || !startTime || !duration) {
+        alert('请填写所有必填字段');
+        return;
+    }
+    
+    // 发送冲突检查请求
+    const checkData = {
+        pilot_id: pilot,
+        battle_area_id: battleArea,
+        start_time: startTime,
+        duration_hours: parseFloat(duration),
+        exclude_id: '{{ announcement.id }}'
+    };
+    
+    fetch('/announcements/check-conflicts', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        body: JSON.stringify(checkData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultsDiv = document.getElementById('conflict_results');
+        const contentDiv = document.getElementById('conflict_content');
+        
+        if (data.success) {
+            resultsDiv.style.display = 'block';
+            
+            if (data.has_conflicts) {
+                let html = '';
+                data.conflicts.forEach(conflict => {
+                    html += `<div class="conflict-item ${conflict.type === '区域冲突' ? 'area-conflict' : 'pilot-conflict'}">`;
+                    html += `<div class="conflict-type">${conflict.type}</div>`;
+                    html += `<div class="conflict-details">`;
+                    html += `机师：${conflict.pilot_name}，时间：${conflict.start_time} - ${conflict.end_time}，`;
+                    html += `时长：${conflict.duration}，区域：${conflict.coords}`;
+                    html += `</div></div>`;
+                });
+                contentDiv.innerHTML = html;
+                document.getElementById('submit_btn').disabled = true;
+            } else {
+                contentDiv.innerHTML = '<div class="no-conflicts">✓ 检查通过，无冲突</div>';
+                document.getElementById('submit_btn').disabled = false;
+            }
+        } else {
+            alert('检查失败：' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('检查失败：网络错误');
+        console.error('Error:', error);
+    });
+});
+
+// 表单提交前再次检查
+document.getElementById('announcementForm').addEventListener('submit', function(e) {
+    const submitBtn = document.getElementById('submit_btn');
+    if (submitBtn.disabled) {
+        e.preventDefault();
+        alert('请先通过冲突检查');
+    }
+});
+</script>
+{% endblock %}
