@@ -4,6 +4,7 @@ from datetime import datetime
 from mongoengine import (DateTimeField, Document, EnumField, IntField, ReferenceField, StringField)
 
 from .user import User
+from utils.timezone_helper import get_current_utc_time
 
 
 class Gender(enum.Enum):
@@ -64,8 +65,8 @@ class Pilot(Document):
     status = EnumField(Status, default=Status.NOT_RECRUITED)
 
     # 系统字段
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=get_current_utc_time)
+    updated_at = DateTimeField(default=get_current_utc_time)
 
     meta = {
         'collection':
@@ -121,7 +122,7 @@ class Pilot(Document):
 
     def save(self, *args, **kwargs):
         """保存时更新修改时间"""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = get_current_utc_time()
         return super().save(*args, **kwargs)
 
     @property
@@ -146,7 +147,7 @@ class PilotChangeLog(Document):
     field_name = StringField(required=True)
     old_value = StringField()
     new_value = StringField()
-    change_time = DateTimeField(default=datetime.utcnow)
+    change_time = DateTimeField(default=get_current_utc_time)
     ip_address = StringField()
 
     meta = {

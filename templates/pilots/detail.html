@@ -85,11 +85,11 @@
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">创建时间</div>
-          <div class="info-value">{{ pilot.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+          <div class="info-value">{{ pilot.created_at | local_datetime('%Y-%m-%d %H:%M:%S') }}</div>
         </div>
         <div class="info-item">
           <div class="info-label">最后修改</div>
-          <div class="info-value">{{ pilot.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+          <div class="info-value">{{ pilot.updated_at | local_datetime('%Y-%m-%d %H:%M:%S') }}</div>
         </div>
       </div>
     </div>

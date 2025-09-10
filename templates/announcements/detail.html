@@ -10,11 +10,6 @@
             <span class="separator">></span>
             <span>通告详情</span>
         </div>
-        <div class="actions">
-            <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}" class="btn btn-primary">编辑</a>
-            <button type="button" class="btn btn-danger" onclick="showDeleteModal()">删除</button>
-            <button type="button" class="btn btn-outline" onclick="showChangesModal()">变更记录</button>
-        </div>
     </div>
 
     <div class="detail-content">
@@ -64,7 +59,7 @@
             <div class="info-grid">
                 <div class="info-item">
                     <label>开始时间：</label>
-                    <div class="value">{{ announcement.start_time.strftime('%Y年%m月%d日 %H:%M') }}</div>
+                    <div class="value">{{ announcement.start_time | local_datetime }}</div>
                 </div>
 
                 <div class="info-item">
@@ -74,7 +69,7 @@
 
                 <div class="info-item">
                     <label>结束时间：</label>
-                    <div class="value">{{ announcement.end_time.strftime('%Y年%m月%d日 %H:%M') }}</div>
+                    <div class="value">{{ announcement.end_time | local_datetime }}</div>
                 </div>
 
                 <div class="info-item">
@@ -91,7 +86,7 @@
             {% if announcement.recurrence_end %}
             <div class="info-item">
                 <label>循环结束：</label>
-                <div class="value">{{ announcement.recurrence_end.strftime('%Y年%m月%d日 %H:%M') }}</div>
+                <div class="value">{{ announcement.recurrence_end | local_datetime }}</div>
             </div>
             {% endif %}
 
@@ -102,7 +97,7 @@
                     {% for related in related_announcements %}
                     <div class="event-item {% if related.id == announcement.id %}current{% endif %}">
                         <a href="{{ url_for('announcement.announcement_detail', announcement_id=related.id) }}">
-                            <span class="event-time">{{ related.start_time.strftime('%m-%d %H:%M') }}</span>
+                            <span class="event-time">{{ related.start_time | local_datetime('%m-%d %H:%M') }}</span>
                             <span class="event-duration">{{ related.duration_display }}</span>
                             {% if related.id == announcement.id %}
                             <span class="current-indicator">当前</span>
@@ -122,12 +117,12 @@
             <div class="info-grid">
                 <div class="info-item">
                     <label>创建时间：</label>
-                    <div class="value">{{ announcement.created_at.strftime('%Y年%m月%d日 %H:%M:%S') }}</div>
+                    <div class="value">{{ announcement.created_at | local_datetime('%Y年%m月%d日 %H:%M:%S') }}</div>
                 </div>
 
                 <div class="info-item">
                     <label>最后修改：</label>
-                    <div class="value">{{ announcement.updated_at.strftime('%Y年%m月%d日 %H:%M:%S') }}</div>
+                    <div class="value">{{ announcement.updated_at | local_datetime('%Y年%m月%d日 %H:%M:%S') }}</div>
                 </div>
 
                 <div class="info-item">
@@ -147,6 +142,15 @@
                 {% endif %}
             </div>
         </div>
+    </div>
+</div>
+
+<!-- 底部操作栏 -->
+<div class="footbar">
+    <div class="inner">
+        <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}" class="btn btn-primary">编辑</a>
+        <button type="button" class="btn btn-danger" onclick="showDeleteModal()">删除</button>
+        <button type="button" class="btn btn-outline" onclick="showChangesModal()">变更记录</button>
     </div>
 </div>
 
@@ -204,12 +208,10 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    padding-bottom: 88px; /* 为底部操作栏留出空间 */
 }
 
 .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 30px;
     padding-bottom: 15px;
     border-bottom: 2px solid #eee;
@@ -235,9 +237,25 @@
     color: #ccc;
 }
 
-.actions {
+/* 底部操作栏样式 */
+.footbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid var(--table-header, #ddd);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
+    z-index: 100;
+}
+
+.footbar .inner {
     display: flex;
-    gap: 10px;
+    gap: 12px;
+    justify-content: center;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .detail-content {
@@ -511,14 +529,9 @@
 }
 
 @media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        gap: 15px;
-        align-items: stretch;
-    }
-    
-    .actions {
-        justify-content: center;
+    .container {
+        padding: 16px;
+        padding-bottom: 88px;
     }
     
     .info-grid {
@@ -542,6 +555,18 @@
     
     .modal-actions {
         flex-direction: column;
+    }
+    
+    /* 移动端footbar样式 */
+    .footbar .inner {
+        flex-direction: row;
+        gap: 8px;
+    }
+    
+    .footbar .btn {
+        flex: 1;
+        font-size: 14px;
+        padding: 12px 8px;
     }
 }
 </style>

@@ -14,6 +14,7 @@ from routes.pilot import pilot_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
+from utils.timezone_helper import (format_local_datetime, format_local_date, format_local_time, get_local_datetime_for_input)
 
 
 def create_app() -> Flask:
@@ -106,6 +107,27 @@ def create_app() -> Flask:
         if isinstance(roles, list):
             return [role_mapping.get(role.name if hasattr(role, 'name') else role, role.name if hasattr(role, 'name') else role) for role in roles]
         return [role_mapping.get(roles, roles)]
+
+    # 注册时间处理过滤器
+    @flask_app.template_filter('local_datetime')
+    def local_datetime_filter(utc_dt, format_str='%Y年%m月%d日 %H:%M'):
+        """将UTC时间转换为GMT+8时间并格式化"""
+        return format_local_datetime(utc_dt, format_str)
+
+    @flask_app.template_filter('local_date')
+    def local_date_filter(utc_dt, format_str='%Y-%m-%d'):
+        """将UTC时间转换为GMT+8日期并格式化"""
+        return format_local_date(utc_dt, format_str)
+
+    @flask_app.template_filter('local_time')
+    def local_time_filter(utc_dt, format_str='%H:%M'):
+        """将UTC时间转换为GMT+8时间并格式化"""
+        return format_local_time(utc_dt, format_str)
+
+    @flask_app.template_filter('local_datetime_for_input')
+    def local_datetime_for_input_filter(utc_dt):
+        """将UTC时间转换为适合HTML datetime-local输入框的格式"""
+        return get_local_datetime_for_input(utc_dt)
 
     # 启动时确保角色与默认议长存在（需要应用上下文以支持密码哈希等）
     with flask_app.app_context():

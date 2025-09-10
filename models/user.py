@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
 
 from flask_security.utils import verify_password
 from mongoengine import (BooleanField, DateTimeField, Document, IntField, ListField, ReferenceField, StringField)
+from utils.timezone_helper import get_current_utc_time
 
 # pylint: disable=R0903
 
@@ -44,7 +44,7 @@ class User(Document):
     password = StringField(required=True)  # 密文
     nickname = StringField(default='')
     active = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=get_current_utc_time)
     # Flask-Security-Too 要求：全局唯一标识
     fs_uniquifier = StringField(required=True, unique=True, default=lambda: uuid.uuid4().hex)
 
@@ -91,7 +91,7 @@ class User(Document):
         """Flask-Security-Too需要的角色获取方法"""
         return self.roles
 
-    def has_permission(self, permission):
+    def has_permission(self, permission):  # pylint: disable=unused-argument
         """Flask-Security-Too需要的权限检查方法"""
         return False  # 暂时不实现权限系统
 

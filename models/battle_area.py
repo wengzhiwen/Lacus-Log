@@ -1,7 +1,7 @@
 import enum
-from datetime import datetime
 
 from mongoengine import DateTimeField, Document, EnumField, StringField
+from utils.timezone_helper import get_current_utc_time
 
 
 class Availability(enum.Enum):
@@ -24,8 +24,8 @@ class BattleArea(Document):
     z_coord = StringField(required=True, max_length=50)
     availability = EnumField(Availability, default=Availability.ENABLED, required=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=get_current_utc_time)
+    updated_at = DateTimeField(default=get_current_utc_time)
 
     meta = {
         'collection':
@@ -74,5 +74,5 @@ class BattleArea(Document):
 
     def save(self, *args, **kwargs):
         """保存时更新修改时间"""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = get_current_utc_time()
         return super().save(*args, **kwargs)

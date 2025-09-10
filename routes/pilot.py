@@ -1,5 +1,5 @@
 # pylint: disable=no-member
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
@@ -8,6 +8,7 @@ from mongoengine import DoesNotExist, ValidationError
 from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank, Status, WorkMode)
 from models.user import User
 from utils.logging_setup import get_logger
+from utils.timezone_helper import get_current_utc_time
 
 logger = get_logger('pilot')
 
@@ -127,7 +128,7 @@ def list_pilots():
                 pass
 
     if days_filter:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_filter)
+        cutoff_date = get_current_utc_time() - timedelta(days=days_filter)
         query = query.filter(created_at__gte=cutoff_date)
 
     pilots = query.order_by('-created_at').all()

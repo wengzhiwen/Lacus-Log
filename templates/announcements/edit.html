@@ -67,7 +67,7 @@
                     <div class="form-group">
                         <label for="start_time" class="required">开始时间：</label>
                         <input type="datetime-local" name="start_time" id="start_time" required
-                               value="{{ announcement.start_time.strftime('%Y-%m-%dT%H:%M') if announcement.start_time else '' }}">
+                               value="{{ announcement.start_time | local_datetime_for_input }}">
                     </div>
 
                     <div class="form-group">
@@ -97,17 +97,20 @@
             </div>
             {% endif %}
 
-            <!-- 冲突检查结果 -->
-            <div id="conflict_results" class="conflict-section" style="display: none;">
-                <h3>冲突检查结果</h3>
-                <div id="conflict_content"></div>
-            </div>
-
             <!-- 表单操作 -->
             <div class="form-actions">
                 <button type="button" id="check_btn" class="btn btn-secondary">检查冲突</button>
-                <button type="submit" id="submit_btn" class="btn btn-primary" disabled>保存修改</button>
-                <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}" class="btn btn-outline">取消</a>
+                
+                <!-- 冲突检查结果 -->
+                <div id="conflict_results" class="conflict-section" style="display: none;">
+                    <h3>冲突检查结果</h3>
+                    <div id="conflict_content"></div>
+                </div>
+                
+                <div class="button-row">
+                    <button type="submit" id="submit_btn" class="btn btn-primary" disabled>保存修改</button>
+                    <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}" class="btn btn-outline">取消</a>
+                </div>
             </div>
         </form>
     </div>
@@ -301,10 +304,27 @@
 
 .form-actions {
     display: flex;
+    flex-direction: column;
     gap: 15px;
-    justify-content: center;
+    align-items: center;
     padding-top: 30px;
     border-top: 1px solid #eee;
+}
+
+.form-actions .conflict-section {
+    width: 100%;
+    max-width: 600px;
+    margin: 20px 0;
+}
+
+.form-actions > .btn {
+    margin: 10px 5px;
+}
+
+.button-row {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
 }
 
 .btn {

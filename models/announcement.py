@@ -8,6 +8,7 @@ from mongoengine import (DateTimeField, Document, EnumField, FloatField, Referen
 from .battle_area import BattleArea
 from .pilot import Pilot
 from .user import User
+from utils.timezone_helper import get_current_utc_time
 
 
 class RecurrenceType(enum.Enum):
@@ -45,8 +46,8 @@ class Announcement(Document):
     parent_announcement = ReferenceField('self')  # 父通告ID（用于关联重复事件组）
 
     # 系统字段
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=get_current_utc_time)
+    updated_at = DateTimeField(default=get_current_utc_time)
     created_by = ReferenceField(User, required=True)
 
     meta = {
@@ -78,9 +79,7 @@ class Announcement(Document):
         """数据验证和业务规则检查"""
         super().clean()
 
-        # 时间验证
-        if self.start_time and self.start_time < datetime.utcnow():
-            raise ValueError("开始时间不能早于当前时间")
+        # 时间验证（移除开始时间不能早于当前时间的限制，允许创建历史记录）
 
         # 时长验证（通过字段定义的min_value和max_value进行）
         if self.duration_hours:
@@ -100,7 +99,7 @@ class Announcement(Document):
                 pattern = json.loads(self.recurrence_pattern)
                 self._validate_recurrence_pattern(pattern)
             except (json.JSONDecodeError, ValueError) as e:
-                raise ValueError(f"重复规则格式错误：{str(e)}")
+                raise ValueError(f"重复规则格式错误：{str(e)}") from e
 
             # 重复跨度不能超过60天
             if self.recurrence_end:
@@ -148,7 +147,7 @@ class Announcement(Document):
 
     def save(self, *args, **kwargs):
         """保存时更新修改时间"""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = get_current_utc_time()
         return super().save(*args, **kwargs)
 
     @property
@@ -334,8 +333,7 @@ class Announcement(Document):
                 target_datetime = target_date.replace(hour=base.start_time.hour, minute=base.start_time.minute, second=base.start_time.second)
 
                 # 仅生成不早于基准开始时间的实例，避免本周内回溯生成
-                if (target_datetime <= end_date and target_datetime >= base.start_time
-                        and target_datetime != base.start_time):
+                if (target_datetime <= end_date and target_datetime >= base.start_time and target_datetime != base.start_time):
                     instance = cls(pilot=base.pilot,
                                    battle_area=base.battle_area,
                                    x_coord=base.x_coord,
@@ -388,7 +386,7 @@ class AnnouncementChangeLog(Document):
     field_name = StringField(required=True)
     old_value = StringField()
     new_value = StringField()
-    change_time = DateTimeField(default=datetime.utcnow)
+    change_time = DateTimeField(default=get_current_utc_time)
     ip_address = StringField()
 
     meta = {

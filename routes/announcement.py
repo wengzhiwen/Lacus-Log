@@ -1,6 +1,5 @@
 # pylint: disable=no-member
 import json
-from datetime import datetime
 
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
@@ -11,6 +10,8 @@ from models.battle_area import BattleArea
 from models.pilot import Pilot
 from models.user import User
 from utils.logging_setup import get_logger
+from utils.timezone_helper import (parse_local_datetime, get_current_local_datetime_for_input, get_current_month_last_day_for_input,
+                                   parse_local_date_to_end_datetime)
 
 logger = get_logger('announcement')
 
@@ -106,6 +107,20 @@ def _get_battle_area_choices():
         x_groups[area.x_coord][area.y_coord].append(area)
 
     return x_groups
+
+
+def _render_new_template(form=None, conflicts=None):
+    """渲染新建通告模板的辅助函数"""
+    context = {
+        'battle_area_choices': _get_battle_area_choices(),
+        'default_start_time': get_current_local_datetime_for_input(),
+        'default_recurrence_end_date': get_current_month_last_day_for_input()
+    }
+    if form:
+        context['form'] = form
+    if conflicts:
+        context['conflicts'] = conflicts
+    return render_template('announcements/new.html', **context)
 
 
 def _get_filter_choices():
@@ -235,19 +250,19 @@ def new_announcement():
             # 基础验证
             if not pilot_id:
                 flash('请选择机师', 'error')
-                return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+                return _render_new_template(form=request.form)
 
             if not battle_area_id:
                 flash('请选择战斗区域', 'error')
-                return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+                return _render_new_template(form=request.form)
 
             if not start_time_str:
                 flash('请选择开始时间', 'error')
-                return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+                return _render_new_template(form=request.form)
 
             if not duration_hours:
                 flash('请输入时长', 'error')
-                return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+                return _render_new_template(form=request.form)
 
             # 获取关联对象
             try:
@@ -255,17 +270,16 @@ def new_announcement():
                 battle_area = BattleArea.objects.get(id=battle_area_id)
             except DoesNotExist:
                 flash('机师或战斗区域不存在', 'error')
-                return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+                return _render_new_template(form=request.form)
 
             # 权限检查：议长和舰长都可以为所有机师创建通告
             # （根据技术设计文档权限矩阵，舰长权限与议长相同）
 
-            # 解析时间
-            try:
-                start_time = datetime.fromisoformat(start_time_str)
-            except ValueError:
+            # 解析时间（将用户输入的GMT+8时间转换为UTC时间）
+            start_time = parse_local_datetime(start_time_str)
+            if start_time is None:
                 flash('时间格式错误', 'error')
-                return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+                return _render_new_template(form=request.form)
 
             # 创建基础通告对象
             announcement = Announcement(pilot=pilot,
@@ -302,15 +316,14 @@ def new_announcement():
                             pattern['specific_dates'] = dates
                         except Exception:
                             flash('自定义日期格式错误', 'error')
-                            return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+                            return _render_new_template(form=request.form)
 
                 # 设置重复结束时间
-                recurrence_end_str = request.form.get('recurrence_end')
-                if recurrence_end_str:
-                    try:
-                        announcement.recurrence_end = datetime.fromisoformat(recurrence_end_str)
-                    except ValueError:
-                        pass
+                recurrence_end_date_str = request.form.get('recurrence_end_date')
+                if recurrence_end_date_str:
+                    recurrence_end = parse_local_date_to_end_datetime(recurrence_end_date_str)
+                    if recurrence_end:
+                        announcement.recurrence_end = recurrence_end
 
                 announcement.recurrence_pattern = json.dumps(pattern)
 
@@ -332,7 +345,7 @@ def new_announcement():
                 # 删除刚创建的通告
                 announcement.delete()
                 flash('存在时间冲突，无法创建通告', 'error')
-                return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices(), conflicts=all_conflicts)
+                return _render_new_template(form=request.form, conflicts=all_conflicts)
 
             # 保存所有重复事件实例（除了基础通告已经保存）
             for instance in instances[1:]:  # 跳过第一个（基础通告）
@@ -344,13 +357,14 @@ def new_announcement():
 
         except (ValueError, ValidationError) as e:
             flash(f'数据验证失败：{str(e)}', 'error')
-            return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+            return _render_new_template(form=request.form)
         except Exception as e:
             flash(f'创建失败：{str(e)}', 'error')
             logger.error('创建通告失败：%s', str(e))
-            return render_template('announcements/new.html', form=request.form, battle_area_choices=_get_battle_area_choices())
+            return _render_new_template(form=request.form)
 
-    return render_template('announcements/new.html', battle_area_choices=_get_battle_area_choices())
+    # 为GET请求设置默认开始时间为当前GMT+8时间
+    return _render_new_template()
 
 
 @announcement_bp.route('/<announcement_id>/edit', methods=['GET', 'POST'])
@@ -401,10 +415,9 @@ def edit_announcement(announcement_id):
                 # 权限检查：议长和舰长都可以编辑所有通告
                 # （根据技术设计文档权限矩阵，舰长权限与议长相同）
 
-                # 解析时间
-                try:
-                    start_time = datetime.fromisoformat(start_time_str)
-                except ValueError:
+                # 解析时间（将用户输入的GMT+8时间转换为UTC时间）
+                start_time = parse_local_datetime(start_time_str)
+                if start_time is None:
                     flash('时间格式错误', 'error')
                     return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
 
@@ -512,7 +525,7 @@ def check_conflicts():
         # 重复规则参数
         recurrence_type = data.get('recurrence_type', 'NONE')
         recurrence_pattern = data.get('recurrence_pattern', {})
-        recurrence_end = data.get('recurrence_end')
+        recurrence_end_date = data.get('recurrence_end_date')
 
         if not all([pilot_id, battle_area_id, start_time_str, duration_hours]):
             return jsonify({'success': False, 'error': '缺少必要参数'}), 400
@@ -520,11 +533,15 @@ def check_conflicts():
         try:
             pilot = Pilot.objects.get(id=pilot_id)
             battle_area = BattleArea.objects.get(id=battle_area_id)
-            start_time = datetime.fromisoformat(start_time_str)
+            start_time = parse_local_datetime(start_time_str)
+            if start_time is None:
+                return jsonify({'success': False, 'error': '时间格式错误'}), 400
             end_time = None
-            if recurrence_end:
-                end_time = datetime.fromisoformat(recurrence_end)
-        except (DoesNotExist, ValueError) as e:
+            if recurrence_end_date:
+                end_time = parse_local_date_to_end_datetime(recurrence_end_date)
+                if end_time is None:
+                    return jsonify({'success': False, 'error': '重复结束日期格式错误'}), 400
+        except DoesNotExist as e:
             return jsonify({'success': False, 'error': f'参数错误：{str(e)}'}), 400
 
         # 创建临时通告对象进行冲突检查

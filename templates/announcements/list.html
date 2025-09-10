@@ -87,7 +87,7 @@
                             </div>
                         </div>
                         <div class="time-info">
-                            <span class="start-time">{{ announcement.start_time.strftime('%m-%d %H:%M') }}</span>
+                            <span class="start-time">{{ announcement.start_time | local_datetime('%m-%d %H:%M') }}</span>
                             <span class="duration">{{ announcement.duration_display }}</span>
                         </div>
                     </div>
@@ -107,7 +107,7 @@
 
                     <div class="card-footer">
                         <div class="announcement-meta">
-                            <span class="created-time">创建：{{ announcement.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span class="created-time">创建：{{ announcement.created_at | local_datetime('%Y-%m-%d %H:%M') }}</span>
                             {% if announcement.parent_announcement %}
                             <span class="parent-indicator">循环事件</span>
                             {% elif announcement.recurrence_type.value != '无重复' %}
