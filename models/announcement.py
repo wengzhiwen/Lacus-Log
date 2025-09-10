@@ -3,12 +3,14 @@ import enum
 import json
 from datetime import datetime, timedelta
 
-from mongoengine import (DateTimeField, Document, EnumField, FloatField, ReferenceField, StringField)
+from mongoengine import (DateTimeField, Document, EnumField, FloatField,
+                         ReferenceField, StringField)
+
+from utils.timezone_helper import get_current_utc_time
 
 from .battle_area import BattleArea
 from .pilot import Pilot
 from .user import User
-from utils.timezone_helper import get_current_utc_time
 
 
 class RecurrenceType(enum.Enum):
@@ -206,11 +208,12 @@ class Announcement(Document):
 
         return self.recurrence_type.value
 
-    def check_conflicts(self, exclude_self=True):
+    def check_conflicts(self, exclude_self=True, exclude_ids=None):
         """检查时间冲突
         
         Args:
             exclude_self: 是否排除自身（用于编辑时检查）
+            exclude_ids: 要排除的通告ID列表（用于编辑未来所有时排除多个通告）
             
         Returns:
             dict: 冲突检查结果
@@ -222,10 +225,18 @@ class Announcement(Document):
 
         end_time = self.end_time
 
-        # 构建查询，排除自身
+        # 构建查询，排除指定的通告
         query = Announcement.objects
+        exclude_list = []
+
         if exclude_self and self.id:
-            query = query.filter(id__ne=self.id)
+            exclude_list.append(self.id)
+
+        if exclude_ids:
+            exclude_list.extend(exclude_ids)
+
+        if exclude_list:
+            query = query.filter(id__nin=exclude_list)
 
         # 查找时间重叠的通告
         overlapping = query.filter(start_time__lt=end_time,

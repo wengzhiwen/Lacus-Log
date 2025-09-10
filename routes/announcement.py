@@ -1,7 +1,7 @@
 # pylint: disable=no-member
 import calendar
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
                    request, url_for)
@@ -745,8 +745,19 @@ def check_conflicts():
         # 检查所有实例的冲突
         all_conflicts = []
 
+        # 收集所有需要排除的通告ID（编辑未来所有时）
+        exclude_ids = []
+        if edit_scope == 'future_all' and exclude_id:
+            try:
+                original_announcement = Announcement.objects.get(id=exclude_id)
+                if original_announcement.is_in_recurrence_group:
+                    future_announcements = original_announcement.get_future_announcements_in_group(include_self=True)
+                    exclude_ids = [str(ann.id) for ann in future_announcements]
+            except DoesNotExist:
+                pass
+
         for instance in instances:
-            conflicts = instance.check_conflicts(exclude_self=bool(exclude_id))
+            conflicts = instance.check_conflicts(exclude_self=bool(exclude_id), exclude_ids=exclude_ids)
 
             # 收集冲突信息
             for conflict in conflicts['area_conflicts']:
