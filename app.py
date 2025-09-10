@@ -14,8 +14,10 @@ from routes.pilot import pilot_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
-from utils.timezone_helper import (format_local_datetime, format_local_date, format_local_time, get_local_datetime_for_input, get_local_date_for_input,
-                                   get_local_time_for_input)
+from utils.timezone_helper import (format_local_date, format_local_datetime,
+                                   format_local_time, get_local_date_for_input,
+                                   get_local_datetime_for_input,
+                                   get_local_time_for_input, utc_to_local)
 
 
 def create_app() -> Flask:
@@ -134,6 +136,11 @@ def create_app() -> Flask:
     def local_date_for_input_filter(utc_dt):
         """将UTC时间转换为适合HTML date输入框的格式"""
         return get_local_date_for_input(utc_dt)
+
+    @flask_app.template_filter('utc_to_local')
+    def utc_to_local_filter(utc_dt):
+        """将UTC时间转换为GMT+8时间"""
+        return utc_to_local(utc_dt)
 
     @flask_app.template_filter('local_time_for_input')
     def local_time_for_input_filter(utc_dt):

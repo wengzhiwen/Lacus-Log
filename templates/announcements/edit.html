@@ -94,7 +94,7 @@
                                     <option value="">时</option>
                                     {% for hour in range(0, 24) %}
                                     <option value="{{ '%02d'|format(hour) }}" 
-                                            {% if announcement.start_time and announcement.start_time.hour == hour %}selected{% endif %}>
+                                            {% if announcement.start_time and (announcement.start_time | utc_to_local).hour == hour %}selected{% endif %}>
                                         {{ '%02d'|format(hour) }}
                                     </option>
                                     {% endfor %}
@@ -104,7 +104,7 @@
                                     <option value="">分</option>
                                     {% for minute in range(0, 60, 15) %}
                                     <option value="{{ '%02d'|format(minute) }}" 
-                                            {% if announcement.start_time and announcement.start_time.minute == minute %}selected{% endif %}>
+                                            {% if announcement.start_time and (announcement.start_time | utc_to_local).minute == minute %}selected{% endif %}>
                                         {{ '%02d'|format(minute) }}
                                     </option>
                                     {% endfor %}
