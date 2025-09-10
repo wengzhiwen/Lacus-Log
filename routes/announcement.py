@@ -5,13 +5,13 @@ from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, 
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
-from models.announcement import Announcement, AnnouncementChangeLog, RecurrenceType
+from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
 from models.battle_area import BattleArea
 from models.pilot import Pilot
 from models.user import User
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (parse_local_datetime, get_current_local_datetime_for_input, get_current_month_last_day_for_input,
-                                   parse_local_date_to_end_datetime)
+from utils.timezone_helper import (get_current_local_datetime_for_input, get_current_local_time, get_current_month_last_day_for_input, local_to_utc,
+                                   parse_local_date_to_end_datetime, parse_local_datetime, utc_to_local)
 
 logger = get_logger('announcement')
 
@@ -153,7 +153,10 @@ def _get_filter_choices():
         y_coords.add(area.y_coord)
     y_choices = [('', '全部Y坐标')] + [(y, y) for y in sorted(y_coords)]
 
-    return {'owner_choices': owner_choices, 'rank_choices': rank_choices, 'x_choices': x_choices, 'y_choices': y_choices}
+    # 时间范围选择
+    time_choices = [('now', '现在开始'), ('all', '全部')]
+
+    return {'owner_choices': owner_choices, 'rank_choices': rank_choices, 'x_choices': x_choices, 'y_choices': y_choices, 'time_choices': time_choices}
 
 
 @announcement_bp.route('/')
@@ -162,9 +165,15 @@ def list_announcements():
     """通告列表页面"""
     # 获取筛选参数
     owner_filter = request.args.get('owner')
+    # 默认筛选：当未提供 owner 参数时，默认按“所属=自己”过滤
+    if owner_filter is None and current_user.is_authenticated:
+        owner_filter = str(current_user.id)
     rank_filter = request.args.get('rank')
     x_filter = request.args.get('x')
     y_filter = request.args.get('y')
+    # 时间范围（默认：现在开始）
+    time_scope = request.args.get('time', 'now')
+
     # 分页参数（当前未使用，为未来分页功能预留）
     # page = request.args.get('page', 1, type=int)
 
@@ -195,8 +204,16 @@ def list_announcements():
     if y_filter:
         query = query.filter(y_coord=y_filter)
 
-    # 排序：按开始时间降序、机师昵称字典顺序
-    announcements = query.order_by('-start_time').limit(100)
+    # 时间筛选：默认仅显示从当前时间（本地GMT+8）开始的通告
+    if time_scope == 'now':
+        current_local = get_current_local_time()
+        current_utc = local_to_utc(current_local)
+        query = query.filter(start_time__gte=current_utc)
+
+    # 排序：按通告日（本地GMT+8）升序、同日按机师昵称字典序
+    # 说明：由于需要按关联字段 pilot.nickname 排序，改为在应用层进行排序
+    announcements = list(query.limit(100))
+    announcements.sort(key=lambda a: ((utc_to_local(a.start_time).date() if a.start_time else None), (a.pilot.nickname or '') if a.pilot else ''))
 
     # 获取筛选选项
     filter_choices = _get_filter_choices()
@@ -207,6 +224,7 @@ def list_announcements():
                            rank_filter=rank_filter,
                            x_filter=x_filter,
                            y_filter=y_filter,
+                           time_scope=time_scope,
                            **filter_choices)
 
 

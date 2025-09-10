@@ -20,6 +20,7 @@
         {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
         {% if x_filter %}{% set _ = selected_items.append('X:' + x_filter) %}{% endif %}
         {% if y_filter %}{% set _ = selected_items.append('Y:' + y_filter) %}{% endif %}
+        {% if time_scope and time_scope == 'now' %}{% set _ = selected_items.append('现在开始') %}{% endif %}
         {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
         
         <button type="button" class="filter-toggle" onclick="toggleFilters()">
@@ -60,6 +61,15 @@
                 <select class="filter-select" name="y" onchange="this.form.submit()">
                     {% for value, label in y_choices %}
                     <option value="{{ value }}" {% if y_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">时间</label>
+                <select class="filter-select" name="time" onchange="this.form.submit()">
+                    {% for value, label in time_choices %}
+                    <option value="{{ value }}" {% if (time_scope or 'now') == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
