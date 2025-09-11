@@ -165,9 +165,12 @@ def run_dev() -> None:
     """
     port = int(os.getenv('FLASK_APP_PORT', '5080'))
     is_debug = os.getenv('LOG_LEVEL', 'DEBUG') == 'DEBUG'
+    host_ip = "127.0.0.1"
+    if is_debug:
+        host_ip = "0.0.0.0"
 
-    app.logger.info('以开发模式启动，端口：%s', port)
-    app.run(host='0.0.0.0', port=port, debug=is_debug, use_reloader=True)
+    app.logger.info('以开发模式启动，监听端口：%s，IP地址：%s', port, host_ip)
+    app.run(host=host_ip, port=port, debug=is_debug, use_reloader=True)
 
 
 if __name__ == '__main__':
