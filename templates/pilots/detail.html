@@ -103,6 +103,12 @@
         <span class="btn-icon">✏️</span>
         编辑
       </a>
+      {% if pilot.status.value == '未征召' %}
+      <a class="btn btn-primary" href="{{ url_for('recruit.start_recruit', pilot_id=pilot.id) }}">
+        <span class="btn-icon">🎯</span>
+        启动征召
+      </a>
+      {% endif %}
       <button class="btn btn-secondary" onclick="showChanges()">
         <span class="btn-icon">📜</span>
         变更记录

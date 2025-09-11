@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}机师征召 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="recruits-list">
+  <!-- 页面头部对齐作战记录样式 -->
+  <div class="page-header">
+    <h1 class="page-title">机师征召</h1>
+  </div>
+
+  <!-- 筛选器（默认折叠，样式对齐作战记录） -->
+  <div class="filter-bar">
+    {% set selected_items = [] %}
+    {% if current_status %}{% set _ = selected_items.append('状态:' + current_status) %}{% endif %}
+    {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
+
+    <button type="button" class="filter-toggle" onclick="toggleFilters()">
+      <span id="filter-summary">{{ filter_summary }}</span>
+      <span class="toggle-icon" id="filter-toggle-icon">▼</span>
+    </button>
+
+    <form class="filter-form is-collapsed" id="filter-form" method="get" action="{{ url_for('recruit.list_recruits') }}">
+      <div class="filter-group">
+        <label class="filter-label" for="status">征召状态</label>
+        <select class="filter-select" name="status" id="status" onchange="this.form.submit()">
+          <option value="已启动" {% if current_status == '已启动' %}selected{% endif %}>已启动</option>
+          <option value="已结束" {% if current_status == '已结束' %}selected{% endif %}>已结束</option>
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <!-- 征召列表（卡片样式对齐作战记录） -->
+  <div class="battle-record-list">
+    {% if recruits %}
+      <div class="record-cards">
+        {% for recruit in recruits %}
+        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              <div class="start-time">{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+            </div>
+            <div class="record-info">
+              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">暂无征召记录</div>
+        <div class="empty-description">
+          {% if current_status == '已启动' %}
+          当前没有进行中的征召，可以从机师详情页启动新的征召。
+          {% else %}
+          当前筛选条件下没有征召记录。
+          {% endif %}
+        </div>
+        <div class="empty-actions">
+          <a class="btn btn-primary" href="{{ url_for('pilot.list_pilots') }}">前往机师管理</a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<style>
+/* 过滤条与按钮（对齐作战记录） */
+.filter-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.filter-form.is-collapsed { display: none; }
+.filter-form { margin-bottom: 12px; }
+
+.filter-group { margin-bottom: 8px; }
+.filter-label { font-size: 14px; color: var(--text); display: block; margin-bottom: 4px; }
+.filter-select { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--table-header); background: #fff; }
+
+/* 卡片列表（对齐作战记录） */
+.record-cards { display: block; }
+.record-card {
+  display: block;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.record-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+  border-color: var(--brand);
+}
+.record-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.record-time { flex: 0 0 auto; }
+.start-time { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.record-info { flex: 1; text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+.pilot-name { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.2; margin-bottom: 2px; }
+.meta-line { font-size: 12px; color: var(--muted); line-height: 1.1; }
+.record-card .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 12px; }
+.record-card:hover .card-arrow { color: var(--brand); }
+
+.empty-state { text-align: center; padding: 60px 20px; }
+.empty-icon { font-size: 48px; margin-bottom: 16px; }
+.empty-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.empty-description { color: var(--muted); line-height: 1.5; margin-bottom: 24px; }
+.empty-actions { display: flex; justify-content: center; gap: 12px; }
+
+/* 移动端适配（对齐作战记录） */
+@media (max-width: 768px) {
+  .filter-form {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .record-card .card-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .record-info { text-align: right; align-items: flex-end; }
+}
+</style>
+
+<script>
+function toggleFilters() {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  const collapsed = form.classList.toggle('is-collapsed');
+  icon.textContent = collapsed ? '▼' : '▲';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  const hasQuery = window.location.search.length > 1;
+
+  if (!hasQuery) {
+    if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
+    icon.textContent = '▼';
+  } else {
+    form.classList.remove('is-collapsed');
+    icon.textContent = '▲';
+  }
+});
+</script>
+{% endblock %}

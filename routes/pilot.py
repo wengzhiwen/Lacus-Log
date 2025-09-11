@@ -1,11 +1,20 @@
 # pylint: disable=no-member
 from datetime import timedelta
 
-from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
-from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank, Status, WorkMode)
+from models.pilot import Gender, Pilot, PilotChangeLog, Platform, Rank, Status, WorkMode
 from models.user import User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import get_current_utc_time
@@ -51,11 +60,10 @@ def _record_changes(pilot, old_data, user, ip_address):
         logger.info('记录机师变更：%s，共%d个字段', pilot.nickname, len(changes))
 
 
-def _check_pilot_permission(pilot):
+def _check_pilot_permission(_pilot):
     """检查用户对机师的操作权限"""
-    if current_user.has_role('gicho'):
-        return True
-    if current_user.has_role('kancho') and pilot.owner and pilot.owner.id == current_user.id:
+    # 议长与舰长权限一致：均可访问/编辑所有机师
+    if current_user.has_role('gicho') or current_user.has_role('kancho'):
         return True
     return False
 
@@ -98,9 +106,7 @@ def list_pilots():
     # 构建查询
     query = Pilot.objects
 
-    # 权限控制：舰长只能看到自己的机师
-    if current_user.has_role('kancho') and not current_user.has_role('gicho'):
-        query = query.filter(owner=current_user)
+    # 权限控制：议长与舰长权限一致，不做按所属的强制过滤
 
     # 应用筛选条件
     if rank_filter:

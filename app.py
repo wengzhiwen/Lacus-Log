@@ -13,6 +13,7 @@ from routes.battle_record import battle_record_bp
 from routes.calendar import calendar_bp
 from routes.main import main_bp
 from routes.pilot import pilot_bp
+from routes.recruit import recruit_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
@@ -93,6 +94,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(main_bp)
     flask_app.register_blueprint(admin_bp, url_prefix='/admin')
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
+    flask_app.register_blueprint(recruit_bp, url_prefix='/recruits')
     flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')
     flask_app.register_blueprint(announcement_bp, url_prefix='/announcements')
     flask_app.register_blueprint(battle_record_bp, url_prefix='/battle-records')

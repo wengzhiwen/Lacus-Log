@@ -1,0 +1,427 @@
+{% extends 'base.html' %}
+{% block title %}征召详情 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
+{% block content %}
+<section class="recruit-detail">
+  <div class="back-nav">
+    <a class="btn btn-secondary" href="{{ url_for('recruit.list_recruits') }}">
+      <span>←</span>
+      返回征召列表
+    </a>
+  </div>
+
+  <!-- 机师信息卡片 -->
+  <div class="pilot-info-card">
+    <div class="card-header">
+      <div class="pilot-avatar">
+        <span class="avatar-icon">
+          {% if recruit.pilot.gender.value == 0 %}♂{% elif recruit.pilot.gender.value == 1 %}♀{% else %}?{% endif %}
+        </span>
+      </div>
+      <div class="pilot-main-info">
+        <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+        <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
+        <div class="pilot-badges">
+          <span class="rank-badge rank-{{ recruit.pilot.rank.value.replace(' ', '') }}">{{ recruit.pilot.rank.value }}</span>
+          <span class="status-badge status-{{ recruit.pilot.status.value.replace(' ', '') }}">{{ recruit.pilot.status.value }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="pilot-basic-info">
+      <div class="info-item">
+        <span class="info-label">性别/年龄：</span>
+        <span class="info-value">{{ recruit.pilot.gender_display }}{% if recruit.pilot.age %}/{{ recruit.pilot.age }}岁{% endif %}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">所属：</span>
+        <span class="info-value">{{ recruit.pilot.owner.nickname or recruit.pilot.owner.username if recruit.pilot.owner else '无' }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">当前阶级：</span>
+        <span class="info-value">{{ recruit.pilot.rank.value }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">当前状态：</span>
+        <span class="info-value">{{ recruit.pilot.status.value }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 征召信息 -->
+  <div class="recruit-info-card">
+    <div class="info-section">
+      <h3 class="section-title">征召信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">征召负责人</div>
+          <div class="info-value">{{ recruit.recruiter.nickname or recruit.recruiter.username }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">预约时间</div>
+          <div class="info-value">{{ recruit.appointment_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">征召渠道</div>
+          <div class="info-value">{{ recruit.channel.value }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">介绍费</div>
+          <div class="info-value">￥{{ recruit.introduction_fee }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">征召状态</div>
+          <div class="info-value status-{{ recruit.status.value.replace(' ', '') }}">{{ recruit.status.value }}</div>
+        </div>
+        {% if recruit.remarks %}
+        <div class="info-item full-width">
+          <div class="info-label">备注</div>
+          <div class="info-value">{{ recruit.remarks }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 系统信息 -->
+    <div class="info-section">
+      <h3 class="section-title">系统信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">创建时间</div>
+          <div class="info-value">{{ recruit.created_at | local_datetime('%Y-%m-%d %H:%M:%S') }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">最后修改</div>
+          <div class="info-value">{{ recruit.updated_at | local_datetime('%Y-%m-%d %H:%M:%S') }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 底部操作按钮 -->
+<div class="footbar">
+  <a class="btn btn-secondary" href="{{ url_for('recruit.edit_recruit', recruit_id=recruit.id) }}">编辑</a>
+  {% if recruit.status.value == '已启动' %}
+  <a class="btn btn-primary" href="{{ url_for('recruit.confirm_recruit_page', recruit_id=recruit.id) }}">确认征召</a>
+  <button class="btn btn-warning" onclick="showAbandonDialog()">放弃征召</button>
+  {% endif %}
+  <button class="btn btn-secondary" onclick="showChangesModal()">变更记录</button>
+</div>
+
+<!-- 放弃征召确认对话框 -->
+<div id="abandonDialog" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>确认放弃征召</h3>
+      <button class="modal-close" onclick="hideAbandonDialog()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p>你确认要放弃这个鸽子王吗？也许他将来可以驾驶强袭自由。</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="hideAbandonDialog()">取消</button>
+      <form style="display: inline;" method="POST" action="{{ url_for('recruit.abandon_recruit', recruit_id=recruit.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-warning">确认放弃</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 变更记录模态框 -->
+<div id="changesModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>征召变更记录</h3>
+      <button class="modal-close" onclick="hideChangesModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="changesContent">加载中...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="hideChangesModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.recruit-detail {
+  padding: 20px;
+}
+
+.back-nav {
+  margin-bottom: 20px;
+}
+
+.pilot-info-card, .recruit-info-card {
+  background: white;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--table-header);
+}
+
+.pilot-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--table-header);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.pilot-main-info {
+  flex: 1;
+}
+
+.pilot-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.pilot-real-name {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.pilot-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.rank-badge, .status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rank-候补机师, .rank-trainee { background: var(--table-header); color: var(--text); }
+.rank-训练机师, .rank-实习机师, .rank-正式机师 { background: var(--brand); color: white; }
+
+.status-未征召 { background: var(--table-header); color: var(--text); }
+.status-已征召, .status-已签约 { background: var(--hud-green); color: white; }
+.status-不征召, .status-已阵亡 { background: var(--error); color: white; }
+
+.pilot-basic-info {
+  display: grid;
+  gap: 8px;
+}
+
+.pilot-basic-info .info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.pilot-basic-info .info-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.pilot-basic-info .info-value {
+  color: var(--text);
+}
+
+.info-section {
+  margin-bottom: 20px;
+}
+
+.info-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.status-已启动 { color: var(--hud-green); font-weight: 600; }
+.status-已结束 { color: var(--muted); }
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  max-width: 90%;
+  max-height: 80%;
+  width: 500px;
+}
+
+.modal-header {
+  padding: 20px 20px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  padding: 0 20px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.changes-table {
+  width: 100%;
+  font-size: 14px;
+}
+
+.changes-table th,
+.changes-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--table-header);
+}
+
+.changes-table th {
+  background: var(--table-header);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-content {
+    margin: 20px;
+    width: auto;
+  }
+}
+</style>
+
+<script>
+function showAbandonDialog() {
+  document.getElementById('abandonDialog').style.display = 'flex';
+}
+
+function hideAbandonDialog() {
+  document.getElementById('abandonDialog').style.display = 'none';
+}
+
+function showChangesModal() {
+  const modal = document.getElementById('changesModal');
+  const content = document.getElementById('changesContent');
+  
+  modal.style.display = 'flex';
+  content.innerHTML = '加载中...';
+  
+  fetch('{{ url_for("recruit.recruit_changes", recruit_id=recruit.id) }}')
+    .then(response => response.json())
+    .then(data => {
+      if (data.length === 0) {
+        content.innerHTML = '<p style="text-align: center; color: var(--muted);">暂无变更记录</p>';
+        return;
+      }
+      
+      let html = '<table class="changes-table">';
+      html += '<thead><tr><th>时间</th><th>操作人</th><th>字段</th><th>前值</th><th>后值</th></tr></thead>';
+      html += '<tbody>';
+      
+      data.forEach(change => {
+        html += `<tr>
+          <td>${change.change_time}</td>
+          <td>${change.user}</td>
+          <td>${change.field}</td>
+          <td>${change.old_value || '-'}</td>
+          <td>${change.new_value || '-'}</td>
+        </tr>`;
+      });
+      
+      html += '</tbody></table>';
+      content.innerHTML = html;
+    })
+    .catch(error => {
+      console.error('加载变更记录失败:', error);
+      content.innerHTML = '<p style="text-align: center; color: var(--error);">加载失败，请重试</p>';
+    });
+}
+
+function hideChangesModal() {
+  document.getElementById('changesModal').style.display = 'none';
+}
+
+// 点击模态框背景关闭
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal')) {
+    e.target.style.display = 'none';
+  }
+});
+</script>
+{% endblock %}
