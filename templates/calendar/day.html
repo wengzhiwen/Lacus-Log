@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+{% block title %}日视图 - 作战计划日历{% endblock %}
+{% block content %}
+<section class="calendar-container">
+  <div class="calendar-header">
+    <h1 class="page-title">作战计划日历</h1>
+    <div class="view-controls">
+      <a href="{{ url_for('calendar.month_view') }}" class="btn btn-sm">月视图</a>
+      <a href="{{ url_for('calendar.week_view') }}" class="btn btn-sm">周视图</a>
+      <a href="{{ url_for('calendar.day_view') }}" class="btn btn-sm btn-primary">日视图</a>
+    </div>
+  </div>
+
+  <div class="day-navigation">
+    <button id="prevDay" class="btn btn-sm">‹ 前一天</button>
+    <h2 id="currentDay" class="day-title"></h2>
+    <button id="nextDay" class="btn btn-sm">后一天 ›</button>
+  </div>
+
+  <div class="day-calendar">
+    <!-- 时间标题行 -->
+    <div class="time-header-row">
+      <div class="area-header">战斗区域</div>
+      <div class="time-header-scroll">
+        <div class="time-slots">
+          <div class="time-slot">0</div>
+          <div class="time-slot">1</div>
+          <div class="time-slot">2</div>
+          <div class="time-slot">3</div>
+          <div class="time-slot">4</div>
+          <div class="time-slot">5</div>
+          <div class="time-slot">6</div>
+          <div class="time-slot">7</div>
+          <div class="time-slot">8</div>
+          <div class="time-slot">9</div>
+          <div class="time-slot">10</div>
+          <div class="time-slot">11</div>
+          <div class="time-slot">12</div>
+          <div class="time-slot">13</div>
+          <div class="time-slot">14</div>
+          <div class="time-slot">15</div>
+          <div class="time-slot">16</div>
+          <div class="time-slot">17</div>
+          <div class="time-slot">18</div>
+          <div class="time-slot">19</div>
+          <div class="time-slot">20</div>
+          <div class="time-slot">21</div>
+          <div class="time-slot">22</div>
+          <div class="time-slot">23</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 数据行容器 -->
+    <div id="dataRows" class="data-rows">
+      <!-- 动态生成数据行 -->
+    </div>
+  </div>
+
+  <div class="loading" id="loading" style="display: none;">
+    <div class="loading-spinner"></div>
+    <span>加载中...</span>
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // 从URL参数获取日期，或使用当前日期
+  const urlParams = new URLSearchParams(window.location.search);
+  let currentDateStr = urlParams.get('date') || new Date().toISOString().split('T')[0];
+  let currentDate = new Date(currentDateStr + 'T00:00:00');
+  
+  const dayTitleEl = document.getElementById('currentDay');
+  const dataRowsEl = document.getElementById('dataRows');
+  const loadingEl = document.getElementById('loading');
+
+  function formatDate(date) {
+    return date.getFullYear() + '-' + 
+           String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+           String(date.getDate()).padStart(2, '0');
+  }
+
+  function formatDateDisplay(date) {
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const weekday = weekdays[date.getDay()];
+    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 (周${weekday})`;
+  }
+
+  function updateDayTitle() {
+    dayTitleEl.textContent = formatDateDisplay(currentDate);
+  }
+
+  function loadDayData() {
+    loadingEl.style.display = 'flex';
+    
+    const dateStr = formatDate(currentDate);
+    
+    fetch(`{{ url_for('calendar.day_data') }}?date=${dateStr}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        renderDay(data);
+      })
+      .catch(error => {
+        console.error('加载日视图数据失败:', error);
+        alert('加载数据失败，请重试');
+      })
+      .finally(() => {
+        loadingEl.style.display = 'none';
+      });
+  }
+
+  function renderDay(data) {
+    dataRowsEl.innerHTML = '';
+
+    if (!data.area_timelines || Object.keys(data.area_timelines).length === 0) {
+      dataRowsEl.innerHTML = '<div class="no-data">当日暂无作战计划安排</div>';
+      return;
+    }
+
+    // 按区域排序
+    const sortedAreas = Object.keys(data.area_timelines).sort((a, b) => {
+      const [x1, y1, z1] = a.split('-');
+      const [x2, y2, z2] = b.split('-');
+      
+      // 按X, Y, Z坐标排序
+      if (x1 !== x2) return x1.localeCompare(x2);
+      if (y1 !== y2) return y1.localeCompare(y2);
+      
+      // Z坐标数值排序
+      const z1Num = parseFloat(z1);
+      const z2Num = parseFloat(z2);
+      
+      if (!isNaN(z1Num) && !isNaN(z2Num)) {
+        return z1Num - z2Num;
+      }
+      
+      return z1.localeCompare(z2);
+    });
+    
+    // 为每个有计划的区域创建一行
+    sortedAreas.forEach(areaKey => {
+      const timeline = data.area_timelines[areaKey];
+      
+      // 创建行容器
+      const rowEl = document.createElement('div');
+      rowEl.className = 'data-row';
+      
+      // 左侧固定区域标签
+      const areaLabelEl = document.createElement('div');
+      areaLabelEl.className = 'area-cell';
+      areaLabelEl.textContent = timeline.area_display;
+      rowEl.appendChild(areaLabelEl);
+      
+      // 右侧可滚动的时间内容
+      const contentScrollEl = document.createElement('div');
+      contentScrollEl.className = 'content-scroll';
+      
+      const timelineEl = document.createElement('div');
+      timelineEl.className = 'timeline-grid';
+      
+      // 为该区域的每个作战计划创建元素
+      timeline.slots.forEach(slotData => {
+        const slotEl = document.createElement('div');
+        slotEl.className = 'time-slot-item occupied';
+        
+        if (slotData.is_own) {
+          slotEl.classList.add('own-slot');
+        }
+        
+        // 设置grid位置和跨度
+        slotEl.style.gridColumnStart = slotData.start_hour + 1; // CSS grid从1开始
+        slotEl.style.gridColumnEnd = slotData.end_hour + 2; // 结束位置+1
+        
+        slotEl.innerHTML = `
+          <div class="slot-content" data-announcement-id="${slotData.id}">
+            <div class="time-info">${slotData.start_time}-${slotData.end_time}</div>
+            <div class="pilot-info">${slotData.pilot_display}</div>
+          </div>
+        `;
+        
+        // 点击跳转到详情页
+        slotEl.addEventListener('click', function() {
+          window.location.href = `{{ url_for('announcement.announcement_detail', announcement_id='PLACEHOLDER') }}`.replace('PLACEHOLDER', slotData.id);
+        });
+        
+        timelineEl.appendChild(slotEl);
+      });
+      
+      contentScrollEl.appendChild(timelineEl);
+      rowEl.appendChild(contentScrollEl);
+      dataRowsEl.appendChild(rowEl);
+    });
+    
+    // 设置滚动同步
+    setupScrollSync();
+  }
+
+  function navigateDay(offset) {
+    currentDate.setDate(currentDate.getDate() + offset);
+    currentDateStr = formatDate(currentDate);
+    
+    // 更新URL参数
+    const url = new URL(window.location);
+    url.searchParams.set('date', currentDateStr);
+    window.history.replaceState({}, '', url);
+    
+    updateDayTitle();
+    loadDayData();
+  }
+
+  // 事件监听
+  document.getElementById('prevDay').addEventListener('click', function() {
+    navigateDay(-1);
+  });
+
+  document.getElementById('nextDay').addEventListener('click', function() {
+    navigateDay(1);
+  });
+
+  // 设置滚动同步
+  function setupScrollSync() {
+    const timeHeaderScroll = document.querySelector('.time-header-scroll');
+    const contentScrolls = document.querySelectorAll('.content-scroll');
+    
+    if (!timeHeaderScroll || contentScrolls.length === 0) return;
+    
+    let isScrolling = false;
+    
+    // 时间标题滚动时同步所有内容行
+    timeHeaderScroll.addEventListener('scroll', function() {
+      if (isScrolling) return;
+      isScrolling = true;
+      const scrollLeft = this.scrollLeft;
+      contentScrolls.forEach(content => {
+        content.scrollLeft = scrollLeft;
+      });
+      setTimeout(() => { isScrolling = false; }, 10);
+    });
+    
+    // 任一内容行滚动时同步时间标题和其他内容行
+    contentScrolls.forEach(contentScroll => {
+      contentScroll.addEventListener('scroll', function() {
+        if (isScrolling) return;
+        isScrolling = true;
+        const scrollLeft = this.scrollLeft;
+        timeHeaderScroll.scrollLeft = scrollLeft;
+        contentScrolls.forEach(otherContent => {
+          if (otherContent !== this) {
+            otherContent.scrollLeft = scrollLeft;
+          }
+        });
+        setTimeout(() => { isScrolling = false; }, 10);
+      });
+    });
+  }
+
+  // 初始化
+  updateDayTitle();
+  loadDayData();
+});
+</script>
+{% endblock %}

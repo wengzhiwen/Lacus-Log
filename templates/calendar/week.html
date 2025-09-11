@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}周视图 - 作战计划日历{% endblock %}
+{% block content %}
+<section class="calendar-container">
+  <div class="calendar-header">
+    <h1 class="page-title">作战计划日历</h1>
+    <div class="view-controls">
+      <a href="{{ url_for('calendar.month_view') }}" class="btn btn-sm">月视图</a>
+      <a href="{{ url_for('calendar.week_view') }}" class="btn btn-sm btn-primary">周视图</a>
+      <a href="{{ url_for('calendar.day_view') }}" class="btn btn-sm">日视图</a>
+    </div>
+  </div>
+
+  <div class="week-navigation">
+    <button id="prevWeek" class="btn btn-sm">‹ 上周</button>
+    <h2 id="currentWeek" class="week-title"></h2>
+    <button id="nextWeek" class="btn btn-sm">下周 ›</button>
+  </div>
+
+  <div class="week-calendar">
+    <div id="weekGrid" class="week-grid">
+      <!-- 动态生成周视图 -->
+    </div>
+  </div>
+
+  <div class="loading" id="loading" style="display: none;">
+    <div class="loading-spinner"></div>
+    <span>加载中...</span>
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  let currentDate = new Date();
+  
+  const weekTitleEl = document.getElementById('currentWeek');
+  const weekGridEl = document.getElementById('weekGrid');
+  const loadingEl = document.getElementById('loading');
+
+  function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - (day === 0 ? 6 : day - 1); // 周一为一周的开始
+    return new Date(d.setDate(diff));
+  }
+
+  function formatDate(date) {
+    return date.getFullYear() + '-' + 
+           String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+           String(date.getDate()).padStart(2, '0');
+  }
+
+  function updateWeekTitle(weekStart) {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    const startStr = `${weekStart.getMonth() + 1}月${weekStart.getDate()}日`;
+    const endStr = `${weekEnd.getMonth() + 1}月${weekEnd.getDate()}日`;
+    
+    weekTitleEl.textContent = `${startStr} - ${endStr}`;
+  }
+
+  function loadWeekData() {
+    loadingEl.style.display = 'flex';
+    
+    const dateStr = formatDate(currentDate);
+    
+    fetch(`{{ url_for('calendar.week_data') }}?date=${dateStr}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        renderWeek(data);
+      })
+      .catch(error => {
+        console.error('加载周视图数据失败:', error);
+        alert('加载数据失败，请重试');
+      })
+      .finally(() => {
+        loadingEl.style.display = 'none';
+      });
+  }
+
+  function renderWeek(data) {
+    weekGridEl.innerHTML = '';
+
+    // 按日期顺序遍历一周
+    const weekStart = new Date(data.week_start);
+    for (let i = 0; i < 7; i++) {
+      const currentDay = new Date(weekStart);
+      currentDay.setDate(weekStart.getDate() + i);
+      const dateKey = formatDate(currentDay);
+      const dayData = data.week_data[dateKey];
+
+      const dayEl = document.createElement('div');
+      dayEl.className = 'week-day';
+      
+      if (dayData && dayData.is_today) {
+        dayEl.classList.add('today');
+      }
+
+      const announmentCount = dayData ? dayData.announcement_count : 0;
+      const availableCount = dayData ? dayData.available_areas_count : 0;
+
+      dayEl.innerHTML = `
+        <div class="day-header">
+          <div class="day-name">${dayData ? dayData.day_name : ''}</div>
+          <div class="day-date">${currentDay.getDate()}</div>
+        </div>
+        <div class="day-stats">
+          <div class="stat-item">
+            <span class="stat-number">${announmentCount}</span>
+            <span class="stat-label">作战计划</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">${availableCount}</span>
+            <span class="stat-label">未使用区域</span>
+          </div>
+        </div>
+      `;
+
+      // 点击跳转到日视图
+      dayEl.addEventListener('click', function() {
+        window.location.href = `{{ url_for('calendar.day_view') }}?date=${dateKey}`;
+      });
+
+      weekGridEl.appendChild(dayEl);
+    }
+  }
+
+  // 事件监听
+  document.getElementById('prevWeek').addEventListener('click', function() {
+    currentDate.setDate(currentDate.getDate() - 7);
+    const weekStart = getWeekStart(currentDate);
+    updateWeekTitle(weekStart);
+    loadWeekData();
+  });
+
+  document.getElementById('nextWeek').addEventListener('click', function() {
+    currentDate.setDate(currentDate.getDate() + 7);
+    const weekStart = getWeekStart(currentDate);
+    updateWeekTitle(weekStart);
+    loadWeekData();
+  });
+
+  // 初始化
+  const weekStart = getWeekStart(currentDate);
+  updateWeekTitle(weekStart);
+  loadWeekData();
+});
+</script>
+{% endblock %}

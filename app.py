@@ -9,14 +9,13 @@ from mongoengine import connect
 from routes.admin import admin_bp
 from routes.announcement import announcement_bp
 from routes.battle_area import battle_area_bp
+from routes.calendar import calendar_bp
 from routes.main import main_bp
 from routes.pilot import pilot_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
-from utils.timezone_helper import (format_local_date, format_local_datetime,
-                                   format_local_time, get_local_date_for_input,
-                                   get_local_datetime_for_input,
+from utils.timezone_helper import (format_local_date, format_local_datetime, format_local_time, get_local_date_for_input, get_local_datetime_for_input,
                                    get_local_time_for_input, utc_to_local)
 
 
@@ -95,6 +94,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
     flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')
     flask_app.register_blueprint(announcement_bp, url_prefix='/announcements')
+    flask_app.register_blueprint(calendar_bp, url_prefix='/calendar')
 
     # 注册Jinja2过滤器
     @flask_app.template_filter('role_display_name')

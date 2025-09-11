@@ -23,6 +23,7 @@
       {% if current_user.has_role('gicho') or current_user.has_role('kancho') %}
       <a class="navlink" href="{{ url_for('pilot.list_pilots') }}">机师管理</a>
       <a class="navlink" href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
+      <a class="navlink" href="{{ url_for('calendar.index') }}">作战日历</a>
       <a class="navlink" href="{{ url_for('announcement.export_page') }}">作战计划导出</a>
       {% endif %}
       {% if current_user.has_role('gicho') %}
