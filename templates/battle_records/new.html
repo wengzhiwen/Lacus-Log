@@ -32,6 +32,29 @@
                 </div>
                 {% endif %}
                 
+                {% if related_announcement %}
+                <!-- 从通告进入：主播与所属只读展示，并提交隐藏字段 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>主播</label>
+                        <div class="readonly-value" id="pilot_display">
+                            {% set age_str = '(' ~ related_announcement.pilot.age ~ ')' if related_announcement.pilot.age else '' %}
+                            {% set gender_icon = '♂' if related_announcement.pilot.gender.value == 0 else ('♀' if related_announcement.pilot.gender.value == 1 else '?') %}
+                            {{ related_announcement.pilot.nickname }}{{ age_str }}[{{ related_announcement.pilot.status.value }}]{{ gender_icon }}
+                        </div>
+                        <input type="hidden" name="pilot" value="{{ related_announcement.pilot.id }}"/>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>所属</label>
+                        <div class="readonly-value" id="owner_display">
+                            {{ (related_announcement.pilot.owner.nickname or related_announcement.pilot.owner.username) if related_announcement.pilot.owner else '无' }}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <!-- 普通入口：展示筛选与主播选择 -->
                 <!-- 机师筛选器 -->
                 <div class="form-row">
                     <div class="form-group">
@@ -56,6 +79,7 @@
                         </select>
                     </div>
                 </div>
+                {% endif %}
 
                 
 
@@ -64,9 +88,11 @@
                     <div class="form-group">
                         <label>关联通告：</label>
                         <div class="readonly-value">
-                            <a href="{{ url_for('announcement.announcement_detail', announcement_id=related_announcement.id|string) }}" class="link">
-                                查看通告详情
-                            </a>
+                            {% set weekday_map = {'0':'日','1':'一','2':'二','3':'三','4':'四','5':'五','6':'六'} %}
+                            {% set weekday_idx = related_announcement.start_time|local_datetime('%w') %}
+                            {% set date_str = related_announcement.start_time|local_datetime('%Y-%m-%d') %}
+                            {% set duration_str = related_announcement.duration_hours ~ '小时' %}
+                            {{ date_str }} 星期{{ weekday_map[weekday_idx] }} {{ duration_str }} @{{ related_announcement.x_coord }}-{{ related_announcement.y_coord }}-{{ related_announcement.z_coord }}
                         </div>
                     </div>
                 </div>
@@ -350,8 +376,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 监听备注字符计数
     document.getElementById('notes').addEventListener('input', updateCharacterCount);
     
-    // 监听主播变更，更新参战形式
-    document.getElementById('pilot').addEventListener('change', function() {
+    // 监听主播变更，更新参战形式（仅当存在下拉时）
+    const pilotEl = document.getElementById('pilot');
+    if (pilotEl) pilotEl.addEventListener('change', function() {
         const pilotId = this.value;
         if (pilotId) {
             fetch(`{{ url_for('battle_record.api_pilots_filtered') }}?pilot_id=${pilotId}`)
@@ -435,7 +462,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializePage() {
-    loadPilotFilters();
+    // 仅普通入口存在筛选器
+    if (document.getElementById('owner_filter') && document.getElementById('rank_filter')) {
+        loadPilotFilters();
+    }
     loadBattleAreaData();
 }
 

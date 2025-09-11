@@ -135,19 +135,18 @@
 <!-- 底部操作栏 -->
 <div class="footbar">
     <div class="inner">
-        <a href="{{ url_for('battle_record.new_battle_record', announcement_id=announcement.id) }}" class="btn btn-success">
-            <span class="btn-icon">📊</span>
-            登记作战记录
-        </a>
         {% if announcement.is_in_recurrence_group %}
-        <!-- 循环组中的通告：提供两个编辑选项 -->
         <button type="button" class="btn btn-primary" onclick="showEditModal()">编辑</button>
-        <button type="button" class="btn btn-danger" onclick="showDeleteModal()">删除</button>
         {% else %}
-        <!-- 单独通告：直接编辑 -->
         <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}" class="btn btn-primary">编辑</a>
-        <button type="button" class="btn btn-danger" onclick="showDeleteModal()">删除</button>
         {% endif %}
+
+        <a href="{{ url_for('battle_record.new_battle_record', announcement_id=announcement.id) }}" class="btn btn-hud">
+            登录作战记录
+        </a>
+
+        <button type="button" class="btn btn-warning" onclick="showDeleteModal()">删除</button>
+
         <button type="button" class="btn btn-outline" onclick="showChangesModal()">变更记录</button>
     </div>
 </div>
@@ -283,6 +282,16 @@
     justify-content: center;
     max-width: 1200px;
     margin: 0 auto;
+}
+
+/* 让footbar按钮内容水平居中（移动端全宽时也居中） */
+.footbar .btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    line-height: 1.2;
+    min-height: 56px;
 }
 
 .detail-content {
@@ -601,6 +610,22 @@
 
 .delete-option-buttons .btn {
     width: 100%;
+}
+
+/* 本页按钮样式微调 */
+.btn-hud {
+    background: var(--hud-green);
+    color: #fff;
+}
+.btn-hud:hover { background: #00a16e; }
+
+.btn-outline {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--gray);
+}
+.btn-outline:hover {
+    background: var(--table-header);
 }
 
 @keyframes fadeIn {
