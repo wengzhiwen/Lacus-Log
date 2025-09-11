@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}作战日报 - {{ pagination.date }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">📊 作战日报</h1>
+  <p class="text-muted">{{ pagination.date }}</p>
+</div>
+
+<!-- 日期导航 -->
+<div class="date-navigation">
+  <div class="date-controls">
+    <a href="{{ url_for('report.daily_report', date=pagination.prev_date) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+    <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
+    <a href="{{ url_for('report.daily_report', date=pagination.next_date) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+  </div>
+  <div class="export-actions">
+    <a href="{{ url_for('report.export_daily_csv', date=pagination.date) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+  </div>
+</div>
+
+<!-- 月度数据卡片 -->
+<div class="summary-section">
+  <h2 class="section-title">本月数据（截至{{ pagination.date }}）</h2>
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="card-label">总机师数量</div>
+      <div class="card-value">{{ month_summary.pilot_count }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">有效机师数量</div>
+      <div class="card-value">{{ month_summary.effective_pilot_count }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计流水</div>
+      <div class="card-value">¥{{ "%.2f"|format(month_summary.revenue_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计底薪支出</div>
+      <div class="card-value">¥{{ "%.2f"|format(month_summary.basepay_sum) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- 日报汇总 -->
+<div class="summary-section">
+  <h2 class="section-title">{{ pagination.date }} 日报汇总</h2>
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="card-label">总机师数量</div>
+      <div class="card-value">{{ day_summary.pilot_count }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">有效机师数量</div>
+      <div class="card-value">{{ day_summary.effective_pilot_count }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计流水</div>
+      <div class="card-value">¥{{ "%.2f"|format(day_summary.revenue_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计底薪支出</div>
+      <div class="card-value">¥{{ "%.2f"|format(day_summary.basepay_sum) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- 日报明细 -->
+<div class="details-section">
+  <h2 class="section-title">日报明细</h2>
+  {% if details %}
+  <div class="table-container">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th class="fixed-col">机师</th>
+          <th>性别年龄</th>
+          <th>所属</th>
+          <th>阶级</th>
+          <th>作战区域</th>
+          <th>播时</th>
+          <th>流水</th>
+          <th>3日平均流水</th>
+          <th>月累计天数</th>
+          <th>月日均播时</th>
+          <th>月累计流水</th>
+          <th>月累计底薪</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for detail in details %}
+        <tr>
+          <td class="fixed-col">{{ detail.pilot_display }}</td>
+          <td>{{ detail.gender_age }}</td>
+          <td>{{ detail.owner }}</td>
+          <td>{{ detail.rank }}</td>
+          <td>{{ detail.battle_area }}</td>
+          <td>{{ "%.1f"|format(detail.duration) if detail.duration else "0.0" }}小时</td>
+          <td>¥{{ "%.2f"|format(detail.revenue) }}</td>
+          <td>{% if detail.three_day_avg_revenue %}¥{{ "%.2f"|format(detail.three_day_avg_revenue) }}{% endif %}</td>
+          <td>{{ detail.monthly_stats.month_days_count }}</td>
+          <td>{{ "%.1f"|format(detail.monthly_stats.month_avg_duration) }}小时</td>
+          <td>¥{{ "%.2f"|format(detail.monthly_stats.month_total_revenue) }}</td>
+          <td>¥{{ "%.2f"|format(detail.monthly_stats.month_total_base_salary) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>今日暂无作战记录</p>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+/* 日期导航样式 */
+.date-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--table-header);
+  border-radius: 8px;
+}
+
+.date-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.export-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 汇总卡片样式 */
+.summary-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+/* 明细表格样式 */
+.details-section {
+  margin: 24px 0;
+}
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1200px;
+}
+
+.report-table th,
+.report-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.report-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.report-table th.fixed-col,
+.report-table td.fixed-col {
+  position: sticky;
+  left: 0;
+  background: #fff; /* 不透明底色，避免被遮挡时透出 */
+  background-clip: padding-box;
+  min-width: 120px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 提升层叠顺序，确保首列在横向滚动时不被内容遮挡 */
+.report-table td.fixed-col { z-index: 4; }
+.report-table th.fixed-col { z-index: 5; }
+
+/* 分隔视觉，横向滚动时更清晰 */
+.report-table td.fixed-col { box-shadow: 2px 0 0 #eee; }
+.report-table th.fixed-col { box-shadow: 2px 0 0 #ddd; }
+
+.report-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .date-navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .summary-card {
+    padding: 12px;
+  }
+
+  .card-value {
+    font-size: 20px;
+  }
+
+  .report-table {
+    font-size: 12px;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 8px 6px;
+  }
+}
+</style>
+
+<script>
+// 日期选择器事件
+document.getElementById('dateSelector').addEventListener('change', function() {
+  const selectedDate = this.value;
+  if (selectedDate) {
+    window.location.href = '{{ url_for("report.daily_report") }}?date=' + selectedDate;
+  }
+});
+</script>
+{% endblock %}
