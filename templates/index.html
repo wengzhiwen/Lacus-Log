@@ -5,16 +5,28 @@
   <h1 class="title">仪表盘</h1>
   <div class="cards">
     <div class="card">
-      <div class="card-title">作战计划</div>
-      <div class="card-body text-muted">待设计</div>
-    </div>
-    <div class="card">
-      <div class="card-title">战斗数据</div>
-      <div class="card-body text-muted">待设计</div>
-    </div>
-    <div class="card">
-      <div class="card-title">机师管理</div>
-      <div class="card-body text-muted">待设计</div>
+      <div class="card-header">
+        <div class="card-title">作战计划统计</div>
+        <div class="card-icon">📊</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value">{{ dashboard_data.today_count }}</div>
+          <div class="main-label">今日作战计划</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value {% if dashboard_data.change_rate >= 0 %}positive{% else %}negative{% endif %}">
+              {% if dashboard_data.change_rate >= 0 %}+{% endif %}{{ dashboard_data.change_rate }}%
+            </div>
+            <div class="sub-label">环比</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value">{{ dashboard_data.week_avg }}</div>
+            <div class="sub-label">7日平均</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>

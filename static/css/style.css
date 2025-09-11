@@ -104,9 +104,102 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 .flash .error { background: #FFE8E5; color: var(--error); }
 .field-error { color: var(--error); font-size: 12px; margin-top: 4px; }
 
-.dashboard .cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.card { border: 1px solid var(--gray); border-radius: 8px; padding: 12px; }
-.card-title { font-weight: 600; margin-bottom: 6px; color: var(--brand); }
+.dashboard .cards { 
+  display: grid; 
+  grid-template-columns: 1fr; 
+  gap: 16px; 
+}
+
+.card { 
+  border: 1px solid var(--gray); 
+  border-radius: 12px; 
+  padding: 20px; 
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-title { 
+  font-weight: 600; 
+  font-size: 16px;
+  color: var(--text); 
+  margin: 0;
+}
+
+.card-icon {
+  font-size: 24px;
+  opacity: 0.7;
+}
+
+.card-body {
+  padding: 0;
+}
+
+.main-data {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--table-header);
+}
+
+.main-value {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--brand);
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.main-label {
+  font-size: 16px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sub-data {
+  display: flex;
+  justify-content: space-around;
+  gap: 20px;
+}
+
+.sub-item {
+  text-align: center;
+  flex: 1;
+}
+
+.sub-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.sub-value.positive {
+  color: var(--hud-green);
+}
+
+.sub-value.negative {
+  color: var(--error);
+}
+
+.sub-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
 
 /* 页面布局 */
 .page-header { 
@@ -477,6 +570,26 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   font-size: 14px; 
   color: var(--text); 
   font-weight: 500; 
+}
+
+/* 响应式布局 - 桌面端 */
+@media (min-width: 768px) {
+  .dashboard .cards {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .sub-data {
+    gap: 40px;
+  }
+  
+  .sub-value {
+    font-size: 24px;
+  }
+  
+  .sub-label {
+    font-size: 14px;
+  }
 }
 
 /* iPhone和iPad样式 */
