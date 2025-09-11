@@ -28,6 +28,72 @@
         </div>
       </div>
     </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">作战记录统计</div>
+        <div class="card-icon">📈</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value">{{ dashboard_data.battle_today_count }}</div>
+          <div class="main-label">今日作战记录</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value {% if dashboard_data.battle_change_rate >= 0 %}positive{% else %}negative{% endif %}">
+              {% if dashboard_data.battle_change_rate >= 0 %}+{% endif %}{{ dashboard_data.battle_change_rate }}%
+            </div>
+            <div class="sub-label">环比</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value">{{ dashboard_data.battle_week_avg }}</div>
+            <div class="sub-label">7日平均</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">机师统计</div>
+        <div class="card-icon">👩‍✈️</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value">{{ dashboard_data.pilot_serving_count }}</div>
+          <div class="main-label">服役人数</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value">{{ dashboard_data.pilot_intern_serving_count }}</div>
+            <div class="sub-label">实习机师</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value">{{ dashboard_data.pilot_official_serving_count }}</div>
+            <div class="sub-label">正式机师</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">候补机师统计</div>
+        <div class="card-icon">🧑‍🚀</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value">{{ dashboard_data.candidate_not_recruited_count }}</div>
+          <div class="main-label">候补人数</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value">{{ dashboard_data.trainee_serving_count }}</div>
+            <div class="sub-label">训练机师</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 

@@ -7,6 +7,8 @@ from flask_security import current_user
 from flask_security.utils import hash_password
 
 from models.announcement import Announcement
+from models.battle_record import BattleRecord
+from models.pilot import Pilot, Rank, Status
 from utils.logging_setup import get_logger
 from utils.timezone_helper import get_current_utc_time
 
@@ -40,7 +42,43 @@ def _calculate_dashboard_data():
     week_count = Announcement.objects(start_time__gte=week_start, start_time__lt=today_end).count()
     week_avg = round(week_count / 7, 1)
 
-    return {'today_count': today_count, 'change_rate': change_rate, 'week_avg': week_avg}
+    # 作战记录统计（开始时间为今天的作战记录）
+    br_today = BattleRecord.objects(start_time__gte=today_start, start_time__lt=today_end).count()
+    br_yesterday = BattleRecord.objects(start_time__gte=yesterday_start, start_time__lt=yesterday_end).count()
+    if br_yesterday > 0:
+        br_change_rate = round(((br_today - br_yesterday) / br_yesterday) * 100, 1)
+    else:
+        br_change_rate = 100.0 if br_today > 0 else 0.0
+    br_week_count = BattleRecord.objects(start_time__gte=week_start, start_time__lt=today_end).count()
+    br_week_avg = round(br_week_count / 7, 1)
+
+    # 机师统计
+    serving_status = [Status.RECRUITED, Status.CONTRACTED]
+    pilot_serving = Pilot.objects(status__in=serving_status).count()
+    pilot_intern_serving = Pilot.objects(rank=Rank.INTERN, status__in=serving_status).count()
+    pilot_official_serving = Pilot.objects(rank=Rank.OFFICIAL, status__in=serving_status).count()
+
+    # 候补机师统计
+    candidate_not_recruited = Pilot.objects(rank=Rank.CANDIDATE, status=Status.NOT_RECRUITED).count()
+    trainee_serving = Pilot.objects(rank=Rank.TRAINEE, status__in=serving_status).count()
+
+    return {
+        # 作战计划统计（保留现有键名以兼容模板）
+        'today_count': today_count,
+        'change_rate': change_rate,
+        'week_avg': week_avg,
+        # 作战记录统计
+        'battle_today_count': br_today,
+        'battle_change_rate': br_change_rate,
+        'battle_week_avg': br_week_avg,
+        # 机师统计
+        'pilot_serving_count': pilot_serving,
+        'pilot_intern_serving_count': pilot_intern_serving,
+        'pilot_official_serving_count': pilot_official_serving,
+        # 候补机师统计
+        'candidate_not_recruited_count': candidate_not_recruited,
+        'trainee_serving_count': trainee_serving,
+    }
 
 
 @main_bp.route('/')
