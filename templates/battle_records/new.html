@@ -1,0 +1,643 @@
+{% extends "base.html" %}
+
+{% block title %}登记作战记录{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('battle_record.list_battle_records') }}">作战记录</a>
+            <span class="separator">></span>
+            <span>登记作战记录</span>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <form method="POST" action="{{ url_for('battle_record.create_battle_record') }}" id="battleRecordForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            
+            {% if default_data.related_announcement %}
+            <input type="hidden" name="related_announcement" value="{{ default_data.related_announcement.id }}"/>
+            {% endif %}
+            
+            <!-- 基础信息 -->
+            <div class="form-section">
+                <h3>基础信息</h3>
+                
+                {% if related_announcement %}
+                <div class="info-banner">
+                    <strong>从通告预填：</strong>{{ related_announcement.pilot.nickname }} - 
+                    {{ related_announcement.start_time|local_datetime('%Y年%m月%d日 %H:%M') }} - 
+                    {{ related_announcement.x_coord }}-{{ related_announcement.y_coord }}-{{ related_announcement.z_coord }}
+                </div>
+                {% endif %}
+                
+                <!-- 机师筛选器 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="owner_filter">所属筛选：</label>
+                        <select id="owner_filter">
+                            <option value="">全部所属</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rank_filter">阶级筛选：</label>
+                        <select id="rank_filter">
+                            <option value="">全部阶级</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pilot" class="required">主播：</label>
+                        <select name="pilot" id="pilot" required>
+                            <option value="">请选择主播</option>
+                        </select>
+                    </div>
+                </div>
+
+                
+
+                {% if related_announcement %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>关联通告：</label>
+                        <div class="readonly-value">
+                            <a href="{{ url_for('announcement.announcement_detail', announcement_id=related_announcement.id|string) }}" class="link">
+                                查看通告详情
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="related_announcement">关联通告（可选）：</label>
+                        <select name="related_announcement" id="related_announcement">
+                            <option value="">无关联通告</option>
+                        </select>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 时间信息 -->
+            <div class="form-section">
+                <h3>时间信息</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="start_time" class="required">开始时间：</label>
+                        <input type="datetime-local" name="start_time" id="start_time" required
+                               value="{{ default_data.start_time.strftime('%Y-%m-%dT%H:%M') if default_data.start_time else '' }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="end_time" class="required">结束时间：</label>
+                        <input type="datetime-local" name="end_time" id="end_time" required
+                               value="{{ default_data.end_time.strftime('%Y-%m-%dT%H:%M') if default_data.end_time else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 作战区域 -->
+            <div class="form-section">
+                <h3>作战区域</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="work_mode" class="required">参战形式：</label>
+                        <select name="work_mode" id="work_mode" required>
+                            <option value="">请选择参战形式</option>
+                            <option value="线下" {% if default_data.work_mode and default_data.work_mode.value == '线下' %}selected{% endif %}>线下</option>
+                            <option value="线上" {% if default_data.work_mode and default_data.work_mode.value == '线上' %}selected{% endif %}>线上</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="x_coord">X坐标：</label>
+                        <select name="x_coord" id="x_coord">
+                            <option value="">请选择X坐标</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="y_coord">Y坐标：</label>
+                        <select name="y_coord" id="y_coord" disabled>
+                            <option value="">请先选择X坐标</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="z_coord">Z坐标：</label>
+                        <select name="z_coord" id="z_coord" disabled>
+                            <option value="">请先选择Y坐标</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 收益信息 -->
+            <div class="form-section">
+                <h3>收益信息</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="revenue_amount" class="required">流水金额（元）：</label>
+                        <input type="number" name="revenue_amount" id="revenue_amount" 
+                               step="0.01" min="0" required
+                               value="{{ default_data.revenue_amount or '0' }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="base_salary" class="required">底薪金额（元）：</label>
+                        <input type="number" name="base_salary" id="base_salary" 
+                               step="0.01" min="0" required
+                               value="{{ default_data.base_salary or '0' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 备注信息 -->
+            <div class="form-section">
+                <h3>备注信息</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="notes">备注（最多200字）：</label>
+                        <textarea name="notes" id="notes" rows="3" maxlength="200" 
+                                  placeholder="可选择填写相关备注信息...">{{ default_data.notes or '' }}</textarea>
+                        <div class="char-count">
+                            <span id="notes-count">0</span>/200
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <span class="btn-icon">💾</span>
+                    登记作战记录
+                </button>
+                <a href="{{ url_for('battle_record.list_battle_records') }}" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* 信息横幅样式 */
+.info-banner {
+    background: var(--bg-light);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: var(--text);
+}
+
+/* （移除误植的脚本，真实脚本见下方 <script> 块） */
+
+/* 只读值样式 */
+.readonly-value {
+    font-size: 14px;
+    color: var(--text);
+    padding: 8px 12px;
+    background: var(--bg-light);
+    border: 1px solid var(--table-header);
+    border-radius: 4px;
+}
+
+.link {
+    color: var(--brand);
+    text-decoration: underline;
+}
+
+.link:hover {
+    color: var(--brand-dark);
+}
+
+/* 字符计数器 */
+.char-count {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    margin-top: 4px;
+}
+
+/* 表单样式继承自基础样式 */
+.form-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid var(--table-header);
+}
+
+.form-section {
+    padding: 20px;
+    border-bottom: 1px solid var(--table-header);
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 2px solid var(--brand);
+    padding-bottom: 8px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.form-row:last-child {
+    margin-bottom: 0;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.form-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.form-group label.required::after {
+    content: " *";
+    color: var(--error);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 8px 12px;
+    border: 1px solid var(--table-header);
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.form-group input:disabled,
+.form-group select:disabled {
+    background: var(--bg-light);
+    color: var(--muted);
+    cursor: not-allowed;
+}
+
+.form-actions {
+    padding: 20px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    border-top: 1px solid var(--table-header);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+let battleAreaData = {};
+let defaultData = {
+    pilot: '{{ default_data.pilot.id if default_data.pilot else "" }}',
+    x_coord: '{{ default_data.x_coord or "" }}',
+    y_coord: '{{ default_data.y_coord or "" }}',
+    z_coord: '{{ default_data.z_coord or "" }}',
+    work_mode: '{{ default_data.work_mode.value if default_data.work_mode else "" }}'
+};
+
+// 初始化页面
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[BR] DOMContentLoaded: initialize page');
+    initializePage();
+    updateCharacterCount();
+    
+    // 监听备注字符计数
+    document.getElementById('notes').addEventListener('input', updateCharacterCount);
+    
+    // 监听主播变更，更新参战形式
+    document.getElementById('pilot').addEventListener('change', function() {
+        const pilotId = this.value;
+        if (pilotId) {
+            fetch(`{{ url_for('battle_record.api_pilots_filtered') }}?pilot_id=${pilotId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.pilots.length > 0) {
+                        const pilot = data.pilots[0];
+                        // 如果没有预填数据，则从主播复制参战形式
+                        if (!defaultData.work_mode) {
+                            document.getElementById('work_mode').value = pilot.work_mode || '';
+                        }
+                    }
+                })
+                .catch(error => console.error('获取主播信息失败:', error));
+
+            // 获取关联通告（昨天/今天/明天）
+            fetch(`{{ url_for('battle_record.api_related_announcements') }}?pilot_id=${pilotId}`)
+                .then(resp => resp.json())
+                .then(data => {
+                    const select = document.getElementById('related_announcement');
+                    if (!select) return;
+                    select.innerHTML = '<option value="">无关联通告</option>';
+                    if (data.success) {
+                        data.announcements.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.id;
+                            opt.textContent = item.label;
+                            select.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(err => console.error('获取关联通告失败:', err));
+        }
+    });
+    // 参战形式联动
+    const wmSelect = document.getElementById('work_mode');
+    if (wmSelect) {
+        wmSelect.addEventListener('change', handleWorkModeChange);
+        handleWorkModeChange();
+    }
+
+    // 关联通告联动预填
+    const relatedSelect = document.getElementById('related_announcement');
+    if (relatedSelect) {
+        relatedSelect.addEventListener('change', function () {
+            const annId = this.value;
+            console.log('[BR] related_announcement changed:', annId);
+            if (!annId) return;
+            const url = `{{ url_for('battle_record.api_announcement_detail', announcement_id='__ANN_ID__') }}`.replace('__ANN_ID__', annId);
+            console.log('[BR] fetching announcement detail:', url);
+            fetch(url)
+                .then(resp => resp.json())
+                .then(data => {
+                    console.log('[BR] announcement detail resp:', data);
+                    if (!data.success) return;
+                    const a = data.announcement;
+
+                    // 时间
+                    const startInput = document.getElementById('start_time');
+                    const endInput = document.getElementById('end_time');
+                    if (startInput && a.start_time) startInput.value = a.start_time.slice(0,16);
+                    if (endInput && a.end_time) endInput.value = a.end_time.slice(0,16);
+
+                    // 参战形式固定线下
+                    const wmSel = document.getElementById('work_mode');
+                    if (wmSel) {
+                        wmSel.value = '线下';
+                        handleWorkModeChange();
+                    }
+
+                    // 坐标快照
+                    defaultData.x_coord = a.x_coord || '';
+                    defaultData.y_coord = a.y_coord || '';
+                    defaultData.z_coord = a.z_coord || '';
+                    console.log('[BR] set default coords:', defaultData);
+                    initializeBattleAreaSelects();
+                })
+                .catch(err => console.error('[BR] fetch announcement detail error:', err));
+        });
+    }
+});
+
+function initializePage() {
+    loadPilotFilters();
+    loadBattleAreaData();
+}
+
+function loadPilotFilters() {
+    fetch('{{ url_for("battle_record.api_pilot_filters") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 填充所属选项
+                const ownerSelect = document.getElementById('owner_filter');
+                data.owners.forEach(owner => {
+                    const option = document.createElement('option');
+                    option.value = owner.id;
+                    option.textContent = owner.name;
+                    ownerSelect.appendChild(option);
+                });
+                
+                // 填充阶级选项
+                const rankSelect = document.getElementById('rank_filter');
+                data.ranks.forEach(rank => {
+                    const option = document.createElement('option');
+                    option.value = rank.value;
+                    option.textContent = rank.name;
+                    rankSelect.appendChild(option);
+                });
+                
+                // 监听筛选器变化
+                ownerSelect.addEventListener('change', updatePilotList);
+                rankSelect.addEventListener('change', updatePilotList);
+                
+                // 初始加载主播列表
+                updatePilotList();
+            }
+        })
+        .catch(error => console.error('加载筛选器失败:', error));
+}
+
+function updatePilotList() {
+    const owner = document.getElementById('owner_filter').value;
+    const rank = document.getElementById('rank_filter').value;
+    
+    fetch(`{{ url_for('battle_record.api_pilots_filtered') }}?owner=${owner}&rank=${rank}`)
+        .then(response => response.json())
+        .then(data => {
+            const pilotSelect = document.getElementById('pilot');
+            pilotSelect.innerHTML = '<option value="">请选择主播</option>';
+            
+            if (data.success) {
+                data.pilots.forEach(pilot => {
+                    const option = document.createElement('option');
+                    option.value = pilot.id;
+                    option.textContent = pilot.name;
+                    if (pilot.id === defaultData.pilot) {
+                        option.selected = true;
+                    }
+                    pilotSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('加载主播列表失败:', error));
+}
+
+function loadBattleAreaData() {
+    fetch('{{ url_for("battle_record.api_battle_areas") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                battleAreaData = data.areas;
+                initializeBattleAreaSelects();
+            }
+        })
+        .catch(error => console.error('加载作战区域数据失败:', error));
+}
+
+function initializeBattleAreaSelects() {
+    const xSelect = document.getElementById('x_coord');
+    const ySelect = document.getElementById('y_coord');
+    const zSelect = document.getElementById('z_coord');
+    console.log('[BR] initializeBattleAreaSelects with defaultData:', defaultData);
+    
+    // 填充X坐标
+    xSelect.innerHTML = '<option value="">请选择X坐标</option>';
+    Object.keys(battleAreaData).sort().forEach(x => {
+        const option = document.createElement('option');
+        option.value = x;
+        option.textContent = x;
+        if (x === defaultData.x_coord) {
+            option.selected = true;
+        }
+        xSelect.appendChild(option);
+    });
+    
+    // 监听X坐标变化
+    xSelect.addEventListener('change', function() {
+        updateYCoords(this.value);
+    });
+    
+    // 监听Y坐标变化
+    ySelect.addEventListener('change', function() {
+        const xCoord = xSelect.value;
+        updateZCoords(xCoord, this.value);
+    });
+    
+    // 如果有默认X坐标，触发联动
+    if (defaultData.x_coord) {
+        updateYCoords(defaultData.x_coord);
+    }
+}
+
+function updateYCoords(xCoord) {
+    const ySelect = document.getElementById('y_coord');
+    const zSelect = document.getElementById('z_coord');
+    console.log('[BR] updateYCoords for X=', xCoord);
+    
+    ySelect.innerHTML = '<option value="">请选择Y坐标</option>';
+    zSelect.innerHTML = '<option value="">请先选择Y坐标</option>';
+    zSelect.disabled = true;
+    
+    if (xCoord && battleAreaData[xCoord]) {
+        ySelect.disabled = false;
+        Object.keys(battleAreaData[xCoord]).sort().forEach(y => {
+            const option = document.createElement('option');
+            option.value = y;
+            option.textContent = y;
+            if (y === defaultData.y_coord) {
+                option.selected = true;
+            }
+            ySelect.appendChild(option);
+        });
+        
+        // 如果有默认Y坐标，触发联动
+        if (defaultData.y_coord) {
+            updateZCoords(xCoord, defaultData.y_coord);
+        }
+    } else {
+        ySelect.disabled = true;
+    }
+}
+
+function updateZCoords(xCoord, yCoord) {
+    const zSelect = document.getElementById('z_coord');
+    console.log('[BR] updateZCoords for X,Y =', xCoord, yCoord);
+    
+    zSelect.innerHTML = '<option value="">请选择Z坐标</option>';
+    
+    if (xCoord && yCoord && battleAreaData[xCoord] && battleAreaData[xCoord][yCoord]) {
+        zSelect.disabled = false;
+        battleAreaData[xCoord][yCoord].forEach(z => {
+            const option = document.createElement('option');
+            option.value = z;
+            option.textContent = z;
+            if (z === defaultData.z_coord) {
+                option.selected = true;
+            }
+            zSelect.appendChild(option);
+        });
+    } else {
+        zSelect.disabled = true;
+    }
+}
+
+function updateCharacterCount() {
+    const textarea = document.getElementById('notes');
+    const counter = document.getElementById('notes-count');
+    counter.textContent = textarea.value.length;
+    
+    if (textarea.value.length > 180) {
+        counter.style.color = 'var(--error)';
+    } else if (textarea.value.length > 150) {
+        counter.style.color = 'var(--warn)';
+    } else {
+        counter.style.color = 'var(--muted)';
+    }
+}
+
+// 参战形式影响作战区域可编辑性
+function handleWorkModeChange() {
+    const wmEl = document.getElementById('work_mode');
+    const wm = wmEl ? wmEl.value : '';
+    const xSelect = document.getElementById('x_coord');
+    const ySelect = document.getElementById('y_coord');
+    const zSelect = document.getElementById('z_coord');
+    const isOnline = wm === '线上';
+    console.log('[BR] handleWorkModeChange:', wm, 'isOnline=', isOnline);
+
+    [xSelect, ySelect, zSelect].forEach(sel => {
+        if (!sel) return;
+        sel.disabled = isOnline || (sel.id !== 'x_coord' && !xSelect.value);
+        sel.required = !isOnline;
+    });
+
+    if (isOnline) {
+        if (xSelect) xSelect.value = '';
+        if (ySelect) {
+            ySelect.innerHTML = '<option value="">请先选择X坐标</option>';
+            ySelect.value = '';
+        }
+        if (zSelect) {
+            zSelect.innerHTML = '<option value="">请先选择Y坐标</option>';
+            zSelect.value = '';
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -9,6 +9,7 @@ from mongoengine import connect
 from routes.admin import admin_bp
 from routes.announcement import announcement_bp
 from routes.battle_area import battle_area_bp
+from routes.battle_record import battle_record_bp
 from routes.calendar import calendar_bp
 from routes.main import main_bp
 from routes.pilot import pilot_bp
@@ -94,6 +95,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
     flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')
     flask_app.register_blueprint(announcement_bp, url_prefix='/announcements')
+    flask_app.register_blueprint(battle_record_bp, url_prefix='/battle-records')
     flask_app.register_blueprint(calendar_bp, url_prefix='/calendar')
 
     # 注册Jinja2过滤器

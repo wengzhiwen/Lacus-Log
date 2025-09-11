@@ -137,6 +137,10 @@
 <!-- 底部操作栏 -->
 <div class="footbar">
     <div class="inner">
+        <a href="{{ url_for('battle_record.new_battle_record', announcement_id=announcement.id) }}" class="btn btn-success">
+            <span class="btn-icon">📊</span>
+            登记作战记录
+        </a>
         {% if announcement.is_in_recurrence_group %}
         <!-- 循环组中的通告：提供两个编辑选项 -->
         <button type="button" class="btn btn-primary" onclick="showEditModal()">编辑</button>

@@ -1,0 +1,352 @@
+{% extends 'base.html' %}
+{% block title %}作战记录 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="battle-record-management">
+  <!-- 页面头部 -->
+  <div class="page-header">
+    <h1 class="page-title">作战记录</h1>
+  </div>
+
+  <!-- 筛选器（默认折叠） -->
+  <div class="filter-bar">
+    {% set selected_items = [] %}
+    {% if current_filters.owner and current_filters.owner != 'all' %}
+      {% if current_filters.owner == 'self' %}
+        {% set _ = selected_items.append('所属:自己') %}
+      {% else %}
+        {% for owner in owners %}
+          {% if owner.id|string == current_filters.owner %}{% set _ = selected_items.append('所属:' + owner.username) %}{% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endif %}
+    {% if current_filters.rank %}{% set _ = selected_items.append('阶级:' + current_filters.rank) %}{% endif %}
+    {% if current_filters.pilot %}{% set _ = selected_items.append('主播已选') %}{% endif %}
+    {% if current_filters.time %}
+      {% if current_filters.time == 'today' %}{% set _ = selected_items.append('今天') %}
+      {% elif current_filters.time == 'recent_7_days' %}{% set _ = selected_items.append('近7天') %}
+      {% endif %}
+    {% endif %}
+    {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
+    
+    <button type="button" class="filter-toggle" onclick="toggleFilters()">
+      <span id="filter-summary">{{ filter_summary }}</span>
+      <span class="toggle-icon" id="filter-toggle-icon">▼</span>
+    </button>
+    
+    <form class="filter-form is-collapsed" id="filter-form" method="get">
+      <div class="filter-group">
+        <label class="filter-label">所属筛选</label>
+        <select class="filter-select" name="owner" onchange="this.form.submit()">
+          <option value="all" {% if current_filters.owner == 'all' %}selected{% endif %}>全部所属</option>
+          <option value="self" {% if current_filters.owner == 'self' %}selected{% endif %}>自己</option>
+          {% for owner in owners %}
+          <option value="{{ owner.id }}" {% if current_filters.owner == owner.id|string %}selected{% endif %}>{{ owner.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">阶级筛选</label>
+        <select class="filter-select" name="rank" id="rank-filter" onchange="updatePilotFilter(); this.form.submit()">
+          <option value="">全部阶级</option>
+          <option value="候补机师" {% if current_filters.rank == '候补机师' %}selected{% endif %}>候补机师</option>
+          <option value="训练机师" {% if current_filters.rank == '训练机师' %}selected{% endif %}>训练机师</option>
+          <option value="实习机师" {% if current_filters.rank == '实习机师' %}selected{% endif %}>实习机师</option>
+          <option value="正式机师" {% if current_filters.rank == '正式机师' %}selected{% endif %}>正式机师</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">主播筛选</label>
+        <select class="filter-select" name="pilot" id="pilot-filter" onchange="this.form.submit()">
+          <option value="">全部主播</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">时间筛选</label>
+        <select class="filter-select" name="time" onchange="this.form.submit()">
+          <option value="recent_7_days" {% if current_filters.time == 'recent_7_days' %}selected{% endif %}>近7天</option>
+          <option value="today" {% if current_filters.time == 'today' %}selected{% endif %}>今天</option>
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <!-- 作战记录列表 -->
+  <div class="battle-record-list">
+    {% if battle_records %}
+      <!-- 作战记录卡片列表 -->
+      <div class="record-cards">
+        {% for record in battle_records %}
+        <a href="{{ url_for('battle_record.detail_battle_record', record_id=record.id|string) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              <div class="start-time">{{ record.start_time|local_datetime('%m月%d日 %H:%M') }}</div>
+              <div class="duration">{{ record.duration_hours }}小时</div>
+            </div>
+            <div class="record-info">
+              {% set age_str = '(' ~ record.pilot.age ~ ')' if record.pilot.age else '' %}
+              {% set gender_icon = '♂' if record.pilot.gender.value == 0 else ('♀' if record.pilot.gender.value == 1 else '?') %}
+              <div class="pilot-name">{{ record.pilot.nickname }}{{ age_str }}[{{ record.pilot.status.value }}]{{ gender_icon }}</div>
+              <div class="meta-line">[{{ record.owner_snapshot.username if record.owner_snapshot else '无' }}][{{ record.pilot.rank.value }}]</div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div class="revenue">
+              <span class="amount">¥{{ record.revenue_amount }}</span>
+              {% if record.base_salary and record.base_salary > 0 %}
+              <span class="base-salary">底薪¥{{ record.base_salary }}</span>
+              {% endif %}
+            </div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+
+      <!-- 加载更多 -->
+      {% if has_more %}
+      <div class="load-more">
+        <a href="{{ url_for('battle_record.list_battle_records', page=(current_page + 1), **current_filters) }}" class="btn btn-secondary">加载更多</a>
+      </div>
+      {% endif %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">暂无作战记录</div>
+        <div class="empty-description">点击下方"登记作战记录"按钮创建第一条记录</div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- 底部footbar：登记作战记录按钮 -->
+<div class="footbar">
+  <div class="inner">
+    <a class="btn btn-primary" href="{{ url_for('battle_record.new_battle_record') }}">
+      <span class="btn-icon">+</span>
+      登记作战记录
+    </a>
+  </div>
+</div>
+
+<style>
+/* 作战记录卡片样式 */
+.record-cards {
+  display: block;
+}
+
+/* 筛选器折叠样式 */
+.filter-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.filter-form.is-collapsed { display: none; }
+.filter-form { margin-bottom: 12px; }
+
+.record-card {
+  display: block;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.record-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+  border-color: var(--brand);
+}
+
+.record-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start; /* 右侧信息置于右上角 */
+  margin-bottom: 8px;
+}
+
+.record-time {
+  flex: 0 0 auto;
+}
+
+.start-time {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.duration {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.record-info {
+  flex: 1;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* 右对齐到角落 */
+}
+
+.pilot-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.meta-line {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.1;
+}
+
+.record-card .card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--table-header);
+  padding-top: 12px;
+}
+
+.revenue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.amount {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--hud-green);
+}
+
+.base-salary {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.record-card:hover .card-arrow {
+  color: var(--brand);
+}
+
+.load-more {
+  text-align: center;
+  margin: 20px 0;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .filter-form {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  /* 保持头部横向排列，右侧信息固定在右上角 */
+  .record-card .card-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .record-info {
+    text-align: right;
+    align-items: flex-end;
+  }
+}
+</style>
+
+<style>
+/* 底部footbar（固定吸附） */
+.footbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid var(--table-header);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
+  z-index: 100;
+}
+.footbar .inner { display: flex; justify-content: center; }
+.container { padding-bottom: 88px; }
+</style>
+
+<script>
+function toggleFilters() {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  const collapsed = form.classList.toggle('is-collapsed');
+  icon.textContent = collapsed ? '▼' : '▲';
+}
+
+// 更新主播筛选器
+function updatePilotFilter() {
+  const ownerSelect = document.querySelector('select[name="owner"]');
+  const rankSelect = document.querySelector('select[name="rank"]');
+  const pilotSelect = document.getElementById('pilot-filter');
+  
+  const owner = ownerSelect.value === 'self' ? '{{ current_user.id }}' : ownerSelect.value;
+  const rank = rankSelect.value;
+  
+  fetch(`{{ url_for('battle_record.api_pilots_filtered') }}?owner=${owner}&rank=${rank}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        pilotSelect.innerHTML = '<option value="">全部主播</option>';
+        data.pilots.forEach(pilot => {
+          const option = document.createElement('option');
+          option.value = pilot.id;
+          option.textContent = pilot.name;
+          option.selected = pilot.id === '{{ current_filters.pilot }}';
+          pilotSelect.appendChild(option);
+        });
+      }
+    })
+    .catch(error => console.error('获取主播列表失败:', error));
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  const hasQuery = window.location.search.length > 1;
+  
+  if (!hasQuery) {
+    if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
+    icon.textContent = '▼';
+  } else {
+    form.classList.remove('is-collapsed');
+    icon.textContent = '▲';
+  }
+  
+  // 初始化主播筛选器
+  updatePilotFilter();
+  
+  // 监听所属筛选变化
+  document.querySelector('select[name="owner"]').addEventListener('change', function() {
+    updatePilotFilter();
+  });
+});
+</script>
+{% endblock %}
