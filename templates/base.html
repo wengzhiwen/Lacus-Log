@@ -4,11 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Lacus-Log{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="mask-icon" href="{{ url_for('static', filename='favicon.svg') }}" color="#000000">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Lacus-Log 拉克斯日志</div>
+    <div class="brand"><img src="{{ url_for('static', filename='favicon.svg') }}" alt="Lacus-Log" style="width:28px;height:28px;vertical-align:middle;margin-right:8px;">Lacus-Log 拉克斯日志</div>
     {% if current_user.is_authenticated %}
     <button class="menu-toggle" id="menuToggle" aria-label="打开菜单">
       <span class="hamburger"></span>
