@@ -616,7 +616,7 @@ function loadPilots(ownerId = '', rank = '', callback) {
                 data.pilots.forEach(pilot => {
                     const option = document.createElement('option');
                     option.value = pilot.id;
-                    option.textContent = `${pilot.nickname}[${pilot.real_name || ''}] - ${pilot.owner || '无所属'}`;
+                    option.textContent = pilot.name || pilot.nickname;
                     pilotSelect.appendChild(option);
                 });
 

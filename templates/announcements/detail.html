@@ -20,11 +20,9 @@
                 <div class="info-item">
                     <label>机师：</label>
                     <div class="value">
-                        <strong>{{ announcement.pilot.nickname }}</strong>
-                        {% if announcement.pilot.real_name %}
-                        <span class="real-name">[{{ announcement.pilot.real_name }}]</span>
-                        {% endif %}
-                        <span class="rank">{{ announcement.pilot.rank.value }}</span>
+                        {% set age_str = '(' ~ announcement.pilot.age ~ ')' if announcement.pilot.age else '' %}
+                        {% set gender_icon = '♂' if announcement.pilot.gender.value == 0 else ('♀' if announcement.pilot.gender.value == 1 else '?') %}
+                        {{ announcement.pilot.nickname }}{{ age_str }}[{{ announcement.pilot.status.value }}]{{ gender_icon }}
                     </div>
                 </div>
 

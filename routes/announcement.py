@@ -3,24 +3,17 @@ import calendar
 import json
 from datetime import datetime
 
-from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
-                   request, url_for)
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
-from models.announcement import (Announcement, AnnouncementChangeLog,
-                                 RecurrenceType)
+from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
 from models.battle_area import BattleArea
 from models.pilot import Pilot
 from models.user import User
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (format_local_datetime,
-                                   get_current_local_datetime_for_input,
-                                   get_current_local_time,
-                                   get_current_month_last_day_for_input,
-                                   local_to_utc,
-                                   parse_local_date_to_end_datetime,
-                                   parse_local_datetime, utc_to_local)
+from utils.timezone_helper import (format_local_datetime, get_current_local_datetime_for_input, get_current_local_time, get_current_month_last_day_for_input,
+                                   local_to_utc, parse_local_date_to_end_datetime, parse_local_datetime, utc_to_local)
 
 logger = get_logger('announcement')
 
@@ -940,7 +933,23 @@ def get_pilots_filtered():
         result = []
         for pilot in pilots:
             owner_name = pilot.owner.nickname or pilot.owner.username if pilot.owner else '无所属'
-            result.append({'id': str(pilot.id), 'nickname': pilot.nickname, 'real_name': pilot.real_name or '', 'rank': pilot.rank.value, 'owner': owner_name})
+            # 统一显示格式与作战记录一致：昵称(年龄)[状态]性别符号
+            age_str = f"({pilot.age})" if getattr(pilot, 'age', None) else ""
+            try:
+                gender_value = pilot.gender.value
+            except Exception:
+                gender_value = None
+            gender_icon = '♂' if gender_value == 0 else ('♀' if gender_value == 1 else '?')
+            display_name = f"{pilot.nickname}{age_str}[{pilot.status.value}]{gender_icon}"
+
+            result.append({
+                'id': str(pilot.id),
+                'name': display_name,
+                'nickname': pilot.nickname,
+                'real_name': pilot.real_name or '',
+                'rank': pilot.rank.value,
+                'owner': owner_name
+            })
 
         return jsonify({'success': True, 'pilots': result})
     except Exception as e:
