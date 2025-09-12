@@ -56,11 +56,9 @@ class TestBattleRecordTimeLogic:
         end_time = datetime(2025, 9, 10, 10, 0)  # 结束时间早于开始时间
 
         # 这应该通过业务逻辑验证被拒绝
-        # 在实际应用中，应该在路由层进行验证
-        record = create_battle_record(pilot, start_time, end_time)
-
-        # 验证时间范围
-        assert record.start_time < record.end_time
+        import pytest
+        with pytest.raises(Exception):
+            create_battle_record(pilot, start_time, end_time)
 
 
 @pytest.mark.unit
@@ -197,25 +195,8 @@ class TestBattleRecordIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        """设置测试数据库"""
-        from mongoengine import connect, disconnect
-        try:
-            disconnect()
-        except Exception:
-            pass
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
-
-        # 清理测试数据
-        BattleRecord.objects().delete()
-
+        """依赖 conftest 的全局连接与用例清库。"""
         yield
-
-        # 测试结束后清理数据
-        try:
-            BattleRecord.objects().delete()
-        except Exception:
-            pass
-        disconnect()
 
     def test_battle_record_crud_operations(self):
         """测试作战记录CRUD操作"""

@@ -226,10 +226,8 @@ class TestPilotModelIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        """设置测试数据库"""
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
+        """依赖 conftest 的连接。"""
         yield
-        disconnect()
 
     def test_pilot_save_and_load(self):
         """测试机师保存和加载"""

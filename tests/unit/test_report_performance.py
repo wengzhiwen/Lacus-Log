@@ -166,7 +166,7 @@ class TestReportPerformance:
         # 应该返回None（数据不足3天）
         assert three_day_avg is None
 
-    @patch('utils.report_optimizer.get_battle_records_for_date_range')
+    @patch('routes.report.get_battle_records_for_date_range')
     def test_query_optimization(self, mock_get_records, pilots, registrar):
         """测试查询优化（减少数据库访问）"""
         report_date = datetime(2025, 9, 15, 12, 0, 0)

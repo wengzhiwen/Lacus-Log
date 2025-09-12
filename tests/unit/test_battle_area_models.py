@@ -34,16 +34,8 @@ class TestBattleAreaIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        try:
-            disconnect()
-        except Exception:
-            pass
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
+        # 依赖 conftest 的连接
         yield
-        try:
-            disconnect()
-        except Exception:
-            pass
 
     def test_unique_constraint(self):
         a1 = BattleArea(x_coord="X", y_coord="Y", z_coord="1")

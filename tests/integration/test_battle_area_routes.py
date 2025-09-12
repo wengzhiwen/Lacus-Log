@@ -32,7 +32,8 @@ class TestBattleAreaRoutes:
     def create_gicho(self):
         from flask_security.utils import hash_password
         gicho_role = Role.objects(name="gicho").first()
-        gicho = User(username="gicho_user", password=hash_password("pwd"), nickname="议长", roles=[gicho_role], active=True)
+        # 使用角色 id 避免 DBRef 未解引用
+        gicho = User(username="gicho_user", password=hash_password("pwd"), nickname="议长", roles=[gicho_role.id] if gicho_role else [], active=True)
         gicho.save()
         return gicho
 

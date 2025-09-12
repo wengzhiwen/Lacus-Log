@@ -64,6 +64,28 @@ class TestRecruitStatusFlow:
         recruit.save()
 
         # 更新机师状态和阶级
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
         pilot.status = Status.RECRUITED
         pilot.rank = Rank.TRAINEE
         pilot.save()
@@ -113,7 +135,7 @@ class TestRecruitValidation:
     def test_channel_validation(self, pilot, recruiter):
         """测试征召渠道验证"""
         # 测试有效渠道
-        valid_channels = [RecruitChannel.BOSS, RecruitChannel.JOB51, RecruitChannel.INTRODUCTION, RecruitChannel.OTHER]
+        valid_channels = [RecruitChannel.BOSS, RecruitChannel.JOB_51, RecruitChannel.INTRODUCTION, RecruitChannel.OTHER]
 
         for channel in valid_channels:
             recruit = Recruit(pilot=pilot,
@@ -223,25 +245,8 @@ class TestRecruitIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        """设置测试数据库"""
-        from mongoengine import connect, disconnect
-        try:
-            disconnect()
-        except Exception:
-            pass
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
-
-        # 清理测试数据
-        Recruit.objects().delete()
-
+        """依赖 conftest 提供的连接与清库。"""
         yield
-
-        # 测试结束后清理数据
-        try:
-            Recruit.objects().delete()
-        except Exception:
-            pass
-        disconnect()
 
     def test_complete_recruit_workflow(self):
         """测试完整征召工作流"""
@@ -268,6 +273,8 @@ class TestRecruitIntegration:
         recruit.status = RecruitStatus.ENDED
         recruit.save()
 
+        pilot.real_name = '测试姓名'
+        pilot.birth_year = 1995
         pilot.status = Status.RECRUITED
         pilot.rank = Rank.TRAINEE
         pilot.save()
@@ -297,7 +304,7 @@ class TestRecruitIntegration:
         recruit2 = Recruit(pilot=pilot,
                            recruiter=recruiter,
                            appointment_time=datetime(2025, 9, 16, 14, 0),
-                           channel=RecruitChannel.JOB51,
+                           channel=RecruitChannel.JOB_51,
                            introduction_fee=Decimal('150.00'),
                            status=RecruitStatus.STARTED)
         recruit2.save()

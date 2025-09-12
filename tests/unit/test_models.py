@@ -97,10 +97,8 @@ class TestUserModelIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        """设置测试数据库"""
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
+        """设置测试数据库（连接由 conftest 提供）"""
         yield
-        disconnect()
 
     def test_role_save_and_load(self):
         """测试角色保存和加载"""

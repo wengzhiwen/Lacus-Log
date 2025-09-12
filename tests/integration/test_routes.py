@@ -16,25 +16,8 @@ class TestMainRoutes:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        """设置测试数据库"""
-        from mongoengine import connect, disconnect
-        try:
-            disconnect()
-        except Exception:
-            pass
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
-
-        # 清理测试数据
-        User.objects().delete()
-
+        """依赖 conftest 的连接与用例清库。"""
         yield
-
-        # 测试结束后清理数据
-        try:
-            User.objects().delete()
-        except Exception:
-            pass  # 忽略清理时的连接错误
-        disconnect()
 
     def test_home_route_requires_login(self, client):
         """测试首页需要登录"""
@@ -65,25 +48,8 @@ class TestAdminRoutes:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        """设置测试数据库"""
-        from mongoengine import connect, disconnect
-        try:
-            disconnect()
-        except Exception:
-            pass
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
-
-        # 清理测试数据
-        User.objects().delete()
-
+        """依赖 conftest 的连接与用例清库。"""
         yield
-
-        # 测试结束后清理数据
-        try:
-            User.objects().delete()
-        except Exception:
-            pass  # 忽略清理时的连接错误
-        disconnect()
 
     def test_users_list_requires_gicho_role(self, client):
         """测试用户列表需要议长角色"""
@@ -129,16 +95,16 @@ class TestRouteConfiguration:
         assert admin_bp.name == 'admin'
         # 验证URL生成是否正确
         with app.app_context():
-            assert url_for('admin.users_list') == 'http://localhost:5000/admin/users'
+            assert url_for('admin.users_list', _external=False) == '/admin/users'
 
     def test_route_urls(self, app):
         """测试路由 URL 生成"""
         with app.app_context():
             # 测试主路由
-            assert url_for('main.home') == 'http://localhost:5000/'
+            assert url_for('main.home', _external=False) == '/'
 
             # 测试管理路由
-            assert url_for('admin.users_list') == 'http://localhost:5000/admin/users'
-            assert url_for('admin.users_new') == 'http://localhost:5000/admin/users/new'
-            assert url_for('admin.users_toggle_active', user_id='test') == 'http://localhost:5000/admin/users/test/toggle'
-            assert url_for('admin.users_reset_password', user_id='test') == 'http://localhost:5000/admin/users/test/reset'
+            assert url_for('admin.users_list', _external=False) == '/admin/users'
+            assert url_for('admin.users_new', _external=False) == '/admin/users/new'
+            assert url_for('admin.users_toggle_active', user_id='test', _external=False) == '/admin/users/test/toggle'
+            assert url_for('admin.users_reset_password', user_id='test', _external=False) == '/admin/users/test/reset'

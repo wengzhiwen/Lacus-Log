@@ -36,11 +36,17 @@ def test_config():
     }
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='session', autouse=True)
 def test_db():
-    """测试数据库连接"""
+    """测试数据库连接 - 自动使用，确保所有测试都有数据库连接"""
+    # 先断开任何现有连接
+    try:
+        disconnect()
+    except:
+        pass
+    
     # 连接测试数据库
-    connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
+    connect(host='mongodb://localhost:27017/test_lacus', uuidRepresentation='standard')
     yield
     # 测试结束后断开连接
     disconnect()
@@ -49,15 +55,15 @@ def test_db():
 @pytest.fixture
 def app(test_config) -> Generator[Flask, None, None]:
     """创建测试应用"""
-    # 断开现有连接
-    try:
-        disconnect()
-    except:
-        pass
-
-    # 设置测试环境变量
+    # 设置测试环境变量（在创建应用之前）
     for key, value in test_config.items():
         os.environ[key] = str(value)
+
+    # 为避免别名冲突，先断开可能存在的默认连接，让 create_app 自行连接
+    try:
+        disconnect()
+    except Exception:
+        pass
 
     app = create_app()
     app.config.update(test_config)
@@ -65,10 +71,32 @@ def app(test_config) -> Generator[Flask, None, None]:
     with app.app_context():
         yield app
 
-    # 清理
+
+@pytest.fixture(autouse=True)
+def app_context(app):
+    """为所有测试自动提供应用上下文。"""
+    with app.app_context():
+        yield
+
+
+@pytest.fixture(autouse=True)
+def request_context(app):
+    """为所有测试自动提供请求上下文，确保 current_user 等可用。"""
+    with app.test_request_context():
+        yield
+
+@pytest.fixture(autouse=True)
+def clean_db_between_tests():
+    """每个用例前清空 test_lacus 库并重建必要索引，避免唯一约束相互影响。"""
+    from mongoengine.connection import get_db
+    from models.user import User, Role
     try:
-        disconnect()
-    except:
+        db = get_db()
+        for name in db.list_collection_names():
+            db.drop_collection(name)
+        Role.ensure_indexes()
+        User.ensure_indexes()
+    except Exception:
         pass
 
 

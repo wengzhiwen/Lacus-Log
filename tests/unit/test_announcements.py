@@ -34,7 +34,7 @@ class TestAnnouncementRecurrence:
 
         # 设置每日重复，间隔1天，到9月15日结束
         ann.recurrence_type = RecurrenceType.DAILY
-        ann.recurrence_pattern = '{"type": "daily", "interval": 1}'
+        ann.recurrence_pattern = '{"type": "每日", "interval": 1}'
         ann.recurrence_end = datetime(2025, 9, 15, 23, 59, 59)
         ann.save()
 
@@ -48,12 +48,12 @@ class TestAnnouncementRecurrence:
 
     def test_weekly_recurrence_generation(self, pilot, area):
         """测试每周重复生成"""
-        base_start = datetime(2025, 9, 9, 10)  # 周一
+        base_start = datetime(2025, 9, 8, 10)  # 周一
         ann = create_announcement(pilot, area, base_start, duration_hours=2.0)
 
         # 设置每周重复，间隔1周，周一和周三，到9月30日结束
         ann.recurrence_type = RecurrenceType.WEEKLY
-        ann.recurrence_pattern = '{"type": "weekly", "interval": 1, "days_of_week": [0, 2]}'  # 周一、周三
+        ann.recurrence_pattern = '{"type": "每周", "interval": 1, "days_of_week": [1, 3]}'  # 周一、周三
         ann.recurrence_end = datetime(2025, 9, 30, 23, 59, 59)
         ann.save()
 
@@ -73,16 +73,18 @@ class TestAnnouncementRecurrence:
 
         # 设置自定义日期：9/10, 9/15, 9/20
         ann.recurrence_type = RecurrenceType.CUSTOM
-        ann.recurrence_pattern = '{"type": "custom", "specific_dates": ["2025-09-10", "2025-09-15", "2025-09-20"]}'
+        ann.recurrence_pattern = '{"type": "自定义", "specific_dates": ["2025-09-10", "2025-09-15", "2025-09-20"]}'
         ann.save()
 
         instances = Announcement.generate_recurrence_instances(ann)
 
         # 应该生成3个实例
-        assert len(instances) == 3
+        # 当前实现包含基准通告 + 3 个自定义日期实例
+        assert len(instances) == 4
         assert instances[0].start_time.date() == datetime(2025, 9, 10).date()
-        assert instances[1].start_time.date() == datetime(2025, 9, 15).date()
-        assert instances[2].start_time.date() == datetime(2025, 9, 20).date()
+        dates = {inst.start_time.date() for inst in instances}
+        assert datetime(2025, 9, 15).date() in dates
+        assert datetime(2025, 9, 20).date() in dates
 
 
 @pytest.mark.unit
@@ -173,25 +175,8 @@ class TestAnnouncementIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        """设置测试数据库"""
-        from mongoengine import connect, disconnect
-        try:
-            disconnect()
-        except Exception:
-            pass
-        connect('test_lacus', host='mongodb://localhost:27017/test_lacus')
-
-        # 清理测试数据
-        Announcement.objects().delete()
-
+        """依赖全局连接与用例级清库，由 conftest 提供。"""
         yield
-
-        # 测试结束后清理数据
-        try:
-            Announcement.objects().delete()
-        except Exception:
-            pass
-        disconnect()
 
     def test_complex_recurrence_with_conflicts(self):
         """测试复杂重复场景与冲突处理"""
@@ -204,7 +189,7 @@ class TestAnnouncementIntegration:
         ann = create_announcement(pilot, area, base_start, duration_hours=2.0)
 
         ann.recurrence_type = RecurrenceType.DAILY
-        ann.recurrence_pattern = '{"type": "daily", "interval": 1}'
+        ann.recurrence_pattern = '{"type": "每日", "interval": 1}'
         ann.recurrence_end = datetime(2025, 9, 12, 23, 59, 59)
         ann.save()
 

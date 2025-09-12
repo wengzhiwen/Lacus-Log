@@ -11,6 +11,7 @@ from decimal import Decimal
 from typing import Tuple
 
 from flask_security.utils import hash_password
+from flask import current_app
 
 from models.announcement import Announcement, RecurrenceType
 from models.battle_area import Availability, BattleArea
@@ -38,7 +39,17 @@ def create_user(username: str, role_name: str = 'kancho', active: bool = True) -
     """创建用户，默认舰长角色。"""
     gicho, kancho = ensure_roles()
     role = gicho if role_name == 'gicho' else kancho
-    user = User(username=username, password=hash_password('test_password'), roles=[role], active=active)
+    # 已存在则直接返回，避免唯一索引冲突
+    existing = User.objects(username=username).first()
+    if existing:
+        return existing
+    # 在无应用上下文时，直接使用明文，避免hash_password访问app.config导致异常
+    try:
+        _ = current_app.config
+        pwd = hash_password('test_password')
+    except Exception:
+        pwd = 'test_password'
+    user = User(username=username, password=pwd, roles=[role], active=active)
     user.save()
     return user
 
@@ -51,7 +62,13 @@ def create_battle_area(x: str = 'X1', y: str = 'Y1', z: str = '1', availability:
 
 def create_pilot(nickname: str = '测试机师', owner: User | None = None, rank: Rank = Rank.CANDIDATE, platform: Platform = Platform.KUAISHOU,
                  work_mode: WorkMode = WorkMode.ONLINE, status: Status = Status.NOT_RECRUITED, gender: Gender = Gender.MALE,
-                 birth_year: int | None = 1998) -> Pilot:
+                 birth_year: int | None = 1998, real_name: str | None = None) -> Pilot:
+    # 自动补齐：当状态为已征召/已签约时，要求 real_name 和 birth_year
+    if status in (Status.RECRUITED, Status.CONTRACTED):
+        if not real_name:
+            real_name = '测试姓名'
+        if not birth_year:
+            birth_year = 1995
     pilot = Pilot(nickname=nickname,
                   owner=owner,
                   rank=rank,
@@ -59,12 +76,14 @@ def create_pilot(nickname: str = '测试机师', owner: User | None = None, rank
                   work_mode=work_mode,
                   status=status,
                   gender=gender,
-                  birth_year=birth_year)
+                  birth_year=birth_year,
+                  real_name=real_name)
     pilot.save()
     return pilot
 
 
 def create_announcement(pilot: Pilot, area: BattleArea, start_local: datetime, duration_hours: float = 2.0) -> Announcement:
+    creator = pilot.owner or create_user('creator_user')
     ann = Announcement(pilot=pilot,
                        battle_area=area,
                        x_coord=area.x_coord,
@@ -72,14 +91,20 @@ def create_announcement(pilot: Pilot, area: BattleArea, start_local: datetime, d
                        z_coord=area.z_coord,
                        start_time=local_to_utc(start_local),
                        duration_hours=duration_hours,
-                       recurrence_type=RecurrenceType.NONE)
+                       recurrence_type=RecurrenceType.NONE,
+                       created_by=creator)
     ann.save()
     return ann
 
 
-def create_battle_record(pilot: Pilot, start_local: datetime, end_local: datetime, x: str = 'X1', y: str = 'Y1', z: str = '1',
+def create_battle_record(pilot: Pilot, start_local: datetime | None = None, end_local: datetime | None = None, x: str = 'X1', y: str = 'Y1', z: str = '1',
                          work_mode: WorkMode = WorkMode.OFFLINE, revenue: Decimal = Decimal('100.00'), base_salary: Decimal = Decimal('50.00'),
-                         registrar: User | None = None) -> BattleRecord:
+                         registrar: User | None = None, **kwargs) -> BattleRecord:
+    # 兼容关键字 start_time/end_time（UTC），或 start_local/end_local（本地）
+    if start_local is None and 'start_time' in kwargs:
+        start_local = kwargs['start_time']
+    if end_local is None and 'end_time' in kwargs:
+        end_local = kwargs['end_time']
     if not registrar:
         registrar = create_user('registrar_user')
     
