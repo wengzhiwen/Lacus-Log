@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block title %}机师征召日报 - {{ pagination.date }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">📊 机师征召日报</h1>
+  <p class="text-muted">{{ pagination.date }}</p>
+</div>
+
+<!-- 日期导航 -->
+<div class="date-navigation">
+  <div class="date-controls">
+    <a href="{{ url_for('recruit.recruit_daily_report', date=pagination.prev_date) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+    <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
+    <a href="{{ url_for('recruit.recruit_daily_report', date=pagination.next_date) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+  </div>
+</div>
+
+<!-- 征召统计表格 -->
+<div class="statistics-section">
+  <h2 class="section-title">征召统计</h2>
+  <div class="table-container">
+    <table class="statistics-table">
+      <thead>
+        <tr>
+          <th>统计范围</th>
+          <th>约面</th>
+          <th>到面</th>
+          <th>试播</th>
+          <th>新开播</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="range-label">报表日</td>
+          <td class="stat-value">
+            {{ statistics.report_day.appointments }}
+            <div class="percentage">{{ statistics.percentages.report_day.appointments }}%</div>
+          </td>
+          <td class="stat-value">
+            {{ statistics.report_day.interviews }}
+            <div class="percentage">{{ statistics.percentages.report_day.interviews }}%</div>
+          </td>
+          <td class="stat-value">
+            {{ statistics.report_day.trials }}
+            <div class="percentage">{{ statistics.percentages.report_day.trials }}%</div>
+          </td>
+          <td class="stat-value">
+            {{ statistics.report_day.new_recruits }}
+            <div class="percentage">{{ statistics.percentages.report_day.new_recruits }}%</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="range-label">近7日</td>
+          <td class="stat-value">
+            {{ statistics.last_7_days.appointments }}
+            <div class="percentage">{{ statistics.percentages.last_7_days.appointments }}%</div>
+          </td>
+          <td class="stat-value">
+            {{ statistics.last_7_days.interviews }}
+            <div class="percentage">{{ statistics.percentages.last_7_days.interviews }}%</div>
+          </td>
+          <td class="stat-value">
+            {{ statistics.last_7_days.trials }}
+            <div class="percentage">{{ statistics.percentages.last_7_days.trials }}%</div>
+          </td>
+          <td class="stat-value">
+            {{ statistics.last_7_days.new_recruits }}
+            <div class="percentage">{{ statistics.percentages.last_7_days.new_recruits }}%</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="range-label">近14日</td>
+          <td class="stat-value">{{ statistics.last_14_days.appointments }}</td>
+          <td class="stat-value">{{ statistics.last_14_days.interviews }}</td>
+          <td class="stat-value">{{ statistics.last_14_days.trials }}</td>
+          <td class="stat-value">{{ statistics.last_14_days.new_recruits }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 指标说明 -->
+<div class="explanation-section">
+  <h2 class="section-title">指标说明</h2>
+  <div class="explanation-cards">
+    <div class="explanation-card">
+      <div class="card-icon">📅</div>
+      <div class="card-content">
+        <h3>约面</h3>
+        <p>当天创建的征召数量</p>
+      </div>
+    </div>
+    <div class="explanation-card">
+      <div class="card-icon">👥</div>
+      <div class="card-content">
+        <h3>到面</h3>
+        <p>当天发生的训练征召决策数量（完成训练征召决策的数量，不论是决定训练征召，还是决定不征召都算）</p>
+      </div>
+    </div>
+    <div class="explanation-card">
+      <div class="card-icon">🎯</div>
+      <div class="card-content">
+        <h3>试播</h3>
+        <p>当天发生的结束征召决策数量（完成结束征召的决策数量，不论是决定征召，还是决定不征召）</p>
+      </div>
+    </div>
+    <div class="explanation-card">
+      <div class="card-icon">🚀</div>
+      <div class="card-content">
+        <h3>新开播</h3>
+        <p>当天在结束征召决策中决定征召的数量（不征召不算）</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* 日期导航样式 */
+.date-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--table-header);
+  border-radius: 8px;
+}
+
+.date-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* 统计表格样式 */
+.statistics-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.statistics-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+.statistics-table th,
+.statistics-table td {
+  padding: 16px 12px;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.statistics-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.statistics-table th:first-child,
+.statistics-table td:first-child {
+  text-align: left;
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+.statistics-table td:first-child {
+  background: #f8f9fa;
+}
+
+.statistics-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.range-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--brand);
+  position: relative;
+}
+
+.percentage {
+  font-size: 12px;
+  color: #999;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+/* 指标说明样式 */
+.explanation-section {
+  margin: 24px 0;
+}
+
+.explanation-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.explanation-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: box-shadow 0.2s ease;
+}
+
+.explanation-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.card-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text);
+}
+
+.card-content p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .date-navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .statistics-table {
+    font-size: 12px;
+  }
+
+  .statistics-table th,
+  .statistics-table td {
+    padding: 12px 8px;
+  }
+
+  .stat-value {
+    font-size: 16px;
+  }
+
+  .explanation-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .explanation-card {
+    padding: 12px;
+  }
+
+  .card-icon {
+    font-size: 20px;
+  }
+}
+</style>
+
+<script>
+// 日期选择器事件
+document.getElementById('dateSelector').addEventListener('change', function() {
+  const selectedDate = this.value;
+  if (selectedDate) {
+    window.location.href = '{{ url_for("recruit.recruit_daily_report") }}?date=' + selectedDate;
+  }
+});
+</script>
+{% endblock %}

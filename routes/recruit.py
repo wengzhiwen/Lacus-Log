@@ -12,7 +12,7 @@ from models.recruit import (FinalDecision, Recruit, RecruitChangeLog,
                             RecruitChannel, RecruitStatus, TrainingDecision)
 from models.user import Role, User
 from utils.logging_setup import get_logger
-from utils.timezone_helper import local_to_utc
+from utils.timezone_helper import local_to_utc, utc_to_local
 
 logger = get_logger('recruit')
 
@@ -98,8 +98,24 @@ def list_recruits():
     # 状态筛选
     if status_filter:
         if status_filter == '进行中':
-            # 进行中：已启动 + 训练征召中
+            # 进行中：已启动 + 训练征召中，且限制最近7天
+            from datetime import timedelta
+
+            from mongoengine import Q
+
+            from utils.timezone_helper import get_current_utc_time
+
+            # 计算7天前的UTC时间
+            current_local = utc_to_local(get_current_utc_time())
+            seven_days_ago_local = current_local - timedelta(days=7)
+            seven_days_ago_utc = local_to_utc(seven_days_ago_local)
+
+            # 进行中状态筛选
             query = query.filter(status__in=[RecruitStatus.STARTED, RecruitStatus.TRAINING_RECRUITING])
+
+            # 7天限制：创建时间、预约时间、训练时间任意一个在7天内
+            seven_days_query = Q(created_at__gte=seven_days_ago_utc) | Q(appointment_time__gte=seven_days_ago_utc) | Q(training_time__gte=seven_days_ago_utc)
+            query = query.filter(seven_days_query)
         elif status_filter == '已结束':
             # 已结束
             query = query.filter(status=RecruitStatus.ENDED)
@@ -1085,3 +1101,157 @@ def _get_owner_choices():
         choices.append((str(user.id), label))
 
     return choices
+
+
+# 征召日报相关路由
+@recruit_bp.route('/reports/daily')
+@roles_accepted('gicho', 'kancho')
+def recruit_daily_report():
+    """征召日报页面"""
+    logger.info(f"用户 {current_user.username} 访问征召日报")
+
+    # 获取报表日期（默认今天）
+    date_str = request.args.get('date')
+    if date_str:
+        report_date = _get_local_date_from_string(date_str)
+        if not report_date:
+            # 日期格式错误，使用今天
+            from utils.timezone_helper import get_current_utc_time
+            report_date = utc_to_local(get_current_utc_time()).replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        # 默认今天
+        from utils.timezone_helper import get_current_utc_time
+        report_date = utc_to_local(get_current_utc_time()).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 计算统计数据
+    statistics = _calculate_recruit_statistics(report_date)
+
+    # 计算百分比数据
+    percentages = _calculate_percentages(statistics)
+
+    # 将百分比数据添加到statistics中
+    statistics['percentages'] = percentages
+
+    # 计算分页导航
+    from datetime import timedelta
+    prev_date = report_date - timedelta(days=1)
+    next_date = report_date + timedelta(days=1)
+
+    pagination = {'date': report_date.strftime('%Y-%m-%d'), 'prev_date': prev_date.strftime('%Y-%m-%d'), 'next_date': next_date.strftime('%Y-%m-%d')}
+
+    return render_template('recruit_reports/daily.html', statistics=statistics, pagination=pagination)
+
+
+def _calculate_percentages(statistics):
+    """计算百分比数据
+    
+    Args:
+        statistics: 统计数据字典
+        
+    Returns:
+        dict: 包含百分比数据的字典
+    """
+
+    def safe_percentage(numerator, denominator):
+        """安全计算百分比，避免除零错误"""
+        if denominator == 0:
+            return 0
+        return round((numerator / denominator) * 100)
+
+    # 计算报表日相对于近7日的百分比
+    report_day_percentages = {
+        'appointments': safe_percentage(statistics['report_day']['appointments'], statistics['last_7_days']['appointments']),
+        'interviews': safe_percentage(statistics['report_day']['interviews'], statistics['last_7_days']['interviews']),
+        'trials': safe_percentage(statistics['report_day']['trials'], statistics['last_7_days']['trials']),
+        'new_recruits': safe_percentage(statistics['report_day']['new_recruits'], statistics['last_7_days']['new_recruits'])
+    }
+
+    # 计算近7日相对于近14日的百分比
+    last_7_days_percentages = {
+        'appointments': safe_percentage(statistics['last_7_days']['appointments'], statistics['last_14_days']['appointments']),
+        'interviews': safe_percentage(statistics['last_7_days']['interviews'], statistics['last_14_days']['interviews']),
+        'trials': safe_percentage(statistics['last_7_days']['trials'], statistics['last_14_days']['trials']),
+        'new_recruits': safe_percentage(statistics['last_7_days']['new_recruits'], statistics['last_14_days']['new_recruits'])
+    }
+
+    return {'report_day': report_day_percentages, 'last_7_days': last_7_days_percentages}
+
+
+def _get_local_date_from_string(date_str):
+    """将日期字符串解析为本地日期对象
+    
+    Args:
+        date_str: 日期字符串，格式为YYYY-MM-DD
+        
+    Returns:
+        datetime: 本地日期对象（时间设为00:00:00）
+    """
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        return None
+
+
+def _calculate_recruit_statistics(report_date):
+    """计算征召统计数据
+    
+    Args:
+        report_date: 报表日期（本地时间）
+        
+    Returns:
+        dict: 包含报表日、近7日、近14日的统计数据
+    """
+    from datetime import timedelta
+
+    # 计算时间范围
+    report_day_start = report_date
+    report_day_end = report_day_start + timedelta(days=1)
+
+    last_7_days_start = report_date - timedelta(days=6)  # 包含报表日，共7天
+    last_14_days_start = report_date - timedelta(days=13)  # 包含报表日，共14天
+
+    # 转换为UTC时间范围
+    report_day_start_utc = local_to_utc(report_day_start)
+    report_day_end_utc = local_to_utc(report_day_end)
+    last_7_days_start_utc = local_to_utc(last_7_days_start)
+    last_14_days_start_utc = local_to_utc(last_14_days_start)
+
+    # 计算报表日数据
+    report_day_stats = _calculate_period_stats(report_day_start_utc, report_day_end_utc)
+
+    # 计算近7日数据
+    last_7_days_stats = _calculate_period_stats(last_7_days_start_utc, report_day_end_utc)
+
+    # 计算近14日数据
+    last_14_days_stats = _calculate_period_stats(last_14_days_start_utc, report_day_end_utc)
+
+    return {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
+
+
+def _calculate_period_stats(start_utc, end_utc):
+    """计算指定时间范围内的征召统计数据
+    
+    Args:
+        start_utc: 开始时间（UTC）
+        end_utc: 结束时间（UTC）
+        
+    Returns:
+        dict: 包含约面、到面、试播、新开播的统计数据
+    """
+    # 约面：当天创建的征召数量
+    appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
+
+    # 到面：当天发生的训练征召决策数量
+    interviews = Recruit.objects.filter(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc).count()
+
+    # 试播：当天发生的结束征召决策数量
+    trials = Recruit.objects.filter(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc).count()
+
+    # 新开播：当天在结束征召决策中决定征召的数量（不征召不算）
+    new_recruits = Recruit.objects.filter(final_decision_time__gte=start_utc,
+                                          final_decision_time__lt=end_utc,
+                                          final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]).count()
+
+    return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
