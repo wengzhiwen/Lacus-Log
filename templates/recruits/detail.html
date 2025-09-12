@@ -71,6 +71,24 @@
           <div class="info-label">征召状态</div>
           <div class="info-value status-{{ recruit.status.value.replace(' ', '') }}">{{ recruit.status.value }}</div>
         </div>
+        {% if recruit.training_decision %}
+        <div class="info-item">
+          <div class="info-label">训练征召决策</div>
+          <div class="info-value">{{ recruit.training_decision.value }}</div>
+        </div>
+        {% endif %}
+        {% if recruit.training_time %}
+        <div class="info-item">
+          <div class="info-label">训练时间</div>
+          <div class="info-value">{{ recruit.training_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endif %}
+        {% if recruit.final_decision %}
+        <div class="info-item">
+          <div class="info-label">结束征召决策</div>
+          <div class="info-value">{{ recruit.final_decision.value }}</div>
+        </div>
+        {% endif %}
         {% if recruit.remarks %}
         <div class="info-item full-width">
           <div class="info-label">备注</div>
@@ -101,31 +119,13 @@
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.edit_recruit', recruit_id=recruit.id) }}">编辑</a>
   {% if recruit.status.value == '已启动' %}
-  <a class="btn btn-primary" href="{{ url_for('recruit.confirm_recruit_page', recruit_id=recruit.id) }}">确认征召</a>
-  <button class="btn btn-warning" onclick="showAbandonDialog()">放弃征召</button>
+  <a class="btn btn-primary" href="{{ url_for('recruit.training_recruit_page', recruit_id=recruit.id) }}">训练征召</a>
+  {% elif recruit.status.value == '训练征召中' %}
+  <a class="btn btn-primary" href="{{ url_for('recruit.final_recruit_page', recruit_id=recruit.id) }}">结束征召</a>
   {% endif %}
   <button class="btn btn-secondary" onclick="showChangesModal()">变更记录</button>
 </div>
 
-<!-- 放弃征召确认对话框 -->
-<div id="abandonDialog" class="modal" style="display: none;">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3>确认放弃征召</h3>
-      <button class="modal-close" onclick="hideAbandonDialog()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p>你确认要放弃这个鸽子王吗？也许他将来可以驾驶强袭自由。</p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="hideAbandonDialog()">取消</button>
-      <form style="display: inline;" method="POST" action="{{ url_for('recruit.abandon_recruit', recruit_id=recruit.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-        <button type="submit" class="btn btn-warning">确认放弃</button>
-      </form>
-    </div>
-  </div>
-</div>
 
 <!-- 变更记录模态框 -->
 <div id="changesModal" class="modal" style="display: none;">
@@ -367,14 +367,6 @@
 </style>
 
 <script>
-function showAbandonDialog() {
-  document.getElementById('abandonDialog').style.display = 'flex';
-}
-
-function hideAbandonDialog() {
-  document.getElementById('abandonDialog').style.display = 'none';
-}
-
 function showChangesModal() {
   const modal = document.getElementById('changesModal');
   const content = document.getElementById('changesContent');

@@ -1,8 +1,7 @@
 import enum
 from datetime import datetime, timedelta
 
-from mongoengine import (DateTimeField, DecimalField, Document, EnumField,
-                         ReferenceField, StringField)
+from mongoengine import (DateTimeField, DecimalField, Document, EnumField, ReferenceField, StringField)
 
 from utils.timezone_helper import get_current_utc_time
 
@@ -21,7 +20,21 @@ class RecruitChannel(enum.Enum):
 class RecruitStatus(enum.Enum):
     """征召状态枚举"""
     STARTED = "已启动"
+    TRAINING_RECRUITING = "训练征召中"
     ENDED = "已结束"
+
+
+class TrainingDecision(enum.Enum):
+    """训练征召决策枚举"""
+    RECRUIT_AS_TRAINEE = "征召为训练机师"
+    NOT_RECRUIT = "不征召"
+
+
+class FinalDecision(enum.Enum):
+    """结束征召决策枚举"""
+    OFFICIAL = "正式机师"
+    INTERN = "实习机师"
+    NOT_RECRUIT = "不征召"
 
 
 class Recruit(Document):
@@ -38,12 +51,24 @@ class Recruit(Document):
     remarks = StringField(max_length=200)
     status = EnumField(RecruitStatus, default=RecruitStatus.STARTED)
 
+    # 训练征召相关字段
+    training_decision = EnumField(TrainingDecision)
+    training_decision_maker = ReferenceField(User)
+    training_decision_time = DateTimeField()
+    training_time = DateTimeField()
+
+    # 结束征召相关字段
+    final_decision = EnumField(FinalDecision)
+    final_decision_maker = ReferenceField(User)
+    final_decision_time = DateTimeField()
+
     # 系统字段
     created_at = DateTimeField(default=get_current_utc_time)
     updated_at = DateTimeField(default=get_current_utc_time)
 
     meta = {
-        'collection': 'recruits',
+        'collection':
+        'recruits',
         'indexes': [
             {
                 'fields': ['pilot']
@@ -60,6 +85,15 @@ class Recruit(Document):
             {
                 'fields': ['-created_at']
             },
+            {
+                'fields': ['training_decision']
+            },
+            {
+                'fields': ['final_decision']
+            },
+            {
+                'fields': ['-training_time']
+            },
         ],
     }
 
@@ -74,6 +108,27 @@ class Recruit(Document):
         # 验证介绍费为有效的非负数
         if self.introduction_fee and self.introduction_fee < 0:
             raise ValueError("介绍费必须为非负数")
+
+        # 验证训练时间不能早于预约时间
+        if self.training_time and self.appointment_time:
+            if self.training_time < self.appointment_time:
+                raise ValueError("训练时间不能早于预约时间")
+
+        # 验证训练征召决策相关字段的一致性
+        if self.training_decision:
+            if not self.training_decision_maker:
+                raise ValueError("训练征召决策时必须有决策人")
+            if not self.training_decision_time:
+                raise ValueError("训练征召决策时必须有决策时间")
+            if self.training_decision == TrainingDecision.RECRUIT_AS_TRAINEE and not self.training_time:
+                raise ValueError("征召为训练机师时必须填写训练时间")
+
+        # 验证结束征召决策相关字段的一致性
+        if self.final_decision:
+            if not self.final_decision_maker:
+                raise ValueError("结束征召决策时必须有决策人")
+            if not self.final_decision_time:
+                raise ValueError("结束征召决策时必须有决策时间")
 
     def save(self, *args, **kwargs):
         """保存时更新修改时间"""
@@ -130,5 +185,12 @@ class RecruitChangeLog(Document):
             'introduction_fee': '介绍费',
             'remarks': '备注',
             'status': '征召状态',
+            'training_decision': '训练征召决策',
+            'training_decision_maker': '训练征召决策人',
+            'training_decision_time': '训练征召决策时间',
+            'training_time': '训练时间',
+            'final_decision': '结束征召决策',
+            'final_decision_maker': '结束征召决策人',
+            'final_decision_time': '结束征召决策时间',
         }
         return mapping.get(self.field_name, self.field_name)
