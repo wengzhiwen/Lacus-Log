@@ -279,7 +279,7 @@ def create_battle_record():
             y_coord=y_coord,
             z_coord=z_coord,
             work_mode=wm_enum,
-            owner_snapshot=pilot.owner or current_user,  # 如果主播没有所属，使用当前用户
+            owner_snapshot=pilot.owner,  # 无所属机师不使用当前用户作为快照
             registered_by=current_user,
             notes=notes.strip() if notes else '')
 
@@ -351,7 +351,7 @@ def update_battle_record(record_id):
             pilot = Pilot.objects.get(id=pilot_id)
             battle_record.pilot = pilot
             # 更新所属快照
-            battle_record.owner_snapshot = pilot.owner or current_user
+            battle_record.owner_snapshot = pilot.owner
 
         # 关联通告：编辑页已不可修改。如果该字段未提交，则保持不变；
         # 仅当前端显式提交该字段时才更新（空字符串表示清空）。

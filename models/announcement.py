@@ -74,6 +74,16 @@ class Announcement(Document):
             {
                 'fields': ['-start_time']
             },
+            # 优化冲突检查性能的复合索引
+            {
+                'fields': ['start_time', 'duration_hours']
+            },
+            {
+                'fields': ['pilot', 'start_time', 'duration_hours']
+            },
+            {
+                'fields': ['battle_area', 'start_time', 'duration_hours']
+            },
         ],
     }
 
@@ -302,10 +312,11 @@ class Announcement(Document):
         instances = []
         interval = pattern.get('interval', 1)
         end_date = base.recurrence_end or (base.start_time + timedelta(days=60))
+        max_instances = 60  # 最多生成60个实例
 
         current_date = base.start_time + timedelta(days=interval)
 
-        while current_date <= end_date:
+        while current_date <= end_date and len(instances) < max_instances:
             instance = cls(pilot=base.pilot,
                            battle_area=base.battle_area,
                            x_coord=base.x_coord,
@@ -328,14 +339,17 @@ class Announcement(Document):
         interval = pattern.get('interval', 1)
         days_of_week = pattern.get('days_of_week', [])
         end_date = base.recurrence_end or (base.start_time + timedelta(days=60))
+        max_instances = 60  # 最多生成60个实例
 
         # 从基准周的周一开始计算，再按间隔推进
         # Python中isoweekday: 周一=1, 周日=7
         base_week_monday = base.start_time - timedelta(days=base.start_time.isoweekday() - 1)
         week_start = base_week_monday
 
-        while week_start <= end_date:
+        while week_start <= end_date and len(instances) < max_instances:
             for day_of_week in days_of_week:
+                if len(instances) >= max_instances:
+                    break
                 # 确保day_of_week是整数
                 day_of_week = int(day_of_week) if isinstance(day_of_week, str) else day_of_week
                 # 计算具体日期（1=周一，7=周日）
@@ -366,8 +380,11 @@ class Announcement(Document):
         """生成自定义重复的实例"""
         instances = []
         specific_dates = pattern.get('specific_dates', [])
+        max_instances = 60  # 最多生成60个实例
 
         for date_str in specific_dates:
+            if len(instances) >= max_instances:
+                break
             try:
                 # 解析ISO格式的日期时间
                 target_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))

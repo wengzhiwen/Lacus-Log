@@ -229,16 +229,28 @@ def daily_report():
         if duration >= 6:
             day_effective_pilots.add(pilot_id)
 
-    # 构建明细数据
+    # 构建明细数据 - 使用优化版本批量计算
+    day_records_ordered = day_records.order_by('-revenue_amount', '-start_time')
+    unique_pilots = list(set(record.pilot for record in day_records_ordered))
+    
+    # 批量计算所有机师的统计数据
+    from utils.report_optimizer import batch_calculate_pilot_stats
+    pilot_stats_cache = batch_calculate_pilot_stats(unique_pilots, report_date)
+    
     details = []
-    for record in day_records.order_by('-revenue_amount', '-start_time'):
+    for record in day_records_ordered:
         pilot = record.pilot
+        pilot_id = str(pilot.id)
 
-        # 计算3日平均流水
-        three_day_avg = calculate_pilot_three_day_avg_revenue(pilot, report_date)
-
-        # 计算月度统计
-        monthly_stats = calculate_pilot_monthly_stats(pilot, report_date)
+        # 从缓存获取统计数据
+        pilot_stats = pilot_stats_cache.get(pilot_id, {})
+        three_day_avg = pilot_stats.get('three_day_avg_revenue')
+        monthly_stats = pilot_stats.get('monthly_stats', {
+            'month_days_count': 0,
+            'month_avg_duration': 0,
+            'month_total_revenue': 0,
+            'month_total_base_salary': 0
+        })
 
         # 构建所属和阶级显示（优先快照，无快照显示当前）
         owner_display = ''
@@ -322,15 +334,27 @@ def export_daily_csv():
     headers = ['机师', '性别年龄', '所属', '阶级', '作战区域', '播时', '流水', '3日平均流水', '月累计天数', '月日均播时', '月累计流水', '月累计底薪']
     writer.writerow(headers)
 
-    # 写入数据行
-    for record in day_records.order_by('-revenue_amount', '-start_time'):
+    # 写入数据行 - 使用优化版本批量计算
+    day_records_ordered = day_records.order_by('-revenue_amount', '-start_time')
+    unique_pilots = list(set(record.pilot for record in day_records_ordered))
+    
+    # 批量计算所有机师的统计数据
+    from utils.report_optimizer import batch_calculate_pilot_stats
+    pilot_stats_cache = batch_calculate_pilot_stats(unique_pilots, report_date)
+    
+    for record in day_records_ordered:
         pilot = record.pilot
+        pilot_id = str(pilot.id)
 
-        # 计算3日平均流水
-        three_day_avg = calculate_pilot_three_day_avg_revenue(pilot, report_date)
-
-        # 计算月度统计
-        monthly_stats = calculate_pilot_monthly_stats(pilot, report_date)
+        # 从缓存获取统计数据
+        pilot_stats = pilot_stats_cache.get(pilot_id, {})
+        three_day_avg = pilot_stats.get('three_day_avg_revenue')
+        monthly_stats = pilot_stats.get('monthly_stats', {
+            'month_days_count': 0,
+            'month_avg_duration': 0,
+            'month_total_revenue': 0,
+            'month_total_base_salary': 0
+        })
 
         # 构建各字段值
         pilot_display = f"{pilot.nickname}（{pilot.real_name or ''}）" if pilot.real_name else pilot.nickname

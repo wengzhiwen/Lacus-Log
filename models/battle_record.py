@@ -36,8 +36,8 @@ class BattleRecord(Document):
     # 参战形式（可从主播复制，但允许修改）
     work_mode = EnumField(WorkMode, required=True)
 
-    # 所属快照（从主播复制，仅显示不可编辑）
-    owner_snapshot = ReferenceField(User, required=True)
+    # 所属快照（从主播复制，仅显示不可编辑；可为空表示机师无所属）
+    owner_snapshot = ReferenceField(User, required=False)
 
     # 登记人（首次登记的操作人，仅显示不可编辑）
     registered_by = ReferenceField(User, required=True)
@@ -78,10 +78,10 @@ class BattleRecord(Document):
         """数据验证和业务规则检查"""
         super().clean()
 
-        # 时间验证：结束时间必须大于等于开始时间
+        # 时间验证：结束时间必须大于开始时间
         if self.start_time and self.end_time:
-            if self.end_time < self.start_time:
-                raise ValueError("结束时间必须大于等于开始时间")
+            if self.end_time <= self.start_time:
+                raise ValueError("结束时间必须大于开始时间")
 
         # 金额验证：保留两位小数
         if self.revenue_amount is not None:

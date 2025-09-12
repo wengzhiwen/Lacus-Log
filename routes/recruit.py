@@ -1,21 +1,14 @@
 # pylint: disable=no-member
 from decimal import Decimal, InvalidOperation
 
-from flask import (
-    Blueprint,
-    abort,
-    flash,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    url_for,
-)
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
 from models.pilot import Pilot, Rank, Status
-from models.recruit import Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus
+from models.recruit import (Recruit, RecruitChangeLog, RecruitChannel,
+                            RecruitStatus)
 from models.user import Role, User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import local_to_utc
@@ -449,6 +442,11 @@ def confirm_recruit(recruit_id):
     if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
         abort(403)
 
+    # 检查机师真实姓名是否为空
+    if not recruit.pilot.real_name or not recruit.pilot.real_name.strip():
+        flash('该机师未填写真实姓名，请先在机师管理补全基本资料后再确认征召', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
     try:
         # 获取表单数据
         introduction_fee = request.form.get('introduction_fee', '0')
@@ -487,16 +485,14 @@ def confirm_recruit(recruit_id):
             'status': recruit.pilot.status.value if recruit.pilot.status else None,
         }
 
-        # 更新征召记录
-        recruit.introduction_fee = introduction_fee_decimal
-        recruit.remarks = remarks
-        recruit.status = RecruitStatus.ENDED
-        recruit.save()
-
-        # 更新机师状态和阶级
-        recruit.pilot.rank = Rank.TRAINEE
-        recruit.pilot.status = Status.RECRUITED
-        recruit.pilot.save()
+        # 使用服务层方法确保原子性
+        try:
+            from utils.recruit_service import confirm_recruit_atomic
+            confirm_recruit_atomic(recruit, introduction_fee_decimal, remarks, current_user, _get_client_ip())
+        except Exception as service_error:
+            logger.error('征召确认服务失败：%s', str(service_error))
+            flash(f'征召确认失败：{str(service_error)}', 'error')
+            return redirect(url_for('recruit.confirm_recruit_page', recruit_id=recruit_id))
 
         # 记录征召变更日志
         _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
@@ -558,13 +554,14 @@ def abandon_recruit(recruit_id):
             'status': recruit.pilot.status.value if recruit.pilot.status else None,
         }
 
-        # 更新征召记录
-        recruit.status = RecruitStatus.ENDED
-        recruit.save()
-
-        # 更新机师状态
-        recruit.pilot.status = Status.NOT_RECRUITING
-        recruit.pilot.save()
+        # 使用服务层方法确保原子性
+        try:
+            from utils.recruit_service import abandon_recruit_atomic
+            abandon_recruit_atomic(recruit, current_user, _get_client_ip())
+        except Exception as service_error:
+            logger.error('征召放弃服务失败：%s', str(service_error))
+            flash(f'征召放弃失败：{str(service_error)}', 'error')
+            return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
 
         # 记录征召变更日志
         _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())

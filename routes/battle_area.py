@@ -1,5 +1,6 @@
 # pylint: disable=no-member
-from flask import (Blueprint, abort, flash, redirect, render_template, request, url_for)
+from flask import (Blueprint, abort, flash, redirect, render_template, request,
+                   url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
@@ -30,6 +31,9 @@ def list_areas():
             query = query.filter(availability=Availability(availability_filter))
         except ValueError:
             pass
+    else:
+        # 默认筛选：只显示可用的战斗区域
+        query = query.filter(availability=Availability.ENABLED)
 
     # 排序：X、Y、Z 字典序
     areas = query.order_by('x_coord', 'y_coord', 'z_coord').all()
