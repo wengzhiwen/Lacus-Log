@@ -34,11 +34,15 @@
     </div>
     <div class="summary-card">
       <div class="card-label">累计流水</div>
-      <div class="card-value">¥{{ "%.2f"|format(month_summary.revenue_sum) }}</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.revenue_sum) }}</div>
     </div>
     <div class="summary-card">
       <div class="card-label">累计底薪支出</div>
-      <div class="card-value">¥{{ "%.2f"|format(month_summary.basepay_sum) }}</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.basepay_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计返点</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.rebate_sum) }}</div>
     </div>
   </div>
 </div>
@@ -57,11 +61,11 @@
     </div>
     <div class="summary-card">
       <div class="card-label">累计流水</div>
-      <div class="card-value">¥{{ "%.2f"|format(day_summary.revenue_sum) }}</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.revenue_sum) }}</div>
     </div>
     <div class="summary-card">
       <div class="card-label">累计底薪支出</div>
-      <div class="card-value">¥{{ "%.2f"|format(day_summary.basepay_sum) }}</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.basepay_sum) }}</div>
     </div>
   </div>
 </div>
@@ -86,6 +90,7 @@
           <th>月日均播时</th>
           <th>月累计流水</th>
           <th>月累计底薪</th>
+          <th>月累计返点</th>
         </tr>
       </thead>
       <tbody>
@@ -97,12 +102,13 @@
           <td>{{ detail.rank }}</td>
           <td>{{ detail.battle_area }}</td>
           <td>{{ "%.1f"|format(detail.duration) if detail.duration else "0.0" }}小时</td>
-          <td>¥{{ "%.2f"|format(detail.revenue) }}</td>
-          <td>{% if detail.three_day_avg_revenue %}¥{{ "%.2f"|format(detail.three_day_avg_revenue) }}{% endif %}</td>
+          <td>¥{{ "{:,.2f}".format(detail.revenue) }}</td>
+          <td>{% if detail.three_day_avg_revenue %}¥{{ "{:,.2f}".format(detail.three_day_avg_revenue) }}{% endif %}</td>
           <td>{{ detail.monthly_stats.month_days_count }}</td>
           <td>{{ "%.1f"|format(detail.monthly_stats.month_avg_duration) }}小时</td>
-          <td>¥{{ "%.2f"|format(detail.monthly_stats.month_total_revenue) }}</td>
-          <td>¥{{ "%.2f"|format(detail.monthly_stats.month_total_base_salary) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.monthly_stats.month_total_revenue) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.monthly_stats.month_total_base_salary) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.rebate_amount) }}</td>
         </tr>
         {% endfor %}
       </tbody>

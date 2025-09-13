@@ -18,9 +18,7 @@ from routes.report import report_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
-from utils.timezone_helper import (format_local_date, format_local_datetime,
-                                   format_local_time, get_local_date_for_input,
-                                   get_local_datetime_for_input,
+from utils.timezone_helper import (format_local_date, format_local_datetime, format_local_time, get_local_date_for_input, get_local_datetime_for_input,
                                    get_local_time_for_input, utc_to_local)
 
 
@@ -154,6 +152,47 @@ def create_app() -> Flask:
     def local_time_for_input_filter(utc_dt):
         """将UTC时间转换为适合HTML time输入框的格式"""
         return get_local_time_for_input(utc_dt)
+
+    # 注册全局错误处理器
+    @flask_app.errorhandler(500)
+    def handle_500_error(error):
+        """处理500内部服务器错误"""
+        import traceback
+        logger = flask_app.logger
+
+        # 记录详细的错误信息
+        error_traceback = traceback.format_exc()
+        logger.error("500内部服务器错误: %s", str(error))
+        logger.error("错误堆栈:\n%s", error_traceback)
+
+        # 记录请求信息
+        from flask import request
+        logger.error("请求URL: %s", request.url)
+        logger.error("请求方法: %s", request.method)
+        logger.error("用户代理: %s", request.headers.get('User-Agent', 'Unknown'))
+        logger.error("客户端IP: %s", request.remote_addr)
+
+        # 返回错误页面（可以根据需要自定义）
+        from flask import render_template
+        return render_template('errors/500.html'), 500
+
+    @flask_app.errorhandler(404)
+    def handle_404_error(_error):
+        """处理404页面未找到错误"""
+        from flask import request
+        logger = flask_app.logger
+        logger.warning("404页面未找到: %s", request.url)
+        from flask import render_template
+        return render_template('errors/404.html'), 404
+
+    @flask_app.errorhandler(403)
+    def handle_403_error(_error):
+        """处理403禁止访问错误"""
+        from flask import request
+        logger = flask_app.logger
+        logger.warning("403禁止访问: %s", request.url)
+        from flask import render_template
+        return render_template('errors/403.html'), 403
 
     # 启动时确保角色与默认议长存在（需要应用上下文以支持密码哈希等）
     with flask_app.app_context():
