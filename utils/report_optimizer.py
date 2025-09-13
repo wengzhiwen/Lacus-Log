@@ -7,7 +7,8 @@ from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
-from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
+from utils.commission_helper import (calculate_commission_amounts,
+                                     get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
 from utils.timezone_helper import utc_to_local
 
@@ -188,9 +189,9 @@ def _calculate_monthly_commission_stats_from_records(records, pilot, report_date
         month_total_pilot_share += commission_amounts['pilot_amount']
         month_total_company_share += commission_amounts['company_amount']
 
-    from routes.report import calculate_pilot_rebate, calculate_pilot_monthly_stats
-    rebate_info = calculate_pilot_rebate(pilot, report_date)
-    monthly_stats = calculate_pilot_monthly_stats(pilot, report_date)
+    # 避免循环导入，直接在这里计算返点和月度统计
+    rebate_info = _calculate_pilot_rebate_from_records(records, pilot, report_date)
+    monthly_stats = _calculate_monthly_stats_from_records(records)
 
     month_total_profit = month_total_company_share + rebate_info['rebate_amount'] - monthly_stats['month_total_base_salary']
 
@@ -199,6 +200,97 @@ def _calculate_monthly_commission_stats_from_records(records, pilot, report_date
         'month_total_company_share': month_total_company_share,
         'month_total_profit': month_total_profit
     }
+
+
+def _calculate_pilot_rebate_from_records(records, pilot, report_date):  # pylint: disable=unused-argument
+    """从记录列表计算机师返点信息"""
+    if not records:
+        return {'rebate_amount': Decimal('0'), 'rebate_rate': 0}
+
+    # 计算各项指标
+    valid_days = set()  # 有效天数（单次播时≥60分钟的自然日）
+    total_duration = 0  # 总播时（小时）
+    total_revenue = Decimal('0')  # 总流水（元）
+
+    for record in records:
+        # 按开始时间换算到本地日归属
+        local_start = utc_to_local(record.start_time)
+        record_date = local_start.date()
+
+        # 累计播时
+        if record.duration_hours:
+            total_duration += record.duration_hours
+
+            # 判断是否为有效天（单次播时≥60分钟）
+            if record.duration_hours >= 1.0:  # 60分钟 = 1小时
+                valid_days.add(record_date)
+
+        # 累计流水
+        total_revenue += record.revenue_amount
+
+    valid_days_count = len(valid_days)
+
+    # 定义返点阶段条件（流水条件为"达到"而非"区间"）
+    rebate_stages = [{
+        'stage': 1,
+        'min_days': 12,
+        'min_hours': 42,
+        'min_revenue': Decimal('1000'),
+        'rate': 0.05,
+        'rate_percent': '5%'
+    }, {
+        'stage': 2,
+        'min_days': 18,
+        'min_hours': 100,
+        'min_revenue': Decimal('5000'),
+        'rate': 0.07,
+        'rate_percent': '7%'
+    }, {
+        'stage': 3,
+        'min_days': 18,
+        'min_hours': 100,
+        'min_revenue': Decimal('10000'),
+        'rate': 0.11,
+        'rate_percent': '11%'
+    }, {
+        'stage': 4,
+        'min_days': 22,
+        'min_hours': 130,
+        'min_revenue': Decimal('30000'),
+        'rate': 0.14,
+        'rate_percent': '14%'
+    }, {
+        'stage': 5,
+        'min_days': 22,
+        'min_hours': 130,
+        'min_revenue': Decimal('80000'),
+        'rate': 0.18,
+        'rate_percent': '18%'
+    }]
+
+    # 检查每个阶段的条件
+    qualified_stages = []
+    for stage in rebate_stages:
+        days_ok = valid_days_count >= stage['min_days']
+        hours_ok = total_duration >= stage['min_hours']
+        revenue_ok = total_revenue >= stage['min_revenue']
+
+        stage_qualified = days_ok and hours_ok and revenue_ok
+
+        if stage_qualified:
+            qualified_stages.append(stage)
+
+    # 取最高档次的返点
+    if qualified_stages:
+        # 按阶段号降序排列，取最高档
+        qualified_stages.sort(key=lambda x: x['stage'], reverse=True)
+        best_stage = qualified_stages[0]
+
+        rebate_amount = total_revenue * Decimal(str(best_stage['rate']))
+
+        return {'rebate_amount': rebate_amount, 'rebate_rate': best_stage['rate']}
+    else:
+        return {'rebate_amount': Decimal('0'), 'rebate_rate': 0}
 
 
 def _calculate_monthly_stats_from_records(records):

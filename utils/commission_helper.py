@@ -4,6 +4,7 @@
 注意：mongoengine 的动态属性在pylint中会触发 no-member 误报，这里统一抑制。
 """
 # pylint: disable=no-member
+from datetime import date, datetime
 from decimal import Decimal
 
 from models.pilot import PilotCommission
@@ -30,7 +31,13 @@ def get_pilot_commission_rate_for_date(pilot_id, target_date):
     logger.debug(f"获取机师 {pilot_id} 在日期 {target_date} 的分成比例")
 
     # 将目标日期转换为UTC时间（当天00:00:00）
-    target_utc = local_to_utc(target_date.replace(hour=0, minute=0, second=0, microsecond=0))
+    if isinstance(target_date, date) and not isinstance(target_date, datetime):
+        # 如果是date对象，转换为datetime对象
+        target_datetime = datetime.combine(target_date, datetime.min.time())
+    else:
+        target_datetime = target_date
+
+    target_utc = local_to_utc(target_datetime.replace(hour=0, minute=0, second=0, microsecond=0))
 
     logger.debug(f"目标日期UTC时间: {target_utc}")
 
