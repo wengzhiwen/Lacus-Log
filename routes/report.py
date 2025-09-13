@@ -102,11 +102,13 @@ def calculate_pilot_rebate(pilot, report_date):
     """计算机师返点金额
     
     基于月度任务完成情况计算返点，任务分为5个阶段：
-    阶段一：≥12天，≥42小时，[1000,5000)元，返点5%
-    阶段二：≥18天，≥100小时，[5000,10000)元，返点7%
-    阶段三：≥18天，≥100小时，[10000,30000)元，返点11%
-    阶段四：≥22天，≥130小时，[30000,80000)元，返点14%
-    阶段五：≥22天，≥130小时，[80000,+∞)元，返点18%
+    阶段一：≥12天，≥42小时，≥1000元，返点5%
+    阶段二：≥18天，≥100小时，≥5000元，返点7%
+    阶段三：≥18天，≥100小时，≥10000元，返点11%
+    阶段四：≥22天，≥130小时，≥30000元，返点14%
+    阶段五：≥22天，≥130小时，≥80000元，返点18%
+    
+    注意：流水条件为"达到"而非"区间"，主播可能同时符合多个阶段，取最高档次
     
     Args:
         pilot: 机师对象
@@ -160,71 +162,56 @@ def calculate_pilot_rebate(pilot, report_date):
     logger.debug(f"  - 直播有效时长: {total_duration:.1f}小时")
     logger.debug(f"  - 视频直播流水: {total_revenue:.2f}元")
 
-    # 定义返点阶段条件
-    rebate_stages = [
-        {
-            'stage': 1,
-            'min_days': 12,
-            'min_hours': 42,
-            'min_revenue': Decimal('1000'),
-            'max_revenue': Decimal('5000'),
-            'rate': 0.05,
-            'rate_percent': '5%'
-        },
-        {
-            'stage': 2,
-            'min_days': 18,
-            'min_hours': 100,
-            'min_revenue': Decimal('5000'),
-            'max_revenue': Decimal('10000'),
-            'rate': 0.07,
-            'rate_percent': '7%'
-        },
-        {
-            'stage': 3,
-            'min_days': 18,
-            'min_hours': 100,
-            'min_revenue': Decimal('10000'),
-            'max_revenue': Decimal('30000'),
-            'rate': 0.11,
-            'rate_percent': '11%'
-        },
-        {
-            'stage': 4,
-            'min_days': 22,
-            'min_hours': 130,
-            'min_revenue': Decimal('30000'),
-            'max_revenue': Decimal('80000'),
-            'rate': 0.14,
-            'rate_percent': '14%'
-        },
-        {
-            'stage': 5,
-            'min_days': 22,
-            'min_hours': 130,
-            'min_revenue': Decimal('80000'),
-            'max_revenue': None,  # 无上限
-            'rate': 0.18,
-            'rate_percent': '18%'
-        }
-    ]
+    # 定义返点阶段条件（流水条件为"达到"而非"区间"）
+    rebate_stages = [{
+        'stage': 1,
+        'min_days': 12,
+        'min_hours': 42,
+        'min_revenue': Decimal('1000'),
+        'rate': 0.05,
+        'rate_percent': '5%'
+    }, {
+        'stage': 2,
+        'min_days': 18,
+        'min_hours': 100,
+        'min_revenue': Decimal('5000'),
+        'rate': 0.07,
+        'rate_percent': '7%'
+    }, {
+        'stage': 3,
+        'min_days': 18,
+        'min_hours': 100,
+        'min_revenue': Decimal('10000'),
+        'rate': 0.11,
+        'rate_percent': '11%'
+    }, {
+        'stage': 4,
+        'min_days': 22,
+        'min_hours': 130,
+        'min_revenue': Decimal('30000'),
+        'rate': 0.14,
+        'rate_percent': '14%'
+    }, {
+        'stage': 5,
+        'min_days': 22,
+        'min_hours': 130,
+        'min_revenue': Decimal('80000'),
+        'rate': 0.18,
+        'rate_percent': '18%'
+    }]
 
     # 检查每个阶段的条件
     qualified_stages = []
     for stage in rebate_stages:
         days_ok = valid_days_count >= stage['min_days']
         hours_ok = total_duration >= stage['min_hours']
-
-        if stage['max_revenue'] is None:
-            revenue_ok = total_revenue >= stage['min_revenue']
-        else:
-            revenue_ok = stage['min_revenue'] <= total_revenue < stage['max_revenue']
+        revenue_ok = total_revenue >= stage['min_revenue']
 
         stage_qualified = days_ok and hours_ok and revenue_ok
 
         logger.debug(f"阶段{stage['stage']}检查: 天数{days_ok}({valid_days_count}>={stage['min_days']}), "
                      f"时长{hours_ok}({total_duration:.1f}>={stage['min_hours']}), "
-                     f"流水{revenue_ok}({total_revenue:.2f}在[{stage['min_revenue']},{stage['max_revenue'] or '∞'})), "
+                     f"流水{revenue_ok}({total_revenue:.2f}>={stage['min_revenue']}), "
                      f"符合条件: {stage_qualified}")
 
         if stage_qualified:
