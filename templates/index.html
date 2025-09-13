@@ -4,6 +4,28 @@
 <section class="dashboard">
   <h1 class="title">仪表盘</h1>
   <div class="cards">
+    <div class="card" id="recruitCard" style="cursor: pointer;">
+      <div class="card-header">
+        <div class="card-title">征召统计</div>
+        <div class="card-icon">📋</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value">{{ dashboard_data.recruit_today_appointments }}</div>
+          <div class="main-label">今日约面</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value">{{ dashboard_data.recruit_today_official }}</div>
+            <div class="sub-label">新增正式机师</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value">{{ dashboard_data.recruit_today_intern }}</div>
+            <div class="sub-label">新增实习机师</div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="card" id="todayCard" style="cursor: pointer;">
       <div class="card-header">
         <div class="card-title">作战计划统计</div>
@@ -28,26 +50,24 @@
         </div>
       </div>
     </div>
-    <div class="card">
+    <div class="card" id="battleRecordCard" style="cursor: pointer;">
       <div class="card-header">
         <div class="card-title">作战记录统计</div>
         <div class="card-icon">📈</div>
       </div>
       <div class="card-body">
         <div class="main-data">
-          <div class="main-value">{{ dashboard_data.battle_today_count }}</div>
-          <div class="main-label">今日作战记录</div>
+          <div class="main-value">{{ "{:,.0f}".format(dashboard_data.battle_today_revenue) }}</div>
+          <div class="main-label">今日流水（元）</div>
         </div>
         <div class="sub-data">
           <div class="sub-item">
-            <div class="sub-value {% if dashboard_data.battle_change_rate >= 0 %}positive{% else %}negative{% endif %}">
-              {% if dashboard_data.battle_change_rate >= 0 %}+{% endif %}{{ dashboard_data.battle_change_rate }}%
-            </div>
-            <div class="sub-label">环比</div>
+            <div class="sub-value">{{ "{:,.0f}".format(dashboard_data.battle_yesterday_revenue) }}</div>
+            <div class="sub-label">昨日流水</div>
           </div>
           <div class="sub-item">
-            <div class="sub-value">{{ dashboard_data.battle_week_avg }}</div>
-            <div class="sub-label">7日平均</div>
+            <div class="sub-value">{{ "{:,.0f}".format(dashboard_data.battle_week_avg_revenue) }}</div>
+            <div class="sub-label">7日平均流水</div>
           </div>
         </div>
       </div>
@@ -99,12 +119,28 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // 设置征召统计卡片的点击事件
+  const recruitCard = document.getElementById('recruitCard');
+  if (recruitCard) {
+    recruitCard.addEventListener('click', function() {
+      window.location.href = '{{ url_for('recruit.recruit_daily_report') }}';
+    });
+  }
+  
   // 设置今日作战计划卡片的点击事件
   const todayCard = document.getElementById('todayCard');
   if (todayCard) {
     const today = new Date().toISOString().split('T')[0];
     todayCard.addEventListener('click', function() {
       window.location.href = '{{ url_for('calendar.day_view') }}?date=' + today;
+    });
+  }
+  
+  // 设置作战记录统计卡片的点击事件
+  const battleRecordCard = document.getElementById('battleRecordCard');
+  if (battleRecordCard) {
+    battleRecordCard.addEventListener('click', function() {
+      window.location.href = '{{ url_for('report.daily_report') }}';
     });
   }
 });

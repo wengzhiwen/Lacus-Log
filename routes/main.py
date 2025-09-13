@@ -9,8 +9,10 @@ from flask_security.utils import hash_password
 from models.announcement import Announcement
 from models.battle_record import BattleRecord
 from models.pilot import Pilot, Rank, Status
+from models.recruit import FinalDecision, Recruit
 from utils.logging_setup import get_logger
-from utils.timezone_helper import get_current_utc_time
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 logger = get_logger('main')
 
@@ -20,17 +22,27 @@ main_bp = Blueprint('main', __name__)
 def _calculate_dashboard_data():
     """计算仪表板数据"""
     now = get_current_utc_time()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
-    yesterday_start = today_start - timedelta(days=1)
-    yesterday_end = today_start
-    week_start = today_start - timedelta(days=7)
+
+    # 使用GMT+8本地时间进行日期归属，与征召日报保持一致
+    current_local = utc_to_local(now)
+    today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_local_end = today_local_start + timedelta(days=1)
+    yesterday_local_start = today_local_start - timedelta(days=1)
+    yesterday_local_end = today_local_start
+    week_local_start = today_local_start - timedelta(days=7)
+
+    # 转换为UTC时间范围进行数据库查询
+    today_start_utc = local_to_utc(today_local_start)
+    today_end_utc = local_to_utc(today_local_end)
+    yesterday_start_utc = local_to_utc(yesterday_local_start)
+    yesterday_end_utc = local_to_utc(yesterday_local_end)
+    week_start_utc = local_to_utc(week_local_start)
 
     # 今日作战计划数量（开播起始日为当前日期的作战计划）
-    today_count = Announcement.objects(start_time__gte=today_start, start_time__lt=today_end).count()
+    today_count = Announcement.objects(start_time__gte=today_start_utc, start_time__lt=today_end_utc).count()
 
     # 昨日作战计划数量
-    yesterday_count = Announcement.objects(start_time__gte=yesterday_start, start_time__lt=yesterday_end).count()
+    yesterday_count = Announcement.objects(start_time__gte=yesterday_start_utc, start_time__lt=yesterday_end_utc).count()
 
     # 计算环比（百分比，保留一位小数）
     if yesterday_count > 0:
@@ -39,18 +51,22 @@ def _calculate_dashboard_data():
         change_rate = 100.0 if today_count > 0 else 0.0
 
     # 最近7天的日均作战计划数量
-    week_count = Announcement.objects(start_time__gte=week_start, start_time__lt=today_end).count()
+    week_count = Announcement.objects(start_time__gte=week_start_utc, start_time__lt=today_end_utc).count()
     week_avg = round(week_count / 7, 1)
 
-    # 作战记录统计（开始时间为今天的作战记录）
-    br_today = BattleRecord.objects(start_time__gte=today_start, start_time__lt=today_end).count()
-    br_yesterday = BattleRecord.objects(start_time__gte=yesterday_start, start_time__lt=yesterday_end).count()
-    if br_yesterday > 0:
-        br_change_rate = round(((br_today - br_yesterday) / br_yesterday) * 100, 1)
-    else:
-        br_change_rate = 100.0 if br_today > 0 else 0.0
-    br_week_count = BattleRecord.objects(start_time__gte=week_start, start_time__lt=today_end).count()
-    br_week_avg = round(br_week_count / 7, 1)
+    # 作战记录统计（流水金额统计）
+    # 今日流水（所有作战记录中的开始日期为今天的作战记录的流水总和）
+    br_today_records = BattleRecord.objects(start_time__gte=today_start_utc, start_time__lt=today_end_utc)
+    br_today_revenue = sum(record.revenue_amount for record in br_today_records)
+
+    # 昨日流水
+    br_yesterday_records = BattleRecord.objects(start_time__gte=yesterday_start_utc, start_time__lt=yesterday_end_utc)
+    br_yesterday_revenue = sum(record.revenue_amount for record in br_yesterday_records)
+
+    # 7日平均流水
+    br_week_records = BattleRecord.objects(start_time__gte=week_start_utc, start_time__lt=today_end_utc)
+    br_week_revenue = sum(record.revenue_amount for record in br_week_records)
+    br_week_avg_revenue = br_week_revenue / 7
 
     # 机师统计
     serving_status = [Status.RECRUITED, Status.CONTRACTED]
@@ -62,15 +78,37 @@ def _calculate_dashboard_data():
     candidate_not_recruited = Pilot.objects(rank=Rank.CANDIDATE, status=Status.NOT_RECRUITED).count()
     trainee_serving = Pilot.objects(rank=Rank.TRAINEE, status__in=serving_status).count()
 
+    # 征召统计（使用本地时间进行日期归属，与征召日报保持一致）
+    # 获取今日的本地时间范围
+    current_local = utc_to_local(now)
+    today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_local_end = today_local_start + timedelta(days=1)
+
+    # 转换为UTC时间范围
+    today_start_utc = local_to_utc(today_local_start)
+    today_end_utc = local_to_utc(today_local_end)
+
+    # 今日约面：今日创建的征召数量
+    recruit_today_appointments = Recruit.objects(created_at__gte=today_start_utc, created_at__lt=today_end_utc).count()
+
+    # 新增正式机师：今日完成结束征召决策且征召为正式机师的数量
+    recruit_today_official = Recruit.objects(final_decision_time__gte=today_start_utc,
+                                             final_decision_time__lt=today_end_utc,
+                                             final_decision=FinalDecision.OFFICIAL).count()
+
+    # 新增实习机师：今日完成结束征召决策且征召为实习机师的数量
+    recruit_today_intern = Recruit.objects(final_decision_time__gte=today_start_utc, final_decision_time__lt=today_end_utc,
+                                           final_decision=FinalDecision.INTERN).count()
+
     return {
         # 作战计划统计（保留现有键名以兼容模板）
         'today_count': today_count,
         'change_rate': change_rate,
         'week_avg': week_avg,
         # 作战记录统计
-        'battle_today_count': br_today,
-        'battle_change_rate': br_change_rate,
-        'battle_week_avg': br_week_avg,
+        'battle_today_revenue': br_today_revenue,
+        'battle_yesterday_revenue': br_yesterday_revenue,
+        'battle_week_avg_revenue': br_week_avg_revenue,
         # 机师统计
         'pilot_serving_count': pilot_serving,
         'pilot_intern_serving_count': pilot_intern_serving,
@@ -78,6 +116,10 @@ def _calculate_dashboard_data():
         # 候补机师统计
         'candidate_not_recruited_count': candidate_not_recruited,
         'trainee_serving_count': trainee_serving,
+        # 征召统计
+        'recruit_today_appointments': recruit_today_appointments,
+        'recruit_today_official': recruit_today_official,
+        'recruit_today_intern': recruit_today_intern,
     }
 
 
