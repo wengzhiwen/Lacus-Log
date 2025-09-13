@@ -4,10 +4,10 @@
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
-from models.battle_record import BattleRecord
+from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
 from utils.timezone_helper import utc_to_local
 
@@ -27,10 +27,9 @@ def calculate_pilot_three_day_avg_revenue_optimized(pilot, report_date):
         Decimal: 3日平均流水，若不足3天则返回None
     """
     # 一次查询获取7天数据
+    from routes.report import get_battle_records_for_date_range
     week_start = report_date - timedelta(days=6)
     week_end = report_date + timedelta(days=1)
-
-    from routes.report import get_battle_records_for_date_range
     week_records = get_battle_records_for_date_range(week_start, week_end)
     pilot_week_records = week_records.filter(pilot=pilot)
 
@@ -130,10 +129,9 @@ def batch_calculate_pilot_stats(pilots, report_date):
     pilot_stats = {}
 
     # 批量计算月度数据
+    from routes.report import get_battle_records_for_date_range
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-    from routes.report import get_battle_records_for_date_range
     month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1))
 
     # 按机师ID分组月度记录
@@ -144,9 +142,7 @@ def batch_calculate_pilot_stats(pilots, report_date):
             pilot_month_data[pilot_id].append(record)
 
     # 批量计算3日平均数据
-    week_start = report_date - timedelta(days=6)
-    week_end = report_date + timedelta(days=1)
-    week_records = get_battle_records_for_date_range(week_start, week_end)
+    week_records = get_battle_records_for_date_range(report_date - timedelta(days=6), report_date + timedelta(days=1))
 
     # 按机师ID分组周度记录
     pilot_week_data = defaultdict(list)
@@ -163,14 +159,46 @@ def batch_calculate_pilot_stats(pilots, report_date):
         month_records_list = pilot_month_data.get(pilot_id, [])
         monthly_stats = _calculate_monthly_stats_from_records(month_records_list)
 
+        # 计算月度分成统计
+        monthly_commission_stats = _calculate_monthly_commission_stats_from_records(month_records_list, pilot, report_date)
+
         # 计算3日平均
         week_records_list = pilot_week_data.get(pilot_id, [])
         three_day_avg = _calculate_three_day_avg_from_records(week_records_list, report_date)
 
-        pilot_stats[pilot_id] = {'monthly_stats': monthly_stats, 'three_day_avg_revenue': three_day_avg}
+        pilot_stats[pilot_id] = {'monthly_stats': monthly_stats, 'three_day_avg_revenue': three_day_avg, 'monthly_commission_stats': monthly_commission_stats}
 
     logger.debug('批量计算完成：%d个机师', len(pilots))
     return pilot_stats
+
+
+def _calculate_monthly_commission_stats_from_records(records, pilot, report_date):
+    """从记录列表计算月度分成统计"""
+    if not records:
+        return {'month_total_pilot_share': Decimal('0'), 'month_total_company_share': Decimal('0'), 'month_total_profit': Decimal('0')}
+
+    month_total_pilot_share = Decimal('0')
+    month_total_company_share = Decimal('0')
+
+    for record in records:
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+
+        month_total_pilot_share += commission_amounts['pilot_amount']
+        month_total_company_share += commission_amounts['company_amount']
+
+    from routes.report import calculate_pilot_rebate, calculate_pilot_monthly_stats
+    rebate_info = calculate_pilot_rebate(pilot, report_date)
+    monthly_stats = calculate_pilot_monthly_stats(pilot, report_date)
+
+    month_total_profit = month_total_company_share + rebate_info['rebate_amount'] - monthly_stats['month_total_base_salary']
+
+    return {
+        'month_total_pilot_share': month_total_pilot_share,
+        'month_total_company_share': month_total_company_share,
+        'month_total_profit': month_total_profit
+    }
 
 
 def _calculate_monthly_stats_from_records(records):

@@ -44,6 +44,18 @@
       <div class="card-label">累计返点</div>
       <div class="card-value">¥{{ "{:,.2f}".format(month_summary.rebate_sum) }}</div>
     </div>
+    <div class="summary-card">
+      <div class="card-label">累计机师分成</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.pilot_share_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计公司分成</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.company_share_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">运营利润估算</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.operating_profit) }}</div>
+    </div>
   </div>
 </div>
 
@@ -67,6 +79,14 @@
       <div class="card-label">累计底薪支出</div>
       <div class="card-value">¥{{ "{:,.2f}".format(day_summary.basepay_sum) }}</div>
     </div>
+    <div class="summary-card">
+      <div class="card-label">累计机师分成</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.pilot_share_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计公司分成</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.company_share_sum) }}</div>
+    </div>
   </div>
 </div>
 
@@ -85,12 +105,22 @@
           <th>作战区域</th>
           <th>播时</th>
           <th>流水</th>
+          <th>当前分成比例</th>
+          <th>机师分成</th>
+          <th>公司分成</th>
+          <th>返点比例</th>
+          <th>产生返点</th>
+          <th>底薪</th>
+          <th>当日毛利</th>
           <th>3日平均流水</th>
           <th>月累计天数</th>
           <th>月日均播时</th>
           <th>月累计流水</th>
-          <th>月累计底薪</th>
+          <th>月累计机师分成</th>
+          <th>月累计公司分成</th>
           <th>月累计返点</th>
+          <th>月累计底薪</th>
+          <th>月累计毛利</th>
         </tr>
       </thead>
       <tbody>
@@ -103,12 +133,22 @@
           <td>{{ detail.battle_area }}</td>
           <td>{{ "%.1f"|format(detail.duration) if detail.duration else "0.0" }}小时</td>
           <td>¥{{ "{:,.2f}".format(detail.revenue) }}</td>
+          <td>{{ "%.0f"|format(detail.commission_rate) }}%</td>
+          <td>¥{{ "{:,.2f}".format(detail.pilot_share) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.company_share) }}</td>
+          <td>{{ "%.0f"|format(detail.rebate_rate * 100) }}%</td>
+          <td>¥{{ "{:,.2f}".format(detail.rebate_amount) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.base_salary) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.daily_profit) }}</td>
           <td>{% if detail.three_day_avg_revenue %}¥{{ "{:,.2f}".format(detail.three_day_avg_revenue) }}{% endif %}</td>
           <td>{{ detail.monthly_stats.month_days_count }}</td>
           <td>{{ "%.1f"|format(detail.monthly_stats.month_avg_duration) }}小时</td>
           <td>¥{{ "{:,.2f}".format(detail.monthly_stats.month_total_revenue) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_pilot_share) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_company_share) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.month_rebate_amount) }}</td>
           <td>¥{{ "{:,.2f}".format(detail.monthly_stats.month_total_base_salary) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.rebate_amount) }}</td>
+          <td>¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_profit) }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -210,7 +250,7 @@
 .report-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1200px;
+  min-width: 2000px;
 }
 
 .report-table th,

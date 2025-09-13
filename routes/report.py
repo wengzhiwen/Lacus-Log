@@ -14,9 +14,9 @@ from flask import Blueprint, Response, render_template, request
 from flask_security import current_user, roles_accepted
 
 from models.battle_record import BattleRecord
+from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 # 创建日志器（按模块分文件）
 logger = get_logger('report')
@@ -239,17 +239,16 @@ def calculate_pilot_rebate(pilot, report_date):
             'total_revenue': total_revenue,
             'qualified_stages': qualified_stages
         }
-    else:
-        logger.debug(f"机师 {pilot.nickname} 未达到任何返点阶段条件")
-        return {
-            'rebate_amount': Decimal('0'),
-            'rebate_rate': 0,
-            'rebate_stage': 0,
-            'valid_days_count': valid_days_count,
-            'total_duration': total_duration,
-            'total_revenue': total_revenue,
-            'qualified_stages': []
-        }
+    logger.debug(f"机师 {pilot.nickname} 未达到任何返点阶段条件")
+    return {
+        'rebate_amount': Decimal('0'),
+        'rebate_rate': 0,
+        'rebate_stage': 0,
+        'valid_days_count': valid_days_count,
+        'total_duration': total_duration,
+        'total_revenue': total_revenue,
+        'qualified_stages': []
+    }
 
 
 def calculate_pilot_monthly_stats(pilot, report_date):
@@ -337,7 +336,9 @@ def daily_report():
     month_effective_pilots = set()
     month_total_revenue = Decimal('0')
     month_total_base_salary = Decimal('0')
-    month_total_rebate = Decimal('0')  # 新增：累计返点
+    month_total_rebate = Decimal('0')  # 累计返点
+    month_total_pilot_share = Decimal('0')  # 累计机师分成
+    month_total_company_share = Decimal('0')  # 累计公司分成
 
     # 按机师聚合月度数据
     pilot_month_duration = {}
@@ -352,6 +353,19 @@ def daily_report():
             pilot_month_duration[pilot_id] = 0
         if record.duration_hours:
             pilot_month_duration[pilot_id] += record.duration_hours
+
+        # 计算分成金额
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+
+        month_total_pilot_share += commission_amounts['pilot_amount']
+        month_total_company_share += commission_amounts['company_amount']
+
+        logger.debug(f"月度记录分成计算: 机师={record.pilot.nickname}, 日期={record_date}, "
+                     f"流水={record.revenue_amount}元, 分成比例={commission_rate}%, "
+                     f"机师分成={commission_amounts['pilot_amount']:.2f}元, "
+                     f"公司分成={commission_amounts['company_amount']:.2f}元")
 
     # 计算月度有效机师（播时≥6小时）
     for pilot_id, duration in pilot_month_duration.items():
@@ -373,6 +387,8 @@ def daily_report():
     day_effective_pilots = set()
     day_total_revenue = Decimal('0')
     day_total_base_salary = Decimal('0')
+    day_total_pilot_share = Decimal('0')  # 日报机师分成
+    day_total_company_share = Decimal('0')  # 日报公司分成
 
     # 按机师聚合日报数据
     pilot_day_duration = {}
@@ -387,6 +403,19 @@ def daily_report():
             pilot_day_duration[pilot_id] = 0
         if record.duration_hours:
             pilot_day_duration[pilot_id] += record.duration_hours
+
+        # 计算分成金额
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+
+        day_total_pilot_share += commission_amounts['pilot_amount']
+        day_total_company_share += commission_amounts['company_amount']
+
+        logger.debug(f"日报记录分成计算: 机师={record.pilot.nickname}, 日期={record_date}, "
+                     f"流水={record.revenue_amount}元, 分成比例={commission_rate}%, "
+                     f"机师分成={commission_amounts['pilot_amount']:.2f}元, "
+                     f"公司分成={commission_amounts['company_amount']:.2f}元")
 
     # 计算日报有效机师（播时≥6小时）
     for pilot_id, duration in pilot_day_duration.items():
@@ -415,9 +444,31 @@ def daily_report():
             'month_total_revenue': 0,
             'month_total_base_salary': 0
         })
+        monthly_commission_stats = pilot_stats.get('monthly_commission_stats', {
+            'month_total_pilot_share': 0,
+            'month_total_company_share': 0,
+            'month_total_profit': 0
+        })
 
         # 计算返点信息
         rebate_info = calculate_pilot_rebate(pilot, report_date)
+
+        # 计算分成信息
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+
+        # 计算当日毛利
+        daily_profit = commission_amounts['company_amount'] + (record.revenue_amount * Decimal(str(rebate_info['rebate_rate']))) - record.base_salary
+
+        logger.debug(f"明细记录计算: 机师={pilot.nickname}, 日期={record_date}, "
+                     f"流水={record.revenue_amount}元, 分成比例={commission_rate}%, "
+                     f"机师分成={commission_amounts['pilot_amount']:.2f}元, "
+                     f"公司分成={commission_amounts['company_amount']:.2f}元, "
+                     f"返点比例={rebate_info['rebate_rate']:.2%}, "
+                     f"产生返点={record.revenue_amount * Decimal(str(rebate_info['rebate_rate'])):.2f}元, "
+                     f"底薪={record.base_salary}元, "
+                     f"当日毛利={daily_profit:.2f}元")
 
         # 构建所属和阶级显示（优先快照，无快照显示当前）
         owner_display = ''
@@ -442,10 +493,39 @@ def daily_report():
             'battle_area': battle_area,
             'duration': record.duration_hours,
             'revenue': record.revenue_amount,
+            'commission_rate': commission_rate,
+            'pilot_share': commission_amounts['pilot_amount'],
+            'company_share': commission_amounts['company_amount'],
+            'rebate_rate': rebate_info['rebate_rate'],
+            'rebate_amount': record.revenue_amount * Decimal(str(rebate_info['rebate_rate'])),
+            'base_salary': record.base_salary,
+            'daily_profit': daily_profit,
             'three_day_avg_revenue': three_day_avg,
             'monthly_stats': monthly_stats,
-            'rebate_amount': rebate_info['rebate_amount'],
+            'month_rebate_amount': rebate_info['rebate_amount'],
+            'monthly_commission_stats': monthly_commission_stats,
         })
+
+    # 计算运营利润估算
+    operating_profit = month_total_company_share + month_total_rebate - month_total_base_salary
+
+    logger.info("月度汇总数据:")
+    logger.info(f"  - 总机师数量: {len(month_pilots)}")
+    logger.info(f"  - 有效机师数量: {len(month_effective_pilots)}")
+    logger.info(f"  - 累计流水: {month_total_revenue:.2f}元")
+    logger.info(f"  - 累计底薪支出: {month_total_base_salary:.2f}元")
+    logger.info(f"  - 累计返点: {month_total_rebate:.2f}元")
+    logger.info(f"  - 累计机师分成: {month_total_pilot_share:.2f}元")
+    logger.info(f"  - 累计公司分成: {month_total_company_share:.2f}元")
+    logger.info(f"  - 运营利润估算: {operating_profit:.2f}元")
+
+    logger.info("日报汇总数据:")
+    logger.info(f"  - 总机师数量: {len(day_pilots)}")
+    logger.info(f"  - 有效机师数量: {len(day_effective_pilots)}")
+    logger.info(f"  - 累计流水: {day_total_revenue:.2f}元")
+    logger.info(f"  - 累计底薪支出: {day_total_base_salary:.2f}元")
+    logger.info(f"  - 累计机师分成: {day_total_pilot_share:.2f}元")
+    logger.info(f"  - 累计公司分成: {day_total_company_share:.2f}元")
 
     # 构建响应数据
     month_summary = {
@@ -453,14 +533,19 @@ def daily_report():
         'effective_pilot_count': len(month_effective_pilots),
         'revenue_sum': month_total_revenue,
         'basepay_sum': month_total_base_salary,
-        'rebate_sum': month_total_rebate
+        'rebate_sum': month_total_rebate,
+        'pilot_share_sum': month_total_pilot_share,
+        'company_share_sum': month_total_company_share,
+        'operating_profit': operating_profit
     }
 
     day_summary = {
         'pilot_count': len(day_pilots),
         'effective_pilot_count': len(day_effective_pilots),
         'revenue_sum': day_total_revenue,
-        'basepay_sum': day_total_base_salary
+        'basepay_sum': day_total_base_salary,
+        'pilot_share_sum': day_total_pilot_share,
+        'company_share_sum': day_total_company_share
     }
 
     # 计算分页导航
@@ -500,7 +585,10 @@ def export_daily_csv():
     output.write('\ufeff')
 
     # 写入表头
-    headers = ['机师', '性别年龄', '所属', '阶级', '作战区域', '播时', '流水', '3日平均流水', '月累计天数', '月日均播时', '月累计流水', '月累计底薪', '月累计返点']
+    headers = [
+        '机师', '性别年龄', '所属', '阶级', '作战区域', '播时', '流水', '当前分成比例', '机师分成', '公司分成', '返点比例', '产生返点', '底薪', '当日毛利', '3日平均流水', '月累计天数', '月日均播时', '月累计流水', '月累计机师分成',
+        '月累计公司分成', '月累计返点', '月累计底薪', '月累计毛利'
+    ]
     writer.writerow(headers)
 
     # 写入数据行 - 使用优化版本批量计算
@@ -524,9 +612,22 @@ def export_daily_csv():
             'month_total_revenue': 0,
             'month_total_base_salary': 0
         })
+        monthly_commission_stats = pilot_stats.get('monthly_commission_stats', {
+            'month_total_pilot_share': 0,
+            'month_total_company_share': 0,
+            'month_total_profit': 0
+        })
 
         # 计算返点信息
         rebate_info = calculate_pilot_rebate(pilot, report_date)
+
+        # 计算分成信息
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+
+        # 计算当日毛利
+        daily_profit = commission_amounts['company_amount'] + (record.revenue_amount * Decimal(str(rebate_info['rebate_rate']))) - record.base_salary
 
         # 构建各字段值
         pilot_display = f"{pilot.nickname}（{pilot.real_name or ''}）" if pilot.real_name else pilot.nickname
@@ -547,16 +648,27 @@ def export_daily_csv():
 
         duration_str = f"{record.duration_hours:.1f}" if record.duration_hours else "0.0"
         revenue_str = f"{record.revenue_amount:,.2f}"
+        commission_rate_str = f"{commission_rate:.0f}%"
+        pilot_share_str = f"{commission_amounts['pilot_amount']:,.2f}"
+        company_share_str = f"{commission_amounts['company_amount']:,.2f}"
+        rebate_rate_str = f"{rebate_info['rebate_rate']:.0%}"
+        rebate_amount_str = f"{record.revenue_amount * Decimal(str(rebate_info['rebate_rate'])):,.2f}"
+        base_salary_str = f"{record.base_salary:,.2f}"
+        daily_profit_str = f"{daily_profit:,.2f}"
         three_day_avg_str = f"{three_day_avg:,.2f}" if three_day_avg else ""
         month_days_str = str(monthly_stats['month_days_count'])
         month_avg_duration_str = f"{monthly_stats['month_avg_duration']:.1f}"
         month_revenue_str = f"{monthly_stats['month_total_revenue']:,.2f}"
+        month_pilot_share_str = f"{monthly_commission_stats['month_total_pilot_share']:,.2f}"
+        month_company_share_str = f"{monthly_commission_stats['month_total_company_share']:,.2f}"
+        month_rebate_str = f"{rebate_info['rebate_amount']:,.2f}"
         month_base_salary_str = f"{monthly_stats['month_total_base_salary']:,.2f}"
-        rebate_amount_str = f"{rebate_info['rebate_amount']:,.2f}"
+        month_profit_str = f"{monthly_commission_stats['month_total_profit']:,.2f}"
 
         row = [
-            pilot_display, gender_age, owner_display, rank_display, battle_area, duration_str, revenue_str, three_day_avg_str, month_days_str,
-            month_avg_duration_str, month_revenue_str, month_base_salary_str, rebate_amount_str
+            pilot_display, gender_age, owner_display, rank_display, battle_area, duration_str, revenue_str, commission_rate_str, pilot_share_str,
+            company_share_str, rebate_rate_str, rebate_amount_str, base_salary_str, daily_profit_str, three_day_avg_str, month_days_str, month_avg_duration_str,
+            month_revenue_str, month_pilot_share_str, month_company_share_str, month_rebate_str, month_base_salary_str, month_profit_str
         ]
         writer.writerow(row)
 
