@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}新增分成调整记录 - {{ pilot.nickname }}{% endblock %}
+
+{% block content %}
+<section class="commission-form">
+  <!-- 页面头部 -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">新增分成调整记录 - {{ pilot.nickname }}</h1>
+      <a href="{{ url_for('pilot.pilot_commission_index', pilot_id=pilot.id) }}" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回分成管理
+      </a>
+    </div>
+  </div>
+
+  <!-- 表单卡片 -->
+  <div class="form-card">
+    <div class="card-header">
+      <h3 class="card-title">调整记录信息</h3>
+    </div>
+    <div class="form-content">
+      <form method="POST" id="commissionForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="form-group">
+          <label for="adjustment_date" class="form-label">调整日 <span class="required">*</span></label>
+          <input type="date" class="form-input" id="adjustment_date" name="adjustment_date" 
+                 value="{{ request.form.adjustment_date or '' }}" required>
+          <div class="form-help">分成比例在此日期当天生效（GMT+8时间），支持选择未来日期</div>
+        </div>
+
+        <div class="form-group">
+          <label for="commission_rate" class="form-label">分成比例 <span class="required">*</span></label>
+          <div class="input-group">
+            <input type="number" class="form-input" id="commission_rate" name="commission_rate" 
+                   value="{{ request.form.commission_rate or '' }}" 
+                   min="0" max="50" step="0.1" required>
+            <span class="input-suffix">%</span>
+          </div>
+          <div class="form-help">分成比例范围：0-50%，表示机师在总流水中的分成比例</div>
+        </div>
+
+        <div class="form-group">
+          <label for="remark" class="form-label">备注</label>
+          <textarea class="form-textarea" id="remark" name="remark" rows="3" 
+                    placeholder="请输入调整原因或说明">{{ request.form.remark or '' }}</textarea>
+          <div class="form-help">可选，用于记录调整原因或相关说明</div>
+        </div>
+
+        <!-- 分成计算预览 -->
+        <div class="preview-section">
+          <h4 class="preview-title">分成计算预览</h4>
+          <div class="preview-card">
+            <div class="preview-item">
+              <div class="preview-value" id="previewRate">-</div>
+              <div class="preview-label">机师分成比例</div>
+            </div>
+            <div class="preview-item">
+              <div class="preview-value pilot-income" id="previewPilotIncome">-</div>
+              <div class="preview-label">机师收入</div>
+            </div>
+            <div class="preview-item">
+              <div class="preview-value company-income" id="previewCompanyIncome">-</div>
+              <div class="preview-label">公司收入</div>
+            </div>
+          </div>
+          <div class="preview-formula" id="previewFormula">计算公式：-</div>
+        </div>
+
+        <div class="form-actions">
+          <a href="{{ url_for('pilot.pilot_commission_index', pilot_id=pilot.id) }}" class="btn btn-secondary">
+            <span class="btn-icon">×</span>
+            取消
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <span class="btn-icon">✓</span>
+            保存
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<style>
+/* 新增分成调整记录页面样式 */
+.commission-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.page-header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  color: #111111;
+}
+
+.form-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.card-header {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #A9A9A9;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #8B0000;
+}
+
+.form-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111111;
+}
+
+.required {
+  color: #FF4500;
+}
+
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid #A9A9A9;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #8B0000;
+}
+
+.form-textarea {
+  padding: 8px 12px;
+  border: 1px solid #A9A9A9;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.2s ease;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #8B0000;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+}
+
+.input-group .form-input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+.input-suffix {
+  padding: 8px 12px;
+  background: #F2F2F2;
+  border: 1px solid #A9A9A9;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  font-size: 14px;
+  color: #666666;
+}
+
+.form-help {
+  font-size: 12px;
+  color: #666666;
+}
+
+.preview-section {
+  background: #F2F2F2;
+  border-radius: 6px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111111;
+  margin: 0 0 12px 0;
+}
+
+.preview-card {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 12px;
+  padding: 12px 0;
+  background: #fff;
+  border-radius: 4px;
+}
+
+.preview-item {
+  text-align: center;
+}
+
+.preview-value {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #8B0000;
+}
+
+.preview-value.pilot-income {
+  color: #00B37A;
+}
+
+.preview-value.company-income {
+  color: #3A5F3D;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #666666;
+}
+
+.preview-formula {
+  font-size: 12px;
+  color: #666666;
+  font-family: monospace;
+  text-align: center;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #A9A9A9;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .preview-card {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .form-actions .btn {
+    width: 100%;
+  }
+}
+</style>
+
+<script>
+// 实时计算分成预览
+function updatePreview() {
+  const rate = parseFloat(document.getElementById('commission_rate').value);
+  if (isNaN(rate) || rate < 0 || rate > 50) {
+    document.getElementById('previewRate').textContent = '-';
+    document.getElementById('previewPilotIncome').textContent = '-';
+    document.getElementById('previewCompanyIncome').textContent = '-';
+    document.getElementById('previewFormula').textContent = '计算公式：-';
+    return;
+  }
+
+  // 计算分成分配
+  const BASE_RATE = 50.0;
+  const COMPANY_RATE = 42.0;
+  const pilotIncome = (rate / BASE_RATE) * COMPANY_RATE;
+  const companyIncome = COMPANY_RATE - pilotIncome;
+
+  // 更新显示
+  document.getElementById('previewRate').textContent = rate + '%';
+  document.getElementById('previewPilotIncome').textContent = pilotIncome.toFixed(1) + '%';
+  document.getElementById('previewCompanyIncome').textContent = companyIncome.toFixed(1) + '%';
+  document.getElementById('previewFormula').textContent = `计算公式：(${rate}%/50%) * 42% = ${pilotIncome.toFixed(1)}%`;
+}
+
+// 绑定事件
+document.getElementById('commission_rate').addEventListener('input', updatePreview);
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+  // 初始计算
+  updatePreview();
+});
+
+// 表单验证
+document.getElementById('commissionForm').addEventListener('submit', function(e) {
+  const adjustmentDate = document.getElementById('adjustment_date').value;
+  const commissionRate = document.getElementById('commission_rate').value;
+  
+  if (!adjustmentDate) {
+    e.preventDefault();
+    alert('请选择调整日');
+    return;
+  }
+  
+  if (!commissionRate) {
+    e.preventDefault();
+    alert('请输入分成比例');
+    return;
+  }
+  
+  const rate = parseFloat(commissionRate);
+  if (isNaN(rate) || rate < 0 || rate > 50) {
+    e.preventDefault();
+    alert('分成比例必须在0-50之间');
+    return;
+  }
+});
+</script>
+{% endblock %}

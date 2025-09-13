@@ -1,20 +1,14 @@
 # pylint: disable=no-member
 from datetime import timedelta
 
-from flask import (
-    Blueprint,
-    abort,
-    flash,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    url_for,
-)
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
-from models.pilot import Gender, Pilot, PilotChangeLog, Platform, Rank, Status, WorkMode
+from models.pilot import (Gender, Pilot, PilotChangeLog, PilotCommission,
+                          PilotCommissionChangeLog, Platform, Rank, Status,
+                          WorkMode)
 from models.user import User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import get_current_utc_time
@@ -164,7 +158,16 @@ def pilot_detail(pilot_id):
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        return render_template('pilots/detail.html', pilot=pilot)
+        # 获取当前分成信息
+        current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
+        calculation_info = _calculate_commission_distribution(current_rate)
+
+        return render_template('pilots/detail.html',
+                               pilot=pilot,
+                               current_rate=current_rate,
+                               effective_date=effective_date,
+                               remark=remark,
+                               calculation_info=calculation_info)
     except DoesNotExist:
         abort(404)
 
@@ -381,6 +384,378 @@ def pilot_changes(pilot_id):
         })
     except DoesNotExist:
         return jsonify({'success': False, 'error': '机师不存在'}), 404
+    except Exception as e:
+        logger.error('获取变更记录失败：%s', str(e))
+        return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
+
+
+# ==================== 分成管理相关函数 ====================
+
+
+def _record_commission_changes(commission, old_data, user, ip_address):
+    """记录分成调整记录字段变更"""
+    changes = []
+    field_mapping = {
+        'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
+        'commission_rate': commission.commission_rate,
+        'remark': commission.remark,
+        'is_active': commission.is_active,
+    }
+
+    for field_name, new_value in field_mapping.items():
+        old_value = old_data.get(field_name)
+        if str(old_value) != str(new_value):
+            change_log = PilotCommissionChangeLog(commission_id=commission,
+                                                  user_id=user,
+                                                  field_name=field_name,
+                                                  old_value=str(old_value) if old_value is not None else '',
+                                                  new_value=str(new_value) if new_value is not None else '',
+                                                  ip_address=ip_address)
+            changes.append(change_log)
+
+    if changes:
+        PilotCommissionChangeLog.objects.insert(changes)
+        logger.info('记录分成调整记录变更：%s，共%d个字段', commission.pilot_id.nickname, len(changes))
+
+
+def _get_pilot_current_commission_rate(pilot_id):
+    """获取机师当前有效的分成比例"""
+    # 获取当前UTC时间
+    current_time = get_current_utc_time()
+
+    # 查询机师的所有有效调整记录，按调整日升序排列
+    commissions = PilotCommission.objects(pilot_id=pilot_id, is_active=True).order_by('adjustment_date')
+
+    # 使用更安全的方法检查是否有记录
+    commission_list = list(commissions)
+    if not commission_list:
+        # 如果没有记录，返回默认20%
+        return 20.0, None, "默认分成比例"
+
+    # 根据当前日期找到生效的分成记录
+    # 找到调整日小于等于当前日期的最后一条记录
+    effective_commission = None
+    for commission in reversed(commission_list):  # 从最新记录开始查找
+        if commission.adjustment_date <= current_time:
+            effective_commission = commission
+            break
+
+    # 如果没有找到生效的记录（所有记录的调整日都是未来日期），返回默认值
+    if effective_commission is None:
+        return 20.0, None, "默认分成比例"
+
+    return effective_commission.commission_rate, effective_commission.adjustment_date, effective_commission.remark
+
+
+def _calculate_commission_distribution(commission_rate):
+    """根据分成比例计算机师和公司的收入分配"""
+    # 固定参数
+    BASE_RATE = 50.0  # 50%
+    COMPANY_RATE = 42.0  # 42%
+
+    # 机师收入 = (分成比例/50%) * 42%
+    pilot_income = (commission_rate / BASE_RATE) * COMPANY_RATE
+
+    # 公司收入 = 42% - 机师收入
+    company_income = COMPANY_RATE - pilot_income
+
+    return {'pilot_income': pilot_income, 'company_income': company_income, 'calculation_formula': f'({commission_rate}%/50%) * 42% = {pilot_income:.1f}%'}
+
+
+# ==================== 分成管理路由 ====================
+
+
+@pilot_bp.route('/<pilot_id>/commission/')
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_index(pilot_id):
+    """机师分成管理页面"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+
+        # 权限检查
+        if not _check_pilot_permission(pilot):
+            abort(403)
+
+        # 获取当前分成信息
+        current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
+        calculation_info = _calculate_commission_distribution(current_rate)
+
+        # 获取调整记录列表（按调整日降序排列）
+        commissions = PilotCommission.objects(pilot_id=pilot_id).order_by('-adjustment_date')
+
+        return render_template('pilots/commission/index.html',
+                               pilot=pilot,
+                               current_rate=current_rate,
+                               effective_date=effective_date,
+                               remark=remark,
+                               calculation_info=calculation_info,
+                               commissions=commissions)
+
+    except DoesNotExist:
+        abort(404)
+
+
+@pilot_bp.route('/<pilot_id>/commission/new', methods=['GET', 'POST'])
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_new(pilot_id):
+    """新增分成调整记录"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+
+        # 权限检查
+        if not _check_pilot_permission(pilot):
+            abort(403)
+
+        if request.method == 'POST':
+            try:
+                # 获取表单数据
+                adjustment_date_str = request.form.get('adjustment_date', '').strip()
+                commission_rate_str = request.form.get('commission_rate', '').strip()
+                remark = request.form.get('remark', '').strip() or None
+
+                # 基础验证
+                if not adjustment_date_str:
+                    flash('调整日为必填项', 'error')
+                    return render_template('pilots/commission/new.html', pilot=pilot)
+
+                if not commission_rate_str:
+                    flash('分成比例为必填项', 'error')
+                    return render_template('pilots/commission/new.html', pilot=pilot)
+
+                # 转换数据类型
+                try:
+                    from datetime import datetime
+                    adjustment_date = datetime.strptime(adjustment_date_str, '%Y-%m-%d')
+                    # 转换为UTC时间（假设输入的是GMT+8时间）
+                    from utils.timezone_helper import local_to_utc
+                    adjustment_date = local_to_utc(adjustment_date)
+                except ValueError:
+                    flash('调整日格式错误', 'error')
+                    return render_template('pilots/commission/new.html', pilot=pilot)
+
+                try:
+                    commission_rate = float(commission_rate_str)
+                except ValueError:
+                    flash('分成比例必须是数字', 'error')
+                    return render_template('pilots/commission/new.html', pilot=pilot)
+
+                # 创建分成调整记录
+                commission = PilotCommission(pilot_id=pilot, adjustment_date=adjustment_date, commission_rate=commission_rate, remark=remark)
+
+                # 保存记录
+                commission.save()
+
+                flash('创建分成调整记录成功', 'success')
+                logger.info('用户%s为机师%s创建分成调整记录：%s%%', current_user.username, pilot.nickname, commission_rate)
+                return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
+
+            except (ValueError, ValidationError) as e:
+                flash(f'数据验证失败：{str(e)}', 'error')
+                return render_template('pilots/commission/new.html', pilot=pilot)
+            except Exception as e:
+                flash(f'创建失败：{str(e)}', 'error')
+                logger.error('创建分成调整记录失败：%s', str(e))
+                return render_template('pilots/commission/new.html', pilot=pilot)
+
+        return render_template('pilots/commission/new.html', pilot=pilot)
+
+    except DoesNotExist:
+        abort(404)
+
+
+@pilot_bp.route('/<pilot_id>/commission/<commission_id>/edit', methods=['GET', 'POST'])
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_edit(pilot_id, commission_id):
+    """编辑分成调整记录"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
+
+        # 权限检查
+        if not _check_pilot_permission(pilot):
+            abort(403)
+
+        if request.method == 'POST':
+            # 记录原始数据用于变更记录
+            old_data = {
+                'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
+                'commission_rate': commission.commission_rate,
+                'remark': commission.remark,
+                'is_active': commission.is_active,
+            }
+
+            try:
+                # 获取表单数据
+                commission_rate = request.form.get('commission_rate')
+                remark = request.form.get('remark', '').strip() or None
+                is_active = request.form.get('is_active') == 'on'  # checkbox返回'on'或None
+
+                # 验证分成比例
+                if commission_rate is not None:
+                    try:
+                        commission_rate = float(commission_rate)
+                        if not (0 <= commission_rate <= 50):
+                            flash('分成比例必须在0-50之间', 'error')
+                            return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
+                    except ValueError:
+                        flash('分成比例必须是有效数字', 'error')
+                        return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
+
+                # 更新数据
+                if commission_rate is not None:
+                    commission.commission_rate = commission_rate
+                commission.remark = remark
+                commission.is_active = is_active
+                commission.save()
+
+                # 记录变更
+                _record_commission_changes(commission, old_data, current_user, _get_client_ip())
+
+                flash('更新分成调整记录成功', 'success')
+                logger.info('用户%s更新机师%s的分成调整记录', current_user.username, pilot.nickname)
+                return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
+
+            except Exception as e:
+                flash(f'更新失败：{str(e)}', 'error')
+                logger.error('更新分成调整记录失败：%s', str(e))
+                return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
+
+        return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
+
+    except DoesNotExist:
+        abort(404)
+
+
+@pilot_bp.route('/<pilot_id>/commission/<commission_id>/delete', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_delete(pilot_id, commission_id):
+    """软删除分成调整记录"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
+
+        # 权限检查
+        if not _check_pilot_permission(pilot):
+            abort(403)
+
+        # 记录原始数据用于变更记录
+        old_data = {
+            'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
+            'commission_rate': commission.commission_rate,
+            'remark': commission.remark,
+            'is_active': commission.is_active,
+        }
+
+        # 软删除
+        commission.is_active = False
+        commission.save()
+
+        # 记录变更
+        _record_commission_changes(commission, old_data, current_user, _get_client_ip())
+
+        flash('删除分成调整记录成功', 'success')
+        logger.info('用户%s软删除机师%s的分成调整记录', current_user.username, pilot.nickname)
+        return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
+
+    except DoesNotExist:
+        abort(404)
+
+
+@pilot_bp.route('/<pilot_id>/commission/<commission_id>/restore', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_restore(pilot_id, commission_id):
+    """恢复软删除的分成调整记录"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
+
+        # 权限检查
+        if not _check_pilot_permission(pilot):
+            abort(403)
+
+        # 记录原始数据用于变更记录
+        old_data = {
+            'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
+            'commission_rate': commission.commission_rate,
+            'remark': commission.remark,
+            'is_active': commission.is_active,
+        }
+
+        # 恢复
+        commission.is_active = True
+        commission.save()
+
+        # 记录变更
+        _record_commission_changes(commission, old_data, current_user, _get_client_ip())
+
+        flash('恢复分成调整记录成功', 'success')
+        logger.info('用户%s恢复机师%s的分成调整记录', current_user.username, pilot.nickname)
+        return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
+
+    except DoesNotExist:
+        abort(404)
+
+
+@pilot_bp.route('/<pilot_id>/commission/current')
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_current(pilot_id):
+    """获取机师当前分成信息API"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+
+        # 权限检查
+        if not _check_pilot_permission(pilot):
+            abort(403)
+
+        # 获取当前分成信息
+        current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
+        calculation_info = _calculate_commission_distribution(current_rate)
+
+        return jsonify({
+            'success': True,
+            'current_rate': current_rate,
+            'effective_date': effective_date.strftime('%Y-%m-%d') if effective_date else None,
+            'remark': remark,
+            'calculation_info': calculation_info
+        })
+
+    except DoesNotExist:
+        return jsonify({'success': False, 'error': '机师不存在'}), 404
+    except Exception as e:
+        logger.error('获取当前分成信息失败：%s', str(e))
+        return jsonify({'success': False, 'error': '获取当前分成信息失败'}), 500
+
+
+@pilot_bp.route('/<pilot_id>/commission/<commission_id>/changes')
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_changes(pilot_id, commission_id):
+    """分成调整记录变更记录"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
+
+        # 权限检查
+        if not _check_pilot_permission(pilot):
+            abort(403)
+
+        # 获取最近100条变更记录
+        changes = PilotCommissionChangeLog.objects(commission_id=commission).order_by('-change_time').limit(100)
+
+        return jsonify({
+            'success':
+            True,
+            'changes': [{
+                'field_name': change.field_display_name,
+                'old_value': change.old_value,
+                'new_value': change.new_value,
+                'change_time': change.change_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'user_name': change.user_id.nickname or change.user_id.username if change.user_id else '未知用户',
+                'ip_address': change.ip_address or '未知'
+            } for change in changes]
+        })
+
+    except DoesNotExist:
+        return jsonify({'success': False, 'error': '记录不存在'}), 404
     except Exception as e:
         logger.error('获取变更记录失败：%s', str(e))
         return jsonify({'success': False, 'error': '获取变更记录失败'}), 500

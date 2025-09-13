@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block title %}机师分成管理 - {{ pilot.nickname }}{% endblock %}
+
+{% block content %}
+<section class="commission-management">
+  <!-- 页面头部 -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">机师分成管理 - {{ pilot.nickname }}</h1>
+      <a href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回机师详情
+      </a>
+    </div>
+  </div>
+
+  <!-- 当前分成信息卡片 -->
+  <div class="commission-info-card">
+    <div class="card-header">
+      <h3 class="card-title">当前分成信息</h3>
+    </div>
+    <div class="commission-summary">
+      <div class="summary-item">
+        <div class="summary-value">{{ current_rate }}%</div>
+        <div class="summary-label">当前分成比例</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value pilot-income">{{ "%.1f"|format(calculation_info.pilot_income) }}%</div>
+        <div class="summary-label">机师收入</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value company-income">{{ "%.1f"|format(calculation_info.company_income) }}%</div>
+        <div class="summary-label">公司收入</div>
+      </div>
+    </div>
+    <div class="commission-details">
+      <div class="detail-item">
+        <span class="detail-label">计算公式：</span>
+        <span class="detail-value">{{ calculation_info.calculation_formula }}</span>
+      </div>
+      {% if effective_date %}
+        <div class="detail-item">
+          <span class="detail-label">生效时间：</span>
+          <span class="detail-value">{{ effective_date|local_date }}</span>
+        </div>
+      {% else %}
+        <div class="detail-item">
+          <span class="detail-label">生效时间：</span>
+          <span class="detail-value">默认分成比例</span>
+        </div>
+      {% endif %}
+      {% if remark %}
+        <div class="detail-item">
+          <span class="detail-label">备注：</span>
+          <span class="detail-value">{{ remark }}</span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 操作区域 -->
+  <div class="action-section">
+    <div class="action-header">
+      <h3 class="section-title">分成调整记录</h3>
+      <a href="{{ url_for('pilot.pilot_commission_new', pilot_id=pilot.id) }}" class="btn btn-primary">
+        <span class="btn-icon">+</span>
+        新增调整记录
+      </a>
+    </div>
+  </div>
+
+  <!-- 调整记录列表 -->
+  <div class="records-section">
+    {% if commissions %}
+      <div class="records-list">
+        {% for commission in commissions %}
+          <div class="record-card {% if not commission.is_active %}inactive{% endif %}">
+            <div class="record-header">
+              <div class="record-date">{{ commission.adjustment_date|local_date }}</div>
+              <div class="record-rate">{{ commission.commission_rate }}%</div>
+              <div class="record-status">
+                {% if commission.is_active %}
+                  <span class="status-badge active">有效</span>
+                {% else %}
+                  <span class="status-badge inactive">无效</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="record-content">
+              {% if commission.remark %}
+                <div class="record-remark">{{ commission.remark }}</div>
+              {% endif %}
+              <div class="record-meta">
+                <span class="meta-item">创建：{{ commission.created_at|local_datetime }}</span>
+              </div>
+            </div>
+            <div class="record-actions">
+              {% if commission.is_active %}
+                <a href="{{ url_for('pilot.pilot_commission_edit', pilot_id=pilot.id, commission_id=commission.id) }}" 
+                   class="btn btn-sm btn-secondary" title="编辑">
+                  <span class="btn-icon">✏️</span>
+                </a>
+              {% else %}
+                <a href="{{ url_for('pilot.pilot_commission_edit', pilot_id=pilot.id, commission_id=commission.id) }}" 
+                   class="btn btn-sm btn-primary" title="编辑">
+                  <span class="btn-icon">✏️</span>
+                </a>
+              {% endif %}
+              <button type="button" class="btn btn-sm btn-secondary" 
+                      onclick="showChanges('{{ commission.id }}')" title="变更记录">
+                <span class="btn-icon">📜</span>
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">💰</div>
+        <div class="empty-title">暂无分成调整记录</div>
+        <div class="empty-description">点击上方"新增调整记录"按钮创建第一条记录</div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- 变更记录模态框 -->
+<div id="changesModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>变更记录</h3>
+      <button class="modal-close" onclick="hideChangesModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="changesContent">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="hideChangesModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<style>
+/* 分成管理页面样式 */
+.commission-management {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  color: #111111;
+}
+
+.commission-info-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.card-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #A9A9A9;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #8B0000;
+}
+
+.commission-summary {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16px;
+  padding: 16px 0;
+  background: #F2F2F2;
+  border-radius: 6px;
+}
+
+.summary-item {
+  text-align: center;
+}
+
+.summary-value {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #8B0000;
+}
+
+.summary-value.pilot-income {
+  color: #00B37A;
+}
+
+.summary-value.company-income {
+  color: #3A5F3D;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #666666;
+}
+
+.commission-details {
+  border-top: 1px solid #A9A9A9;
+  padding-top: 12px;
+}
+
+.detail-item {
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.detail-label {
+  color: #666666;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #111111;
+  font-family: monospace;
+}
+
+.action-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.action-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #8B0000;
+}
+
+.records-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.record-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid #A9A9A9;
+  transition: all 0.2s ease;
+}
+
+.record-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-color: #8B0000;
+}
+
+.record-card.inactive {
+  background: #F2F2F2;
+  opacity: 0.7;
+}
+
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.record-date {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111111;
+}
+
+.record-rate {
+  font-size: 18px;
+  font-weight: 700;
+  color: #8B0000;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.active {
+  background: #00B37A;
+  color: #fff;
+}
+
+.status-badge.inactive {
+  background: #A9A9A9;
+  color: #fff;
+}
+
+.record-content {
+  margin-bottom: 12px;
+}
+
+.record-remark {
+  font-size: 14px;
+  color: #666666;
+  margin-bottom: 6px;
+}
+
+.record-meta {
+  font-size: 12px;
+  color: #666666;
+}
+
+.meta-item {
+  margin-right: 16px;
+}
+
+.record-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #666666;
+  margin-bottom: 8px;
+}
+
+.empty-description {
+  font-size: 14px;
+  color: #666666;
+}
+
+/* 模态框样式 */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #A9A9A9;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666666;
+}
+
+.modal-close:hover {
+  color: #111111;
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #A9A9A9;
+}
+
+.loading {
+  text-align: center;
+  color: #666666;
+  padding: 20px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .commission-summary {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .action-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .record-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .record-actions {
+    justify-content: flex-start;
+  }
+  
+  .modal-content {
+    width: 95%;
+    margin: 0 10px;
+  }
+}
+</style>
+
+<script>
+function showChanges(commissionId) {
+  document.getElementById('changesModal').style.display = 'flex';
+  
+  // 加载变更记录
+  fetch("{{ url_for('pilot.pilot_commission_changes', pilot_id=pilot.id, commission_id='PLACEHOLDER') }}".replace('PLACEHOLDER', commissionId))
+    .then(response => response.json())
+    .then(data => {
+      const content = document.getElementById('changesContent');
+      if (data.success) {
+        if (data.changes.length > 0) {
+          let html = '<div class="changes-list">';
+          data.changes.forEach(change => {
+            html += `<div class="change-item">
+              <div class="change-header">
+                <span class="change-field">${change.field_name}</span>
+                <span class="change-time">${change.change_time}</span>
+              </div>
+              <div class="change-content">
+                <span class="old-value">${change.old_value || '空'}</span>
+                →
+                <span class="new-value">${change.new_value || '空'}</span>
+              </div>
+              <div class="change-meta">
+                <span>操作者：${change.user_name}</span>
+                <span>IP：${change.ip_address}</span>
+              </div>
+            </div>`;
+          });
+          html += '</div>';
+          content.innerHTML = html;
+        } else {
+          content.innerHTML = '<div class="empty-state"><div class="empty-title">暂无变更记录</div></div>';
+        }
+      } else {
+        content.innerHTML = '<div class="text-center text-danger">加载失败：' + data.error + '</div>';
+      }
+    })
+    .catch(error => {
+      document.getElementById('changesContent').innerHTML = '<div class="text-center text-danger">加载失败</div>';
+    });
+}
+
+function hideChangesModal() {
+  document.getElementById('changesModal').style.display = 'none';
+}
+
+// 点击模态框外部关闭
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal')) {
+    e.target.style.display = 'none';
+  }
+});
+</script>
+{% endblock %}

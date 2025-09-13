@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+
+{% block title %}编辑分成调整记录 - {{ pilot.nickname }}{% endblock %}
+
+{% block content %}
+<section class="commission-form">
+  <!-- 页面头部 -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">编辑分成调整记录 - {{ pilot.nickname }}</h1>
+      <a href="{{ url_for('pilot.pilot_commission_index', pilot_id=pilot.id) }}" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回分成管理
+      </a>
+    </div>
+  </div>
+
+  <!-- 表单卡片 -->
+  <div class="form-card">
+    <div class="card-header">
+      <h3 class="card-title">调整记录信息</h3>
+    </div>
+    <div class="form-content">
+      <form method="POST" id="commissionForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <!-- 只读字段 -->
+        <div class="form-group">
+          <label for="adjustment_date" class="form-label">调整日</label>
+          <input type="text" class="form-input readonly" id="adjustment_date" 
+                 value="{{ commission.adjustment_date|local_date }}" readonly>
+          <div class="form-help">调整日不可修改，如需修改请删除后重新创建</div>
+        </div>
+
+        <div class="form-group">
+          <label for="commission_rate" class="form-label">分成比例 <span class="required">*</span></label>
+          <div class="input-group">
+            <input type="number" class="form-input" id="commission_rate" name="commission_rate"
+                   value="{{ request.form.commission_rate or commission.commission_rate }}" 
+                   min="0" max="50" step="0.1" required>
+            <span class="input-suffix">%</span>
+          </div>
+          <div class="form-help">分成比例范围：0-50%，表示机师在总流水中的分成比例</div>
+        </div>
+
+        <!-- 可编辑字段 -->
+        <div class="form-group">
+          <label for="remark" class="form-label">备注</label>
+          <textarea class="form-textarea" id="remark" name="remark" rows="3" 
+                    placeholder="请输入调整原因或说明">{{ request.form.remark or commission.remark or '' }}</textarea>
+          <div class="form-help">可以修改备注信息</div>
+        </div>
+
+        <!-- 状态切换 -->
+        <div class="form-group">
+          <label class="form-label">记录状态</label>
+          <div class="status-toggle">
+            <label class="toggle-switch">
+              <input type="checkbox" id="is_active" name="is_active" 
+                     {% if commission.is_active %}checked{% endif %}>
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label" id="status-label">
+              {% if commission.is_active %}有效{% else %}无效{% endif %}
+            </span>
+          </div>
+          <div class="form-help">
+            {% if commission.is_active %}
+              当前记录有效，取消勾选将设为无效（软删除）
+            {% else %}
+              当前记录无效，勾选将重新激活
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 当前分成计算 -->
+        <div class="preview-section">
+          <h4 class="preview-title">当前分成计算</h4>
+          <div class="preview-card">
+            <div class="preview-item">
+              <div class="preview-value">{{ commission.commission_rate }}%</div>
+              <div class="preview-label">机师分成比例</div>
+            </div>
+            <div class="preview-item">
+              <div class="preview-value pilot-income">{{ "%.1f"|format((commission.commission_rate / 50.0) * 42.0) }}%</div>
+              <div class="preview-label">机师收入</div>
+            </div>
+            <div class="preview-item">
+              <div class="preview-value company-income">{{ "%.1f"|format(42.0 - (commission.commission_rate / 50.0) * 42.0) }}%</div>
+              <div class="preview-label">公司收入</div>
+            </div>
+          </div>
+          <div class="preview-formula">计算公式：({{ commission.commission_rate }}%/50%) * 42% = {{ "%.1f"|format((commission.commission_rate / 50.0) * 42.0) }}%</div>
+        </div>
+
+        <!-- 记录信息 -->
+        <div class="record-info">
+          <h4 class="info-title">记录信息</h4>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">创建时间：</span>
+              <span class="info-value">{{ commission.created_at|local_datetime }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">最后修改：</span>
+              <span class="info-value">{{ commission.updated_at|local_datetime }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">状态：</span>
+              <span class="info-value">
+                {% if commission.is_active %}
+                  <span class="status-badge active">有效</span>
+                {% else %}
+                  <span class="status-badge inactive">无效</span>
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <a href="{{ url_for('pilot.pilot_commission_index', pilot_id=pilot.id) }}" class="btn btn-secondary">
+            <span class="btn-icon">×</span>
+            取消
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <span class="btn-icon">✓</span>
+            保存
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<style>
+/* 编辑分成调整记录页面样式 */
+.commission-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.page-header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  color: #111111;
+}
+
+.form-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.card-header {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #A9A9A9;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #8B0000;
+}
+
+.form-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111111;
+}
+
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid #A9A9A9;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.2s ease;
+}
+
+.form-input.readonly {
+  background: #F2F2F2;
+  color: #666666;
+  cursor: not-allowed;
+}
+
+.form-textarea {
+  padding: 8px 12px;
+  border: 1px solid #A9A9A9;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.2s ease;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #8B0000;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+}
+
+.input-group .form-input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+.input-suffix {
+  padding: 8px 12px;
+  background: #F2F2F2;
+  border: 1px solid #A9A9A9;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  font-size: 14px;
+  color: #666666;
+}
+
+.form-help {
+  font-size: 12px;
+  color: #666666;
+}
+
+/* 状态切换开关样式 */
+.status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: #2196F3;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(26px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111111;
+}
+
+.preview-section {
+  background: #F2F2F2;
+  border-radius: 6px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111111;
+  margin: 0 0 12px 0;
+}
+
+.preview-card {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 12px;
+  padding: 12px 0;
+  background: #fff;
+  border-radius: 4px;
+}
+
+.preview-item {
+  text-align: center;
+}
+
+.preview-value {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #8B0000;
+}
+
+.preview-value.pilot-income {
+  color: #00B37A;
+}
+
+.preview-value.company-income {
+  color: #3A5F3D;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #666666;
+}
+
+.preview-formula {
+  font-size: 12px;
+  color: #666666;
+  font-family: monospace;
+  text-align: center;
+}
+
+.record-info {
+  background: #F2F2F2;
+  border-radius: 6px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.info-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111111;
+  margin: 0 0 12px 0;
+}
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.info-label {
+  color: #666666;
+  font-weight: 500;
+}
+
+.info-value {
+  color: #111111;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.active {
+  background: #00B37A;
+  color: #fff;
+}
+
+.status-badge.inactive {
+  background: #A9A9A9;
+  color: #fff;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #A9A9A9;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .preview-card {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .info-item {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .form-actions .btn {
+    width: 100%;
+  }
+}
+</style>
+
+<script>
+// 实时更新分成计算预览
+function updatePreview() {
+  const commissionRate = parseFloat(document.getElementById('commission_rate').value) || 0;
+  
+  // 计算机师收入和公司收入
+  const pilotIncome = (commissionRate / 50.0) * 42.0;
+  const companyIncome = 42.0 - pilotIncome;
+  
+  // 更新预览显示
+  document.querySelector('.preview-item:nth-child(1) .preview-value').textContent = commissionRate + '%';
+  document.querySelector('.preview-item:nth-child(2) .preview-value').textContent = pilotIncome.toFixed(1) + '%';
+  document.querySelector('.preview-item:nth-child(3) .preview-value').textContent = companyIncome.toFixed(1) + '%';
+  
+  // 更新计算公式
+  document.querySelector('.preview-formula').textContent = 
+    `计算公式：(${commissionRate}%/50%) * 42% = ${pilotIncome.toFixed(1)}%`;
+}
+
+// 绑定输入事件
+document.getElementById('commission_rate').addEventListener('input', updatePreview);
+
+// 状态切换事件
+document.getElementById('is_active').addEventListener('change', function() {
+  const statusLabel = document.getElementById('status-label');
+  const helpText = this.parentElement.parentElement.querySelector('.form-help');
+  
+  if (this.checked) {
+    statusLabel.textContent = '有效';
+    helpText.textContent = '当前记录有效，取消勾选将设为无效（软删除）';
+  } else {
+    statusLabel.textContent = '无效';
+    helpText.textContent = '当前记录无效，勾选将重新激活';
+  }
+});
+
+// 页面加载时初始化预览
+document.addEventListener('DOMContentLoaded', updatePreview);
+</script>
+{% endblock %}

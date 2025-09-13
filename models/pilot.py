@@ -1,10 +1,13 @@
+#pylint: disable=no-member
 import enum
 from datetime import datetime
 
-from mongoengine import (DateTimeField, Document, EnumField, IntField, ReferenceField, StringField)
+from mongoengine import (BooleanField, DateTimeField, Document, EnumField,
+                         FloatField, IntField, ReferenceField, StringField)
+
+from utils.timezone_helper import get_current_utc_time
 
 from .user import User
-from utils.timezone_helper import get_current_utc_time
 
 
 class Gender(enum.Enum):
@@ -178,5 +181,114 @@ class PilotChangeLog(Document):
             'work_mode': '参战形式',
             'rank': '阶级',
             'status': '状态',
+        }
+        return mapping.get(self.field_name, self.field_name)
+
+
+class PilotCommission(Document):
+    """机师分成调整记录模型"""
+
+    # 关联字段
+    pilot_id = ReferenceField(Pilot, required=True)
+
+    # 业务字段
+    adjustment_date = DateTimeField(required=True)  # 调整生效日期（UTC时间）
+    commission_rate = FloatField(required=True)  # 分成比例（0-50，表示0%-50%）
+    remark = StringField(max_length=200)  # 备注说明
+
+    # 状态字段
+    is_active = BooleanField(default=True)  # 是否有效（用于软删除）
+
+    # 系统字段
+    created_at = DateTimeField(default=get_current_utc_time)
+    updated_at = DateTimeField(default=get_current_utc_time)
+
+    meta = {
+        'collection':
+        'pilot_commissions',
+        'indexes': [
+            {
+                'fields': ['pilot_id', 'adjustment_date']
+            },
+            {
+                'fields': ['pilot_id', 'is_active']
+            },
+            {
+                'fields': ['adjustment_date']
+            },
+            {
+                'fields': ['is_active']
+            },
+            {
+                'fields': ['-created_at']
+            },
+        ],
+    }
+
+    def clean(self):
+        """数据验证和业务规则检查"""
+        super().clean()
+
+        # 分成比例范围验证（0-50）
+        if self.commission_rate < 0 or self.commission_rate > 50:
+            raise ValueError("分成比例必须在0-50之间")
+
+        # 同一机师同一调整日唯一性验证（仅对有效记录）
+        if self.is_active:
+            existing = PilotCommission.objects(pilot_id=self.pilot_id, adjustment_date=self.adjustment_date, is_active=True).first()
+            if existing and existing.id != self.id:
+                raise ValueError("同一机师同一调整日只能有一条有效记录")
+
+    def save(self, *args, **kwargs):
+        """保存时更新修改时间"""
+        self.updated_at = get_current_utc_time()
+        return super().save(*args, **kwargs)
+
+    @property
+    def commission_rate_display(self):
+        """分成比例显示格式"""
+        return f"{self.commission_rate}%"
+
+    @property
+    def adjustment_date_local(self):
+        """调整日期的本地时间显示"""
+        from utils.timezone_helper import format_local_date
+        return format_local_date(self.adjustment_date, '%Y-%m-%d')
+
+
+class PilotCommissionChangeLog(Document):
+    """机师分成调整记录变更日志模型"""
+
+    commission_id = ReferenceField(PilotCommission, required=True)
+    user_id = ReferenceField(User, required=True)
+    field_name = StringField(required=True)
+    old_value = StringField()
+    new_value = StringField()
+    change_time = DateTimeField(default=get_current_utc_time)
+    ip_address = StringField()
+
+    meta = {
+        'collection': 'pilot_commission_change_logs',
+        'indexes': [
+            {
+                'fields': ['commission_id', '-change_time']
+            },
+            {
+                'fields': ['user_id']
+            },
+            {
+                'fields': ['-change_time']
+            },
+        ],
+    }
+
+    @property
+    def field_display_name(self):
+        """字段显示名称"""
+        mapping = {
+            'adjustment_date': '调整日',
+            'commission_rate': '分成比例',
+            'remark': '备注',
+            'is_active': '状态',
         }
         return mapping.get(self.field_name, self.field_name)

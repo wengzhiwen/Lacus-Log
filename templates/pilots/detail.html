@@ -79,6 +79,40 @@
       </div>
     </div>
 
+    <!-- 分成信息 -->
+    <div class="info-section">
+      <h3 class="section-title">分成信息</h3>
+      <div class="commission-card">
+        <div class="commission-header">
+          <div class="commission-rate">
+            <span class="rate-value">{{ current_rate }}%</span>
+            <span class="rate-label">当前分成比例</span>
+          </div>
+          <div class="commission-calculation">
+            <div class="calc-item">
+              <span class="calc-value">{{ "%.1f"|format(calculation_info.pilot_income) }}%</span>
+              <span class="calc-label">机师收入</span>
+            </div>
+            <div class="calc-item">
+              <span class="calc-value">{{ "%.1f"|format(calculation_info.company_income) }}%</span>
+              <span class="calc-label">公司收入</span>
+            </div>
+          </div>
+        </div>
+        <div class="commission-footer">
+          <div class="commission-formula">{{ calculation_info.calculation_formula }}</div>
+          {% if effective_date %}
+            <div class="commission-date">生效时间：{{ effective_date|local_date }}</div>
+          {% else %}
+            <div class="commission-date">默认分成比例</div>
+          {% endif %}
+          {% if remark %}
+            <div class="commission-remark">备注：{{ remark }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
     <!-- 系统信息 -->
     <div class="info-section">
       <h3 class="section-title">系统信息</h3>
@@ -109,6 +143,10 @@
         启动征召
       </a>
       {% endif %}
+      <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_commission_index', pilot_id=pilot.id) }}">
+        <span class="btn-icon">💰</span>
+        分成管理
+      </a>
       <button class="btn btn-secondary" onclick="showChanges()">
         <span class="btn-icon">📜</span>
         变更记录
@@ -132,6 +170,104 @@
 </div>
 
 <style>
+/* 分成信息卡片样式 */
+.commission-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.commission-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.commission-rate {
+  text-align: center;
+}
+
+.rate-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: #8B0000;
+  margin-bottom: 4px;
+}
+
+.rate-label {
+  font-size: 12px;
+  color: #666666;
+}
+
+.commission-calculation {
+  display: flex;
+  gap: 16px;
+}
+
+.calc-item {
+  text-align: center;
+}
+
+.calc-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.calc-item:first-child .calc-value {
+  color: #00B37A;
+}
+
+.calc-item:last-child .calc-value {
+  color: #3A5F3D;
+}
+
+.calc-label {
+  font-size: 11px;
+  color: #666666;
+}
+
+.commission-footer {
+  border-top: 1px solid #A9A9A9;
+  padding-top: 12px;
+}
+
+.commission-formula {
+  font-size: 12px;
+  color: #666666;
+  margin-bottom: 4px;
+  font-family: monospace;
+}
+
+.commission-date {
+  font-size: 12px;
+  color: #666666;
+  margin-bottom: 4px;
+}
+
+.commission-remark {
+  font-size: 12px;
+  color: #666666;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .commission-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .commission-calculation {
+    justify-content: center;
+  }
+}
+
 /* 机师详情页面样式 */
 .pilot-detail {
   max-width: 800px;
