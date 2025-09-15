@@ -40,6 +40,10 @@
           <div class="info-value">{{ user.nickname or '未设置' }}</div>
         </div>
         <div class="info-item">
+          <div class="info-label">邮箱</div>
+          <div class="info-value">{{ user.email or '未设置' }}</div>
+        </div>
+        <div class="info-item">
           <div class="info-label">角色</div>
           <div class="info-value">{{ (user.roles | map(attribute='name') | list) | map('role_display_name') | join(', ') }}</div>
         </div>
@@ -67,6 +71,7 @@
   <div class="action-section">
     <h2 class="section-title">用户操作</h2>
     <div class="action-buttons">
+      <a class="btn btn-primary" href="{{ url_for('admin.users_edit', user_id=(user.id|string)) }}">编辑</a>
       <form method="post" action="{{ url_for('admin.users_toggle_active', user_id=(user.id|string)) }}" class="action-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <button class="btn btn-secondary" type="submit">

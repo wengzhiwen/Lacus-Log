@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}编辑用户 - {{ user.username }} - Lacus-Log{% endblock %}
+{% block content %}
+<section>
+  <h1 class="title">编辑用户</h1>
+  <form class="form" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+    <label>用户名</label>
+    <input class="input" type="text" value="{{ user.username }}" disabled />
+
+    <label>昵称</label>
+    <input class="input" type="text" name="nickname" value="{{ user.nickname or '' }}" />
+
+    <label>邮箱（可选）</label>
+    <input class="input" type="email" name="email" value="{{ user.email or '' }}" placeholder="name@example.com" />
+
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">保存</button>
+      <a class="btn btn-secondary" href="{{ url_for('admin.users_detail', user_id=(user.id|string)) }}">取消</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+

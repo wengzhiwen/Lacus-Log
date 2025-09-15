@@ -17,6 +17,7 @@
   - `username` 唯一，登录标识
   - `password` 密文（pbkdf2_sha512哈希）
   - `nickname` 用户昵称
+  - `email` 邮箱，非必填
   - `active` 布尔，账户激活状态
   - `created_at` 创建时间
   - `fs_uniquifier` 唯一标识符（Flask-Security-Too要求）

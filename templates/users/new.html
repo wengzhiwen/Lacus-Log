@@ -6,13 +6,16 @@
   <form class="form" method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <label>用户名</label>
-    <input type="text" name="username" value="{{ (form.username if form else '') | default('') }}" required />
+    <input class="input" type="text" name="username" value="{{ (form.username if form else '') | default('') }}" required />
 
     <label>昵称</label>
-    <input type="text" name="nickname" value="{{ (form.nickname if form else '') | default('') }}" />
+    <input class="input" type="text" name="nickname" value="{{ (form.nickname if form else '') | default('') }}" />
+
+    <label>邮箱（可选）</label>
+    <input class="input" type="email" name="email" value="{{ (form.email if form else '') | default('') }}" placeholder="name@example.com" />
 
     <label>密码</label>
-    <input type="password" name="password" required />
+    <input class="input" type="password" name="password" required />
 
     <div class="form-actions">
       <button class="btn btn-primary" type="submit">创建</button>

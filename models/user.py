@@ -1,10 +1,11 @@
+# pylint: disable=R0903,no-member
+
 import uuid
 
 from flask_security.utils import verify_password
-from mongoengine import (BooleanField, DateTimeField, Document, IntField, ListField, ReferenceField, StringField)
+from mongoengine import (BooleanField, DateTimeField, Document, IntField, ListField, ReferenceField, StringField,
+                         EmailField, DoesNotExist)
 from utils.timezone_helper import get_current_utc_time
-
-# pylint: disable=R0903
 
 
 class Role(Document):
@@ -43,6 +44,8 @@ class User(Document):
     username = StringField(required=True, unique=True)
     password = StringField(required=True)  # 密文
     nickname = StringField(default='')
+    # 邮箱（可选，用于邮件报表通知）
+    email = EmailField(required=False, null=True)
     active = BooleanField(default=True)
     created_at = DateTimeField(default=get_current_utc_time)
     # Flask-Security-Too 要求：全局唯一标识
@@ -111,3 +114,28 @@ class User(Document):
     def get_id(self) -> str:  # pragma: no cover
         # 使用 fs_uniquifier 作为稳定的会话标识
         return self.fs_uniquifier
+
+    # ---- 业务辅助方法 ----
+    @classmethod
+    def get_emails_by_role(cls, role_name: str | None = None, only_active: bool = True):
+        """按角色名获取邮箱列表；不传角色名时返回全部用户邮箱。
+
+        - role_name: 角色名，如 'gicho'（议长）、'kancho'（舰长）
+        - only_active: 是否仅返回激活用户的邮箱
+
+        返回去重后的邮箱字符串列表（忽略空值）。
+        """
+        if not role_name:
+            query = cls.objects(email__ne=None)
+        else:
+            try:
+                role_obj = Role.objects.get(name=role_name)
+            except DoesNotExist:
+                return []
+            query = cls.objects(roles=role_obj, email__ne=None)
+        if only_active:
+            query = query.filter(active=True)
+
+        emails = [u.email for u in query if getattr(u, 'email', None)]
+        # 去重并稳定排序
+        return sorted(set(emails))

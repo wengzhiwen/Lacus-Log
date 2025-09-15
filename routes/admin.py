@@ -37,6 +37,7 @@ def users_new():
         username = request.form.get('username', '').strip()
         nickname = request.form.get('nickname', '').strip()
         password = request.form.get('password', '').strip()
+        email = request.form.get('email', '').strip()
 
         # 输入验证
         if not username or not password:
@@ -68,6 +69,7 @@ def users_new():
         user = User(username=username,
                     nickname=nickname,
                     password=hash_password(password),
+                    email=(email or None),
                     roles=[kancho],
                     active=True)
         user.save()
@@ -76,6 +78,30 @@ def users_new():
         return redirect(url_for('admin.users_list'))
 
     return render_template('users/new.html')
+
+
+@admin_bp.route('/users/<user_id>/edit', methods=['GET', 'POST'])
+@roles_required('gicho')
+def users_edit(user_id: str):
+    """编辑用户基本信息（昵称、邮箱）。"""
+    try:
+        user = User.objects.get(id=user_id)
+    except DoesNotExist:
+        abort(404)
+
+    if request.method == 'POST':
+        nickname = request.form.get('nickname', '').strip()
+        email = request.form.get('email', '').strip()
+
+        user.nickname = nickname
+        # 允许清空邮箱
+        user.email = (email or None)
+        user.save()
+        flash('已更新用户信息', 'success')
+        logger.info('更新用户信息：%s', user.username)
+        return redirect(url_for('admin.users_detail', user_id=user_id))
+
+    return render_template('users/edit.html', user=user)
 
 
 @admin_bp.route('/users/<user_id>/toggle', methods=['POST'])

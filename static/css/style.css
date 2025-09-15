@@ -94,7 +94,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 }
 
 .form { display: flex; flex-direction: column; gap: 10px; }
-.form input[type="text"], .form input[type="password"], .form select { padding: 10px; border: 1px solid var(--gray); border-radius: 6px; }
+.form input[type="text"], .form input[type="password"], .form input[type="email"], .form .input, .form select { padding: 10px; border: 1px solid var(--gray); border-radius: 6px; }
 .form-actions { display: flex; gap: 8px; margin-top: 8px; }
 .form-check { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 
