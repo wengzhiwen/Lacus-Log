@@ -39,6 +39,9 @@ def _apply_inline_table_styles(html: str) -> str:
     """
     为<table>/<th>/<td>添加内联样式以增强邮件客户端的表格显示效果。
     使用HTML解析器安全地内联样式，避免正则误改。
+
+    注意：Markdown 渲染可能会在 th/td 上预先设置 `text-align` 样式，
+    这里在保留原有 `style` 的基础上按需补齐缺失的边框/内边距/背景等。
     """
     if not html:
         return html
@@ -46,18 +49,46 @@ def _apply_inline_table_styles(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
 
     table_style = "border-collapse: collapse; width: 100%; margin: 10px 0;"
-    th_style = "border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; background:#f7f7f7;"
-    td_style = "border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top;"
+    th_defaults = {
+        "border": "1px solid #ddd",
+        "padding": "8px",
+        "text-align": "left",
+        "vertical-align": "top",
+        "background": "#f7f7f7",
+    }
+    td_defaults = {
+        "border": "1px solid #ddd",
+        "padding": "8px",
+        "text-align": "left",
+        "vertical-align": "top",
+    }
+
+    def _merge_style(existing: str, defaults: dict) -> str:
+        # 将已有style分解为键值映射
+        style_map = {}
+        if existing:
+            parts = [p.strip() for p in existing.split(';') if p.strip()]
+            for p in parts:
+                if ':' in p:
+                    k, v = p.split(':', 1)
+                    style_map[k.strip().lower()] = v.strip()
+
+        # 仅在不存在时补齐默认项（不覆盖已有，例如 text-align:right 保留）
+        for k, v in defaults.items():
+            if k not in style_map:
+                style_map[k] = v
+
+        # 重新拼装为 style 字符串，保持稳定顺序
+        ordered_keys = list(defaults.keys()) + [k for k in style_map.keys() if k not in defaults]
+        return "; ".join(f"{k}: {style_map[k]}" for k in ordered_keys if k in style_map)
 
     for table in soup.find_all("table"):
         if not table.get("style"):
             table["style"] = table_style
         for th in table.find_all("th"):
-            if not th.get("style"):
-                th["style"] = th_style
+            th["style"] = _merge_style(th.get("style", ""), th_defaults)
         for td in table.find_all("td"):
-            if not td.get("style"):
-                td["style"] = td_style
+            td["style"] = _merge_style(td.get("style", ""), td_defaults)
 
     return str(soup)
 

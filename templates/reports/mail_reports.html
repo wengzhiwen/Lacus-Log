@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}邮件报告 - Lacus-Log{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">📧 邮件报告</h1>
+  <div class="text-muted">以下报表为异步触发型，点击按钮后将开始计算并尝试发送邮件，页面不会等待计算完成。</div>
+  <input type="hidden" id="csrfToken" value="{{ csrf_token() }}">
+  <div id="result" class="text-muted" style="margin-top:8px;"></div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">未开播提醒（近48小时）</h2>
+    <div class="card-icon">⏰</div>
+  </div>
+  <div class="card-body">
+    <button id="btnUnstarted" class="btn btn-primary" style="width:100%" type="button" aria-label="触发未开播提醒报表">开始发送</button>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const btn = document.getElementById('btnUnstarted');
+  const result = document.getElementById('result');
+  const csrf = document.getElementById('csrfToken')?.value || '';
+
+  async function postUnstarted() {
+    result.textContent = '报表已开始运算...';
+    try {
+      const resp = await fetch("{{ url_for('report_mail.trigger_unstarted_report') }}", {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrf
+        },
+        credentials: 'same-origin'
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        if (data.sent) {
+          result.textContent = `已触发发送，共 ${data.count} 条。`;
+        } else {
+          result.textContent = `无可发送内容（或未配置收件人）。`;
+        }
+      } else {
+        result.textContent = `触发失败：${data && data.error ? data.error : '未知错误'}`;
+      }
+    } catch (e) {
+      result.textContent = '网络异常或服务器错误。';
+    }
+  }
+
+  if (btn) {
+    btn.addEventListener('click', postUnstarted);
+  }
+});
+</script>
+{% endblock %}
+
+

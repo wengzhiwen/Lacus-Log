@@ -15,6 +15,7 @@ from routes.main import main_bp
 from routes.pilot import pilot_bp
 from routes.recruit import recruit_bp
 from routes.report import report_bp
+from routes.report_mail import report_mail_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
@@ -101,6 +102,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(battle_record_bp, url_prefix='/battle-records')
     flask_app.register_blueprint(calendar_bp, url_prefix='/calendar')
     flask_app.register_blueprint(report_bp, url_prefix='/reports')
+    flask_app.register_blueprint(report_mail_bp, url_prefix='/reports')
 
     # 注册Jinja2过滤器
     @flask_app.template_filter('role_display_name')
