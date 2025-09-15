@@ -1,10 +1,11 @@
-"""议长专用 - 邮件报告模块（未开播提醒）
+"""
+议长专用 - 邮件报告模块（未开播提醒）
 
 本模块提供基于按钮触发的离线报表，通过邮件发送结果。
 """
 # pylint: disable=no-member
-import os
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
+ 
 from math import floor
 from typing import List
 
@@ -13,6 +14,7 @@ from flask_security import current_user, roles_required
 
 from models.announcement import Announcement
 from models.battle_record import BattleRecord
+from models.user import User
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
 from utils.timezone_helper import get_current_utc_time, utc_to_local
@@ -21,13 +23,6 @@ logger = get_logger('report_mail')
 
 report_mail_bp = Blueprint('report_mail', __name__)
 
-
-def _get_recipients_from_env() -> List[str]:
-    """从环境变量读取报告收件人列表。"""
-    addresses = os.getenv('REPORT_MAIL_ADDRESS', '').strip()
-    if not addresses:
-        return []
-    return [addr.strip() for addr in addresses.split(',') if addr.strip()]
 
 
 def _build_unstarted_markdown(items: List[dict]) -> str:
@@ -121,7 +116,8 @@ def trigger_unstarted_report():
 
         unstarted_items.append(item)
 
-    recipients = _get_recipients_from_env()
+    # 收件人：从用户模块获取所有激活用户的邮箱（去重、稳定排序）
+    recipients = User.get_emails_by_role(role_name=None, only_active=True)
     subject_ts = utc_to_local(now_utc).strftime('%Y-%m-%d %H:%M')
     subject = f"[Lacus-Log] 未开播提醒（近48小时） - {subject_ts}"
 
@@ -132,7 +128,7 @@ def trigger_unstarted_report():
     md = _build_unstarted_markdown(unstarted_items)
 
     if not recipients:
-        logger.error('REPORT_MAIL_ADDRESS 未配置或为空，无法发送未开播提醒邮件')
+        logger.error('收件人为空，用户模块未取得任何有效邮箱，无法发送未开播提醒邮件')
         return jsonify({'status': 'started', 'sent': False, 'count': len(unstarted_items), 'error': 'no_recipients'}), 500
 
     ok = send_email_md(recipients, subject, md)
