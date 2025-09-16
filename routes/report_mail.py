@@ -51,11 +51,12 @@ def mail_reports_page():
     return render_template('reports/mail_reports.html')
 
 
-@report_mail_bp.route('/mail/unstarted', methods=['POST'])
-@roles_required('gicho')
-def trigger_unstarted_report():
-    """触发“未开播提醒”报表计算与邮件发送（异步最小实现：请求内完成）。"""
-    logger.info('用户 %s 触发未开播提醒报表', getattr(current_user, 'username', '未知'))
+def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
+    """执行“未开播提醒”报表计算与邮件发送（供任务与路由复用）。
+
+    返回：{"sent": bool, "count": int}
+    """
+    logger.info('触发未开播提醒报表，来源：%s', triggered_by or '未知')
 
     # 统一使用项目的UTC naive时间口径，避免aware/naive相减报错
     now_utc = get_current_utc_time()
@@ -122,19 +123,29 @@ def trigger_unstarted_report():
     subject = f"[Lacus-Log] 未开播提醒（近48小时） - {subject_ts}"
 
     if not unstarted_items:
-        logger.info('无未开播计划，已跳过发送。触发人：%s', getattr(current_user, 'username', '未知'))
-        return jsonify({'status': 'started', 'sent': False, 'count': 0})
+        logger.info('无未开播计划，已跳过发送。来源：%s', triggered_by or '未知')
+        return {'sent': False, 'count': 0}
 
     md = _build_unstarted_markdown(unstarted_items)
 
     if not recipients:
         logger.error('收件人为空，用户模块未取得任何有效邮箱，无法发送未开播提醒邮件')
-        return jsonify({'status': 'started', 'sent': False, 'count': len(unstarted_items), 'error': 'no_recipients'}), 500
+        return {'sent': False, 'count': len(unstarted_items)}
 
     ok = send_email_md(recipients, subject, md)
     if ok:
         logger.info('未开播提醒已发送，共%d条；收件人：%s', len(unstarted_items), ', '.join(recipients))
-        return jsonify({'status': 'started', 'sent': True, 'count': len(unstarted_items)})
+        return {'sent': True, 'count': len(unstarted_items)}
 
     logger.error('未开播提醒发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
-    return jsonify({'status': 'started', 'sent': False, 'count': len(unstarted_items)}), 500
+    return {'sent': False, 'count': len(unstarted_items)}
+
+
+@report_mail_bp.route('/mail/unstarted', methods=['POST'])
+@roles_required('gicho')
+def trigger_unstarted_report():
+    """触发“未开播提醒”报表计算与邮件发送（异步最小实现：请求内完成）。"""
+    username = getattr(current_user, 'username', '未知')
+    result = run_unstarted_report_job(triggered_by=username)
+    status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
+    return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)

@@ -1,3 +1,15 @@
+## 最新的更新内容
+
+> 以下所有日期为更新发生时的系统GMT+8时间
+
+2025-09-15 新增
+- 自动化任务模块：新增 `utils/scheduler.py` 应用内置定时调度（APScheduler）
+  - 集成：在 `app.py` 初始化完成后启动后台调度器
+  - 每日任务：每日 GMT+8 20:00 自动执行未开播提醒报表（等效 UTC 12:00）
+  - 可扩展：后续任务可在该模块集中登记
+
+## 历史的更新内容
+
 2025-09-15 变更
 - 报告-邮件报告模块：未开播提醒收件人改为从用户模块动态获取（激活用户邮箱）
   - 规则：统计近48小时内，计划“接受时间”已过且超过4小时仍无关联“作战记录”的作战计划
@@ -10,6 +22,15 @@
 - 报告-邮件报告模块：新增议长页面入口与未开播提醒报表（近48小时）
   - 仅议长可见入口，点击触发计算并邮件发送（无数据仅记日志）
   - 邮件使用Markdown表格并自动内联样式，复用`utils.mail_utils.send_email_md`
+
+2025-09-15 新增
+- 邮件发送功能支持Markdown：新增 `utils/mail_utils.py:send_email_md()`
+  - Markdown渲染：使用`markdown`将md渲染为HTML
+  - 纯文本生成：优先用`html2text`从HTML提取纯文本，缺失时降级为简单去标签
+  - 复用发送：调用既有`send_email()`完成实际发送
+  - 依赖更新：`requirements.txt` 增加 `html2text`
+  - 新增测试方法：`__send_test_email_by_md(recipient)` 发送Markdown测试邮件
+  - 测试内容增强：在Markdown测试邮件中加入表格验证渲染效果
 
 2025-09-15 新增
 - 邮件发送工具模块：在utils中创建mail_utils.py统一邮件发送功能
@@ -534,15 +555,4 @@
 - 机师管理权限调整：舰长与议长权限一致，不再限制舰长仅查看/编辑自己所属机师；相应更新 `routes/pilot.py`、技术/业务文档与变更日志。
  - 征召模块权限调整：舰长与议长权限一致，移除“仅能操作所属机师”的限制；更新 `routes/recruit.py` 与征召文档。
 - 完整实现机师管理功能模块，包括数据模型、路由控制、前端界面
- 
-2025-09-15 新增
-- 邮件发送功能支持Markdown：新增 `utils/mail_utils.py:send_email_md()`
-  - Markdown渲染：使用`markdown`将md渲染为HTML
-  - 纯文本生成：优先用`html2text`从HTML提取纯文本，缺失时降级为简单去标签
-  - 复用发送：调用既有`send_email()`完成实际发送
-  - 依赖更新：`requirements.txt` 增加 `html2text`
-  - 新增测试方法：`__send_test_email_by_md(recipient)` 发送Markdown测试邮件
-  - 测试内容增强：在Markdown测试邮件中加入表格验证渲染效果
 
-2025-09-15 增强
-- 邮件发送CLI：在 `utils/mail_utils.py:main()` 增加测试方式选择（1=普通模板，2=Markdown）

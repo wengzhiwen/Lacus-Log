@@ -21,6 +21,7 @@ from utils.logging_setup import init_logging
 from utils.security import create_user_datastore, init_security
 from utils.timezone_helper import (format_local_date, format_local_datetime, format_local_time, get_local_date_for_input, get_local_datetime_for_input,
                                    get_local_time_for_input, utc_to_local)
+from utils.scheduler import init_scheduled_jobs
 
 
 def create_app() -> Flask:
@@ -199,6 +200,12 @@ def create_app() -> Flask:
     # 启动时确保角色与默认议长存在（需要应用上下文以支持密码哈希等）
     with flask_app.app_context():
         ensure_initial_roles_and_admin(user_datastore)
+
+    # 初始化应用内置调度器（放在一切注册完成之后）
+    try:
+        init_scheduled_jobs(flask_app)
+    except Exception as exc:
+        flask_app.logger.error('初始化定时任务失败：%s', exc)
 
     return flask_app
 
