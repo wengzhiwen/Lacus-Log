@@ -1,6 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}作战记录详情 - Lacus-Log{% endblock %}
 {% block content %}
+<div class="container">
+  <div class="header">
+    <div class="breadcrumb">
+      <a href="{{ url_for('battle_record.list_battle_records') }}">作战记录</a>
+      <span class="separator">></span>
+      <span>作战记录详情</span>
+    </div>
+  </div>
+
 <section class="battle-record-detail">
   <!-- 页面头部 -->
   <div class="page-header">
@@ -383,6 +392,33 @@
   .detail-grid {
     grid-template-columns: 1fr;
   }
+
+  /* 面包屑导航样式 */
+  .header {
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee;
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #666;
+  }
+
+  .breadcrumb a {
+    color: #007bff;
+    text-decoration: none;
+  }
+
+  .breadcrumb a:hover {
+    text-decoration: underline;
+  }
+
+  .separator {
+    color: #ccc;
+  }
   
   .footbar .inner {
     flex-wrap: wrap;
@@ -452,4 +488,5 @@ document.addEventListener('click', function(e) {
   }
 });
 </script>
+</div>
 {% endblock %}
