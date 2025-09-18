@@ -66,9 +66,15 @@
         <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
           <div class="card-header">
             <div class="record-time">
+              {% if recruit.status.value == '训练征召中' %}
+              {% if recruit.training_time %}
+              <div class="start-time">训练：{{ recruit.training_time | local_datetime('%Y年%m月%d日') }}</div>
+              {% endif %}
+              {% else %}
               <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
               {% if recruit.training_time %}
               <div class="training-time">训练：{{ recruit.training_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
               {% endif %}
             </div>
             <div class="record-info">
