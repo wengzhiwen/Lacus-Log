@@ -70,7 +70,7 @@ def list_battle_records():
     logger.info(f"用户 {current_user.username} 访问作战记录列表")
 
     # 获取筛选参数
-    owner_filter = request.args.get('owner', 'self')  # 默认显示自己的
+    owner_filter = request.args.get('owner', 'all')  # 默认显示全部所属
     rank_filter = request.args.get('rank', '')
     pilot_filter = request.args.get('pilot', '')
     time_filter = request.args.get('time', 'recent_7_days')  # 默认近7天
