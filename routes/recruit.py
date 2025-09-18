@@ -2,14 +2,12 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
-from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
-                   request, url_for)
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
 from models.pilot import Pilot, Status
-from models.recruit import (FinalDecision, Recruit, RecruitChangeLog,
-                            RecruitChannel, RecruitStatus, TrainingDecision)
+from models.recruit import (FinalDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision)
 from models.user import Role, User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import local_to_utc, utc_to_local
@@ -367,6 +365,7 @@ def update_recruit(recruit_id):
         'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
         'remarks': recruit.remarks,
         'status': recruit.status.value if recruit.status else None,
+        'training_time': recruit.training_time.isoformat() if recruit.training_time else None,
     }
 
     try:
@@ -377,6 +376,7 @@ def update_recruit(recruit_id):
         introduction_fee = request.form.get('introduction_fee', '0')
         remarks = request.form.get('remarks', '')
         status = request.form.get('status')
+        training_time_str = request.form.get('training_time')
 
         # 验证必填项
         if not recruiter_id:
@@ -433,6 +433,20 @@ def update_recruit(recruit_id):
             flash('介绍费格式不正确', 'error')
             return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
 
+        # 解析训练时间（仅当状态为训练征召中时允许设置/清除）
+        if status == RecruitStatus.TRAINING_RECRUITING.value:
+            if training_time_str:
+                try:
+                    training_time_local = datetime.fromisoformat(training_time_str.replace('T', ' '))
+                    training_time_utc = local_to_utc(training_time_local)
+                except ValueError:
+                    flash('训练时间格式不正确', 'error')
+                    return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
+            else:
+                training_time_utc = None
+        else:
+            training_time_utc = recruit.training_time  # 保持原值，不在非训练征召中状态下编辑
+
         # 更新征召记录
         recruit.recruiter = recruiter
         recruit.appointment_time = appointment_time_utc
@@ -440,6 +454,8 @@ def update_recruit(recruit_id):
         recruit.introduction_fee = introduction_fee_decimal
         recruit.remarks = remarks
         recruit.status = status_enum
+        if status_enum == RecruitStatus.TRAINING_RECRUITING:
+            recruit.training_time = training_time_utc
 
         recruit.save()
 
@@ -756,10 +772,7 @@ def training_recruit(recruit_id):
                 training_time_local = datetime.fromisoformat(training_time_str.replace('T', ' '))
                 training_time_utc = local_to_utc(training_time_local)
 
-                # 验证训练时间不能早于预约时间
-                if training_time_utc < recruit.appointment_time:
-                    flash('训练时间不能早于预约时间', 'error')
-                    return redirect(url_for('recruit.training_recruit_page', recruit_id=recruit_id))
+                # 放宽训练时间与预约时间的先后限制（允许任意填写）
             except ValueError:
                 flash('训练时间格式不正确', 'error')
                 return redirect(url_for('recruit.training_recruit_page', recruit_id=recruit_id))

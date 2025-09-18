@@ -109,10 +109,9 @@ class Recruit(Document):
         if self.introduction_fee and self.introduction_fee < 0:
             raise ValueError("介绍费必须为非负数")
 
-        # 验证训练时间不能早于预约时间
-        if self.training_time and self.appointment_time:
-            if self.training_time < self.appointment_time:
-                raise ValueError("训练时间不能早于预约时间")
+        # 放宽训练时间与预约时间的先后限制（允许任意填写）
+        # 原规则：训练时间不能早于预约时间
+        # 现按需求移除此先后检查，仅保留字段一致性校验
 
         # 验证训练征召决策相关字段的一致性
         if self.training_decision:

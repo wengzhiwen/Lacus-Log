@@ -99,6 +99,19 @@
         </div>
       </div>
 
+      {% if recruit.status.value == '训练征召中' %}
+      <div class="form-row">
+        <div class="form-group">
+          <label for="training_time">训练时间</label>
+          <input type="datetime-local" name="training_time" id="training_time"
+                 value="{{ recruit.training_time | default(None) | local_datetime_for_input }}">
+          <div class="help-text">
+            <small>仅在“训练征召中”状态下显示，留空可清除训练时间</small>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="form-row">
         <div class="form-group">
           <label for="remarks">备注</label>
