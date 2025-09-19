@@ -11,6 +11,7 @@ from models.recruit import (FinalDecision, Recruit, RecruitChangeLog, RecruitCha
 from models.user import Role, User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import local_to_utc, utc_to_local
+from utils.filter_state import persist_and_restore_filters
 
 logger = get_logger('recruit')
 
@@ -85,10 +86,15 @@ def _get_recruiter_choices():
 @roles_accepted('gicho', 'kancho')
 def list_recruits():
     """征召列表页面"""
-    # 获取筛选参数
-    status_filter = request.args.get('status', '进行中')  # 默认显示进行中的征召
-    recruiter_filter = request.args.get('recruiter', '')
-    channel_filter = request.args.get('channel', '')
+    # 获取并持久化筛选参数（会话）
+    filters = persist_and_restore_filters(
+        'recruits_list',
+        allowed_keys=['status', 'recruiter', 'channel'],
+        default_filters={'status': '进行中', 'recruiter': '', 'channel': ''},
+    )
+    status_filter = filters.get('status') or '进行中'
+    recruiter_filter = filters.get('recruiter') or ''
+    channel_filter = filters.get('channel') or ''
 
     # 构建查询
     query = Recruit.objects

@@ -12,6 +12,7 @@ from models.pilot import (Gender, Pilot, PilotChangeLog, PilotCommission,
 from models.user import User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import get_current_utc_time
+from utils.filter_state import persist_and_restore_filters
 
 logger = get_logger('pilot')
 
@@ -91,11 +92,21 @@ def _get_user_choices():
 @roles_accepted('gicho', 'kancho')
 def list_pilots():
     """机师列表页面"""
-    # 获取筛选参数
-    rank_filter = request.args.get('rank')
-    status_filter = request.args.get('status')
-    owner_filter = request.args.get('owner')
-    days_filter = request.args.get('days', type=int)
+    # 获取并持久化筛选参数（会话）
+    filters = persist_and_restore_filters(
+        'pilots_list',
+        allowed_keys=['rank', 'status', 'owner', 'days'],
+        default_filters={'rank': '', 'status': '', 'owner': '', 'days': ''},
+    )
+
+    rank_filter = filters.get('rank') or None
+    status_filter = filters.get('status') or None
+    owner_filter = filters.get('owner') or None
+    days_raw = filters.get('days') or None
+    try:
+        days_filter = int(days_raw) if days_raw else None
+    except ValueError:
+        days_filter = None
 
     # 构建查询
     query = Pilot.objects

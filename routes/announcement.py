@@ -14,6 +14,7 @@ from models.user import User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (format_local_datetime, get_current_local_datetime_for_input, get_current_local_time, get_current_month_last_day_for_input,
                                    local_to_utc, parse_local_date_to_end_datetime, parse_local_datetime, utc_to_local)
+from utils.filter_state import persist_and_restore_filters
 
 logger = get_logger('announcement')
 
@@ -165,13 +166,17 @@ def _get_filter_choices():
 @roles_accepted('gicho', 'kancho')
 def list_announcements():
     """通告列表页面"""
-    # 获取筛选参数（默认不按所属过滤）
-    owner_filter = request.args.get('owner')
-    rank_filter = request.args.get('rank')
-    x_filter = request.args.get('x')
-    y_filter = request.args.get('y')
-    # 时间范围（默认：现在开始）
-    time_scope = request.args.get('time', 'now')
+    # 获取并持久化筛选参数（会话）
+    filters = persist_and_restore_filters(
+        'announcements_list',
+        allowed_keys=['owner', 'rank', 'x', 'y', 'time'],
+        default_filters={'owner': '', 'rank': '', 'x': '', 'y': '', 'time': 'now'},
+    )
+    owner_filter = filters.get('owner') or None
+    rank_filter = filters.get('rank') or None
+    x_filter = filters.get('x') or None
+    y_filter = filters.get('y') or None
+    time_scope = filters.get('time') or 'now'
 
     # 分页参数（当前未使用，为未来分页功能预留）
     # page = request.args.get('page', 1, type=int)

@@ -6,6 +6,7 @@ from mongoengine import DoesNotExist, ValidationError
 
 from models.battle_area import Availability, BattleArea
 from utils.logging_setup import get_logger
+from utils.filter_state import persist_and_restore_filters
 
 logger = get_logger('battle_area')
 
@@ -16,9 +17,14 @@ battle_area_bp = Blueprint('battle_area', __name__)
 @roles_accepted('gicho')
 def list_areas():
     """战斗区域列表（仅议长可访问）"""
-    x_filter = request.args.get('x')
-    y_filter = request.args.get('y')
-    availability_filter = request.args.get('availability')
+    filters = persist_and_restore_filters(
+        'battle_areas_list',
+        allowed_keys=['x', 'y', 'availability'],
+        default_filters={'x': '', 'y': '', 'availability': Availability.ENABLED.value},
+    )
+    x_filter = filters.get('x') or None
+    y_filter = filters.get('y') or None
+    availability_filter = filters.get('availability') or None
 
     query = BattleArea.objects
 

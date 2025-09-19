@@ -15,6 +15,7 @@ from models.pilot import Pilot, WorkMode
 from models.user import Role, User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.filter_state import persist_and_restore_filters
 
 # 创建日志器（按模块分文件）
 logger = get_logger('battle_record')
@@ -69,11 +70,17 @@ def list_battle_records():
     """作战记录列表页"""
     logger.info(f"用户 {current_user.username} 访问作战记录列表")
 
-    # 获取筛选参数
-    owner_filter = request.args.get('owner', 'all')  # 默认显示全部所属
-    rank_filter = request.args.get('rank', '')
-    pilot_filter = request.args.get('pilot', '')
-    time_filter = request.args.get('time', 'recent_7_days')  # 默认近7天
+    # 获取并持久化筛选参数（会话）
+    filters = persist_and_restore_filters(
+        'battle_records_list',
+        allowed_keys=['owner', 'rank', 'pilot', 'time'],
+        default_filters={'owner': 'all', 'rank': '', 'pilot': '', 'time': 'recent_7_days'},
+    )
+
+    owner_filter = filters.get('owner') or 'all'
+    rank_filter = filters.get('rank') or ''
+    pilot_filter = filters.get('pilot') or ''
+    time_filter = filters.get('time') or 'recent_7_days'
 
     # 构建查询条件
     query = BattleRecord.objects
