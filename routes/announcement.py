@@ -165,11 +165,8 @@ def _get_filter_choices():
 @roles_accepted('gicho', 'kancho')
 def list_announcements():
     """通告列表页面"""
-    # 获取筛选参数
+    # 获取筛选参数（默认不按所属过滤）
     owner_filter = request.args.get('owner')
-    # 默认筛选：当未提供 owner 参数时，默认按“所属=自己”过滤
-    if owner_filter is None and current_user.is_authenticated:
-        owner_filter = str(current_user.id)
     rank_filter = request.args.get('rank')
     x_filter = request.args.get('x')
     y_filter = request.args.get('y')
