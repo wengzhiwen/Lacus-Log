@@ -23,6 +23,7 @@
     {% if current_filters.pilot %}{% set _ = selected_items.append('主播已选') %}{% endif %}
     {% if current_filters.time %}
       {% if current_filters.time == 'today' %}{% set _ = selected_items.append('今天') %}
+      {% elif current_filters.time == 'two_days' %}{% set _ = selected_items.append('这两天') %}
       {% elif current_filters.time == 'recent_7_days' %}{% set _ = selected_items.append('近7天') %}
       {% endif %}
     {% endif %}
@@ -66,6 +67,7 @@
       <div class="filter-group">
         <label class="filter-label">时间筛选</label>
         <select class="filter-select" name="time" onchange="this.form.submit()">
+          <option value="two_days" {% if current_filters.time == 'two_days' %}selected{% endif %}>这两天</option>
           <option value="recent_7_days" {% if current_filters.time == 'recent_7_days' %}selected{% endif %}>近7天</option>
           <option value="today" {% if current_filters.time == 'today' %}selected{% endif %}>今天</option>
         </select>

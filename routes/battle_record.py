@@ -74,13 +74,13 @@ def list_battle_records():
     filters = persist_and_restore_filters(
         'battle_records_list',
         allowed_keys=['owner', 'rank', 'pilot', 'time'],
-        default_filters={'owner': 'all', 'rank': '', 'pilot': '', 'time': 'recent_7_days'},
+        default_filters={'owner': 'all', 'rank': '', 'pilot': '', 'time': 'two_days'},
     )
 
     owner_filter = filters.get('owner') or 'all'
     rank_filter = filters.get('rank') or ''
     pilot_filter = filters.get('pilot') or ''
-    time_filter = filters.get('time') or 'recent_7_days'
+    time_filter = filters.get('time') or 'two_days'
 
     # 构建查询条件
     query = BattleRecord.objects
@@ -117,6 +117,15 @@ def list_battle_records():
         utc_today_start = local_to_utc(local_today_start)
         utc_today_end = local_to_utc(local_today_end)
         query = query.filter(start_time__gte=utc_today_start, start_time__lt=utc_today_end)
+    elif time_filter == 'two_days':
+        # 这两天：昨天+今天+明天（以本地时区计算边界）
+        now_local = utc_to_local(now_utc)
+        today_local_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_local_start = today_local_start - timedelta(days=1)
+        day_after_tomorrow_local_start = today_local_start + timedelta(days=2)
+        range_start_utc = local_to_utc(yesterday_local_start)
+        range_end_utc = local_to_utc(day_after_tomorrow_local_start)
+        query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
     elif time_filter == 'recent_7_days':
         # 近7天
         seven_days_ago = now_utc - timedelta(days=7)

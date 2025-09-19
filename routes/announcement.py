@@ -1,7 +1,7 @@
 # pylint: disable=no-member
 import calendar
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
@@ -157,7 +157,7 @@ def _get_filter_choices():
     y_choices = [('', '全部Y坐标')] + [(y, y) for y in sorted(y_coords)]
 
     # 时间范围选择
-    time_choices = [('now', '现在开始'), ('all', '全部')]
+    time_choices = [('two_days', '这两天'), ('now', '现在开始'), ('all', '全部')]
 
     return {'owner_choices': owner_choices, 'rank_choices': rank_choices, 'x_choices': x_choices, 'y_choices': y_choices, 'time_choices': time_choices}
 
@@ -170,13 +170,13 @@ def list_announcements():
     filters = persist_and_restore_filters(
         'announcements_list',
         allowed_keys=['owner', 'rank', 'x', 'y', 'time'],
-        default_filters={'owner': '', 'rank': '', 'x': '', 'y': '', 'time': 'now'},
+        default_filters={'owner': '', 'rank': '', 'x': '', 'y': '', 'time': 'two_days'},
     )
     owner_filter = filters.get('owner') or None
     rank_filter = filters.get('rank') or None
     x_filter = filters.get('x') or None
     y_filter = filters.get('y') or None
-    time_scope = filters.get('time') or 'now'
+    time_scope = filters.get('time') or 'two_days'
 
     # 分页参数（当前未使用，为未来分页功能预留）
     # page = request.args.get('page', 1, type=int)
@@ -208,11 +208,21 @@ def list_announcements():
     if y_filter:
         query = query.filter(y_coord=y_filter)
 
-    # 时间筛选：默认仅显示从当前时间（本地GMT+8）开始的通告
+    # 时间筛选
     if time_scope == 'now':
+        # 现在开始：显示开始时间>=当前本地时间的通告
         current_local = get_current_local_time()
         current_utc = local_to_utc(current_local)
         query = query.filter(start_time__gte=current_utc)
+    elif time_scope == 'two_days':
+        # 这两天：昨天+今天+明天（本地时区边界）
+        current_local = get_current_local_time()
+        today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_local_start = today_local_start - timedelta(days=1)
+        day_after_tomorrow_local_start = today_local_start + timedelta(days=2)
+        range_start_utc = local_to_utc(yesterday_local_start)
+        range_end_utc = local_to_utc(day_after_tomorrow_local_start)
+        query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
 
     # 排序：按通告日（本地GMT+8）升序、同日按机师昵称字典序
     # 说明：由于需要按关联字段 pilot.nickname 排序，改为在应用层进行排序
