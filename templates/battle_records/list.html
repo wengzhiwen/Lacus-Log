@@ -15,7 +15,7 @@
         {% set _ = selected_items.append('所属:自己') %}
       {% else %}
         {% for owner in owners %}
-          {% if owner.id|string == current_filters.owner %}{% set _ = selected_items.append('所属:' + owner.username) %}{% endif %}
+          {% if owner.id|string == current_filters.owner %}{% set _ = selected_items.append('所属:' + (owner.nickname or owner.username)) %}{% endif %}
         {% endfor %}
       {% endif %}
     {% endif %}
@@ -40,7 +40,7 @@
           <option value="all" {% if current_filters.owner == 'all' %}selected{% endif %}>全部所属</option>
           <option value="self" {% if current_filters.owner == 'self' %}selected{% endif %}>自己</option>
           {% for owner in owners %}
-          <option value="{{ owner.id }}" {% if current_filters.owner == owner.id|string %}selected{% endif %}>{{ owner.username }}</option>
+          <option value="{{ owner.id }}" {% if current_filters.owner == owner.id|string %}selected{% endif %}>{{ owner.nickname or owner.username }}</option>
           {% endfor %}
         </select>
       </div>
@@ -89,7 +89,7 @@
               {% set age_str = '(' ~ record.pilot.age ~ ')' if record.pilot.age else '' %}
               {% set gender_icon = '♂' if record.pilot.gender.value == 0 else ('♀' if record.pilot.gender.value == 1 else '?') %}
               <div class="pilot-name">{{ record.pilot.nickname }}{{ age_str }}[{{ record.pilot.status.value }}]{{ gender_icon }}</div>
-              <div class="meta-line">[{{ record.owner_snapshot.username if record.owner_snapshot else '无' }}][{{ record.pilot.rank.value }}]</div>
+              <div class="meta-line">[{{ (record.owner_snapshot.nickname or record.owner_snapshot.username) if record.owner_snapshot else '无' }}][{{ record.pilot.rank.value }}]</div>
             </div>
           </div>
           <div class="card-footer">
