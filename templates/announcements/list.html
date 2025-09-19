@@ -20,7 +20,12 @@
         {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
         {% if x_filter %}{% set _ = selected_items.append('X:' + x_filter) %}{% endif %}
         {% if y_filter %}{% set _ = selected_items.append('Y:' + y_filter) %}{% endif %}
-        {% if time_scope and time_scope == 'now' %}{% set _ = selected_items.append('现在开始') %}{% endif %}
+        {% if time_scope %}
+            {% if time_scope == 'two_days' %}{% set _ = selected_items.append('这两天') %}
+            {% elif time_scope == 'now' %}{% set _ = selected_items.append('现在开始') %}
+            {% elif time_scope == 'all' %}{% set _ = selected_items.append('全部') %}
+            {% endif %}
+        {% endif %}
         {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
         
         <button type="button" class="filter-toggle" onclick="toggleFilters()">
