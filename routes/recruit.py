@@ -1,13 +1,14 @@
 # pylint: disable=no-member
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
-from models.pilot import Pilot, Status
-from models.recruit import (FinalDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision)
+from models.pilot import Pilot, Rank, Status
+from models.recruit import (BroadcastDecision, FinalDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision,
+                            TrainingDecisionOld)
 from models.user import Role, User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import local_to_utc, utc_to_local
@@ -90,7 +91,11 @@ def list_recruits():
     filters = persist_and_restore_filters(
         'recruits_list',
         allowed_keys=['status', 'recruiter', 'channel'],
-        default_filters={'status': '进行中', 'recruiter': '', 'channel': ''},
+        default_filters={
+            'status': '进行中',
+            'recruiter': '',
+            'channel': ''
+        },
     )
     status_filter = filters.get('status') or '进行中'
     recruiter_filter = filters.get('recruiter') or ''
@@ -102,7 +107,7 @@ def list_recruits():
     # 状态筛选
     if status_filter:
         if status_filter == '进行中':
-            # 进行中：已启动 + 训练征召中，且限制最近7天
+            # 进行中：新六步制流程中除已结束外的所有状态，且限制最近7天
             from datetime import timedelta
 
             from mongoengine import Q
@@ -114,11 +119,24 @@ def list_recruits():
             seven_days_ago_local = current_local - timedelta(days=7)
             seven_days_ago_utc = local_to_utc(seven_days_ago_local)
 
-            # 进行中状态筛选
-            query = query.filter(status__in=[RecruitStatus.STARTED, RecruitStatus.TRAINING_RECRUITING])
+            # 进行中状态筛选（新六步制 + 历史兼容）
+            query = query.filter(status__in=[
+                RecruitStatus.PENDING_INTERVIEW,
+                RecruitStatus.PENDING_TRAINING_SCHEDULE,
+                RecruitStatus.PENDING_TRAINING,
+                RecruitStatus.PENDING_BROADCAST_SCHEDULE,
+                RecruitStatus.PENDING_BROADCAST,
+                # 历史兼容状态
+                RecruitStatus.STARTED,
+                RecruitStatus.TRAINING_RECRUITING
+            ])
 
-            # 7天限制：创建时间、预约时间、训练时间任意一个在7天内
-            seven_days_query = Q(created_at__gte=seven_days_ago_utc) | Q(appointment_time__gte=seven_days_ago_utc) | Q(training_time__gte=seven_days_ago_utc)
+            # 7天限制：创建时间、预约时间、预约训练时间、预约开播时间任意一个在7天内
+            seven_days_query = (
+                Q(created_at__gte=seven_days_ago_utc) | Q(appointment_time__gte=seven_days_ago_utc) | Q(scheduled_training_time__gte=seven_days_ago_utc)
+                | Q(scheduled_broadcast_time__gte=seven_days_ago_utc) |
+                # 历史兼容字段
+                Q(training_time__gte=seven_days_ago_utc))
             query = query.filter(seven_days_query)
         elif status_filter == '已结束':
             # 已结束
@@ -203,7 +221,18 @@ def start_recruit(pilot_id):
         return redirect(url_for('pilot.pilot_detail', pilot_id=pilot_id))
 
     # 检查是否已有进行中的征召
-    existing_recruit = Recruit.objects.filter(pilot=pilot, status=RecruitStatus.STARTED).first()
+    existing_recruit = Recruit.objects.filter(
+        pilot=pilot,
+        status__in=[
+            RecruitStatus.PENDING_INTERVIEW,
+            RecruitStatus.PENDING_TRAINING_SCHEDULE,
+            RecruitStatus.PENDING_TRAINING,
+            RecruitStatus.PENDING_BROADCAST_SCHEDULE,
+            RecruitStatus.PENDING_BROADCAST,
+            # 历史兼容状态
+            RecruitStatus.STARTED,
+            RecruitStatus.TRAINING_RECRUITING
+        ]).first()
     if existing_recruit:
         flash('该机师已有正在进行的征召', 'error')
         return redirect(url_for('recruit.detail_recruit', recruit_id=existing_recruit.id))
@@ -237,7 +266,18 @@ def create_recruit(pilot_id):
         return redirect(url_for('pilot.pilot_detail', pilot_id=pilot_id))
 
     # 检查是否已有进行中的征召
-    existing_recruit = Recruit.objects.filter(pilot=pilot, status=RecruitStatus.STARTED).first()
+    existing_recruit = Recruit.objects.filter(
+        pilot=pilot,
+        status__in=[
+            RecruitStatus.PENDING_INTERVIEW,
+            RecruitStatus.PENDING_TRAINING_SCHEDULE,
+            RecruitStatus.PENDING_TRAINING,
+            RecruitStatus.PENDING_BROADCAST_SCHEDULE,
+            RecruitStatus.PENDING_BROADCAST,
+            # 历史兼容状态
+            RecruitStatus.STARTED,
+            RecruitStatus.TRAINING_RECRUITING
+        ]).first()
     if existing_recruit:
         flash('该机师已有正在进行的征召', 'error')
         return redirect(url_for('recruit.detail_recruit', recruit_id=existing_recruit.id))
@@ -305,7 +345,7 @@ def create_recruit(pilot_id):
                           channel=channel_enum,
                           introduction_fee=introduction_fee_decimal,
                           remarks=remarks,
-                          status=RecruitStatus.STARTED)
+                          status=RecruitStatus.PENDING_INTERVIEW)
 
         recruit.save()
 
@@ -340,13 +380,8 @@ def edit_recruit(recruit_id):
 
     recruiter_choices = _get_recruiter_choices()
     channel_choices = [(c.value, c.value) for c in RecruitChannel]
-    status_choices = [(s.value, s.value) for s in RecruitStatus]
 
-    return render_template('recruits/edit.html',
-                           recruit=recruit,
-                           recruiter_choices=recruiter_choices,
-                           channel_choices=channel_choices,
-                           status_choices=status_choices)
+    return render_template('recruits/edit.html', recruit=recruit, recruiter_choices=recruiter_choices, channel_choices=channel_choices)
 
 
 @recruit_bp.route('/<recruit_id>/edit', methods=['POST'])
@@ -381,7 +416,6 @@ def update_recruit(recruit_id):
         channel = request.form.get('channel')
         introduction_fee = request.form.get('introduction_fee', '0')
         remarks = request.form.get('remarks', '')
-        status = request.form.get('status')
         training_time_str = request.form.get('training_time')
 
         # 验证必填项
@@ -395,10 +429,6 @@ def update_recruit(recruit_id):
 
         if not channel:
             flash('请选择征召渠道', 'error')
-            return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
-
-        if not status:
-            flash('请选择征召状态', 'error')
             return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
 
         # 验证征召负责人
@@ -422,13 +452,6 @@ def update_recruit(recruit_id):
             flash('无效的征召渠道', 'error')
             return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
 
-        # 验证状态
-        try:
-            status_enum = RecruitStatus(status)
-        except ValueError:
-            flash('无效的征召状态', 'error')
-            return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
-
         # 验证介绍费
         try:
             introduction_fee_decimal = Decimal(introduction_fee).quantize(Decimal('0.00'))
@@ -440,7 +463,7 @@ def update_recruit(recruit_id):
             return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
 
         # 解析训练时间（仅当状态为训练征召中时允许设置/清除）
-        if status == RecruitStatus.TRAINING_RECRUITING.value:
+        if recruit.status == RecruitStatus.TRAINING_RECRUITING:
             if training_time_str:
                 try:
                     training_time_local = datetime.fromisoformat(training_time_str.replace('T', ' '))
@@ -459,8 +482,7 @@ def update_recruit(recruit_id):
         recruit.channel = channel_enum
         recruit.introduction_fee = introduction_fee_decimal
         recruit.remarks = remarks
-        recruit.status = status_enum
-        if status_enum == RecruitStatus.TRAINING_RECRUITING:
+        if recruit.status == RecruitStatus.TRAINING_RECRUITING:
             recruit.training_time = training_time_utc
 
         recruit.save()
@@ -483,18 +505,198 @@ def update_recruit(recruit_id):
         return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
 
 
-@recruit_bp.route('/<recruit_id>/confirm')
+@recruit_bp.route('/<recruit_id>/interview')
 @roles_accepted('gicho', 'kancho')
-def confirm_recruit_page(recruit_id):
-    """确认征召页面"""
+def interview_decision_page(recruit_id):
+    """面试决策页面"""
     try:
         recruit = Recruit.objects.get(id=recruit_id)
     except DoesNotExist:
         abort(404)
 
     # 检查征召状态
-    if recruit.status != RecruitStatus.STARTED:
-        flash('只能确认已启动状态的征召', 'error')
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_INTERVIEW:
+        flash('只能对待面试状态的征召执行面试决策', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    # 构建面试决策选项
+    interview_decision_choices = [(d.value, d.value) for d in InterviewDecision]
+
+    # 获取当前年份用于出生年验证
+    current_year = datetime.now().year
+
+    return render_template('recruits/interview.html', recruit=recruit, interview_decision_choices=interview_decision_choices, current_year=current_year)
+
+
+@recruit_bp.route('/<recruit_id>/interview', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def interview_decision(recruit_id):
+    """执行面试决策"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_INTERVIEW:
+        flash('只能对待面试状态的征召执行面试决策', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    try:
+        # 获取表单数据
+        interview_decision_value = request.form.get('interview_decision')
+        introduction_fee = request.form.get('introduction_fee', '0')
+        remarks = request.form.get('remarks', '')
+
+        # 机师基本信息（当选择预约训练时）
+        real_name = request.form.get('real_name', '').strip()
+        birth_year_str = request.form.get('birth_year', '')
+
+        # 验证必填项
+        if not interview_decision_value:
+            flash('请选择面试决策', 'error')
+            return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+
+        # 验证面试决策
+        try:
+            interview_decision_enum = InterviewDecision(interview_decision_value)
+        except ValueError:
+            flash('无效的面试决策', 'error')
+            return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+
+        # 当选择预约训练时的额外验证
+        if interview_decision_enum == InterviewDecision.SCHEDULE_TRAINING:
+            # 验证机师基本信息
+            if not real_name:
+                flash('预约训练时必须填写真实姓名', 'error')
+                return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+
+            if not birth_year_str:
+                flash('预约训练时必须填写出生年', 'error')
+                return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+
+            # 验证出生年格式和范围
+            try:
+                birth_year = int(birth_year_str)
+                current_year = datetime.now().year
+                if birth_year < current_year - 60 or birth_year > current_year - 10:
+                    flash('出生年必须在距今60年前到距今10年前之间', 'error')
+                    return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+            except ValueError:
+                flash('出生年格式不正确', 'error')
+                return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+
+        # 验证介绍费
+        try:
+            introduction_fee_decimal = Decimal(introduction_fee).quantize(Decimal('0.00'))
+            if introduction_fee_decimal < 0:
+                flash('介绍费不能为负数', 'error')
+                return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+        except (ValueError, InvalidOperation):
+            flash('介绍费格式不正确', 'error')
+            return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+
+        # 保存修改前的数据用于变更记录
+        old_recruit_data = {
+            'pilot': str(recruit.pilot.id) if recruit.pilot else None,
+            'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
+            'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
+            'channel': recruit.channel.value if recruit.channel else None,
+            'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
+            'remarks': recruit.remarks,
+            'status': recruit.status.value if recruit.status else None,
+        }
+
+        old_pilot_data = {
+            'nickname': recruit.pilot.nickname,
+            'real_name': recruit.pilot.real_name,
+            'gender': recruit.pilot.gender.value if recruit.pilot.gender else None,
+            'birth_year': recruit.pilot.birth_year,
+            'owner': str(recruit.pilot.owner.id) if recruit.pilot.owner else None,
+            'platform': recruit.pilot.platform.value if recruit.pilot.platform else None,
+            'work_mode': recruit.pilot.work_mode.value if recruit.pilot.work_mode else None,
+            'rank': recruit.pilot.rank.value if recruit.pilot.rank else None,
+            'status': recruit.pilot.status.value if recruit.pilot.status else None,
+        }
+
+        # 执行面试决策
+        from utils.timezone_helper import get_current_utc_time
+
+        recruit.interview_decision = interview_decision_enum
+        recruit.interview_decision_maker = current_user
+        recruit.interview_decision_time = get_current_utc_time()
+        recruit.introduction_fee = introduction_fee_decimal
+        recruit.remarks = remarks
+
+        if interview_decision_enum == InterviewDecision.SCHEDULE_TRAINING:
+            # 更新征召状态为待预约训练
+            recruit.status = RecruitStatus.PENDING_TRAINING_SCHEDULE
+
+            # 更新机师信息
+            recruit.pilot.real_name = real_name
+            recruit.pilot.birth_year = birth_year
+            recruit.pilot.rank = Rank.TRAINEE
+            recruit.pilot.status = Status.RECRUITED
+            recruit.pilot.save()
+        else:
+            # 更新征召状态为已结束
+            recruit.status = RecruitStatus.ENDED
+
+            # 更新机师状态为不征召
+            recruit.pilot.status = Status.NOT_RECRUITING
+            recruit.pilot.save()
+
+        recruit.save()
+
+        # 记录征召变更日志
+        _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
+
+        # 记录机师变更日志
+        from routes.pilot import _record_changes as record_pilot_changes
+        record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
+
+        if interview_decision_enum == InterviewDecision.SCHEDULE_TRAINING:
+            logger.info('面试决策成功：ID=%s，机师=%s，预约训练', recruit_id, recruit.pilot.nickname)
+            flash('面试决策成功，机师已进入待预约训练阶段', 'success')
+        else:
+            logger.info('面试决策完成：ID=%s，机师=%s，不征召', recruit_id, recruit.pilot.nickname)
+            flash('面试决策完成，已决定不征召该机师', 'success')
+
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    except ValidationError as e:
+        logger.error('面试决策验证失败：%s', str(e))
+        flash('数据验证失败，请检查输入', 'error')
+        return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+    except Exception as e:
+        logger.error('面试决策失败：%s', str(e))
+        flash('面试决策失败，请重试', 'error')
+        return redirect(url_for('recruit.interview_decision_page', recruit_id=recruit_id))
+
+
+@recruit_bp.route('/<recruit_id>/confirm')
+@roles_accepted('gicho', 'kancho')
+def confirm_recruit_page(recruit_id):
+    """确认征召页面（废弃，保留用于历史兼容）"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_INTERVIEW:
+        flash('只能对待面试状态的征召执行确认征召', 'error')
         return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
 
     # 检查用户权限：议长与舰长权限一致
@@ -502,6 +704,649 @@ def confirm_recruit_page(recruit_id):
         abort(403)
 
     return render_template('recruits/confirm.html', recruit=recruit)
+
+
+@recruit_bp.route('/<recruit_id>/schedule-training')
+@roles_accepted('gicho', 'kancho')
+def schedule_training_page(recruit_id):
+    """预约训练页面"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_TRAINING_SCHEDULE:
+        flash('只能对待预约训练状态的征召执行预约训练', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    # 构建参战形式选项
+    from models.pilot import WorkMode
+    work_mode_choices = [(w.value, w.value) for w in WorkMode if w != WorkMode.UNKNOWN]
+    
+    # 计算默认预约训练时间：当前GMT+8时间向后一个半点或整点取整
+    from utils.timezone_helper import utc_to_local
+    now_utc = datetime.utcnow()
+    now_gmt8 = utc_to_local(now_utc)
+    
+    # 获取当前分钟
+    current_minute = now_gmt8.minute
+    if current_minute < 30:
+        # 如果当前分钟小于30，设置为下一个半点
+        default_time_gmt8 = now_gmt8.replace(minute=30, second=0, microsecond=0)
+    else:
+        # 如果当前分钟大于等于30，设置为下一个整点
+        default_time_gmt8 = now_gmt8.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    
+    # 转换为GMT+8时间字符串用于表单输入
+    default_time_str = default_time_gmt8.strftime('%Y-%m-%dT%H:%M')
+
+    return render_template('recruits/schedule_training.html', 
+                         recruit=recruit, 
+                         work_mode_choices=work_mode_choices,
+                         default_time=default_time_str)
+
+
+@recruit_bp.route('/<recruit_id>/schedule-training', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def schedule_training(recruit_id):
+    """执行预约训练"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_TRAINING_SCHEDULE:
+        flash('只能对待预约训练状态的征召执行预约训练', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    try:
+        # 获取表单数据
+        scheduled_training_time_str = request.form.get('scheduled_training_time')
+        work_mode = request.form.get('work_mode', '')
+        introduction_fee = request.form.get('introduction_fee', '0')
+        remarks = request.form.get('remarks', '')
+
+        # 验证必填项
+        if not scheduled_training_time_str:
+            flash('请选择预约训练时间', 'error')
+            return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+
+        if not work_mode:
+            flash('请选择参战形式', 'error')
+            return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+
+        # 解析时间（前端传来的是GMT+8本地时间）
+        try:
+            scheduled_training_time_local = datetime.fromisoformat(scheduled_training_time_str.replace('T', ' '))
+            scheduled_training_time_utc = local_to_utc(scheduled_training_time_local)
+        except ValueError:
+            flash('预约训练时间格式不正确', 'error')
+            return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+
+        # 验证参战形式
+        try:
+            from models.pilot import WorkMode
+            WorkMode(work_mode)  # 验证参战形式值是否有效
+        except ValueError:
+            flash('无效的参战形式选择', 'error')
+            return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+
+        # 验证介绍费
+        try:
+            introduction_fee_decimal = Decimal(introduction_fee).quantize(Decimal('0.00'))
+            if introduction_fee_decimal < 0:
+                flash('介绍费不能为负数', 'error')
+                return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+        except (ValueError, InvalidOperation):
+            flash('介绍费格式不正确', 'error')
+            return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+
+        # 保存修改前的数据用于变更记录
+        old_recruit_data = {
+            'pilot': str(recruit.pilot.id) if recruit.pilot else None,
+            'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
+            'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
+            'channel': recruit.channel.value if recruit.channel else None,
+            'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
+            'remarks': recruit.remarks,
+            'status': recruit.status.value if recruit.status else None,
+        }
+
+        old_pilot_data = {
+            'nickname': recruit.pilot.nickname,
+            'real_name': recruit.pilot.real_name,
+            'gender': recruit.pilot.gender.value if recruit.pilot.gender else None,
+            'birth_year': recruit.pilot.birth_year,
+            'owner': str(recruit.pilot.owner.id) if recruit.pilot.owner else None,
+            'platform': recruit.pilot.platform.value if recruit.pilot.platform else None,
+            'work_mode': recruit.pilot.work_mode.value if recruit.pilot.work_mode else None,
+            'rank': recruit.pilot.rank.value if recruit.pilot.rank else None,
+            'status': recruit.pilot.status.value if recruit.pilot.status else None,
+        }
+
+        # 执行预约训练
+        from utils.timezone_helper import get_current_utc_time
+
+        recruit.scheduled_training_time = scheduled_training_time_utc
+        recruit.scheduled_training_decision_maker = current_user
+        recruit.scheduled_training_decision_time = get_current_utc_time()
+        recruit.introduction_fee = introduction_fee_decimal
+        recruit.remarks = remarks
+
+        # 更新征召状态为待训练
+        recruit.status = RecruitStatus.PENDING_TRAINING
+
+        # 更新机师参战形式
+        recruit.pilot.work_mode = WorkMode(work_mode)
+        recruit.pilot.save()
+
+        recruit.save()
+
+        # 记录征召变更日志
+        _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
+
+        # 记录机师变更日志
+        from routes.pilot import _record_changes as record_pilot_changes
+        record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
+
+        logger.info('预约训练成功：ID=%s，机师=%s，训练时间=%s', recruit_id, recruit.pilot.nickname, scheduled_training_time_utc)
+        flash('预约训练成功，机师已进入待训练阶段', 'success')
+
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    except ValidationError as e:
+        logger.error('预约训练验证失败：%s', str(e))
+        flash('数据验证失败，请检查输入', 'error')
+        return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+    except Exception as e:
+        logger.error('预约训练失败：%s', str(e))
+        flash('预约训练失败，请重试', 'error')
+        return redirect(url_for('recruit.schedule_training_page', recruit_id=recruit_id))
+
+
+@recruit_bp.route('/<recruit_id>/training-decision')
+@roles_accepted('gicho', 'kancho')
+def training_decision_page(recruit_id):
+    """训练决策页面"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_TRAINING:
+        flash('只能对待训练状态的征召执行训练决策', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    # 构建训练决策选项
+    training_decision_choices = [(d.value, d.value) for d in TrainingDecision]
+
+    return render_template('recruits/training_decision.html', recruit=recruit, training_decision_choices=training_decision_choices)
+
+
+@recruit_bp.route('/<recruit_id>/training-decision', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def training_decision(recruit_id):
+    """执行训练决策"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_TRAINING:
+        flash('只能对待训练状态的征召执行训练决策', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    try:
+        # 获取表单数据
+        training_decision_value = request.form.get('training_decision')
+        introduction_fee = request.form.get('introduction_fee', '0')
+        remarks = request.form.get('remarks', '')
+
+        # 验证必填项
+        if not training_decision_value:
+            flash('请选择训练决策', 'error')
+            return redirect(url_for('recruit.training_decision_page', recruit_id=recruit_id))
+
+        # 验证训练决策
+        try:
+            training_decision_enum = TrainingDecision(training_decision_value)
+        except ValueError:
+            flash('无效的训练决策', 'error')
+            return redirect(url_for('recruit.training_decision_page', recruit_id=recruit_id))
+
+        # 验证介绍费
+        try:
+            introduction_fee_decimal = Decimal(introduction_fee).quantize(Decimal('0.00'))
+            if introduction_fee_decimal < 0:
+                flash('介绍费不能为负数', 'error')
+                return redirect(url_for('recruit.training_decision_page', recruit_id=recruit_id))
+        except (ValueError, InvalidOperation):
+            flash('介绍费格式不正确', 'error')
+            return redirect(url_for('recruit.training_decision_page', recruit_id=recruit_id))
+
+        # 保存修改前的数据用于变更记录
+        old_recruit_data = {
+            'pilot': str(recruit.pilot.id) if recruit.pilot else None,
+            'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
+            'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
+            'channel': recruit.channel.value if recruit.channel else None,
+            'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
+            'remarks': recruit.remarks,
+            'status': recruit.status.value if recruit.status else None,
+        }
+
+        old_pilot_data = {
+            'nickname': recruit.pilot.nickname,
+            'real_name': recruit.pilot.real_name,
+            'gender': recruit.pilot.gender.value if recruit.pilot.gender else None,
+            'birth_year': recruit.pilot.birth_year,
+            'owner': str(recruit.pilot.owner.id) if recruit.pilot.owner else None,
+            'platform': recruit.pilot.platform.value if recruit.pilot.platform else None,
+            'work_mode': recruit.pilot.work_mode.value if recruit.pilot.work_mode else None,
+            'rank': recruit.pilot.rank.value if recruit.pilot.rank else None,
+            'status': recruit.pilot.status.value if recruit.pilot.status else None,
+        }
+
+        # 执行训练决策
+        from utils.timezone_helper import get_current_utc_time
+
+        recruit.training_decision = training_decision_enum
+        recruit.training_decision_maker = current_user
+        recruit.training_decision_time = get_current_utc_time()
+        recruit.introduction_fee = introduction_fee_decimal
+        recruit.remarks = remarks
+
+        if training_decision_enum == TrainingDecision.SCHEDULE_BROADCAST:
+            # 更新征召状态为待预约开播
+            recruit.status = RecruitStatus.PENDING_BROADCAST_SCHEDULE
+        else:
+            # 更新征召状态为已结束
+            recruit.status = RecruitStatus.ENDED
+
+            # 更新机师状态为不征召
+            recruit.pilot.status = Status.NOT_RECRUITING
+            recruit.pilot.save()
+
+        recruit.save()
+
+        # 记录征召变更日志
+        _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
+
+        # 记录机师变更日志
+        if training_decision_enum == TrainingDecision.NOT_RECRUIT:
+            from routes.pilot import _record_changes as record_pilot_changes
+            record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
+
+        if training_decision_enum == TrainingDecision.SCHEDULE_BROADCAST:
+            logger.info('训练决策成功：ID=%s，机师=%s，预约开播', recruit_id, recruit.pilot.nickname)
+            flash('训练决策成功，机师已进入待预约开播阶段', 'success')
+        else:
+            logger.info('训练决策完成：ID=%s，机师=%s，不征召', recruit_id, recruit.pilot.nickname)
+            flash('训练决策完成，已决定不征召该机师', 'success')
+
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    except ValidationError as e:
+        logger.error('训练决策验证失败：%s', str(e))
+        flash('数据验证失败，请检查输入', 'error')
+        return redirect(url_for('recruit.training_decision_page', recruit_id=recruit_id))
+    except Exception as e:
+        logger.error('训练决策失败：%s', str(e))
+        flash('训练决策失败，请重试', 'error')
+        return redirect(url_for('recruit.training_decision_page', recruit_id=recruit_id))
+
+
+@recruit_bp.route('/<recruit_id>/schedule-broadcast')
+@roles_accepted('gicho', 'kancho')
+def schedule_broadcast_page(recruit_id):
+    """预约开播页面"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_BROADCAST_SCHEDULE:
+        flash('只能对待预约开播状态的征召执行预约开播', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    # 计算默认预约开播时间：当前GMT+8时间向后一个半点或整点取整
+    from utils.timezone_helper import utc_to_local
+    now_utc = datetime.utcnow()
+    now_gmt8 = utc_to_local(now_utc)
+    
+    # 获取当前分钟
+    current_minute = now_gmt8.minute
+    if current_minute < 30:
+        # 如果当前分钟小于30，设置为下一个半点
+        default_time_gmt8 = now_gmt8.replace(minute=30, second=0, microsecond=0)
+    else:
+        # 如果当前分钟大于等于30，设置为下一个整点
+        default_time_gmt8 = now_gmt8.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    
+    # 转换为GMT+8时间字符串用于表单输入
+    default_time_str = default_time_gmt8.strftime('%Y-%m-%dT%H:%M')
+
+    return render_template('recruits/schedule_broadcast.html', 
+                         recruit=recruit,
+                         default_time=default_time_str)
+
+
+@recruit_bp.route('/<recruit_id>/schedule-broadcast', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def schedule_broadcast(recruit_id):
+    """执行预约开播"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_BROADCAST_SCHEDULE:
+        flash('只能对待预约开播状态的征召执行预约开播', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    try:
+        # 获取表单数据
+        scheduled_broadcast_time_str = request.form.get('scheduled_broadcast_time')
+        introduction_fee = request.form.get('introduction_fee', '0')
+        remarks = request.form.get('remarks', '')
+
+        # 验证必填项
+        if not scheduled_broadcast_time_str:
+            flash('请选择预约开播时间', 'error')
+            return redirect(url_for('recruit.schedule_broadcast_page', recruit_id=recruit_id))
+
+        # 解析时间（前端传来的是GMT+8本地时间）
+        try:
+            scheduled_broadcast_time_local = datetime.fromisoformat(scheduled_broadcast_time_str.replace('T', ' '))
+            scheduled_broadcast_time_utc = local_to_utc(scheduled_broadcast_time_local)
+        except ValueError:
+            flash('预约开播时间格式不正确', 'error')
+            return redirect(url_for('recruit.schedule_broadcast_page', recruit_id=recruit_id))
+
+        # 验证介绍费
+        try:
+            introduction_fee_decimal = Decimal(introduction_fee).quantize(Decimal('0.00'))
+            if introduction_fee_decimal < 0:
+                flash('介绍费不能为负数', 'error')
+                return redirect(url_for('recruit.schedule_broadcast_page', recruit_id=recruit_id))
+        except (ValueError, InvalidOperation):
+            flash('介绍费格式不正确', 'error')
+            return redirect(url_for('recruit.schedule_broadcast_page', recruit_id=recruit_id))
+
+        # 保存修改前的数据用于变更记录
+        old_recruit_data = {
+            'pilot': str(recruit.pilot.id) if recruit.pilot else None,
+            'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
+            'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
+            'channel': recruit.channel.value if recruit.channel else None,
+            'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
+            'remarks': recruit.remarks,
+            'status': recruit.status.value if recruit.status else None,
+        }
+
+        # 执行预约开播
+        from utils.timezone_helper import get_current_utc_time
+
+        recruit.scheduled_broadcast_time = scheduled_broadcast_time_utc
+        recruit.scheduled_broadcast_decision_maker = current_user
+        recruit.scheduled_broadcast_decision_time = get_current_utc_time()
+        recruit.introduction_fee = introduction_fee_decimal
+        recruit.remarks = remarks
+
+        # 更新征召状态为待开播
+        recruit.status = RecruitStatus.PENDING_BROADCAST
+
+        recruit.save()
+
+        # 记录征召变更日志
+        _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
+
+        logger.info('预约开播成功：ID=%s，机师=%s，开播时间=%s', recruit_id, recruit.pilot.nickname, scheduled_broadcast_time_utc)
+        flash('预约开播成功，机师已进入待开播阶段', 'success')
+
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    except ValidationError as e:
+        logger.error('预约开播验证失败：%s', str(e))
+        flash('数据验证失败，请检查输入', 'error')
+        return redirect(url_for('recruit.schedule_broadcast_page', recruit_id=recruit_id))
+    except Exception as e:
+        logger.error('预约开播失败：%s', str(e))
+        flash('预约开播失败，请重试', 'error')
+        return redirect(url_for('recruit.schedule_broadcast_page', recruit_id=recruit_id))
+
+
+@recruit_bp.route('/<recruit_id>/broadcast-decision')
+@roles_accepted('gicho', 'kancho')
+def broadcast_decision_page(recruit_id):
+    """开播决策页面"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_BROADCAST:
+        flash('只能对待开播状态的征召执行开播决策', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    # 构建开播决策选项
+    broadcast_decision_choices = [(d.value, d.value) for d in BroadcastDecision]
+
+    # 构建所属选择列表
+    owner_choices = _get_owner_choices()
+
+    # 构建战区选项
+    from models.pilot import Platform
+    platform_choices = [(p.value, p.value) for p in Platform]
+
+    return render_template('recruits/broadcast_decision.html',
+                           recruit=recruit,
+                           broadcast_decision_choices=broadcast_decision_choices,
+                           owner_choices=owner_choices,
+                           platform_choices=platform_choices)
+
+
+@recruit_bp.route('/<recruit_id>/broadcast-decision', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def broadcast_decision(recruit_id):
+    """执行开播决策"""
+    try:
+        recruit = Recruit.objects.get(id=recruit_id)
+    except DoesNotExist:
+        abort(404)
+
+    # 检查征召状态
+    effective_status = recruit.get_effective_status()
+    if effective_status != RecruitStatus.PENDING_BROADCAST:
+        flash('只能对待开播状态的征召执行开播决策', 'error')
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    # 检查用户权限：议长与舰长权限一致
+    if not (current_user.has_role('gicho') or current_user.has_role('kancho')):
+        abort(403)
+
+    try:
+        # 获取表单数据
+        broadcast_decision_value = request.form.get('broadcast_decision')
+        introduction_fee = request.form.get('introduction_fee', '0')
+        remarks = request.form.get('remarks', '')
+
+        # 机师分配信息（当征召成功时）
+        owner = request.form.get('owner', '')
+        platform = request.form.get('platform', '')
+
+        # 验证必填项
+        if not broadcast_decision_value:
+            flash('请选择开播决策', 'error')
+            return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+
+        # 验证开播决策
+        try:
+            broadcast_decision_enum = BroadcastDecision(broadcast_decision_value)
+        except ValueError:
+            flash('无效的开播决策', 'error')
+            return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+
+        # 当征召成功时的额外验证
+        if broadcast_decision_enum in [BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]:
+            if not owner:
+                flash('征召成功时必须选择所属', 'error')
+                return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+
+            if not platform:
+                flash('征召成功时必须选择战区', 'error')
+                return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+
+            # 验证战区
+            try:
+                from models.pilot import Platform
+                Platform(platform)  # 验证战区值是否有效
+            except ValueError:
+                flash('无效的战区选择', 'error')
+                return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+
+            # 验证所属用户是否存在
+            try:
+                owner_user = User.objects.get(id=owner)
+                if not (owner_user.has_role('kancho') or owner_user.has_role('gicho')):
+                    flash('所属必须是舰长或议长', 'error')
+                    return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+            except DoesNotExist:
+                flash('无效的所属选择', 'error')
+                return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+
+        # 验证介绍费
+        try:
+            introduction_fee_decimal = Decimal(introduction_fee).quantize(Decimal('0.00'))
+            if introduction_fee_decimal < 0:
+                flash('介绍费不能为负数', 'error')
+                return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+        except (ValueError, InvalidOperation):
+            flash('介绍费格式不正确', 'error')
+            return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+
+        # 保存修改前的数据用于变更记录
+        old_recruit_data = {
+            'pilot': str(recruit.pilot.id) if recruit.pilot else None,
+            'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
+            'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
+            'channel': recruit.channel.value if recruit.channel else None,
+            'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
+            'remarks': recruit.remarks,
+            'status': recruit.status.value if recruit.status else None,
+        }
+
+        old_pilot_data = {
+            'nickname': recruit.pilot.nickname,
+            'real_name': recruit.pilot.real_name,
+            'gender': recruit.pilot.gender.value if recruit.pilot.gender else None,
+            'birth_year': recruit.pilot.birth_year,
+            'owner': str(recruit.pilot.owner.id) if recruit.pilot.owner else None,
+            'platform': recruit.pilot.platform.value if recruit.pilot.platform else None,
+            'work_mode': recruit.pilot.work_mode.value if recruit.pilot.work_mode else None,
+            'rank': recruit.pilot.rank.value if recruit.pilot.rank else None,
+            'status': recruit.pilot.status.value if recruit.pilot.status else None,
+        }
+
+        # 执行开播决策
+        from utils.timezone_helper import get_current_utc_time
+
+        recruit.broadcast_decision = broadcast_decision_enum
+        recruit.broadcast_decision_maker = current_user
+        recruit.broadcast_decision_time = get_current_utc_time()
+        recruit.introduction_fee = introduction_fee_decimal
+        recruit.remarks = remarks
+
+        # 更新征召状态为已结束
+        recruit.status = RecruitStatus.ENDED
+
+        if broadcast_decision_enum in [BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]:
+            # 更新机师信息
+            from models.pilot import Platform
+            recruit.pilot.owner = User.objects.get(id=owner)
+            recruit.pilot.platform = Platform(platform)
+            recruit.pilot.status = Status.RECRUITED
+
+            # 根据决策设置阶级
+            if broadcast_decision_enum == BroadcastDecision.OFFICIAL:
+                recruit.pilot.rank = Rank.OFFICIAL
+            else:
+                recruit.pilot.rank = Rank.INTERN
+
+            recruit.pilot.save()
+        else:
+            # 更新机师状态为不征召
+            recruit.pilot.status = Status.NOT_RECRUITING
+            recruit.pilot.save()
+
+        recruit.save()
+
+        # 记录征召变更日志
+        _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
+
+        # 记录机师变更日志
+        from routes.pilot import _record_changes as record_pilot_changes
+        record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
+
+        if broadcast_decision_enum in [BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]:
+            logger.info('开播决策成功：ID=%s，机师=%s，征召为%s', recruit_id, recruit.pilot.nickname, broadcast_decision_enum.value)
+            flash(f'开播决策成功，机师已被征召为{broadcast_decision_enum.value}', 'success')
+        else:
+            logger.info('开播决策完成：ID=%s，机师=%s，不征召', recruit_id, recruit.pilot.nickname)
+            flash('开播决策完成，已决定不征召该机师', 'success')
+
+        return redirect(url_for('recruit.detail_recruit', recruit_id=recruit_id))
+
+    except ValidationError as e:
+        logger.error('开播决策验证失败：%s', str(e))
+        flash('数据验证失败，请检查输入', 'error')
+        return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
+    except Exception as e:
+        logger.error('开播决策失败：%s', str(e))
+        flash('开播决策失败，请重试', 'error')
+        return redirect(url_for('recruit.broadcast_decision_page', recruit_id=recruit_id))
 
 
 @recruit_bp.route('/<recruit_id>/confirm', methods=['POST'])
@@ -743,7 +1588,7 @@ def training_recruit(recruit_id):
 
     try:
         # 获取表单数据
-        training_decision = request.form.get('training_decision')
+        training_decision_value = request.form.get('training_decision')
         training_time_str = request.form.get('training_time', '')
         introduction_fee = request.form.get('introduction_fee', '0')
         remarks = request.form.get('remarks', '')
@@ -754,13 +1599,13 @@ def training_recruit(recruit_id):
         work_mode = request.form.get('work_mode', '')
 
         # 验证必填项
-        if not training_decision:
+        if not training_decision_value:
             flash('请选择训练征召决策', 'error')
             return redirect(url_for('recruit.training_recruit_page', recruit_id=recruit_id))
 
         # 验证训练征召决策
         try:
-            training_decision_enum = TrainingDecision(training_decision)
+            training_decision_enum = TrainingDecisionOld(training_decision_value)
         except ValueError:
             flash('无效的训练征召决策', 'error')
             return redirect(url_for('recruit.training_recruit_page', recruit_id=recruit_id))

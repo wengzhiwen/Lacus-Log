@@ -120,10 +120,76 @@
   - `user_id` 索引
   - `change_time` 索引
 
+### recruits
+- 字段：
+  - `pilot` 关联机师（关联到pilots集合）
+  - `recruiter` 征召负责人（关联到users集合，必须是舰长或议长）
+  - `appointment_time` 预约时间，UTC时间戳
+  - `channel` 征召渠道枚举（BOSS/51/介绍/其他）
+  - `introduction_fee` 介绍费，精确到分（DecimalField，精度2）
+  - `remarks` 备注，最大200字符
+  - `status` 征召状态枚举（待面试/待预约训练/待训练/待预约开播/待开播/已结束）
+  - 新六步制流程字段：
+    - `interview_decision` 面试决策枚举（预约训练/不征召）
+    - `interview_decision_maker` 面试决策人（关联到users集合）
+    - `interview_decision_time` 面试决策时间，UTC时间戳
+    - `scheduled_training_time` 预约训练时间，UTC时间戳
+    - `scheduled_training_decision_maker` 预约训练决策人（关联到users集合）
+    - `scheduled_training_decision_time` 预约训练决策时间，UTC时间戳
+    - `training_decision` 训练决策枚举（预约开播/不征召）
+    - `training_decision_maker` 训练决策人（关联到users集合）
+    - `training_decision_time` 训练决策时间，UTC时间戳
+    - `scheduled_broadcast_time` 预约开播时间，UTC时间戳
+    - `scheduled_broadcast_decision_maker` 预约开播决策人（关联到users集合）
+    - `scheduled_broadcast_decision_time` 预约开播决策时间，UTC时间戳
+    - `broadcast_decision` 开播决策枚举（正式机师/实习机师/不征召）
+    - `broadcast_decision_maker` 开播决策人（关联到users集合）
+    - `broadcast_decision_time` 开播决策时间，UTC时间戳
+  - 废弃字段（历史兼容）：
+    - `training_decision_old` 训练征召决策枚举（废弃）
+    - `training_decision_maker_old` 训练征召决策人（废弃）
+    - `training_decision_time_old` 训练征召决策时间（废弃）
+    - `training_time` 训练时间（废弃）
+    - `final_decision` 结束征召决策枚举（废弃）
+    - `final_decision_maker` 结束征召决策人（废弃）
+    - `final_decision_time` 结束征召决策时间（废弃）
+  - `created_at` 创建时间
+  - `updated_at` 最后修改时间
+- 索引：
+  - `pilot` 索引
+  - `recruiter` 索引
+  - `status` 索引
+  - `-appointment_time` 降序索引
+  - `-created_at` 降序索引
+  - `interview_decision` 索引
+  - `training_decision` 索引
+  - `broadcast_decision` 索引
+  - `-scheduled_training_time` 降序索引
+  - `-scheduled_broadcast_time` 降序索引
+  - `training_decision_old` 索引（历史兼容）
+  - `final_decision` 索引（历史兼容）
+  - `-training_time` 降序索引（历史兼容）
+
+### recruit_change_logs
+- 字段：
+  - `recruit_id` 关联征召ID（关联到recruits集合）
+  - `user_id` 操作用户ID（关联到users集合）
+  - `field_name` 变更字段名
+  - `old_value` 变更前值
+  - `new_value` 变更后值
+  - `change_time` 变更时间
+  - `ip_address` 操作IP地址
+- 索引：
+  - `recruit_id + change_time` 复合索引（降序）
+  - `user_id` 索引
+  - `change_time` 索引
+
 ## 说明
 - 启动时自动创建缺失的角色（gicho/kancho）与默认议长
 - 使用Flask-Security-Too的MongoEngineUserDatastore
 - 支持会话跟踪和登录统计
 - 机师管理系统包含完整的CRUD操作和变更记录
 - 作战计划管理系统支持重复事件、冲突检查、变更记录等功能
+- 机师征召管理系统支持六步制征召流程：待面试→待预约训练→待训练→待预约开播→待开播→已结束
+- 征召系统包含完整的决策记录、决策人追踪、变更记录和历史数据兼容性
 - 预计后续将为审计日志、登录日志、业务数据增加索引

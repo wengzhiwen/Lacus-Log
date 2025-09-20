@@ -66,6 +66,42 @@
         <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
           <div class="card-header">
             <div class="record-time">
+              {% set effective_status = recruit.get_effective_status() %}
+              {% set effective_scheduled_training_time = recruit.get_effective_scheduled_training_time() %}
+              {% set effective_scheduled_broadcast_time = recruit.get_effective_scheduled_broadcast_time() %}
+              
+              {% if effective_status.value == '待面试' %}
+              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% elif effective_status.value == '待预约训练' %}
+              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% elif effective_status.value == '待训练' %}
+              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% if effective_scheduled_training_time %}
+              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
+              {% elif effective_status.value == '待预约开播' %}
+              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% if effective_scheduled_training_time %}
+              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
+              {% elif effective_status.value == '待开播' %}
+              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% if effective_scheduled_training_time %}
+              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
+              {% if effective_scheduled_broadcast_time %}
+              <div class="broadcast-time">开播：{{ effective_scheduled_broadcast_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
+              {% elif effective_status.value == '已结束' %}
+              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% if effective_scheduled_training_time %}
+              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
+              {% if effective_scheduled_broadcast_time %}
+              <div class="broadcast-time">开播：{{ effective_scheduled_broadcast_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
+              {% else %}
+              <!-- 历史兼容 -->
               {% if recruit.status.value == '训练征召中' %}
               {% if recruit.training_time %}
               <div class="start-time">训练：{{ recruit.training_time | local_datetime('%Y年%m月%d日') }}</div>
@@ -76,14 +112,28 @@
               <div class="training-time">训练：{{ recruit.training_time | local_datetime('%m月%d日 %H:%M') }}</div>
               {% endif %}
               {% endif %}
+              {% endif %}
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
-                <span class="status-badge status-{{ recruit.status.value.replace(' ', '') }}">{{ recruit.status.value }}</span>
-                {% if recruit.training_decision %}
-                <span class="decision-badge">{{ recruit.training_decision.value }}</span>
+                <span class="status-badge status-{{ effective_status.value.replace(' ', '') }}">{{ effective_status.value }}</span>
+                {% set effective_interview_decision = recruit.get_effective_interview_decision() %}
+                {% if effective_interview_decision %}
+                <span class="decision-badge">{{ effective_interview_decision.value }}</span>
+                {% endif %}
+                {% set effective_training_decision = recruit.get_effective_training_decision() %}
+                {% if effective_training_decision %}
+                <span class="decision-badge">{{ effective_training_decision.value }}</span>
+                {% endif %}
+                {% set effective_broadcast_decision = recruit.get_effective_broadcast_decision() %}
+                {% if effective_broadcast_decision %}
+                <span class="decision-badge">{{ effective_broadcast_decision.value }}</span>
+                {% endif %}
+                <!-- 历史兼容 -->
+                {% if recruit.training_decision_old %}
+                <span class="decision-badge">{{ recruit.training_decision_old.value }}</span>
                 {% endif %}
                 {% if recruit.final_decision %}
                 <span class="decision-badge">{{ recruit.final_decision.value }}</span>
@@ -170,6 +220,7 @@
 .record-time { flex: 0 0 auto; }
 .start-time { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
 .training-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.broadcast-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .record-info { flex: 1; text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
 .pilot-name { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.2; margin-bottom: 2px; }
 .meta-line { font-size: 12px; color: var(--muted); line-height: 1.1; }
@@ -178,6 +229,11 @@
 .status-已启动 { background: var(--hud-green); color: white; }
 .status-训练征召中 { background: var(--brand); color: white; }
 .status-已结束 { background: var(--muted); color: white; }
+.status-待面试 { background: #e3f2fd; color: #1565c0; }
+.status-待预约训练 { background: #f3e5f5; color: #7b1fa2; }
+.status-待训练 { background: #fff3e0; color: #ef6c00; }
+.status-待预约开播 { background: #e8f5e8; color: #2e7d32; }
+.status-待开播 { background: #fff8e1; color: #f57c00; }
 .decision-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500; background: var(--table-header); color: var(--text); }
 .record-card .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 12px; }
 .record-card:hover .card-arrow { color: var(--brand); }

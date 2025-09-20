@@ -87,14 +87,12 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label for="status">征召状态 <span class="required">*</span></label>
-          <select name="status" id="status" required>
-            {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if value == recruit.status.value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
+          <label>征召状态</label>
+          <div class="readonly-field">
+            <span class="status-badge status-{{ recruit.get_effective_status().value.replace(' ', '') }}">{{ recruit.get_effective_status().value }}</span>
+          </div>
           <div class="help-text">
-            <small>建议使用"放弃征召"来结束征召，不建议手动修改状态</small>
+            <small>征召状态只能通过决策步骤进行流转，不可手动修改</small>
           </div>
         </div>
       </div>
@@ -302,6 +300,21 @@
 .help-text small {
   color: var(--muted);
   font-size: 12px;
+}
+
+.readonly-field {
+  padding: 8px 12px;
+  background: var(--table-header);
+  border: 1px solid var(--gray);
+  border-radius: 4px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.readonly-field .status-badge {
+  font-size: 14px;
+  padding: 4px 8px;
 }
 
 @media (min-width: 768px) {

@@ -1,5 +1,13 @@
 {% extends 'base.html' %}
 {% block title %}征召详情 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
+
+{% macro get_role_display_name(role_name) %}
+  {% if role_name == 'gicho' %}议长
+  {% elif role_name == 'kancho' %}舰长
+  {% else %}{{ role_name }}
+  {% endif %}
+{% endmacro %}
+
 {% block content %}
 <section class="recruit-detail">
   <div class="back-nav">
@@ -48,8 +56,9 @@
 
   <!-- 征召信息 -->
   <div class="recruit-info-card">
+    <!-- 基本信息 -->
     <div class="info-section">
-      <h3 class="section-title">征召信息</h3>
+      <h3 class="section-title">基本信息</h3>
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">征召负责人</div>
@@ -69,26 +78,8 @@
         </div>
         <div class="info-item">
           <div class="info-label">征召状态</div>
-          <div class="info-value status-{{ recruit.status.value.replace(' ', '') }}">{{ recruit.status.value }}</div>
+          <div class="info-value status-{{ recruit.get_effective_status().value.replace(' ', '') }}">{{ recruit.get_effective_status().value }}</div>
         </div>
-        {% if recruit.training_decision %}
-        <div class="info-item">
-          <div class="info-label">训练征召决策</div>
-          <div class="info-value">{{ recruit.training_decision.value }}</div>
-        </div>
-        {% endif %}
-        {% if recruit.training_time %}
-        <div class="info-item">
-          <div class="info-label">训练时间</div>
-          <div class="info-value">{{ recruit.training_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
-        </div>
-        {% endif %}
-        {% if recruit.final_decision %}
-        <div class="info-item">
-          <div class="info-label">结束征召决策</div>
-          <div class="info-value">{{ recruit.final_decision.value }}</div>
-        </div>
-        {% endif %}
         {% if recruit.remarks %}
         <div class="info-item full-width">
           <div class="info-label">备注</div>
@@ -97,6 +88,173 @@
         {% endif %}
       </div>
     </div>
+
+    <!-- 面试阶段 -->
+    {% set effective_interview_decision = recruit.get_effective_interview_decision() %}
+    {% if effective_interview_decision %}
+    <div class="info-section">
+      <h3 class="section-title">面试阶段</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">面试决策</div>
+          <div class="info-value">{{ effective_interview_decision.value }}</div>
+        </div>
+        {% set effective_interview_decision_maker = recruit.get_effective_interview_decision_maker() %}
+        {% if effective_interview_decision_maker %}
+        <div class="info-item">
+          <div class="info-label">面试决策人</div>
+          <div class="info-value">{{ effective_interview_decision_maker.nickname or effective_interview_decision_maker.username }}[{{ get_role_display_name(effective_interview_decision_maker.roles[0].name) if effective_interview_decision_maker.roles else '未知' }}]</div>
+        </div>
+        {% endif %}
+        {% set effective_interview_decision_time = recruit.get_effective_interview_decision_time() %}
+        {% if effective_interview_decision_time %}
+        <div class="info-item">
+          <div class="info-label">面试决策时间</div>
+          <div class="info-value">{{ effective_interview_decision_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 训练预约阶段 -->
+    {% set effective_scheduled_training_time = recruit.get_effective_scheduled_training_time() %}
+    {% if effective_scheduled_training_time %}
+    <div class="info-section">
+      <h3 class="section-title">训练预约阶段</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">预约训练时间</div>
+          <div class="info-value">{{ effective_scheduled_training_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% set effective_scheduled_training_decision_maker = recruit.get_effective_scheduled_training_decision_maker() %}
+        {% if effective_scheduled_training_decision_maker %}
+        <div class="info-item">
+          <div class="info-label">预约训练决策人</div>
+          <div class="info-value">{{ effective_scheduled_training_decision_maker.nickname or effective_scheduled_training_decision_maker.username }}[{{ get_role_display_name(effective_scheduled_training_decision_maker.roles[0].name) if effective_scheduled_training_decision_maker.roles else '未知' }}]</div>
+        </div>
+        {% endif %}
+        {% set effective_scheduled_training_decision_time = recruit.get_effective_scheduled_training_decision_time() %}
+        {% if effective_scheduled_training_decision_time %}
+        <div class="info-item">
+          <div class="info-label">预约训练决策时间</div>
+          <div class="info-value">{{ effective_scheduled_training_decision_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 训练阶段 -->
+    {% set effective_training_decision = recruit.get_effective_training_decision() %}
+    {% if effective_training_decision %}
+    <div class="info-section">
+      <h3 class="section-title">训练阶段</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">训练决策</div>
+          <div class="info-value">{{ effective_training_decision.value }}</div>
+        </div>
+        {% set effective_training_decision_maker = recruit.get_effective_training_decision_maker() %}
+        {% if effective_training_decision_maker %}
+        <div class="info-item">
+          <div class="info-label">训练决策人</div>
+          <div class="info-value">{{ effective_training_decision_maker.nickname or effective_training_decision_maker.username }}[{{ get_role_display_name(effective_training_decision_maker.roles[0].name) if effective_training_decision_maker.roles else '未知' }}]</div>
+        </div>
+        {% endif %}
+        {% set effective_training_decision_time = recruit.get_effective_training_decision_time() %}
+        {% if effective_training_decision_time %}
+        <div class="info-item">
+          <div class="info-label">训练决策时间</div>
+          <div class="info-value">{{ effective_training_decision_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 开播预约阶段 -->
+    {% set effective_scheduled_broadcast_time = recruit.get_effective_scheduled_broadcast_time() %}
+    {% if effective_scheduled_broadcast_time %}
+    <div class="info-section">
+      <h3 class="section-title">开播预约阶段</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">预约开播时间</div>
+          <div class="info-value">{{ effective_scheduled_broadcast_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% set effective_scheduled_broadcast_decision_maker = recruit.get_effective_scheduled_broadcast_decision_maker() %}
+        {% if effective_scheduled_broadcast_decision_maker %}
+        <div class="info-item">
+          <div class="info-label">预约开播决策人</div>
+          <div class="info-value">{{ effective_scheduled_broadcast_decision_maker.nickname or effective_scheduled_broadcast_decision_maker.username }}[{{ get_role_display_name(effective_scheduled_broadcast_decision_maker.roles[0].name) if effective_scheduled_broadcast_decision_maker.roles else '未知' }}]</div>
+        </div>
+        {% endif %}
+        {% set effective_scheduled_broadcast_decision_time = recruit.get_effective_scheduled_broadcast_decision_time() %}
+        {% if effective_scheduled_broadcast_decision_time %}
+        <div class="info-item">
+          <div class="info-label">预约开播决策时间</div>
+          <div class="info-value">{{ effective_scheduled_broadcast_decision_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 开播阶段 -->
+    {% set effective_broadcast_decision = recruit.get_effective_broadcast_decision() %}
+    {% if effective_broadcast_decision %}
+    <div class="info-section">
+      <h3 class="section-title">开播阶段</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">开播决策</div>
+          <div class="info-value">{{ effective_broadcast_decision.value }}</div>
+        </div>
+        {% set effective_broadcast_decision_maker = recruit.get_effective_broadcast_decision_maker() %}
+        {% if effective_broadcast_decision_maker %}
+        <div class="info-item">
+          <div class="info-label">开播决策人</div>
+          <div class="info-value">{{ effective_broadcast_decision_maker.nickname or effective_broadcast_decision_maker.username }}[{{ get_role_display_name(effective_broadcast_decision_maker.roles[0].name) if effective_broadcast_decision_maker.roles else '未知' }}]</div>
+        </div>
+        {% endif %}
+        {% set effective_broadcast_decision_time = recruit.get_effective_broadcast_decision_time() %}
+        {% if effective_broadcast_decision_time %}
+        <div class="info-item">
+          <div class="info-label">开播决策时间</div>
+          <div class="info-value">{{ effective_broadcast_decision_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 历史数据（兼容性） -->
+    {% if recruit.training_decision_old or recruit.training_time or recruit.final_decision %}
+    <div class="info-section">
+      <h3 class="section-title">历史数据</h3>
+      <div class="info-grid">
+        {% if recruit.training_decision_old %}
+        <div class="info-item">
+          <div class="info-label">训练征召决策（历史）</div>
+          <div class="info-value">{{ recruit.training_decision_old.value }}</div>
+        </div>
+        {% endif %}
+        {% if recruit.training_time %}
+        <div class="info-item">
+          <div class="info-label">训练时间（历史）</div>
+          <div class="info-value">{{ recruit.training_time | local_datetime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+        {% endif %}
+        {% if recruit.final_decision %}
+        <div class="info-item">
+          <div class="info-label">结束征召决策（历史）</div>
+          <div class="info-value">{{ recruit.final_decision.value }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
 
     <!-- 系统信息 -->
     <div class="info-section">
@@ -118,11 +276,27 @@
 <!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.edit_recruit', recruit_id=recruit.id) }}">编辑</a>
+  
+  {% set effective_status = recruit.get_effective_status() %}
+  {% if effective_status.value == '待面试' %}
+  <a class="btn btn-primary" href="{{ url_for('recruit.interview_decision_page', recruit_id=recruit.id) }}">面试决策</a>
+  {% elif effective_status.value == '待预约训练' %}
+  <a class="btn btn-primary" href="{{ url_for('recruit.schedule_training_page', recruit_id=recruit.id) }}">预约训练</a>
+  {% elif effective_status.value == '待训练' %}
+  <a class="btn btn-primary" href="{{ url_for('recruit.training_decision_page', recruit_id=recruit.id) }}">训练决策</a>
+  {% elif effective_status.value == '待预约开播' %}
+  <a class="btn btn-primary" href="{{ url_for('recruit.schedule_broadcast_page', recruit_id=recruit.id) }}">预约开播</a>
+  {% elif effective_status.value == '待开播' %}
+  <a class="btn btn-primary" href="{{ url_for('recruit.broadcast_decision_page', recruit_id=recruit.id) }}">开播决策</a>
+  {% endif %}
+  
+  <!-- 历史兼容按钮 -->
   {% if recruit.status.value == '已启动' %}
   <a class="btn btn-primary" href="{{ url_for('recruit.training_recruit_page', recruit_id=recruit.id) }}">训练征召</a>
   {% elif recruit.status.value == '训练征召中' %}
   <a class="btn btn-primary" href="{{ url_for('recruit.final_recruit_page', recruit_id=recruit.id) }}">结束征召</a>
   {% endif %}
+  
   <button class="btn btn-secondary" onclick="showChangesModal()">变更记录</button>
 </div>
 
@@ -279,8 +453,14 @@
   color: var(--text);
 }
 
-.status-已启动 { color: var(--hud-green); font-weight: 600; }
+.status-待面试 { color: var(--hud-green); font-weight: 600; }
+.status-待预约训练 { color: var(--hud-green); font-weight: 600; }
+.status-待训练 { color: var(--hud-green); font-weight: 600; }
+.status-待预约开播 { color: var(--hud-green); font-weight: 600; }
+.status-待开播 { color: var(--hud-green); font-weight: 600; }
 .status-已结束 { color: var(--muted); }
+.status-已启动 { color: var(--hud-green); font-weight: 600; }  /* 历史兼容 */
+.status-训练征召中 { color: var(--hud-green); font-weight: 600; }  /* 历史兼容 */
 
 .modal {
   position: fixed;
