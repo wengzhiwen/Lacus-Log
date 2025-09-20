@@ -80,6 +80,16 @@
     </form>
   </div>
 
+  <!-- 搜索框 -->
+  <div class="search-bar">
+    <div class="search-input-group">
+      <input type="text" id="pilot-search" class="search-input" placeholder="搜索机师昵称或真实姓名..." />
+      <button type="button" class="search-button" onclick="performSearch()">
+        <span class="search-icon">🔍</span>
+      </button>
+    </div>
+  </div>
+
   <!-- 机师列表 -->
   <div class="pilot-list">
     {% if pilots %}
@@ -152,6 +162,54 @@
   padding: 12px 14px;
   margin-bottom: 10px;
   font-size: 14px;
+}
+
+/* 搜索框样式 */
+.search-bar {
+  margin-bottom: 16px;
+}
+
+.search-input-group {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--table-header);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  padding: 12px 14px;
+  font-size: 14px;
+  outline: none;
+  background: transparent;
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+}
+
+.search-button {
+  background: var(--brand);
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.search-button:hover {
+  background: #d32f2f;
+}
+
+.search-icon {
+  font-size: 16px;
+  color: #fff;
 }
 
 .filter-form.is-collapsed { display: none; }
@@ -258,12 +316,112 @@
 .container { padding-bottom: 88px; }
 </style>
 <script>
+// 存储所有机师数据用于搜索
+let allPilots = [];
+
 function toggleFilters() {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
   const collapsed = form.classList.toggle('is-collapsed');
   icon.textContent = collapsed ? '▼' : '▲';
 }
+
+// 搜索功能
+function performSearch() {
+  const searchInput = document.getElementById('pilot-search');
+  const searchTerm = searchInput.value.trim().toLowerCase();
+  
+  if (!searchTerm) {
+    // 如果搜索框为空，显示所有机师
+    showAllPilots();
+    return;
+  }
+  
+  // 过滤机师
+  const filteredPilots = allPilots.filter(pilot => {
+    const nickname = (pilot.nickname || '').toLowerCase();
+    const realName = (pilot.realName || '').toLowerCase();
+    
+    return nickname.includes(searchTerm) || realName.includes(searchTerm);
+  });
+  
+  // 显示过滤后的机师
+  showFilteredPilots(filteredPilots);
+}
+
+// 显示所有机师
+function showAllPilots() {
+  const pilotCards = document.querySelectorAll('.pilot-card');
+  pilotCards.forEach(card => {
+    card.style.display = 'block';
+  });
+  
+  // 更新空状态显示
+  updateEmptyState(pilotCards.length > 0);
+}
+
+// 显示过滤后的机师
+function showFilteredPilots(filteredPilots) {
+  const pilotCards = document.querySelectorAll('.pilot-card');
+  const pilotIds = filteredPilots.map(pilot => pilot.id);
+  
+  pilotCards.forEach(card => {
+    const pilotId = card.getAttribute('href').split('/').pop();
+    if (pilotIds.includes(pilotId)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  
+  // 更新空状态显示
+  updateEmptyState(filteredPilots.length > 0);
+}
+
+// 更新空状态显示
+function updateEmptyState(hasResults) {
+  const emptyState = document.querySelector('.empty-state');
+  if (emptyState) {
+    emptyState.style.display = hasResults ? 'none' : 'block';
+  }
+}
+
+// 初始化搜索功能
+function initSearch() {
+  const searchInput = document.getElementById('pilot-search');
+  
+  // 收集所有机师数据
+  const pilotCards = document.querySelectorAll('.pilot-card');
+  allPilots = Array.from(pilotCards).map(card => {
+    const pilotNameElement = card.querySelector('.pilot-name');
+    const pilotRealNameElement = card.querySelector('.pilot-real-name');
+    const href = card.getAttribute('href');
+    
+    return {
+      id: href.split('/').pop(),
+      nickname: pilotNameElement ? pilotNameElement.textContent.trim() : '',
+      realName: pilotRealNameElement ? pilotRealNameElement.textContent.trim() : ''
+    };
+  });
+  
+  // 绑定搜索事件
+  searchInput.addEventListener('input', function() {
+    // 实时搜索
+    performSearch();
+  });
+  
+  // 绑定键盘事件
+  searchInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      performSearch();
+    } else if (event.key === 'Backspace' || event.key === 'Delete') {
+      // 退格键和删除键触发搜索
+      setTimeout(() => performSearch(), 10);
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
@@ -275,6 +433,9 @@ document.addEventListener('DOMContentLoaded', function () {
     form.classList.remove('is-collapsed');
     icon.textContent = '▲';
   }
+  
+  // 初始化搜索功能
+  initSearch();
 });
 </script>
 {% endblock %}
