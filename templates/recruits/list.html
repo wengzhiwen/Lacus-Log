@@ -11,12 +11,6 @@
   <div class="filter-bar">
     {% set selected_items = [] %}
     {% if current_status %}{% set _ = selected_items.append('状态:' + current_status) %}{% endif %}
-    {% if current_recruiter %}
-      {% for value, text in recruiter_choices %}
-        {% if value == current_recruiter %}{% set _ = selected_items.append('负责人:' + text) %}{% endif %}
-      {% endfor %}
-    {% endif %}
-    {% if current_channel %}{% set _ = selected_items.append('渠道:' + current_channel) %}{% endif %}
     {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
 
     <button type="button" class="filter-toggle" onclick="toggleFilters()">
@@ -34,110 +28,54 @@
             {% endfor %}
           </select>
         </div>
-        
-        <div class="filter-group">
-          <label class="filter-label" for="recruiter">征召负责人</label>
-          <select class="filter-select" name="recruiter" id="recruiter" onchange="this.form.submit()">
-            <option value="">-- 全部负责人 --</option>
-            {% for value, text in recruiter_choices %}
-            <option value="{{ value }}" {% if current_recruiter == value %}selected{% endif %}>{{ text }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        
-        <div class="filter-group">
-          <label class="filter-label" for="channel">征召渠道</label>
-          <select class="filter-select" name="channel" id="channel" onchange="this.form.submit()">
-            <option value="">-- 全部渠道 --</option>
-            {% for value, text in channel_choices %}
-            <option value="{{ value }}" {% if current_channel == value %}selected{% endif %}>{{ text }}</option>
-            {% endfor %}
-          </select>
-        </div>
       </div>
     </form>
   </div>
 
-  <!-- 征召列表（卡片样式对齐作战记录） -->
-  <div class="battle-record-list">
-    {% if recruits %}
+  <!-- 快速跳转按钮组 -->
+  <div class="quick-nav" id="quick-nav">
+    {% if grouped_recruits.pending_interview %}
+    <button class="quick-nav-btn" onclick="scrollToGroup('pending-interview')">待面试</button>
+    {% endif %}
+    {% if grouped_recruits.pending_training_schedule %}
+    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training-schedule')">待预约训练</button>
+    {% endif %}
+    {% if grouped_recruits.pending_training %}
+    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training')">待训练</button>
+    {% endif %}
+    {% if grouped_recruits.pending_broadcast_schedule %}
+    <button class="quick-nav-btn" onclick="scrollToGroup('pending-broadcast-schedule')">待预约开播</button>
+    {% endif %}
+    {% if grouped_recruits.pending_broadcast %}
+    <button class="quick-nav-btn" onclick="scrollToGroup('pending-broadcast')">待开播</button>
+    {% endif %}
+    {% if grouped_recruits.overdue %}
+    <button class="quick-nav-btn" onclick="scrollToGroup('overdue')">鸽</button>
+    {% endif %}
+    {% if grouped_recruits.ended %}
+    <button class="quick-nav-btn" onclick="scrollToGroup('ended')">已结束</button>
+    {% endif %}
+  </div>
+
+  <!-- 征召列表（分组显示） -->
+  <div class="recruit-groups">
+    {% if grouped_recruits.pending_interview %}
+    <div class="recruit-group" id="pending-interview">
+      <h3 class="group-title">待面试</h3>
       <div class="record-cards">
-        {% for recruit in recruits %}
+        {% for recruit in grouped_recruits.pending_interview %}
         <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
           <div class="card-header">
             <div class="record-time">
-              {% set effective_status = recruit.get_effective_status() %}
-              {% set effective_scheduled_training_time = recruit.get_effective_scheduled_training_time() %}
-              {% set effective_scheduled_broadcast_time = recruit.get_effective_scheduled_broadcast_time() %}
-              
-              {% if effective_status.value == '待面试' %}
-              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待预约训练' %}
-              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待训练' %}
-              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% if effective_scheduled_training_time %}
-              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-              {% elif effective_status.value == '待预约开播' %}
-              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% if effective_scheduled_training_time %}
-              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-              {% elif effective_status.value == '待开播' %}
-              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% if effective_scheduled_training_time %}
-              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-              {% if effective_scheduled_broadcast_time %}
-              <div class="broadcast-time">开播：{{ effective_scheduled_broadcast_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-              {% elif effective_status.value == '已结束' %}
-              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% if effective_scheduled_training_time %}
-              <div class="training-time">训练：{{ effective_scheduled_training_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-              {% if effective_scheduled_broadcast_time %}
-              <div class="broadcast-time">开播：{{ effective_scheduled_broadcast_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-              {% else %}
-              <!-- 历史兼容 -->
-              {% if recruit.status.value == '训练征召中' %}
-              {% if recruit.training_time %}
-              <div class="start-time">训练：{{ recruit.training_time | local_datetime('%Y年%m月%d日') }}</div>
-              {% endif %}
-              {% else %}
-              <div class="start-time">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% if recruit.training_time %}
-              <div class="training-time">训练：{{ recruit.training_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-              {% endif %}
-              {% endif %}
+              <div class="start-time {% if recruit.appointment_time and recruit.appointment_time < current_utc - timedelta(hours=24) %}overdue{% endif %}">
+                预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}
+              </div>
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
-                <span class="status-badge status-{{ effective_status.value.replace(' ', '') }}">{{ effective_status.value }}</span>
-                {% set effective_interview_decision = recruit.get_effective_interview_decision() %}
-                {% if effective_interview_decision %}
-                <span class="decision-badge">{{ effective_interview_decision.value }}</span>
-                {% endif %}
-                {% set effective_training_decision = recruit.get_effective_training_decision() %}
-                {% if effective_training_decision %}
-                <span class="decision-badge">{{ effective_training_decision.value }}</span>
-                {% endif %}
-                {% set effective_broadcast_decision = recruit.get_effective_broadcast_decision() %}
-                {% if effective_broadcast_decision %}
-                <span class="decision-badge">{{ effective_broadcast_decision.value }}</span>
-                {% endif %}
-                <!-- 历史兼容 -->
-                {% if recruit.training_decision_old %}
-                <span class="decision-badge">{{ recruit.training_decision_old.value }}</span>
-                {% endif %}
-                {% if recruit.final_decision %}
-                <span class="decision-badge">{{ recruit.final_decision.value }}</span>
-                {% endif %}
+                <span class="status-badge status-待面试">待面试</span>
               </div>
             </div>
           </div>
@@ -148,13 +86,209 @@
         </a>
         {% endfor %}
       </div>
-    {% else %}
+    </div>
+    {% endif %}
+
+    {% if grouped_recruits.pending_training_schedule %}
+    <div class="recruit-group" id="pending-training-schedule">
+      <h3 class="group-title">待预约训练</h3>
+      <div class="record-cards">
+        {% for recruit in grouped_recruits.pending_training_schedule %}
+        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              <div class="start-time">
+                面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}
+              </div>
+            </div>
+            <div class="record-info">
+              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+              <div class="status-line">
+                <span class="status-badge status-待预约训练">待预约训练</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if grouped_recruits.pending_training %}
+    <div class="recruit-group" id="pending-training">
+      <h3 class="group-title">待训练</h3>
+      <div class="record-cards">
+        {% for recruit in grouped_recruits.pending_training %}
+        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              <div class="start-time {% if recruit.get_effective_scheduled_training_time() and recruit.get_effective_scheduled_training_time() < current_utc - timedelta(hours=24) %}overdue{% endif %}">
+                训练：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}
+              </div>
+            </div>
+            <div class="record-info">
+              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+              <div class="status-line">
+                <span class="status-badge status-待训练">待训练</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if grouped_recruits.pending_broadcast_schedule %}
+    <div class="recruit-group" id="pending-broadcast-schedule">
+      <h3 class="group-title">待预约开播</h3>
+      <div class="record-cards">
+        {% for recruit in grouped_recruits.pending_broadcast_schedule %}
+        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              <div class="start-time">
+                训练决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}
+              </div>
+            </div>
+            <div class="record-info">
+              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+              <div class="status-line">
+                <span class="status-badge status-待预约开播">待预约开播</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if grouped_recruits.pending_broadcast %}
+    <div class="recruit-group" id="pending-broadcast">
+      <h3 class="group-title">待开播</h3>
+      <div class="record-cards">
+        {% for recruit in grouped_recruits.pending_broadcast %}
+        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              <div class="start-time {% if recruit.get_effective_scheduled_broadcast_time() and recruit.get_effective_scheduled_broadcast_time() < current_utc - timedelta(hours=24) %}overdue{% endif %}">
+                开播：{{ recruit.get_effective_scheduled_broadcast_time() | local_datetime('%m月%d日 %H:%M') }}
+              </div>
+            </div>
+            <div class="record-info">
+              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+              <div class="status-line">
+                <span class="status-badge status-待开播">待开播</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if grouped_recruits.overdue %}
+    <div class="recruit-group" id="overdue">
+      <h3 class="group-title">鸽</h3>
+      <div class="record-cards">
+        {% for recruit in grouped_recruits.overdue %}
+        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              {% set effective_status = recruit.get_effective_status() %}
+              {% if effective_status.value == '待面试' %}
+              <div class="start-time overdue">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% elif effective_status.value == '待预约训练' %}
+              <div class="start-time overdue">面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% elif effective_status.value == '待训练' %}
+              <div class="start-time overdue">训练：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% elif effective_status.value == '待预约开播' %}
+              <div class="start-time overdue">训练决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% elif effective_status.value == '待开播' %}
+              <div class="start-time overdue">开播：{{ recruit.get_effective_scheduled_broadcast_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% endif %}
+            </div>
+            <div class="record-info">
+              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+              <div class="status-line">
+                <span class="status-badge status-鸽">鸽</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+                {% endif %}
+
+    {% if grouped_recruits.ended %}
+    <div class="recruit-group" id="ended">
+      <h3 class="group-title">已结束</h3>
+      <div class="record-cards">
+        {% for recruit in grouped_recruits.ended %}
+        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
+          <div class="card-header">
+            <div class="record-time">
+              <div class="start-time">最后修改：{{ recruit.updated_at | local_datetime('%m月%d日 %H:%M') }}</div>
+            </div>
+            <div class="record-info">
+              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+              <div class="status-line">
+                <span class="status-badge status-已结束">已结束</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 空状态 -->
+  {% if not grouped_recruits.pending_interview and not grouped_recruits.pending_training_schedule and not grouped_recruits.pending_training and not grouped_recruits.pending_broadcast_schedule and not grouped_recruits.pending_broadcast and not grouped_recruits.overdue and not grouped_recruits.ended %}
       <div class="empty-state">
         <div class="empty-icon">📋</div>
         <div class="empty-title">暂无征召记录</div>
         <div class="empty-description">
           {% if current_status == '进行中' %}
           当前没有进行中的征召，可以从机师详情页启动新的征召。
+      {% elif current_status == '鸽' %}
+      当前没有超时的征召记录。
+      {% elif current_status == '已结束' %}
+      当前没有已结束的征召记录。
           {% else %}
           当前筛选条件下没有征召记录。
           {% endif %}
@@ -164,7 +298,11 @@
         </div>
       </div>
     {% endif %}
-  </div>
+
+  <!-- 浮动回到顶部按钮 -->
+  <button class="floating-back-to-top" id="floating-back-to-top" onclick="scrollToTop()" style="display: none;">
+    ↑
+  </button>
 </section>
 
 <style>
@@ -190,6 +328,53 @@
 .filter-group { margin-bottom: 8px; }
 .filter-label { font-size: 14px; color: var(--text); display: block; margin-bottom: 4px; }
 .filter-select { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--table-header); background: #fff; }
+
+/* 快速跳转按钮组 */
+.quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid var(--table-header);
+}
+
+.quick-nav-btn {
+  padding: 6px 12px;
+  background: #fff;
+  border: 1px solid var(--table-header);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-nav-btn:hover {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+/* 分组标题 */
+.recruit-groups {
+  margin-bottom: 20px;
+}
+
+.recruit-group {
+  margin-bottom: 24px;
+}
+
+.group-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand);
+}
 
 /* 卡片列表（对齐作战记录） */
 .record-cards { display: block; }
@@ -219,6 +404,7 @@
 }
 .record-time { flex: 0 0 auto; }
 .start-time { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.start-time.overdue { color: #d32f2f; }
 .training-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .broadcast-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .record-info { flex: 1; text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
@@ -234,9 +420,35 @@
 .status-待训练 { background: #fff3e0; color: #ef6c00; }
 .status-待预约开播 { background: #e8f5e8; color: #2e7d32; }
 .status-待开播 { background: #fff8e1; color: #f57c00; }
+.status-鸽 { background: #ffebee; color: #d32f2f; }
 .decision-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500; background: var(--table-header); color: var(--text); }
 .record-card .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 12px; }
 .record-card:hover .card-arrow { color: var(--brand); }
+
+/* 浮动回到顶部按钮 */
+.floating-back-to-top {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.floating-back-to-top:hover {
+  background: #c62828;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+}
 
 .empty-state { text-align: center; padding: 60px 20px; }
 .empty-icon { font-size: 48px; margin-bottom: 16px; }
@@ -257,6 +469,20 @@
     gap: 8px;
   }
   .record-info { text-align: right; align-items: flex-end; }
+  .quick-nav {
+    padding: 8px;
+  }
+  .quick-nav-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .floating-back-to-top {
+    bottom: 15px;
+    right: 15px;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
 }
 </style>
 
@@ -268,11 +494,31 @@ function toggleFilters() {
   icon.textContent = collapsed ? '▼' : '▲';
 }
 
+function scrollToGroup(groupId) {
+  const element = document.getElementById(groupId);
+  if (element) {
+    element.scrollIntoView({ 
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
+}
+
+function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
   const hasQuery = window.location.search.length > 1;
+  const floatingBtn = document.getElementById('floating-back-to-top');
+  const quickNav = document.getElementById('quick-nav');
 
+  // 初始化筛选器状态
   if (!hasQuery) {
     if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
     icon.textContent = '▼';
@@ -280,6 +526,26 @@ document.addEventListener('DOMContentLoaded', function () {
     form.classList.remove('is-collapsed');
     icon.textContent = '▲';
   }
+
+  // 监听滚动事件，控制浮动按钮显示
+  function handleScroll() {
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const quickNavRect = quickNav.getBoundingClientRect();
+    const quickNavBottom = quickNavRect.bottom + scrollTop;
+    
+    // 当快速跳转按钮不可见时显示浮动按钮
+    if (scrollTop > quickNavBottom) {
+      floatingBtn.style.display = 'block';
+    } else {
+      floatingBtn.style.display = 'none';
+    }
+  }
+
+  // 添加滚动监听器
+  window.addEventListener('scroll', handleScroll);
+  
+  // 初始化时检查一次
+  handleScroll();
 });
 </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from flask import Flask
@@ -140,6 +140,14 @@ def create_app() -> Flask:
     def local_datetime_for_input_filter(utc_dt):
         """将UTC时间转换为适合HTML datetime-local输入框的格式"""
         return get_local_datetime_for_input(utc_dt)
+
+    # 添加模板上下文变量
+    @flask_app.context_processor
+    def inject_template_vars():
+        return {
+            'datetime': datetime,
+            'timedelta': timedelta
+        }
 
     @flask_app.template_filter('local_date_for_input')
     def local_date_for_input_filter(utc_dt):

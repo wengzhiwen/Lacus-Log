@@ -83,6 +83,168 @@ def _get_recruiter_choices():
     return choices
 
 
+def _get_overdue_recruits_query():
+    """获取超时征召记录的查询"""
+    from mongoengine import Q
+    from utils.timezone_helper import get_current_utc_time
+
+    # 计算当前GMT+8时间
+    current_local = utc_to_local(get_current_utc_time())
+
+    # 计算24小时前的时间
+    twenty_four_hours_ago_local = current_local - timedelta(hours=24)
+    twenty_four_hours_ago_utc = local_to_utc(twenty_four_hours_ago_local)
+
+    # 计算7天前的时间
+    seven_days_ago_local = current_local - timedelta(days=7)
+    seven_days_ago_utc = local_to_utc(seven_days_ago_local)
+
+    # 超时条件：
+    # 1. 状态=待面试 且 预约时间过期超过24小时
+    # 2. 状态=待预约训练 且 面试决策时间超过7天
+    # 3. 状态=待训练 且 预约训练时间过期超过24小时
+    # 4. 状态=待预约开播 且 训练决策时间超过7天
+    # 5. 状态=待开播 且 预约开播时间过期超过24小时
+    overdue_query = (
+        # 待面试超时
+        Q(status=RecruitStatus.PENDING_INTERVIEW, appointment_time__lt=twenty_four_hours_ago_utc) |
+        # 待预约训练超时
+        Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE, interview_decision_time__lt=seven_days_ago_utc) |
+        # 待训练超时
+        Q(status=RecruitStatus.PENDING_TRAINING, scheduled_training_time__lt=twenty_four_hours_ago_utc) |
+        # 待预约开播超时
+        Q(status=RecruitStatus.PENDING_BROADCAST_SCHEDULE, training_decision_time__lt=seven_days_ago_utc) |
+        # 待开播超时
+        Q(status=RecruitStatus.PENDING_BROADCAST, scheduled_broadcast_time__lt=twenty_four_hours_ago_utc) |
+        # 历史兼容：训练征召中超时
+        Q(status=RecruitStatus.TRAINING_RECRUITING, training_time__lt=twenty_four_hours_ago_utc))
+
+    return Recruit.objects.filter(overdue_query)
+
+
+def _group_recruits(recruits, exclude_overdue=False):
+    """将征召记录按状态和时间条件分组"""
+    from utils.timezone_helper import get_current_utc_time
+
+    # 计算当前GMT+8时间
+    current_local = utc_to_local(get_current_utc_time())
+    twenty_four_hours_ago_local = current_local - timedelta(hours=24)
+    twenty_four_hours_ago_utc = local_to_utc(twenty_four_hours_ago_local)
+    seven_days_ago_local = current_local - timedelta(days=7)
+    seven_days_ago_utc = local_to_utc(seven_days_ago_local)
+
+    groups = {
+        'pending_interview': [],
+        'pending_training_schedule': [],
+        'pending_training': [],
+        'pending_broadcast_schedule': [],
+        'pending_broadcast': [],
+        'overdue': [],
+        'ended': []
+    }
+
+    for recruit in recruits:
+        effective_status = recruit.get_effective_status()
+
+        # 检查是否为超时记录
+        is_overdue = False
+
+        if effective_status == RecruitStatus.PENDING_INTERVIEW:
+            if recruit.appointment_time and recruit.appointment_time < twenty_four_hours_ago_utc:
+                is_overdue = True
+            else:
+                groups['pending_interview'].append(recruit)
+        elif effective_status == RecruitStatus.PENDING_TRAINING_SCHEDULE:
+            interview_time = recruit.get_effective_interview_decision_time()
+            if interview_time and interview_time < seven_days_ago_utc:
+                is_overdue = True
+            else:
+                groups['pending_training_schedule'].append(recruit)
+        elif effective_status == RecruitStatus.PENDING_TRAINING:
+            scheduled_time = recruit.get_effective_scheduled_training_time()
+            if scheduled_time and scheduled_time < twenty_four_hours_ago_utc:
+                is_overdue = True
+            else:
+                groups['pending_training'].append(recruit)
+        elif effective_status == RecruitStatus.PENDING_BROADCAST_SCHEDULE:
+            training_time = recruit.get_effective_training_decision_time()
+            if training_time and training_time < seven_days_ago_utc:
+                is_overdue = True
+            else:
+                groups['pending_broadcast_schedule'].append(recruit)
+        elif effective_status == RecruitStatus.PENDING_BROADCAST:
+            scheduled_time = recruit.get_effective_scheduled_broadcast_time()
+            if scheduled_time and scheduled_time < twenty_four_hours_ago_utc:
+                is_overdue = True
+            else:
+                groups['pending_broadcast'].append(recruit)
+        elif effective_status == RecruitStatus.ENDED:
+            groups['ended'].append(recruit)
+
+        # 如果是超时记录，根据exclude_overdue参数决定是否加入超时分组
+        if is_overdue and not exclude_overdue:
+            groups['overdue'].append(recruit)
+
+    # 对每个分组进行排序
+    _sort_group(groups['pending_interview'], 'appointment_time', ascending=True)
+    _sort_group(groups['pending_training_schedule'], 'interview_decision_time', ascending=False)
+    _sort_group(groups['pending_training'], 'scheduled_training_time', ascending=True)
+    _sort_group(groups['pending_broadcast_schedule'], 'training_decision_time', ascending=False)
+    _sort_group(groups['pending_broadcast'], 'scheduled_broadcast_time', ascending=True)
+    _sort_group(groups['overdue'], 'status', ascending=True, secondary_field='updated_at', secondary_ascending=False)
+    _sort_group(groups['ended'], 'updated_at', ascending=False)
+
+    # 限制超时和已结束分组的数量
+    groups['overdue'] = groups['overdue'][:100]
+    groups['ended'] = groups['ended'][:100]
+
+    return groups
+
+
+def _sort_group(group, field, ascending=True, secondary_field=None, secondary_ascending=True):
+    """对分组进行排序"""
+    if not group:
+        return
+
+    # 获取排序键
+    def get_sort_key(recruit):
+        primary_value = getattr(recruit, field, None)
+        if primary_value is None:
+            # 尝试从有效字段获取
+            if field == 'appointment_time':
+                primary_value = recruit.appointment_time
+            elif field == 'interview_decision_time':
+                primary_value = recruit.get_effective_interview_decision_time()
+            elif field == 'scheduled_training_time':
+                primary_value = recruit.get_effective_scheduled_training_time()
+            elif field == 'training_decision_time':
+                primary_value = recruit.get_effective_training_decision_time()
+            elif field == 'scheduled_broadcast_time':
+                primary_value = recruit.get_effective_scheduled_broadcast_time()
+            elif field == 'updated_at':
+                primary_value = recruit.updated_at
+
+        if secondary_field:
+            secondary_value = getattr(recruit, secondary_field, None)
+            if secondary_value is None:
+                secondary_value = recruit.updated_at
+            # 使用secondary_ascending参数
+            if secondary_ascending:
+                return (primary_value, secondary_value)
+            else:
+                return (primary_value, -secondary_value if hasattr(secondary_value, '__neg__') else secondary_value)
+        else:
+            return primary_value
+
+    # 排序
+    reverse = not ascending
+    if secondary_field:
+        # 需要处理二级排序
+        group.sort(key=get_sort_key, reverse=reverse)
+    else:
+        group.sort(key=get_sort_key, reverse=reverse)
+
+
 @recruit_bp.route('/')
 @roles_accepted('gicho', 'kancho')
 def list_recruits():
@@ -90,16 +252,10 @@ def list_recruits():
     # 获取并持久化筛选参数（会话）
     filters = persist_and_restore_filters(
         'recruits_list',
-        allowed_keys=['status', 'recruiter', 'channel'],
-        default_filters={
-            'status': '进行中',
-            'recruiter': '',
-            'channel': ''
-        },
+        allowed_keys=['status'],
+        default_filters={'status': '进行中'},
     )
     status_filter = filters.get('status') or '进行中'
-    recruiter_filter = filters.get('recruiter') or ''
-    channel_filter = filters.get('channel') or ''
 
     # 构建查询
     query = Recruit.objects
@@ -108,8 +264,6 @@ def list_recruits():
     if status_filter:
         if status_filter == '进行中':
             # 进行中：新六步制流程中除已结束外的所有状态，且限制最近7天
-            from datetime import timedelta
-
             from mongoengine import Q
 
             from utils.timezone_helper import get_current_utc_time
@@ -138,6 +292,9 @@ def list_recruits():
                 # 历史兼容字段
                 Q(training_time__gte=seven_days_ago_utc))
             query = query.filter(seven_days_query)
+        elif status_filter == '鸽':
+            # 鸽：超时的征召记录
+            query = _get_overdue_recruits_query()
         elif status_filter == '已结束':
             # 已结束
             query = query.filter(status=RecruitStatus.ENDED)
@@ -149,43 +306,31 @@ def list_recruits():
             except ValueError:
                 pass
 
-    # 征召负责人筛选
-    if recruiter_filter:
-        try:
-            recruiter = User.objects.get(id=recruiter_filter)
-            query = query.filter(recruiter=recruiter)
-        except DoesNotExist:
-            pass
+    # 获取所有征召记录
+    all_recruits = list(query)
 
-    # 渠道筛选
-    if channel_filter:
-        try:
-            channel_enum = RecruitChannel(channel_filter)
-            query = query.filter(channel=channel_enum)
-        except ValueError:
-            pass
-
-    # 按预约时间升序排序
-    recruits = query.order_by('appointment_time')
+    # 分组处理
+    if status_filter == '进行中':
+        # 进行中：排除鸽分组的记录
+        grouped_recruits = _group_recruits(all_recruits, exclude_overdue=True)
+    else:
+        # 鸽和已结束：正常分组
+        grouped_recruits = _group_recruits(all_recruits)
 
     # 获取筛选选项
     status_choices = [
         ('进行中', '进行中'),
+        ('鸽', '鸽'),
         ('已结束', '已结束'),
     ]
-    recruiter_choices = _get_recruiter_choices()
-    channel_choices = [(c.value, c.value) for c in RecruitChannel]
 
-    logger.debug('征召列表查询：状态=%s，负责人=%s，渠道=%s，结果数量=%d', status_filter, recruiter_filter, channel_filter, recruits.count())
+    # 计算当前时间用于模板中的超时判断
+    from utils.timezone_helper import get_current_utc_time
+    current_utc = get_current_utc_time()
 
-    return render_template('recruits/list.html',
-                           recruits=recruits,
-                           current_status=status_filter,
-                           current_recruiter=recruiter_filter,
-                           current_channel=channel_filter,
-                           status_choices=status_choices,
-                           recruiter_choices=recruiter_choices,
-                           channel_choices=channel_choices)
+    logger.debug('征召列表查询：状态=%s，结果数量=%d', status_filter, len(all_recruits))
+
+    return render_template('recruits/list.html', grouped_recruits=grouped_recruits, current_status=status_filter, status_choices=status_choices, current_utc=current_utc)
 
 
 @recruit_bp.route('/<recruit_id>')
@@ -728,12 +873,11 @@ def schedule_training_page(recruit_id):
     # 构建参战形式选项
     from models.pilot import WorkMode
     work_mode_choices = [(w.value, w.value) for w in WorkMode if w != WorkMode.UNKNOWN]
-    
+
     # 计算默认预约训练时间：当前GMT+8时间向后一个半点或整点取整
-    from utils.timezone_helper import utc_to_local
     now_utc = datetime.utcnow()
     now_gmt8 = utc_to_local(now_utc)
-    
+
     # 获取当前分钟
     current_minute = now_gmt8.minute
     if current_minute < 30:
@@ -742,14 +886,11 @@ def schedule_training_page(recruit_id):
     else:
         # 如果当前分钟大于等于30，设置为下一个整点
         default_time_gmt8 = now_gmt8.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-    
+
     # 转换为GMT+8时间字符串用于表单输入
     default_time_str = default_time_gmt8.strftime('%Y-%m-%dT%H:%M')
 
-    return render_template('recruits/schedule_training.html', 
-                         recruit=recruit, 
-                         work_mode_choices=work_mode_choices,
-                         default_time=default_time_str)
+    return render_template('recruits/schedule_training.html', recruit=recruit, work_mode_choices=work_mode_choices, default_time=default_time_str)
 
 
 @recruit_bp.route('/<recruit_id>/schedule-training', methods=['POST'])
@@ -1040,10 +1181,9 @@ def schedule_broadcast_page(recruit_id):
         abort(403)
 
     # 计算默认预约开播时间：当前GMT+8时间向后一个半点或整点取整
-    from utils.timezone_helper import utc_to_local
     now_utc = datetime.utcnow()
     now_gmt8 = utc_to_local(now_utc)
-    
+
     # 获取当前分钟
     current_minute = now_gmt8.minute
     if current_minute < 30:
@@ -1052,13 +1192,11 @@ def schedule_broadcast_page(recruit_id):
     else:
         # 如果当前分钟大于等于30，设置为下一个整点
         default_time_gmt8 = now_gmt8.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-    
+
     # 转换为GMT+8时间字符串用于表单输入
     default_time_str = default_time_gmt8.strftime('%Y-%m-%dT%H:%M')
 
-    return render_template('recruits/schedule_broadcast.html', 
-                         recruit=recruit,
-                         default_time=default_time_str)
+    return render_template('recruits/schedule_broadcast.html', recruit=recruit, default_time=default_time_str)
 
 
 @recruit_bp.route('/<recruit_id>/schedule-broadcast', methods=['POST'])
@@ -1997,7 +2135,6 @@ def recruit_daily_report():
     statistics['percentages'] = percentages
 
     # 计算分页导航
-    from datetime import timedelta
     prev_date = report_date - timedelta(days=1)
     next_date = report_date + timedelta(days=1)
 
@@ -2067,7 +2204,6 @@ def _calculate_recruit_statistics(report_date):
     Returns:
         dict: 包含报表日、近7日、近14日的统计数据
     """
-    from datetime import timedelta
 
     # 计算时间范围
     report_day_start = report_date
