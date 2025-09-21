@@ -91,14 +91,23 @@ def _calculate_dashboard_data():
     # 今日约面：今日创建的征召数量
     recruit_today_appointments = Recruit.objects(created_at__gte=today_start_utc, created_at__lt=today_end_utc).count()
 
-    # 新增正式机师：今日完成结束征召决策且征召为正式机师的数量
-    recruit_today_official = Recruit.objects(final_decision_time__gte=today_start_utc,
-                                             final_decision_time__lt=today_end_utc,
-                                             final_decision=FinalDecision.OFFICIAL).count()
+    # 今日到面：今日发生的面试决策数量（新六步制 + 历史兼容）
+    from mongoengine import Q
+    interviews_query = (
+        Q(interview_decision_time__gte=today_start_utc, interview_decision_time__lt=today_end_utc) |
+        Q(training_decision_time_old__gte=today_start_utc, training_decision_time_old__lt=today_end_utc)
+    )
+    recruit_today_interviews = Recruit.objects.filter(interviews_query).count()
 
-    # 新增实习机师：今日完成结束征召决策且征召为实习机师的数量
-    recruit_today_intern = Recruit.objects(final_decision_time__gte=today_start_utc, final_decision_time__lt=today_end_utc,
-                                           final_decision=FinalDecision.INTERN).count()
+    # 今日新开播：今日在开播决策中决定征召的数量（不征召不算）
+    from models.recruit import BroadcastDecision
+    new_recruits_query = (
+        Q(broadcast_decision_time__gte=today_start_utc, broadcast_decision_time__lt=today_end_utc,
+          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]) |
+        Q(final_decision_time__gte=today_start_utc, final_decision_time__lt=today_end_utc,
+          final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
+    )
+    recruit_today_new_recruits = Recruit.objects.filter(new_recruits_query).count()
 
     return {
         # 作战计划统计（保留现有键名以兼容模板）
@@ -118,8 +127,8 @@ def _calculate_dashboard_data():
         'trainee_serving_count': trainee_serving,
         # 征召统计
         'recruit_today_appointments': recruit_today_appointments,
-        'recruit_today_official': recruit_today_official,
-        'recruit_today_intern': recruit_today_intern,
+        'recruit_today_interviews': recruit_today_interviews,
+        'recruit_today_new_recruits': recruit_today_new_recruits,
     }
 
 
