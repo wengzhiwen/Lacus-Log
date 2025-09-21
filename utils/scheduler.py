@@ -30,7 +30,7 @@ def init_scheduled_jobs(flask_app) -> None:
     """
     sched = _ensure_scheduler()
 
-    # 每天 GMT+8 20:00 执行 => UTC 12:00
+    # 每天 GMT+8 20:00 执行未开播提醒 => UTC 12:00
     def run_unstarted_wrapper():
         # 延迟导入避免循环依赖
         from routes.report_mail import run_unstarted_report_job
@@ -38,10 +38,24 @@ def init_scheduled_jobs(flask_app) -> None:
             result = run_unstarted_report_job(triggered_by='scheduler@daily-20:00+08')
             logger.info('定时任务 run_unstarted_report_job 完成：%s', result)
 
-    # 使用 CronTrigger：UTC 12:00
+    # 每天 GMT+8 00:05 执行征召日报 => UTC 16:05 (前一天)
+    def run_recruit_daily_wrapper():
+        # 延迟导入避免循环依赖
+        from routes.report_mail import run_recruit_daily_report_job
+        with flask_app.app_context():
+            result = run_recruit_daily_report_job(triggered_by='scheduler@daily-00:05+08')
+            logger.info('定时任务 run_recruit_daily_report_job 完成：%s', result)
+
+    # 使用 CronTrigger
     from apscheduler.triggers.cron import CronTrigger  # type: ignore
-    trigger = CronTrigger(hour=12, minute=0, timezone='UTC')
-    sched.add_job(run_unstarted_wrapper, trigger, id='daily_unstarted_report', replace_existing=True)
+    
+    # 未开播提醒：UTC 12:00 (GMT+8 20:00)
+    unstarted_trigger = CronTrigger(hour=12, minute=0, timezone='UTC')
+    sched.add_job(run_unstarted_wrapper, unstarted_trigger, id='daily_unstarted_report', replace_existing=True)
+    
+    # 征召日报：UTC 16:05 (GMT+8 00:05)
+    recruit_daily_trigger = CronTrigger(hour=16, minute=5, timezone='UTC')
+    sched.add_job(run_recruit_daily_wrapper, recruit_daily_trigger, id='daily_recruit_daily_report', replace_existing=True)
 
     if not sched.running:
         sched.start(paused=False)
