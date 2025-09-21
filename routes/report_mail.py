@@ -360,6 +360,16 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
     return {'sent': False, 'count': len(unstarted_items)}
 
 
+@report_mail_bp.route('/mail/unstarted', methods=['POST'])
+@roles_required('gicho')
+def trigger_unstarted_report():
+    """触发"未开播提醒"报表计算与邮件发送（异步最小实现：请求内完成）。"""
+    username = getattr(current_user, 'username', '未知')
+    result = run_unstarted_report_job(triggered_by=username)
+    status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
+    return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
+
+
 @report_mail_bp.route('/mail/recruit-daily', methods=['POST'])
 @roles_required('gicho')
 def trigger_recruit_daily_report():
