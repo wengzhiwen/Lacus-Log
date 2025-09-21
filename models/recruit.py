@@ -156,6 +156,22 @@ class Recruit(Document):
             {
                 'fields': ['-scheduled_broadcast_time']
             },
+            # 征召日报统计所需索引
+            {
+                'fields': ['-interview_decision_time']
+            },
+            {
+                'fields': ['-broadcast_decision_time']
+            },
+            {
+                'fields': ['-training_decision_time']
+            },
+            {
+                'fields': ['-scheduled_training_decision_time']
+            },
+            {
+                'fields': ['-scheduled_broadcast_decision_time']
+            },
             # 废弃字段索引（历史兼容）
             {
                 'fields': ['training_decision_old']
@@ -165,6 +181,12 @@ class Recruit(Document):
             },
             {
                 'fields': ['-training_time']
+            },
+            {
+                'fields': ['-training_decision_time_old']
+            },
+            {
+                'fields': ['-final_decision_time']
             },
         ],
     }

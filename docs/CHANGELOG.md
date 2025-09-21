@@ -1,6 +1,30 @@
 ## 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+2025-01-20 修复
+- 机师征召日报适配新六步制流程：完成征召日报功能对新六步制征召流程的适配
+  - 数据统计更新：修改_calculate_period_stats函数，支持新六步制字段和历史兼容字段的联合查询
+  - 到面统计：优先使用interview_decision_time，降级使用training_decision_time_old
+  - 试播统计：优先使用broadcast_decision_time，降级使用final_decision_time
+  - 新开播统计：优先使用broadcast_decision_time和broadcast_decision，降级使用final_decision_time和final_decision
+  - 数据库索引：新增interview_decision_time、broadcast_decision_time、training_decision_time等时间字段的降序索引
+  - 历史兼容：完善training_decision_time_old、final_decision_time等废弃字段的索引
+  - 模板更新：修改征召日报模板中的指标说明，更新为新的六步制流程描述
+  - 查询优化：使用MongoDB的Q对象实现复杂查询，确保新旧数据都能正确统计
+
+2025-09-20 文档
+- 机师征召日报文档更新：适应新六步制征召流程的字段映射和统计规则
+  - 统计指标更新：到面改为面试决策统计，试播改为开播决策统计，新开播改为开播决策中征召统计
+  - 数据计算规则：更新为新六步制字段（interview_decision_time、broadcast_decision_time、broadcast_decision）
+  - 历史数据兼容：添加字段降级读取说明，支持新旧字段的兼容性处理
+  - 技术实现要点：新增历史数据兼容性处理章节，说明字段映射策略和查询优化
+  - 接口设计：更新实现要点，包含历史数据兼容性处理的具体方法
+- 数据库设计文档更新：完善征召系统的索引设计
+  - 新增重要时间字段索引：interview_decision_time、broadcast_decision_time、training_decision_time等
+  - 完善历史兼容字段索引：training_decision_time_old、final_decision_time等
+  - 优化征召日报统计查询性能，确保所有时间字段都有对应的降序索引
+  - 统一征召日报文档与数据库设计文档的索引建议
+
 2025-09-19 重构
 - 机师征召列表界面重构：优化征召列表的用户体验和操作效率
   - 筛选器简化：只保留状态筛选（进行中/鸽/已结束），移除负责人和渠道筛选

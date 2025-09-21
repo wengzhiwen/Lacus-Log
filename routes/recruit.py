@@ -2240,18 +2240,38 @@ def _calculate_period_stats(start_utc, end_utc):
     Returns:
         dict: 包含约面、到面、试播、新开播的统计数据
     """
+    from mongoengine import Q
+    
     # 约面：当天创建的征召数量
     appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
 
-    # 到面：当天发生的训练征召决策数量
-    interviews = Recruit.objects.filter(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc).count()
+    # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
+    # 新六步制：使用 interview_decision_time
+    # 历史兼容：使用 training_decision_time_old
+    interviews_query = (
+        Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc) |
+        Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
+    )
+    interviews = Recruit.objects.filter(interviews_query).count()
 
-    # 试播：当天发生的结束征召决策数量
-    trials = Recruit.objects.filter(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc).count()
+    # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
+    # 新六步制：使用 broadcast_decision_time
+    # 历史兼容：使用 final_decision_time
+    trials_query = (
+        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc) |
+        Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc)
+    )
+    trials = Recruit.objects.filter(trials_query).count()
 
-    # 新开播：当天在结束征召决策中决定征召的数量（不征召不算）
-    new_recruits = Recruit.objects.filter(final_decision_time__gte=start_utc,
-                                          final_decision_time__lt=end_utc,
-                                          final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]).count()
+    # 新开播：当天在开播决策中决定征召的数量（不征召不算）
+    # 新六步制：使用 broadcast_decision_time 和 broadcast_decision
+    # 历史兼容：使用 final_decision_time 和 final_decision
+    new_recruits_query = (
+        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc,
+          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]) |
+        Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc,
+          final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
+    )
+    new_recruits = Recruit.objects.filter(new_recruits_query).count()
 
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}

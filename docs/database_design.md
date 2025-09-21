@@ -166,9 +166,16 @@
   - `broadcast_decision` 索引
   - `-scheduled_training_time` 降序索引
   - `-scheduled_broadcast_time` 降序索引
+  - `-interview_decision_time` 降序索引（用于征召日报统计）
+  - `-broadcast_decision_time` 降序索引（用于征召日报统计）
+  - `-training_decision_time` 降序索引（用于训练决策时间查询）
+  - `-scheduled_training_decision_time` 降序索引（用于预约训练决策时间查询）
+  - `-scheduled_broadcast_decision_time` 降序索引（用于预约开播决策时间查询）
   - `training_decision_old` 索引（历史兼容）
   - `final_decision` 索引（历史兼容）
   - `-training_time` 降序索引（历史兼容）
+  - `-training_decision_time_old` 降序索引（历史兼容，用于征召日报统计）
+  - `-final_decision_time` 降序索引（历史兼容，用于征召日报统计）
 
 ### recruit_change_logs
 - 字段：
