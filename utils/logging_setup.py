@@ -1,6 +1,5 @@
 import logging
 import os
-
 from logging.handlers import TimedRotatingFileHandler
 
 
@@ -54,6 +53,15 @@ def init_logging() -> None:
     flask_app_logger.setLevel(level)
     flask_app_logger.handlers.clear()
     flask_app_logger.addHandler(_daily_file_handler('app', level))
+
+    # Flask ERROR 独立文件（按日切分）
+    flask_app_logger.addHandler(_daily_file_handler('flask_error', logging.ERROR))
+
+    # Werkzeug 访问与内部日志：常规信息设为 INFO，ERROR 单独落盘
+    werkzeug_logger = logging.getLogger('werkzeug')
+    werkzeug_logger.setLevel(logging.INFO)
+    # 不清空现有 handler，避免影响开发时控制台输出；仅附加 ERROR 文件处理器
+    werkzeug_logger.addHandler(_daily_file_handler('werkzeug_error', logging.ERROR))
 
     # 控制第三方日志量
     pymongo_level = getattr(logging, os.getenv('PYMONGO_LOG_LEVEL', 'INFO').upper(), logging.INFO)

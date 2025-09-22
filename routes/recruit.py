@@ -10,9 +10,9 @@ from models.pilot import Pilot, Rank, Status
 from models.recruit import (BroadcastDecision, FinalDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision,
                             TrainingDecisionOld)
 from models.user import Role, User
+from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
 from utils.timezone_helper import local_to_utc, utc_to_local
-from utils.filter_state import persist_and_restore_filters
 
 logger = get_logger('recruit')
 
@@ -86,6 +86,7 @@ def _get_recruiter_choices():
 def _get_overdue_recruits_query():
     """获取超时征召记录的查询"""
     from mongoengine import Q
+
     from utils.timezone_helper import get_current_utc_time
 
     # 计算当前GMT+8时间
@@ -208,6 +209,24 @@ def _sort_group(group, field, ascending=True, secondary_field=None, secondary_as
 
     # 获取排序键
     def get_sort_key(recruit):
+        import enum as _enum
+
+        def _normalize_value(value, is_time_hint=False):
+            """将值转换为可比较的简单类型。
+            - Enum → 其 value（字符串）
+            - datetime → datetime 本身（可比较）
+            - None → 根据是否时间字段给默认极小值
+            - 其他 → 原值
+            """
+            if isinstance(value, _enum.Enum):
+                return value.value
+            if hasattr(value, 'timestamp') and hasattr(value, 'year'):
+                return value
+            if value is None:
+                return datetime.min if is_time_hint else ''
+            return value
+
+        # 主键值
         primary_value = getattr(recruit, field, None)
         if primary_value is None:
             # 尝试从有效字段获取
@@ -224,17 +243,29 @@ def _sort_group(group, field, ascending=True, secondary_field=None, secondary_as
             elif field == 'updated_at':
                 primary_value = recruit.updated_at
 
+        # 归一主键
+        primary_is_time = field.endswith('_time') or field in ('updated_at', 'appointment_time')
+        primary_key = _normalize_value(primary_value, is_time_hint=primary_is_time)
+
         if secondary_field:
             secondary_value = getattr(recruit, secondary_field, None)
             if secondary_value is None:
                 secondary_value = recruit.updated_at
-            # 使用secondary_ascending参数
-            if secondary_ascending:
-                return (primary_value, secondary_value)
-            else:
-                return (primary_value, -secondary_value if hasattr(secondary_value, '__neg__') else secondary_value)
+
+            # 归一二级键
+            secondary_is_time = secondary_field.endswith('_time') or secondary_field in ('updated_at', 'appointment_time')
+            secondary_key = _normalize_value(secondary_value, is_time_hint=secondary_is_time)
+
+            # 当要求二级降序时，针对时间或数值做方向翻转
+            if not secondary_ascending:
+                if hasattr(secondary_key, 'timestamp') and hasattr(secondary_key, 'year'):
+                    secondary_key = -secondary_key.timestamp()
+                elif isinstance(secondary_key, (int, float)):
+                    secondary_key = -secondary_key
+
+            return (primary_key, secondary_key)
         else:
-            return primary_value
+            return primary_key
 
     # 排序
     reverse = not ascending
@@ -317,6 +348,15 @@ def list_recruits():
         # 鸽和已结束：正常分组
         grouped_recruits = _group_recruits(all_recruits)
 
+    # 调试日志：当筛选“鸽”时输出状态分布，便于排查生产环境数据
+    if status_filter == '鸽':
+        try:
+            from collections import Counter
+            status_counter = Counter([getattr(r.get_effective_status(), 'value', str(r.get_effective_status())) for r in grouped_recruits.get('overdue', [])])
+            logger.debug('征召列表-鸽分组：数量=%d，状态分布=%s', len(grouped_recruits.get('overdue', [])), dict(status_counter))
+        except Exception as _log_err:
+            logger.debug('征召列表-鸽分组日志生成失败：%s', str(_log_err))
+
     # 获取筛选选项
     status_choices = [
         ('进行中', '进行中'),
@@ -330,7 +370,11 @@ def list_recruits():
 
     logger.debug('征召列表查询：状态=%s，结果数量=%d', status_filter, len(all_recruits))
 
-    return render_template('recruits/list.html', grouped_recruits=grouped_recruits, current_status=status_filter, status_choices=status_choices, current_utc=current_utc)
+    return render_template('recruits/list.html',
+                           grouped_recruits=grouped_recruits,
+                           current_status=status_filter,
+                           status_choices=status_choices,
+                           current_utc=current_utc)
 
 
 @recruit_bp.route('/<recruit_id>')
@@ -2241,37 +2285,32 @@ def _calculate_period_stats(start_utc, end_utc):
         dict: 包含约面、到面、试播、新开播的统计数据
     """
     from mongoengine import Q
-    
+
     # 约面：当天创建的征召数量
     appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
 
     # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
     # 新六步制：使用 interview_decision_time
     # 历史兼容：使用 training_decision_time_old
-    interviews_query = (
-        Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc) |
-        Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
-    )
+    interviews_query = (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+                        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     interviews = Recruit.objects.filter(interviews_query).count()
 
     # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
     # 新六步制：使用 broadcast_decision_time
     # 历史兼容：使用 final_decision_time
-    trials_query = (
-        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc) |
-        Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc)
-    )
+    trials_query = (Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
+                    | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
     trials = Recruit.objects.filter(trials_query).count()
 
     # 新开播：当天在开播决策中决定征召的数量（不征召不算）
     # 新六步制：使用 broadcast_decision_time 和 broadcast_decision
     # 历史兼容：使用 final_decision_time 和 final_decision
     new_recruits_query = (
-        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc,
-          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]) |
-        Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc,
-          final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
-    )
+        Q(broadcast_decision_time__gte=start_utc,
+          broadcast_decision_time__lt=end_utc,
+          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
     new_recruits = Recruit.objects.filter(new_recruits_query).count()
 
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}

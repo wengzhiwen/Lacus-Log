@@ -1,6 +1,11 @@
 ## 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+2025-09-22 增强
+- 日志：将 Flask/Werkzeug 的 ERROR 输出重定向到独立日志文件，按自然日切分（`log/flask_error_YYYYMMDD.log`、`log/werkzeug_error_YYYYMMDD.log`）；保持原有应用日志不变。
+2025-09-22 修复
+- 征召列表“鸽”筛选报错：修复排序时比较RecruitStatus枚举导致的TypeError；统一将排序键中的枚举转为其value，并完善二级时间降序逻辑；增加DEBUG日志输出鸽分组状态分布。
+
 2025-09-22 重构
 - 定时任务重构，结合mongoDB保证定时任务的可靠性
 
