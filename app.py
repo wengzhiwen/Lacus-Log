@@ -18,10 +18,10 @@ from routes.report import report_bp
 from routes.report_mail import report_mail_bp
 from utils.bootstrap import ensure_initial_roles_and_admin
 from utils.logging_setup import init_logging
+from utils.scheduler import init_scheduled_jobs
 from utils.security import create_user_datastore, init_security
 from utils.timezone_helper import (format_local_date, format_local_datetime, format_local_time, get_local_date_for_input, get_local_datetime_for_input,
                                    get_local_time_for_input, utc_to_local)
-from utils.scheduler import init_scheduled_jobs
 
 
 def create_app() -> Flask:
@@ -144,10 +144,7 @@ def create_app() -> Flask:
     # 添加模板上下文变量
     @flask_app.context_processor
     def inject_template_vars():
-        return {
-            'datetime': datetime,
-            'timedelta': timedelta
-        }
+        return {'datetime': datetime, 'timedelta': timedelta}
 
     @flask_app.template_filter('local_date_for_input')
     def local_date_for_input_filter(utc_dt):
@@ -210,10 +207,22 @@ def create_app() -> Flask:
         ensure_initial_roles_and_admin(user_datastore)
 
     # 初始化应用内置调度器（放在一切注册完成之后）
-    try:
-        init_scheduled_jobs(flask_app)
-    except Exception as exc:
-        flask_app.logger.error('初始化定时任务失败：%s', exc)
+    # 说明：生产多进程/多实例部署时，应仅在“领导实例”启用该开关，避免重复触发任务
+    enable_scheduler = os.getenv('ENABLE_SCHEDULER', 'false').lower() == 'true'
+    is_dev = os.getenv('FLASK_ENV', '').lower() == 'development'
+    is_reloader_main = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+
+    if not enable_scheduler:
+        flask_app.logger.info('ENABLE_SCHEDULER=false，跳过启动内置定时任务')
+    else:
+        # 在开发环境（带自动重载）下，仅在重载主进程内启动，避免重复
+        if (not is_dev) or (is_dev and is_reloader_main):
+            try:
+                init_scheduled_jobs(flask_app)
+            except Exception as exc:
+                flask_app.logger.error('初始化定时任务失败：%s', exc)
+        else:
+            flask_app.logger.info('开发环境下的首次加载，跳过调度器启动（等待重载主进程）')
 
     return flask_app
 
