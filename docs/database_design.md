@@ -191,6 +191,24 @@
   - `user_id` 索引
   - `change_time` 索引
 
+### job_plans（新增：任务计划令牌）
+- 用途：调度“计划令牌”，保证同一分钟的同名任务只执行一次（多进程/多实例下防重）。
+- 字段：
+  - `job_code` 任务代码（字符串，必填）
+  - `fire_minute` 触发分钟（UTC，格式：YYYYMMDDHHMM，字符串，必填）
+  - `planned_at` 计划写入时间（UTC，DateTime）
+  - `expire_at` 过期参考时间（UTC，DateTime）
+- 索引：
+  - 复合唯一索引：`job_code + fire_minute`（用于 upsert 与原子 find_one_and_delete 消费）
+  - TTL 索引：`expire_at`（`expireAfterSeconds = 7*24*3600`，计划历史自动清理）
+- 读写路径：
+  - 启动时：基于 Cron 计算“下一次触发时间（UTC分钟）”，执行 upsert 写入计划
+  - 触发时：以“当前分钟（UTC）”执行 `find_one_and_delete` 原子消费；成功才运行任务；任务完成后写入下一次计划
+- 启动清理：
+  - 应用启动时在 `app.py` 中清空历史 JobPlan 记录（`JobPlan.objects.delete()`），避免重启导致的令牌残留与冲突。
+- 环境开关：
+  - 需设置 `ENABLE_SCHEDULER=true` 才会启动内置调度器并写入/消费计划令牌；开发环境仅在“重载主进程”启动以避免重复注册。
+
 ## 说明
 - 启动时自动创建缺失的角色（gicho/kancho）与默认议长
 - 使用Flask-Security-Too的MongoEngineUserDatastore

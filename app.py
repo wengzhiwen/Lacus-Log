@@ -86,6 +86,14 @@ def create_app() -> Flask:
         flask_app.logger.error('MongoDB 连接失败：%s', exc)
         raise
 
+    # 启动时清空所有已存在的令牌（避免重启冲突）
+    try:
+        from utils.job_token import JobPlan
+        JobPlan.objects.delete()  # type: ignore[attr-defined]  # pylint: disable=no-member
+        flask_app.logger.info('已清空所有已存在的任务计划令牌')
+    except Exception as exc:  # pylint: disable=broad-except
+        flask_app.logger.error('清空任务计划令牌失败：%s', exc)
+
     # 启用全局 CSRF 保护（包含自定义表单）
     CSRFProtect(flask_app)
 

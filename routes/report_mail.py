@@ -4,8 +4,7 @@
 本模块提供基于按钮触发的离线报表，通过邮件发送结果。
 """
 # pylint: disable=no-member
-from datetime import timedelta, datetime
- 
+from datetime import datetime, timedelta
 from math import floor
 from typing import List
 
@@ -15,16 +14,16 @@ from mongoengine import Q
 
 from models.announcement import Announcement
 from models.battle_record import BattleRecord
-from models.recruit import Recruit, BroadcastDecision, FinalDecision
+from models.recruit import BroadcastDecision, FinalDecision, Recruit
 from models.user import User
+from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
-from utils.timezone_helper import get_current_utc_time, utc_to_local, local_to_utc
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('report_mail')
 
 report_mail_bp = Blueprint('report_mail', __name__)
-
 
 
 def _build_recruit_daily_markdown(statistics: dict) -> str:
@@ -36,17 +35,18 @@ def _build_recruit_daily_markdown(statistics: dict) -> str:
     Returns:
         str: Markdown格式的表格内容
     """
+
     def safe_percentage(numerator, denominator):
         """安全计算百分比，避免除零错误"""
         if denominator == 0:
             return 0
         return round((numerator / denominator) * 100)
-    
+
     # 计算百分比
     report_day = statistics['report_day']
     last_7_days = statistics['last_7_days']
     last_14_days = statistics['last_14_days']
-    
+
     percentages = {
         'report_day': {
             'appointments': safe_percentage(report_day['appointments'], last_7_days['appointments']),
@@ -61,32 +61,32 @@ def _build_recruit_daily_markdown(statistics: dict) -> str:
             'new_recruits': safe_percentage(last_7_days['new_recruits'], last_14_days['new_recruits'])
         }
     }
-    
+
     header = "| 统计范围 | 约面 | 到面 | 试播 | 新开播 |\n| --- | ---: | ---: | ---: | ---: |"
-    
+
     lines = [header]
-    
+
     # 报表日行
     report_line = (f"| 报表日 | {report_day['appointments']} ({percentages['report_day']['appointments']}%) | "
                    f"{report_day['interviews']} ({percentages['report_day']['interviews']}%) | "
                    f"{report_day['trials']} ({percentages['report_day']['trials']}%) | "
                    f"{report_day['new_recruits']} ({percentages['report_day']['new_recruits']}%) |")
     lines.append(report_line)
-    
+
     # 近7日行
     week_line = (f"| 近7日 | {last_7_days['appointments']} ({percentages['last_7_days']['appointments']}%) | "
                  f"{last_7_days['interviews']} ({percentages['last_7_days']['interviews']}%) | "
                  f"{last_7_days['trials']} ({percentages['last_7_days']['trials']}%) | "
                  f"{last_7_days['new_recruits']} ({percentages['last_7_days']['new_recruits']}%) |")
     lines.append(week_line)
-    
+
     # 近14日行
     fortnight_line = (f"| 近14日 | {last_14_days['appointments']} | "
                       f"{last_14_days['interviews']} | "
                       f"{last_14_days['trials']} | "
                       f"{last_14_days['new_recruits']} |")
     lines.append(fortnight_line)
-    
+
     return "\n".join(lines)
 
 
@@ -101,27 +101,27 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
         dict: {"sent": bool, "count": int}
     """
     logger.info('触发征召日报邮件发送，来源：%s，报表日期：%s', triggered_by or '未知', report_date or '昨天')
-    
+
     # 确定报表日期
     if not report_date:
         # 默认发送昨天的报表
         now_utc = get_current_utc_time()
         yesterday_local = utc_to_local(now_utc) - timedelta(days=1)
         report_date = yesterday_local.strftime('%Y-%m-%d')
-    
+
     # 解析报表日期
     try:
         report_date_obj = datetime.strptime(report_date, '%Y-%m-%d')
     except ValueError:
         logger.error('报表日期格式错误：%s', report_date)
         return {'sent': False, 'count': 0}
-    
+
     # 计算统计数据（复用征召日报的计算逻辑）
     statistics = _calculate_recruit_statistics(report_date_obj)
-    
+
     # 生成邮件内容
     md_content = _build_recruit_daily_markdown(statistics)
-    
+
     # 添加说明文字
     full_content = f"""# 机师征召日报
 
@@ -141,28 +141,28 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
 ---
 *本报表由 Lacus-Log 系统自动生成*
 """
-    
+
     # 获取收件人：舰长和议长
     recipients = []
     recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 议长
     recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 舰长
-    
+
     if not recipients:
         logger.error('收件人为空，未找到任何舰长或议长的邮箱')
         return {'sent': False, 'count': 0}
-    
+
     # 去重
     recipients = list(set(recipients))
-    
+
     # 生成邮件主题
     subject = f"[Lacus-Log] 机师征召日报 - {report_date}"
-    
+
     # 发送邮件
     ok = send_email_md(recipients, subject, full_content)
     if ok:
         logger.info('征召日报邮件已发送，收件人：%s', ', '.join(recipients))
         return {'sent': True, 'count': len(recipients)}
-    
+
     logger.error('征召日报邮件发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
     return {'sent': False, 'count': len(recipients)}
 
@@ -176,29 +176,29 @@ def _calculate_recruit_statistics(report_date):
     Returns:
         dict: 包含报表日、近7日、近14日的统计数据
     """
-    
+
     # 计算时间范围
     report_day_start = report_date
     report_day_end = report_day_start + timedelta(days=1)
-    
+
     last_7_days_start = report_date - timedelta(days=6)  # 包含报表日，共7天
     last_14_days_start = report_date - timedelta(days=13)  # 包含报表日，共14天
-    
+
     # 转换为UTC时间范围
     report_day_start_utc = local_to_utc(report_day_start)
     report_day_end_utc = local_to_utc(report_day_end)
     last_7_days_start_utc = local_to_utc(last_7_days_start)
     last_14_days_start_utc = local_to_utc(last_14_days_start)
-    
+
     # 计算报表日数据
     report_day_stats = _calculate_period_stats(report_day_start_utc, report_day_end_utc)
-    
+
     # 计算近7日数据
     last_7_days_stats = _calculate_period_stats(last_7_days_start_utc, report_day_end_utc)
-    
+
     # 计算近14日数据
     last_14_days_stats = _calculate_period_stats(last_14_days_start_utc, report_day_end_utc)
-    
+
     return {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
 
 
@@ -212,39 +212,34 @@ def _calculate_period_stats(start_utc, end_utc):
     Returns:
         dict: 包含约面、到面、试播、新开播的统计数据
     """
-    
+
     # 约面：当天创建的征召数量
     appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
-    
+
     # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
     # 新六步制：使用 interview_decision_time
     # 历史兼容：使用 training_decision_time_old
-    interviews_query = (
-        Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc) |
-        Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
-    )
+    interviews_query = (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+                        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     interviews = Recruit.objects.filter(interviews_query).count()
-    
+
     # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
     # 新六步制：使用 broadcast_decision_time
     # 历史兼容：使用 final_decision_time
-    trials_query = (
-        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc) |
-        Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc)
-    )
+    trials_query = (Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
+                    | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
     trials = Recruit.objects.filter(trials_query).count()
-    
+
     # 新开播：当天在开播决策中决定征召的数量（不征召不算）
     # 新六步制：使用 broadcast_decision_time 和 broadcast_decision
     # 历史兼容：使用 final_decision_time 和 final_decision
     new_recruits_query = (
-        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc,
-          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]) |
-        Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc,
-          final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
-    )
+        Q(broadcast_decision_time__gte=start_utc,
+          broadcast_decision_time__lt=end_utc,
+          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
     new_recruits = Recruit.objects.filter(new_recruits_query).count()
-    
+
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
 
 
@@ -267,7 +262,32 @@ def _build_unstarted_markdown(items: List[dict]) -> str:
 @roles_required('gicho')
 def mail_reports_page():
     """展示邮件报告入口页面（仅议长可见）。"""
-    return render_template('reports/mail_reports.html')
+    # 读取 MongoDB 中的下一次触发计划（UTC），界面显示为 GMT+8
+    try:
+        now_minute = get_current_utc_time().strftime('%Y%m%d%H%M')
+        # 未开播提醒
+        unstarted_plan = (JobPlan.objects(job_code='daily_unstarted_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (JobPlan.objects(
+            job_code='daily_unstarted_report').order_by('-fire_minute').first())
+        unstarted_next_local = None
+        if unstarted_plan:
+            fire_dt_utc = datetime.strptime(unstarted_plan.fire_minute, '%Y%m%d%H%M')
+            unstarted_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
+
+        # 征召日报
+        recruit_plan = (JobPlan.objects(job_code='daily_recruit_daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
+            JobPlan.objects(job_code='daily_recruit_daily_report').order_by('-fire_minute').first())
+        recruit_next_local = None
+        if recruit_plan:
+            fire_dt_utc = datetime.strptime(recruit_plan.fire_minute, '%Y%m%d%H%M')
+            recruit_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
+
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('读取任务下一次触发时间失败：%s', exc)
+        unstarted_next_local = None
+        recruit_next_local = None
+
+    next_times = {'unstarted': unstarted_next_local, 'recruit_daily': recruit_next_local}
+    return render_template('reports/mail_reports.html', next_times=next_times)
 
 
 def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
@@ -375,10 +395,10 @@ def trigger_unstarted_report():
 def trigger_recruit_daily_report():
     """触发征召日报邮件发送（手动触发）。"""
     username = getattr(current_user, 'username', '未知')
-    
+
     # 获取请求参数
     report_date = request.json.get('report_date') if request.is_json else None
-    
+
     result = run_recruit_daily_report_job(report_date=report_date, triggered_by=username)
     status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
     return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
