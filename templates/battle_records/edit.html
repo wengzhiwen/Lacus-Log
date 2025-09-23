@@ -46,12 +46,14 @@
                     <div class="form-group">
                         <label>关联通告：</label>
                         <div class="readonly-value">
-                            {% if battle_record.related_announcement %}
+                            {% if related_announcement_deleted %}
+                                关联作战计划已被删除
+                            {% elif related_announcement %}
                                 {% set weekday_map = {'0':'日','1':'一','2':'二','3':'三','4':'四','5':'五','6':'六'} %}
-                                {% set weekday_idx = battle_record.related_announcement.start_time|local_datetime('%w') %}
-                                {% set date_str = battle_record.related_announcement.start_time|local_datetime('%Y-%m-%d') %}
-                                {% set duration_str = battle_record.related_announcement.duration_hours ~ '小时' %}
-                                {{ date_str }} 星期{{ weekday_map[weekday_idx] }} {{ duration_str }} @{{ battle_record.related_announcement.x_coord }}-{{ battle_record.related_announcement.y_coord }}-{{ battle_record.related_announcement.z_coord }}
+                                {% set weekday_idx = related_announcement.start_time|local_datetime('%w') %}
+                                {% set date_str = related_announcement.start_time|local_datetime('%Y-%m-%d') %}
+                                {% set duration_str = related_announcement.duration_hours ~ '小时' %}
+                                {{ date_str }} 星期{{ weekday_map[weekday_idx] }} {{ duration_str }} @{{ related_announcement.x_coord }}-{{ related_announcement.y_coord }}-{{ related_announcement.z_coord }}
                             {% else %}
                                 无关联通告
                             {% endif %}

@@ -353,7 +353,21 @@ def edit_battle_record(record_id):
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
         logger.info(f"用户 {current_user.username} 编辑作战记录 {record_id}")
-        return render_template('battle_records/edit.html', battle_record=battle_record)
+
+        # 安全处理关联通告，避免模板中解引用触发异常
+        related_announcement = None
+        related_announcement_deleted = False
+        try:
+            related_announcement = battle_record.related_announcement
+            _ = related_announcement.id if related_announcement else None
+        except Exception as e:
+            related_announcement_deleted = True
+            logger.warning(f"作战记录 {record_id} 的关联通告不存在（编辑页），显示已删除占位。原因: {e}", exc_info=True)
+
+        return render_template('battle_records/edit.html',
+                               battle_record=battle_record,
+                               related_announcement=related_announcement,
+                               related_announcement_deleted=related_announcement_deleted)
     except BattleRecord.DoesNotExist:
         flash('作战记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))
@@ -368,9 +382,16 @@ def update_battle_record(record_id):
         logger.info(f"用户 {current_user.username} 更新作战记录 {record_id}")
 
         # 记录变更前的值
+        # 注意：直接访问 related_announcement 可能触发懒加载并在目标不存在时抛异常
+        try:
+            old_related_announcement = battle_record.related_announcement
+            _ = old_related_announcement.id if old_related_announcement else None
+        except Exception:
+            old_related_announcement = None
+
         old_values = {
             'pilot': battle_record.pilot,
-            'related_announcement': battle_record.related_announcement,
+            'related_announcement': old_related_announcement,
             'start_time': battle_record.start_time,
             'end_time': battle_record.end_time,
             'revenue_amount': battle_record.revenue_amount,
@@ -390,17 +411,14 @@ def update_battle_record(record_id):
             # 更新所属快照
             battle_record.owner_snapshot = pilot.owner
 
-        # 关联通告：编辑页已不可修改。如果该字段未提交，则保持不变；
-        # 仅当前端显式提交该字段时才更新（空字符串表示清空）。
-        if 'related_announcement' in request.form:
-            related_announcement_id = request.form.get('related_announcement')
-            if related_announcement_id:
-                try:
-                    battle_record.related_announcement = Announcement.objects.get(id=related_announcement_id)
-                except Announcement.DoesNotExist:
-                    battle_record.related_announcement = None
-            else:
-                battle_record.related_announcement = None
+        # 关联通告：编辑页不可修改。
+        # 若当前存量关联通告已被删除，则在保存时强制清空，避免后续界面再次 500。
+        try:
+            _tmp_ann = battle_record.related_announcement
+            _ = _tmp_ann.id if _tmp_ann else None
+        except Exception as e:
+            logger.warning(f"作战记录 {record_id} 的关联通告在保存时检测为不存在，自动清空该引用。原因: {e}", exc_info=True)
+            battle_record.related_announcement = None
 
         # 更新时间
         start_time_str = request.form.get('start_time')
