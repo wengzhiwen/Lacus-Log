@@ -596,13 +596,18 @@ def api_pilots_filtered():
             gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
             display_name = f"{pilot.nickname}{age_str}[{pilot.status.value}]{gender_icon}"
 
+            # 优先使用所属用户的昵称，若无昵称则使用用户名；无所属则返回空字符串
+            owner_name = ''
+            if pilot.owner:
+                owner_name = (pilot.owner.nickname or pilot.owner.username) or ''
+
             pilots_data.append({
                 'id': str(pilot.id),
                 'name': display_name,
                 'nickname': pilot.nickname,
                 'status': pilot.status.value,
                 'rank': pilot.rank.value,
-                'owner': pilot.owner.username if pilot.owner else ''
+                'owner': owner_name
             })
 
         return jsonify({'success': True, 'pilots': pilots_data})

@@ -344,19 +344,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化关联通告（基于当前主播）
     const pilotId = currentData.pilot;
     if (pilotId) {
-        fetch(`{{ url_for('battle_record.api_pilots_filtered') }}?pilot_id=${pilotId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.pilots.length > 0) {
-                    const pilot = data.pilots[0];
-                    const ownerDisplay = document.getElementById('owner_display');
-                    if (ownerDisplay && pilot.owner) {
-                        ownerDisplay.innerHTML = `${pilot.owner} <span class="note">（从主播复制的快照，不可编辑）</span>`;
-                    }
-                }
-            })
-            .catch(error => console.error('获取主播信息失败:', error));
-
         fetch(`{{ url_for('battle_record.api_related_announcements') }}?pilot_id=${pilotId}`)
             .then(resp => resp.json())
             .then(data => {
