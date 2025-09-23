@@ -13,9 +13,9 @@ from models.announcement import Announcement
 from models.battle_record import BattleRecord, BattleRecordChangeLog
 from models.pilot import Pilot, WorkMode
 from models.user import Role, User
+from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
-from utils.filter_state import persist_and_restore_filters
 
 # 创建日志器（按模块分文件）
 logger = get_logger('battle_record')
@@ -74,7 +74,12 @@ def list_battle_records():
     filters = persist_and_restore_filters(
         'battle_records_list',
         allowed_keys=['owner', 'rank', 'pilot', 'time'],
-        default_filters={'owner': 'all', 'rank': '', 'pilot': '', 'time': 'two_days'},
+        default_filters={
+            'owner': 'all',
+            'rank': '',
+            'pilot': '',
+            'time': 'two_days'
+        },
     )
 
     owner_filter = filters.get('owner') or 'all'
@@ -319,7 +324,23 @@ def detail_battle_record(record_id):
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
         logger.info(f"用户 {current_user.username} 查看作战记录详情 {record_id}")
-        return render_template('battle_records/detail.html', battle_record=battle_record)
+
+        # 安全处理关联通告：若已被删除，则不触发模板中的懒加载异常
+        related_announcement = None
+        related_announcement_deleted = False
+        try:
+            # 触发一次解引用；若目标不存在会抛出 DoesNotExist
+            related_announcement = battle_record.related_announcement
+            _ = related_announcement.id if related_announcement else None
+        except Exception as e:  # mongoengine.errors.DoesNotExist 等
+            related_announcement_deleted = True
+            # 提升为 WARNING，并带上堆栈，确保写入日志文件
+            logger.warning(f"作战记录 {record_id} 的关联通告不存在，显示已删除占位。原因: {e}", exc_info=True)
+
+        return render_template('battle_records/detail.html',
+                               battle_record=battle_record,
+                               related_announcement=related_announcement,
+                               related_announcement_deleted=related_announcement_deleted)
     except BattleRecord.DoesNotExist:
         flash('作战记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))

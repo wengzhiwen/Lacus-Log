@@ -170,27 +170,29 @@ def create_app() -> Flask:
         return get_local_time_for_input(utc_dt)
 
     # 注册全局错误处理器
-    @flask_app.errorhandler(500)
-    def handle_500_error(error):
-        """处理500内部服务器错误"""
-        import traceback
+    def _render_500(error):
+        """统一记录并渲染 500 错误页面。"""
+        from flask import render_template, request
         logger = flask_app.logger
 
-        # 记录详细的错误信息
-        error_traceback = traceback.format_exc()
-        logger.error("500内部服务器错误: %s", str(error))
-        logger.error("错误堆栈:\n%s", error_traceback)
-
-        # 记录请求信息
-        from flask import request
+        # 记录详细错误与请求上下文
+        logger.error("500内部服务器错误: %s", str(error), exc_info=True)
         logger.error("请求URL: %s", request.url)
         logger.error("请求方法: %s", request.method)
         logger.error("用户代理: %s", request.headers.get('User-Agent', 'Unknown'))
         logger.error("客户端IP: %s", request.remote_addr)
 
-        # 返回错误页面（可以根据需要自定义）
-        from flask import render_template
         return render_template('errors/500.html'), 500
+
+    @flask_app.errorhandler(500)
+    def handle_500_error(error):
+        """处理500内部服务器错误（框架转换后的 HTTP 500）。"""
+        return _render_500(error)
+
+    @flask_app.errorhandler(Exception)
+    def handle_uncaught_exception(error):  # pylint: disable=unused-argument
+        """兜底的未捕获异常处理，确保所有 500 都被记录。"""
+        return _render_500(error)
 
     @flask_app.errorhandler(404)
     def handle_404_error(_error):
