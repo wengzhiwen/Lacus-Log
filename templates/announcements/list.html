@@ -81,6 +81,16 @@
         </form>
     </div>
 
+    <!-- 搜索框（与机师管理一致的UI） -->
+    <div class="search-bar">
+        <div class="search-input-group">
+            <input type="text" id="announcement-pilot-search" class="search-input" placeholder="搜索机师昵称或真实姓名..." />
+            <button type="button" class="search-button" onclick="performAnnouncementSearch()">
+                <span class="search-icon">🔍</span>
+            </button>
+        </div>
+    </div>
+
     <!-- 通告列表 -->
     <div class="announcement-list">
         {% if announcements %}
@@ -171,6 +181,44 @@
     margin-bottom: 10px;
     font-size: 14px;
     cursor: pointer;
+}
+
+/* 搜索框样式（复用机师管理样式） */
+.search-bar {
+    margin-bottom: 16px;
+}
+
+.search-input-group {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--table-header);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.search-input {
+    flex: 1;
+    border: none;
+    padding: 10px 12px;
+    font-size: 14px;
+    outline: none;
+}
+
+.search-button {
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-icon {
+    font-size: 16px;
 }
 
 .filter-form.is-collapsed { 
@@ -458,6 +506,83 @@ document.addEventListener('DOMContentLoaded', function () {
         form.classList.remove('is-collapsed');
         icon.textContent = '▲';
     }
+    initAnnouncementSearch();
 });
+
+// 纯前端搜索：按机师昵称与真实姓名过滤通告卡片
+let allAnnouncements = [];
+
+function performAnnouncementSearch() {
+    const searchInput = document.getElementById('announcement-pilot-search');
+    const searchTerm = (searchInput.value || '').trim().toLowerCase();
+
+    if (!searchTerm) {
+        showAllAnnouncements();
+        return;
+    }
+
+    const filtered = allAnnouncements.filter(item => {
+        const nickname = (item.nickname || '').toLowerCase();
+        const realName = (item.realName || '').toLowerCase();
+        return nickname.includes(searchTerm) || realName.includes(searchTerm);
+    });
+
+    showFilteredAnnouncements(filtered);
+}
+
+function showAllAnnouncements() {
+    const cards = document.querySelectorAll('.announcement-card');
+    cards.forEach(card => { card.style.display = 'block'; });
+    updateAnnouncementEmptyState(cards.length > 0);
+}
+
+function showFilteredAnnouncements(filtered) {
+    const idSet = new Set(filtered.map(i => i.id));
+    const cards = document.querySelectorAll('.announcement-card');
+    cards.forEach(card => {
+        const id = (card.getAttribute('href') || '').split('/').pop();
+        if (idSet.has(id)) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    updateAnnouncementEmptyState(filtered.length > 0);
+}
+
+function updateAnnouncementEmptyState(hasResults) {
+    const emptyState = document.querySelector('.empty-state');
+    if (emptyState) {
+        emptyState.style.display = hasResults ? 'none' : 'block';
+    }
+}
+
+function initAnnouncementSearch() {
+    // 收集所有通告卡片中的机师昵称与真实姓名
+    const cards = document.querySelectorAll('.announcement-card');
+    allAnnouncements = Array.from(cards).map(card => {
+        const nicknameEl = card.querySelector('.pilot-name');
+        const realNameEl = card.querySelector('.pilot-details .real-name');
+        const href = card.getAttribute('href') || '';
+        return {
+            id: href.split('/').pop(),
+            nickname: nicknameEl ? nicknameEl.textContent.trim() : '',
+            realName: realNameEl ? realNameEl.textContent.replace(/[\[\]]/g, '').trim() : ''
+        };
+    });
+
+    const searchInput = document.getElementById('announcement-pilot-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', performAnnouncementSearch);
+        searchInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                performAnnouncementSearch();
+            } else if (event.key === 'Backspace' || event.key === 'Delete') {
+                setTimeout(performAnnouncementSearch, 10);
+            }
+        });
+    }
+}
 </script>
 {% endblock %}
