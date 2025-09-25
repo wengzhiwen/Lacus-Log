@@ -35,6 +35,9 @@ def _record_changes(recruit, old_data, user, ip_address):
         'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
         'remarks': recruit.remarks,
         'status': recruit.status.value if recruit.status else None,
+        # 新六步制可编辑时间（在编辑页按状态渐进开放）
+        'scheduled_training_time': recruit.scheduled_training_time.isoformat() if getattr(recruit, 'scheduled_training_time', None) else None,
+        'scheduled_broadcast_time': recruit.scheduled_broadcast_time.isoformat() if getattr(recruit, 'scheduled_broadcast_time', None) else None,
     }
 
     for field_name, new_value in field_mapping.items():
@@ -596,6 +599,8 @@ def update_recruit(recruit_id):
         'remarks': recruit.remarks,
         'status': recruit.status.value if recruit.status else None,
         'training_time': recruit.training_time.isoformat() if recruit.training_time else None,
+        'scheduled_training_time': recruit.scheduled_training_time.isoformat() if recruit.scheduled_training_time else None,
+        'scheduled_broadcast_time': recruit.scheduled_broadcast_time.isoformat() if recruit.scheduled_broadcast_time else None,
     }
 
     try:
@@ -606,6 +611,8 @@ def update_recruit(recruit_id):
         introduction_fee = request.form.get('introduction_fee', '0')
         remarks = request.form.get('remarks', '')
         training_time_str = request.form.get('training_time')
+        scheduled_training_time_str = request.form.get('scheduled_training_time')
+        scheduled_broadcast_time_str = request.form.get('scheduled_broadcast_time')
 
         # 验证必填项
         if not recruiter_id:
@@ -665,6 +672,33 @@ def update_recruit(recruit_id):
         else:
             training_time_utc = recruit.training_time  # 保持原值，不在非训练征召中状态下编辑
 
+        # 按有效状态解析可编辑的预约训练/预约开播时间
+        effective_status = recruit.get_effective_status()
+        scheduled_training_time_utc = recruit.scheduled_training_time
+        scheduled_broadcast_time_utc = recruit.scheduled_broadcast_time
+
+        if effective_status in [RecruitStatus.PENDING_TRAINING, RecruitStatus.PENDING_BROADCAST_SCHEDULE, RecruitStatus.PENDING_BROADCAST]:
+            if scheduled_training_time_str:
+                try:
+                    _local = datetime.fromisoformat(scheduled_training_time_str.replace('T', ' '))
+                    scheduled_training_time_utc = local_to_utc(_local)
+                except ValueError:
+                    flash('预约训练时间格式不正确', 'error')
+                    return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
+            elif scheduled_training_time_str == '':
+                scheduled_training_time_utc = None
+
+        if effective_status in [RecruitStatus.PENDING_BROADCAST]:
+            if scheduled_broadcast_time_str:
+                try:
+                    _local_b = datetime.fromisoformat(scheduled_broadcast_time_str.replace('T', ' '))
+                    scheduled_broadcast_time_utc = local_to_utc(_local_b)
+                except ValueError:
+                    flash('预约开播时间格式不正确', 'error')
+                    return redirect(url_for('recruit.edit_recruit', recruit_id=recruit_id))
+            elif scheduled_broadcast_time_str == '':
+                scheduled_broadcast_time_utc = None
+
         # 更新征召记录
         recruit.recruiter = recruiter
         recruit.appointment_time = appointment_time_utc
@@ -673,6 +707,11 @@ def update_recruit(recruit_id):
         recruit.remarks = remarks
         if recruit.status == RecruitStatus.TRAINING_RECRUITING:
             recruit.training_time = training_time_utc
+        # 仅当处于对应阶段才允许覆盖预约训练/预约开播时间（不变更决策人时间）
+        if effective_status in [RecruitStatus.PENDING_TRAINING, RecruitStatus.PENDING_BROADCAST_SCHEDULE, RecruitStatus.PENDING_BROADCAST]:
+            recruit.scheduled_training_time = scheduled_training_time_utc
+        if effective_status in [RecruitStatus.PENDING_BROADCAST]:
+            recruit.scheduled_broadcast_time = scheduled_broadcast_time_utc
 
         recruit.save()
 

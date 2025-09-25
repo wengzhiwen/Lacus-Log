@@ -97,6 +97,37 @@
         </div>
       </div>
 
+      {# 按状态逐步开放可编辑字段 #}
+      {% set effective_status = recruit.get_effective_status().value %}
+
+      {# 待训练及之后：允许编辑预约训练时间 #}
+      {% if effective_status in ['待训练', '待预约开播', '待开播'] %}
+      <div class="form-row">
+        <div class="form-group">
+          <label for="scheduled_training_time">预约训练时间</label>
+          <input type="datetime-local" name="scheduled_training_time" id="scheduled_training_time"
+                 value="{{ recruit.get_effective_scheduled_training_time() | local_datetime_for_input }}">
+          <div class="help-text">
+            <small>显示为GMT+8，保存为UTC；不会改变决策人/时间</small>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# 待开播：允许编辑预约开播时间 #}
+      {% if effective_status in ['待开播'] %}
+      <div class="form-row">
+        <div class="form-group">
+          <label for="scheduled_broadcast_time">预约开播时间</label>
+          <input type="datetime-local" name="scheduled_broadcast_time" id="scheduled_broadcast_time"
+                 value="{{ recruit.get_effective_scheduled_broadcast_time() | local_datetime_for_input }}">
+          <div class="help-text">
+            <small>显示为GMT+8，保存为UTC；不会改变决策人/时间</small>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       {% if recruit.status.value == '训练征召中' %}
       <div class="form-row">
         <div class="form-group">
@@ -123,7 +154,11 @@
 <!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
+  {% if recruit.get_effective_status().value == '已结束' %}
+  <button type="button" class="btn btn-primary" disabled>已结束（仅查看）</button>
+  {% else %}
   <button type="submit" form="recruit_form" class="btn btn-primary">保存修改</button>
+  {% endif %}
 </div>
 
 <style>
