@@ -79,5 +79,33 @@
       }
     });
   </script>
+  <script>
+    // 全站禁用回车键触发表单提交（必须点击提交按钮）
+    // 允许 textarea 与可编辑区域正常换行
+    (function() {
+      function shouldBlockEnter(event) {
+        if (!event) return false;
+        const key = event.key || '';
+        if (key !== 'Enter') return false;
+        const target = event.target;
+        if (!target) return false;
+        const tag = (target.tagName || '').toUpperCase();
+        if (tag === 'TEXTAREA') return false;
+        if (target.isContentEditable === true) return false;
+        if (typeof target.closest === 'function') {
+          const form = target.closest('form');
+          if (form) return true;
+        }
+        return false;
+      }
+
+      document.addEventListener('keydown', function(event) {
+        if (shouldBlockEnter(event)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+    })();
+  </script>
 </body>
 </html>
