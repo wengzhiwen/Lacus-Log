@@ -605,6 +605,9 @@ def api_pilots_filtered():
                 'id': str(pilot.id),
                 'name': display_name,
                 'nickname': pilot.nickname,
+                'real_name': pilot.real_name or '',
+                'age': pilot.age or '',
+                'gender': pilot.gender.value if hasattr(pilot, 'gender') and pilot.gender is not None else None,
                 'status': pilot.status.value,
                 'rank': pilot.rank.value,
                 'owner': owner_name

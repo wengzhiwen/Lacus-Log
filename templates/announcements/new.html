@@ -19,19 +19,11 @@
             <div class="form-section">
                 <h3>基础信息</h3>
                 
-                <!-- 机师筛选器 -->
+                <!-- 机师本地搜索（替代所属/阶级筛选） -->
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="owner_filter">所属筛选：</label>
-                        <select id="owner_filter">
-                            <option value="">全部所属</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="rank_filter">阶级筛选：</label>
-                        <select id="rank_filter">
-                            <option value="">全部阶级</option>
-                        </select>
+                        <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
+                        <input type="text" id="pilot_search" placeholder="输入机师昵称或真实姓名进行筛选">
                     </div>
                 </div>
                 
@@ -727,79 +719,67 @@ document.getElementById('announcementForm').addEventListener('submit', function(
     }
 });
 
-// 机师筛选功能
-function loadPilotFilters(callback) {
-    // 加载所属选项
-    fetch('/announcements/api/pilot-filters')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const ownerSelect = document.getElementById('owner_filter');
-                const rankSelect = document.getElementById('rank_filter');
-                
-                // 填充所属选项
-                data.owners.forEach(owner => {
-                    const option = document.createElement('option');
-                    option.value = owner.id;
-                    option.textContent = owner.name;
-                    ownerSelect.appendChild(option);
-                });
-                
-                // 填充阶级选项
-                data.ranks.forEach(rank => {
-                    const option = document.createElement('option');
-                    option.value = rank;
-                    option.textContent = rank;
-                    rankSelect.appendChild(option);
-                });
-                
-                // 加载所有机师
-                loadPilots('', '', callback);
-            }
-        })
-        .catch(error => console.error('Error loading filters:', error));
-}
-
-function loadPilots(ownerId = '', rank = '', callback) {
+// 机师本地搜索 + 列表加载
+function loadAllPilots(callback) {
     const pilotSelect = document.getElementById('pilot');
     pilotSelect.innerHTML = '<option value="">请选择机师</option>';
     
-    let url = '/announcements/api/pilots-filtered?';
-    if (ownerId) url += `owner=${ownerId}&`;
-    if (rank) url += `rank=${rank}&`;
-    
-    fetch(url)
+    fetch('/announcements/api/pilots-filtered')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                data.pilots.forEach(pilot => {
+                window.__annAllPilots = data.pilots || [];
+                window.__annAllPilots.forEach(pilot => {
                     const option = document.createElement('option');
                     option.value = pilot.id;
-                    option.textContent = pilot.name || pilot.nickname;
+                    option.textContent = buildPilotDisplay(pilot);
+                    option.setAttribute('data-nickname', pilot.nickname || '');
+                    option.setAttribute('data-real-name', pilot.real_name || '');
                     pilotSelect.appendChild(option);
                 });
-                
-                // 如果有回调函数，执行它
-                if (callback) {
-                    callback();
-                }
+                if (callback) callback();
             }
         })
         .catch(error => console.error('Error loading pilots:', error));
 }
 
-// 筛选器事件监听
-document.getElementById('owner_filter').addEventListener('change', function() {
-    const ownerId = this.value;
-    const rank = document.getElementById('rank_filter').value;
-    loadPilots(ownerId, rank);
-});
+function initPilotLocalSearch() {
+    const input = document.getElementById('pilot_search');
+    const pilotSelect = document.getElementById('pilot');
+    if (!input || !pilotSelect) return;
+    
+    function applyFilter() {
+        const keyword = (input.value || '').trim().toLowerCase();
+        pilotSelect.innerHTML = '<option value="">请选择机师</option>';
+        const source = (window.__annAllPilots || []);
+        const filtered = keyword
+            ? source.filter(p => (p.nickname || '').toLowerCase().includes(keyword) || (p.real_name || '').toLowerCase().includes(keyword))
+            : source;
+        filtered.forEach(pilot => {
+            const option = document.createElement('option');
+            option.value = pilot.id;
+            option.textContent = buildPilotDisplay(pilot);
+            option.setAttribute('data-nickname', pilot.nickname || '');
+            option.setAttribute('data-real-name', pilot.real_name || '');
+            pilotSelect.appendChild(option);
+        });
+    }
+    
+    input.addEventListener('input', applyFilter);
+}
 
-document.getElementById('rank_filter').addEventListener('change', function() {
-    const rank = this.value;
-    const ownerId = document.getElementById('owner_filter').value;
-    loadPilots(ownerId, rank);
-});
+// 构建机师显示文本：昵称(年龄)真实姓名[阶级]性别icon
+function buildPilotDisplay(p) {
+    const nickname = p.nickname || '';
+    const agePart = p.age ? `(${p.age})` : '';
+    const realName = p.real_name ? p.real_name : '';
+    const rank = p.rank ? p.rank : '';
+    const genderVal = (p.gender === 0 || p.gender === 1) ? p.gender : null;
+    const genderIcon = genderVal === 0 ? '♂' : (genderVal === 1 ? '♀' : '?');
+    const nameWithReal = realName ? `${nickname}${agePart}${realName}` : `${nickname}${agePart}`;
+    const rankPart = rank ? `[${rank}]` : '';
+    return `${nameWithReal}${rankPart}${genderIcon}`;
+}
 
 // 设置默认开始时间（当前时间+1小时）
 window.addEventListener('load', function() {
@@ -880,13 +860,14 @@ window.addEventListener('load', function() {
         }, 100);
     }
     
-    // 加载机师筛选器，并在加载完成后恢复机师选择
-    loadPilotFilters(function() {
+    // 加载机师列表（本地搜索），并在加载完成后恢复机师选择
+    loadAllPilots(function() {
         if (formData.pilot) {
             const pilotSelect = document.getElementById('pilot');
             pilotSelect.value = formData.pilot;
         }
     });
+    initPilotLocalSearch();
     
     // 恢复坐标选择（触发X->Y->Z的联动链）
     setTimeout(function() {

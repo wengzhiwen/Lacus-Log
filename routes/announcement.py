@@ -11,10 +11,10 @@ from models.announcement import (Announcement, AnnouncementChangeLog, Recurrence
 from models.battle_area import BattleArea
 from models.pilot import Pilot
 from models.user import User
+from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (format_local_datetime, get_current_local_datetime_for_input, get_current_local_time, get_current_month_last_day_for_input,
                                    local_to_utc, parse_local_date_to_end_datetime, parse_local_datetime, utc_to_local)
-from utils.filter_state import persist_and_restore_filters
 
 logger = get_logger('announcement')
 
@@ -170,7 +170,13 @@ def list_announcements():
     filters = persist_and_restore_filters(
         'announcements_list',
         allowed_keys=['owner', 'rank', 'x', 'y', 'time'],
-        default_filters={'owner': '', 'rank': '', 'x': '', 'y': '', 'time': 'two_days'},
+        default_filters={
+            'owner': '',
+            'rank': '',
+            'x': '',
+            'y': '',
+            'time': 'two_days'
+        },
     )
     owner_filter = filters.get('owner') or None
     rank_filter = filters.get('rank') or None
@@ -945,7 +951,7 @@ def get_pilots_filtered():
         result = []
         for pilot in pilots:
             owner_name = pilot.owner.nickname or pilot.owner.username if pilot.owner else '无所属'
-            # 统一显示格式与作战记录一致：昵称(年龄)[状态]性别符号
+            # 统一显示字段，显示文本交由前端构建
             age_str = f"({pilot.age})" if getattr(pilot, 'age', None) else ""
             try:
                 gender_value = pilot.gender.value
@@ -959,6 +965,8 @@ def get_pilots_filtered():
                 'name': display_name,
                 'nickname': pilot.nickname,
                 'real_name': pilot.real_name or '',
+                'age': pilot.age or '',
+                'gender': gender_value,
                 'rank': pilot.rank.value,
                 'owner': owner_name
             })
