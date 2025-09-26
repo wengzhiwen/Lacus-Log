@@ -1,12 +1,15 @@
 # 数据库结构设计
 
+> 术语统一记录（2025-09-26）
+> - 历史用语→统一用语：机师→主播；征召→招募；训练→试播；X坐标→基地；Y坐标→场地；Z坐标→坐席；预约训练→预约试播；训练征召→试播招募；训练决策→试播决策。
+> - 本次复核（2025-09-26）：已完成逐段术语检查，正文采用统一用语；数据库/接口字段仍保留历史命名，仅以字段标注说明。
 数据库：`lacus`
 
 ## 集合与索引
 
 ### roles
 - 字段：
-  - `name` 唯一，角色名称（gicho=议长, kancho=舰长）
+  - `name` 唯一，角色名称（gicho=管理员, kancho=运营）
   - `description` 角色描述
   - `permissions` 权限列表（Flask-Security-Too扩展）
 - 索引：
@@ -37,11 +40,11 @@
   - `real_name` 真实姓名，最大20字符
   - `gender` 性别枚举（0=男，1=女，2=不明确）
   - `birth_year` 出生年份
-  - `owner` 所属舰长/议长（关联到users集合）
-  - `platform` 战区枚举（快手/抖音/其他/未知）
-  - `work_mode` 参战形式枚举（线下/线上/未知）
-  - `rank` 阶级枚举（候补机师/训练机师/实习机师/正式机师）
-  - `status` 状态枚举（未征召/不征召/已征召/已签约/已阵亡）
+  - `owner` 直属运营（关联到users集合）
+  - `platform` 开播地点（快手/抖音/其他/未知）
+  - `work_mode` 开播方式（线下/线上/未知）
+  - `rank` 主播分类（候选人/试播主播/实习主播/正式主播）
+  - `status` 状态（未招募/不招募/已招募/已签约/已阵亡）
   - `created_at` 创建时间
   - `updated_at` 最后修改时间
 - 索引：
@@ -54,7 +57,7 @@
 
 ### pilot_change_logs
 - 字段：
-  - `pilot_id` 关联机师ID（关联到pilots集合）
+  - `pilot_id` 关联主播ID（关联到pilots集合）
   - `user_id` 操作用户ID（关联到users集合）
   - `field_name` 变更字段名
   - `old_value` 变更前值
@@ -68,9 +71,9 @@
 
 ### battle_areas
 - 字段：
-  - `x_coord` X坐标，字符串，必填，最大50字符
-  - `y_coord` Y坐标，字符串，必填，最大50字符
-  - `z_coord` Z坐标，字符串，必填，最大50字符
+  - `x_coord` 基地，字符串，必填，最大50字符
+  - `y_coord` 场地，字符串，必填，最大50字符
+  - `z_coord` 坐席，字符串，必填，最大50字符
   - `availability` 可用性枚举（可用/禁用），默认可用
   - `created_at` 创建时间
   - `updated_at` 最后修改时间
@@ -84,11 +87,11 @@
 
 ### announcements
 - 字段：
-  - `pilot` 关联机师（关联到pilots集合）
-  - `battle_area` 关联战斗区域（关联到battle_areas集合）
-  - `x_coord` X坐标快照，字符串，必填
-  - `y_coord` Y坐标快照，字符串，必填
-  - `z_coord` Z坐标快照，字符串，必填
+  - `pilot` 关联主播（关联到pilots集合）
+  - `battle_area` 关联开播地点（关联到battle_areas集合）
+  - `x_coord` 基地快照，字符串，必填
+  - `y_coord` 场地快照，字符串，必填
+  - `z_coord` 坐席快照，字符串，必填
   - `start_time` 开始时间，UTC时间戳
   - `duration_hours` 计划时长，浮点数（1.0-16.0小时，0.5步进）
   - `recurrence_type` 重复类型枚举（无重复/每日/每周/自定义）
@@ -122,37 +125,37 @@
 
 ### recruits
 - 字段：
-  - `pilot` 关联机师（关联到pilots集合）
-  - `recruiter` 征召负责人（关联到users集合，必须是舰长或议长）
+  - `pilot` 关联主播（历史称“机师”，字段名保留为 pilot，关联到 pilots 集合）
+  - `recruiter` 招募负责人（关联到users集合，必须是运营或管理员）
   - `appointment_time` 预约时间，UTC时间戳
-  - `channel` 征召渠道枚举（BOSS/51/介绍/其他）
+  - `channel` 招募渠道枚举（BOSS/51/介绍/其他）
   - `introduction_fee` 介绍费，精确到分（DecimalField，精度2）
   - `remarks` 备注，最大200字符
-  - `status` 征召状态枚举（待面试/待预约训练/待训练/待预约开播/待开播/已结束）
+  - `status` 招募状态枚举（待面试/待预约试播/待试播/待预约开播/待开播/已结束）
   - 新六步制流程字段：
-    - `interview_decision` 面试决策枚举（预约训练/不征召）
+    - `interview_decision` 面试决策枚举（预约试播/不招募）
     - `interview_decision_maker` 面试决策人（关联到users集合）
     - `interview_decision_time` 面试决策时间，UTC时间戳
-    - `scheduled_training_time` 预约训练时间，UTC时间戳
-    - `scheduled_training_decision_maker` 预约训练决策人（关联到users集合）
-    - `scheduled_training_decision_time` 预约训练决策时间，UTC时间戳
-    - `training_decision` 训练决策枚举（预约开播/不征召）
-    - `training_decision_maker` 训练决策人（关联到users集合）
-    - `training_decision_time` 训练决策时间，UTC时间戳
+    - `scheduled_training_time` 预约试播时间，UTC时间戳
+    - `scheduled_training_decision_maker` 预约试播决策人（关联到users集合）
+    - `scheduled_training_decision_time` 预约试播决策时间，UTC时间戳
+    - `training_decision` 试播决策枚举（预约开播/不招募）
+    - `training_decision_maker` 试播决策人（关联到users集合）
+    - `training_decision_time` 试播决策时间，UTC时间戳
     - `scheduled_broadcast_time` 预约开播时间，UTC时间戳
     - `scheduled_broadcast_decision_maker` 预约开播决策人（关联到users集合）
     - `scheduled_broadcast_decision_time` 预约开播决策时间，UTC时间戳
-    - `broadcast_decision` 开播决策枚举（正式机师/实习机师/不征召）
+    - `broadcast_decision` 开播决策枚举（正式主播/实习主播/不招募）
     - `broadcast_decision_maker` 开播决策人（关联到users集合）
     - `broadcast_decision_time` 开播决策时间，UTC时间戳
   - 废弃字段（历史兼容）：
-    - `training_decision_old` 训练征召决策枚举（废弃）
-    - `training_decision_maker_old` 训练征召决策人（废弃）
-    - `training_decision_time_old` 训练征召决策时间（废弃）
-    - `training_time` 训练时间（废弃）
-    - `final_decision` 结束征召决策枚举（废弃）
-    - `final_decision_maker` 结束征召决策人（废弃）
-    - `final_decision_time` 结束征召决策时间（废弃）
+    - `training_decision_old` 试播招募决策枚举（废弃，原称“训练征召决策”）
+    - `training_decision_maker_old` 试播招募决策人（废弃）
+    - `training_decision_time_old` 试播招募决策时间（废弃）
+    - `training_time` 试播时间（废弃）
+    - `final_decision` 结束招募决策枚举（废弃）
+    - `final_decision_maker` 结束招募决策人（废弃）
+    - `final_decision_time` 结束招募决策时间（废弃）
   - `created_at` 创建时间
   - `updated_at` 最后修改时间
 - 索引：
@@ -166,20 +169,20 @@
   - `broadcast_decision` 索引
   - `-scheduled_training_time` 降序索引
   - `-scheduled_broadcast_time` 降序索引
-  - `-interview_decision_time` 降序索引（用于征召日报统计）
-  - `-broadcast_decision_time` 降序索引（用于征召日报统计）
-  - `-training_decision_time` 降序索引（用于训练决策时间查询）
-  - `-scheduled_training_decision_time` 降序索引（用于预约训练决策时间查询）
+  - `-interview_decision_time` 降序索引（用于招募日报统计）
+  - `-broadcast_decision_time` 降序索引（用于招募日报统计）
+  - `-training_decision_time` 降序索引（用于试播决策时间查询）
+  - `-scheduled_training_decision_time` 降序索引（用于预约试播决策时间查询）
   - `-scheduled_broadcast_decision_time` 降序索引（用于预约开播决策时间查询）
   - `training_decision_old` 索引（历史兼容）
   - `final_decision` 索引（历史兼容）
   - `-training_time` 降序索引（历史兼容）
-  - `-training_decision_time_old` 降序索引（历史兼容，用于征召日报统计）
-  - `-final_decision_time` 降序索引（历史兼容，用于征召日报统计）
+  - `-training_decision_time_old` 降序索引（历史兼容，用于招募日报统计）
+  - `-final_decision_time` 降序索引（历史兼容，用于招募日报统计）
 
 ### recruit_change_logs
 - 字段：
-  - `recruit_id` 关联征召ID（关联到recruits集合）
+  - `recruit_id` 关联招募ID（关联到recruits集合）
   - `user_id` 操作用户ID（关联到users集合）
   - `field_name` 变更字段名
   - `old_value` 变更前值
@@ -210,11 +213,11 @@
   - 需设置 `ENABLE_SCHEDULER=true` 才会启动内置调度器并写入/消费计划令牌；开发环境仅在“重载主进程”启动以避免重复注册。
 
 ## 说明
-- 启动时自动创建缺失的角色（gicho/kancho）与默认议长
+- 启动时自动创建缺失的角色（gicho/kancho）与默认管理员
 - 使用Flask-Security-Too的MongoEngineUserDatastore
 - 支持会话跟踪和登录统计
-- 机师管理系统包含完整的CRUD操作和变更记录
-- 作战计划管理系统支持重复事件、冲突检查、变更记录等功能
-- 机师征召管理系统支持六步制征召流程：待面试→待预约训练→待训练→待预约开播→待开播→已结束
-- 征召系统包含完整的决策记录、决策人追踪、变更记录和历史数据兼容性
+- 主播管理系统包含完整的CRUD操作和变更记录（字段名沿用历史命名）
+- 通告管理系统支持重复事件、冲突检查、变更记录等功能
+- 招募管理系统支持六步制招募流程：待面试→待预约试播→待试播→待预约开播→待开播→已结束
+- 招募系统包含完整的决策记录、决策人追踪、变更记录和历史数据兼容性
 - 预计后续将为审计日志、登录日志、业务数据增加索引
