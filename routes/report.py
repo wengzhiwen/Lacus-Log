@@ -685,3 +685,121 @@ def export_daily_csv():
     response = Response(response_data, mimetype='text/csv', headers={'Content-Disposition': content_disposition, 'Content-Type': 'text/csv; charset=utf-8'})
 
     return response
+
+
+# ==================== 征召日报相关函数 ====================
+from models.recruit import Recruit, BroadcastDecision, FinalDecision
+from mongoengine import Q
+
+def _calculate_recruit_statistics(report_date):
+    """计算征召统计数据
+    
+    Args:
+        report_date: 报表日期（本地时间）
+        
+    Returns:
+        dict: 包含报表日、近7日、近14日的统计数据
+    """
+
+    # 计算时间范围
+    report_day_start = report_date
+    report_day_end = report_day_start + timedelta(days=1)
+
+    last_7_days_start = report_date - timedelta(days=6)  # 包含报表日，共7天
+    last_14_days_start = report_date - timedelta(days=13)  # 包含报表日，共14天
+
+    # 转换为UTC时间范围
+    report_day_start_utc = local_to_utc(report_day_start)
+    report_day_end_utc = local_to_utc(report_day_end)
+    last_7_days_start_utc = local_to_utc(last_7_days_start)
+    last_14_days_start_utc = local_to_utc(last_14_days_start)
+
+    # 计算报表日数据
+    report_day_stats = _calculate_period_stats(report_day_start_utc, report_day_end_utc)
+
+    # 计算近7日数据
+    last_7_days_stats = _calculate_period_stats(last_7_days_start_utc, report_day_end_utc)
+
+    # 计算近14日数据
+    last_14_days_stats = _calculate_period_stats(last_14_days_start_utc, report_day_end_utc)
+
+    return {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
+
+
+def _calculate_period_stats(start_utc, end_utc):
+    """计算指定时间范围内的征召统计数据"""
+
+    # 约面：当天创建的征召数量
+    appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
+
+    # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
+    interviews_query = (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+                        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
+    interviews = Recruit.objects.filter(interviews_query).count()
+
+    # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
+    trials_query = (Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
+                    | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
+    trials = Recruit.objects.filter(trials_query).count()
+
+    # 新开播：当天在开播决策中决定征召的数量（不征召不算）
+    new_recruits_query = (
+        Q(broadcast_decision_time__gte=start_utc,
+          broadcast_decision_time__lt=end_utc,
+          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
+    new_recruits = Recruit.objects.filter(new_recruits_query).count()
+
+    return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
+
+
+@report_bp.route('/recruits/daily-report')
+@roles_accepted('gicho', 'kancho')
+def recruit_daily_report():
+    """主播招募日报页面"""
+    logger.info(f"用户 {current_user.username} 访问主播招募日报")
+
+    # 获取报表日期（默认今天）
+    date_str = request.args.get('date')
+    if date_str:
+        report_date = get_local_date_from_string(date_str)
+        if not report_date:
+            report_date = utc_to_local(get_current_utc_time()).replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        report_date = utc_to_local(get_current_utc_time()).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 计算统计数据
+    statistics = _calculate_recruit_statistics(report_date)
+
+    # 计算百分比
+    def safe_percentage(numerator, denominator):
+        if denominator == 0:
+            return 0
+        return round((numerator / denominator) * 100)
+
+    report_day = statistics['report_day']
+    last_7_days = statistics['last_7_days']
+    last_14_days = statistics['last_14_days']
+
+    percentages = {
+        'report_day': {
+            'appointments': safe_percentage(report_day['appointments'], last_7_days['appointments']),
+            'interviews': safe_percentage(report_day['interviews'], last_7_days['interviews']),
+            'trials': safe_percentage(report_day['trials'], last_7_days['trials']),
+            'new_recruits': safe_percentage(report_day['new_recruits'], last_7_days['new_recruits'])
+        },
+        'last_7_days': {
+            'appointments': safe_percentage(last_7_days['appointments'], last_14_days['appointments']),
+            'interviews': safe_percentage(last_7_days['interviews'], last_14_days['interviews']),
+            'trials': safe_percentage(last_7_days['trials'], last_14_days['trials']),
+            'new_recruits': safe_percentage(last_7_days['new_recruits'], last_14_days['new_recruits'])
+        }
+    }
+    statistics['percentages'] = percentages
+
+    # 计算分页导航
+    prev_date = report_date - timedelta(days=1)
+    next_date = report_date + timedelta(days=1)
+    pagination = {'date': report_date.strftime('%Y-%m-%d'), 'prev_date': prev_date.strftime('%Y-%m-%d'), 'next_date': next_date.strftime('%Y-%m-%d')}
+
+    return render_template('recruit_reports/daily.html', statistics=statistics, pagination=pagination)

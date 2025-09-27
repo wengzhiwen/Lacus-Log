@@ -390,10 +390,15 @@ def trigger_unstarted_report():
     return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
 
 
-@report_mail_bp.route('/mail/recruit-daily', methods=['POST'])
+@report_mail_bp.route('/mail/recruit-daily', methods=['GET', 'POST'])
 @roles_required('gicho')
 def trigger_recruit_daily_report():
-    """触发征召日报邮件发送（手动触发）。"""
+    """触发或显示征召日报。GET请求用于显示，POST请求用于触发邮件。"""
+    if request.method == 'GET':
+        # 将GET请求重定向到新的、正确的显示页面
+        return redirect(url_for('report.recruit_daily_report', **request.args))
+
+    # --- 以下为原有的POST逻辑 ---
     username = getattr(current_user, 'username', '未知')
 
     # 获取请求参数

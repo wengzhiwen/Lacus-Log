@@ -11,9 +11,9 @@
 <!-- 日期导航 -->
 <div class="date-navigation">
   <div class="date-controls">
-    <a href="{{ url_for('report_mail.trigger_recruit_daily_report', date=pagination.prev_date) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+    <a href="{{ url_for('report.recruit_daily_report', date=pagination.prev_date) }}" class="btn btn-secondary btn-sm">← 前一日</a>
     <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
-    <a href="{{ url_for('report_mail.trigger_recruit_daily_report', date=pagination.next_date) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+    <a href="{{ url_for('report.recruit_daily_report', date=pagination.next_date) }}" class="btn btn-secondary btn-sm">后一日 →</a>
   </div>
 </div>
 
@@ -303,7 +303,7 @@
 document.getElementById('dateSelector').addEventListener('change', function() {
   const selectedDate = this.value;
   if (selectedDate) {
-    window.location.href = '{{ url_for("recruit.recruit_daily_report") }}?date=' + selectedDate;
+    window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + selectedDate;
   }
 });
 </script>

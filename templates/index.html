@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const recruitCard = document.getElementById('recruitCard');
   if (recruitCard) {
     recruitCard.addEventListener('click', function() {
-      window.location.href = '{{ url_for('recruit.recruit_daily_report') }}';
+      window.location.href = '{{ url_for('report.recruit_daily_report') }}';
     });
   }
   
