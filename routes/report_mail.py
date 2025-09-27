@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from math import floor
 from typing import List
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 from flask_security import current_user, roles_required
 from mongoengine import Q
 
@@ -27,7 +27,7 @@ report_mail_bp = Blueprint('report_mail', __name__)
 
 
 def _build_recruit_daily_markdown(statistics: dict) -> str:
-    """将征召日报统计数据渲染为Markdown表格。
+    """将招募日报统计数据渲染为Markdown表格。
     
     Args:
         statistics: 统计数据字典
@@ -91,7 +91,7 @@ def _build_recruit_daily_markdown(statistics: dict) -> str:
 
 
 def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler') -> dict:
-    """执行征召日报邮件发送任务。
+    """执行招募日报邮件发送任务。
     
     Args:
         report_date: 报表日期字符串（YYYY-MM-DD格式），默认为昨天
@@ -100,7 +100,7 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
     Returns:
         dict: {"sent": bool, "count": int}
     """
-    logger.info('触发征召日报邮件发送，来源：%s，报表日期：%s', triggered_by or '未知', report_date or '昨天')
+    logger.info('触发招募日报邮件发送，来源：%s，报表日期：%s', triggered_by or '未知', report_date or '昨天')
 
     # 确定报表日期
     if not report_date:
@@ -116,14 +116,14 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
         logger.error('报表日期格式错误：%s', report_date)
         return {'sent': False, 'count': 0}
 
-    # 计算统计数据（复用征召日报的计算逻辑）
+    # 计算统计数据（复用招募日报的计算逻辑）
     statistics = _calculate_recruit_statistics(report_date_obj)
 
     # 生成邮件内容
     md_content = _build_recruit_daily_markdown(statistics)
 
     # 添加说明文字
-    full_content = f"""# 机师征召日报
+    full_content = f"""# 主播招募日报
 
 **报表日期：** {report_date}
 
@@ -133,10 +133,10 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
 
 ## 指标说明
 
-- **约面**：当天创建的征召数量
-- **到面**：当天发生的面试决策数量（完成面试决策的数量，不论是决定预约训练，还是决定不征召都算）
-- **试播**：当天发生的开播决策数量（完成开播决策的数量，不论是决定征召，还是决定不征召）
-- **新开播**：当天在开播决策中决定征召的数量（不征召不算）
+- **约面**：当天创建的招募数量
+- **到面**：当天发生的面试决策数量（完成面试决策的数量，不论是决定预约试播，还是决定不招募都算）
+- **试播**：当天发生的开播决策数量（完成开播决策的数量，不论是决定招募，还是决定不招募）
+- **新开播**：当天在开播决策中决定招募的数量（不招募不算）
 
 ---
 *本报表由 Lacus-Log 系统自动生成*
@@ -155,20 +155,20 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
     recipients = list(set(recipients))
 
     # 生成邮件主题
-    subject = f"[Lacus-Log] 机师征召日报 - {report_date}"
+    subject = f"[Lacus-Log] 主播招募日报 - {report_date}"
 
     # 发送邮件
     ok = send_email_md(recipients, subject, full_content)
     if ok:
-        logger.info('征召日报邮件已发送，收件人：%s', ', '.join(recipients))
+        logger.info('招募日报邮件已发送，收件人：%s', ', '.join(recipients))
         return {'sent': True, 'count': len(recipients)}
 
-    logger.error('征召日报邮件发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
+    logger.error('招募日报邮件发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
     return {'sent': False, 'count': len(recipients)}
 
 
 def _calculate_recruit_statistics(report_date):
-    """计算征召统计数据（复用征召日报的计算逻辑）
+    """计算招募统计数据（复用招募日报的计算逻辑）
     
     Args:
         report_date: 报表日期（本地时间）
@@ -203,7 +203,7 @@ def _calculate_recruit_statistics(report_date):
 
 
 def _calculate_period_stats(start_utc, end_utc):
-    """计算指定时间范围内的征召统计数据
+    """计算指定时间范围内的招募统计数据
     
     Args:
         start_utc: 开始时间（UTC）
@@ -213,7 +213,7 @@ def _calculate_period_stats(start_utc, end_utc):
         dict: 包含约面、到面、试播、新开播的统计数据
     """
 
-    # 约面：当天创建的征召数量
+    # 约面：当天创建的招募数量
     appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
 
     # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
@@ -230,7 +230,7 @@ def _calculate_period_stats(start_utc, end_utc):
                     | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
     trials = Recruit.objects.filter(trials_query).count()
 
-    # 新开播：当天在开播决策中决定征召的数量（不征召不算）
+    # 新开播：当天在开播决策中决定招募的数量（不招募不算）
     # 新六步制：使用 broadcast_decision_time 和 broadcast_decision
     # 历史兼容：使用 final_decision_time 和 final_decision
     new_recruits_query = (
@@ -247,7 +247,7 @@ def _build_unstarted_markdown(items: List[dict]) -> str:
     if not items:
         return ''
 
-    header = ("| 主播昵称 | 所属-阶级 | 作战区域 | 计划开播时间（GMT+8） | 计划播时（小时） | 当前超时（小时） | 备注 |\n"
+    header = ("| 主播昵称 | 直属运营-主播分类 | 开播地点 | 计划开播时间（GMT+8） | 计划播时（小时） | 当前超时（小时） | 备注 |\n"
               "| --- | --- | --- | --- | ---: | ---: | --- |")
 
     lines = [header]
@@ -273,7 +273,7 @@ def mail_reports_page():
             fire_dt_utc = datetime.strptime(unstarted_plan.fire_minute, '%Y%m%d%H%M')
             unstarted_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
-        # 征召日报
+        # 招募日报
         recruit_plan = (JobPlan.objects(job_code='daily_recruit_daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
             JobPlan.objects(job_code='daily_recruit_daily_report').order_by('-fire_minute').first())
         recruit_next_local = None
@@ -303,7 +303,7 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
     deadline_threshold_utc = now_utc - timedelta(hours=4)
 
     # 说明：此处将“计划的接受时间”按现有数据模型暂以 Announcement.start_time 代替
-    # 过滤48小时窗口内、且已超过4小时阈值的作战计划
+    # 过滤48小时窗口内、且已超过4小时阈值的通告
     candidate_plans = Announcement.objects.filter(start_time__gte=window_start_utc, start_time__lte=deadline_threshold_utc).order_by('-start_time')
 
     logger.debug('候选计划数量（48小时内且超4小时）：%d', candidate_plans.count())
@@ -311,7 +311,7 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
     unstarted_items: List[dict] = []
     sample_logged = 0
     for ann in candidate_plans:
-        # 若存在与该计划关联的作战记录，则视为已开播
+        # 若存在与该计划关联的开播记录，则视为已开播
         exists_record = BattleRecord.objects.filter(related_announcement=ann).first() is not None
         if exists_record:
             continue
@@ -347,7 +347,7 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
             'start_local': start_local.strftime('%Y-%m-%d %H:%M'),
             'plan_duration_hours': f"{getattr(ann, 'duration_hours', 0):.1f}",
             'overdue_hours': overdue_hours,
-            'note': '请确认是否漏填作战记录'
+            'note': '请确认是否漏填开播记录'
         }
 
         if sample_logged < 5:
@@ -393,7 +393,7 @@ def trigger_unstarted_report():
 @report_mail_bp.route('/mail/recruit-daily', methods=['GET', 'POST'])
 @roles_required('gicho')
 def trigger_recruit_daily_report():
-    """触发或显示征召日报。GET请求用于显示，POST请求用于触发邮件。"""
+    """触发或显示招募日报。GET请求用于显示，POST请求用于触发邮件。"""
     if request.method == 'GET':
         # 将GET请求重定向到新的、正确的显示页面
         return redirect(url_for('report.recruit_daily_report', **request.args))

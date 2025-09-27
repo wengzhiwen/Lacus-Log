@@ -18,22 +18,22 @@
       <span class="hamburger"></span>
     </button>
     <nav class="topnav" id="topNav">
-      <a class="navlink" href="{{ url_for('main.home') }}">首页</a>
+      <a class="navlink" href="{{ url_for('main.home') }}">🏠首页</a>
       {% if current_user.roles | selectattr('name', 'equalto', 'gicho') | list | length > 0 %}
-      <a class="navlink" href="{{ url_for('admin.users_list') }}">基础-运营管理</a>
+      <a class="navlink" href="{{ url_for('admin.users_list') }}">✈️基础-运营管理</a>
       {% endif %}
       {% if current_user.has_role('gicho') %}
-      <a class="navlink" href="{{ url_for('battle_area.list_areas') }}">基础-开播地点管理</a>
+      <a class="navlink" href="{{ url_for('battle_area.list_areas') }}">✈️基础-开播地点管理</a>
       {% endif %}
       {% if current_user.has_role('gicho') or current_user.has_role('kancho') %}
-      <a class="navlink" href="{{ url_for('pilot.list_pilots') }}">🧑‍✈️主播管理</a>
-      <a class="navlink" href="{{ url_for('recruit.list_recruits') }}">🧑‍✈️主播招募</a>
-      <a class="navlink" href="{{ url_for('report.recruit_daily_report') }}">📊主播招募日报</a>
-      <a class="navlink" href="{{ url_for('announcement.list_announcements') }}">📅通告-通告计划</a>
+      <a class="navlink" href="{{ url_for('pilot.list_pilots') }}">🎤主播-主播管理</a>
+      <a class="navlink" href="{{ url_for('recruit.list_recruits') }}">🎤主播-主播招募</a>
+      <a class="navlink" href="{{ url_for('report.recruit_daily_report') }}">🎤主播-招募日报</a>
+      <a class="navlink" href="{{ url_for('announcement.list_announcements') }}">📅通告-通告管理</a>
       <a class="navlink" href="{{ url_for('calendar.index') }}">📅通告-通告日历</a>
-      <a class="navlink" href="{{ url_for('announcement.export_page') }}">📅通告-通告计划导出</a>
-      <a class="navlink" href="{{ url_for('battle_record.list_battle_records') }}">📒开播记录</a>
-      <a class="navlink" href="{{ url_for('report.daily_report') }}">📊开播日报</a>
+      <a class="navlink" href="{{ url_for('announcement.export_page') }}">📅通告-通告导出</a>
+      <a class="navlink" href="{{ url_for('battle_record.list_battle_records') }}">📒开播-开播记录</a>
+      <a class="navlink" href="{{ url_for('report.daily_report') }}">📒开播-开播日报</a>
       {% if current_user.has_role('gicho') %}
       <a class="navlink" href="{{ url_for('report_mail.mail_reports_page') }}">📧邮件报告</a>
       {% endif %}

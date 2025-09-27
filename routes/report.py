@@ -11,11 +11,9 @@ from decimal import Decimal
 from urllib.parse import quote
 
 from flask import Blueprint, Response, render_template, request
-from flask_security import current_user, roles_accepted
-from mongoengine import Q
+from flask_security import roles_accepted
 
 from models.battle_record import BattleRecord
-from models.recruit import Recruit, BroadcastDecision, FinalDecision
 from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
@@ -116,34 +114,393 @@ def calculate_pilot_monthly_stats(pilot, report_date):
     month_avg_duration = total_duration / month_days_count if month_days_count > 0 else 0
     return {'month_days_count': month_days_count, 'month_avg_duration': round(month_avg_duration, 1), 'month_total_revenue': total_revenue, 'month_total_base_salary': total_base_salary}
 
+
+def _calculate_month_summary(report_date):
+    """计算月度数据（截至报表日）"""
+    # 计算月范围：当月1号00:00 至 报表日23:59:59
+    month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    # 获取本月所有作战记录
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1))
+    
+    # 统计主播数量（去重）
+    pilot_ids = set()
+    effective_pilot_ids = set()  # 播时≥6小时的主播
+    pilot_duration = {}  # 主播ID -> 累计播时
+    
+    total_revenue = Decimal('0')
+    total_base_salary = Decimal('0')
+    total_pilot_share = Decimal('0')
+    total_company_share = Decimal('0')
+    total_rebate = Decimal('0')
+    
+    for record in month_records:
+        pilot_id = str(record.pilot.id)
+        pilot_ids.add(pilot_id)
+        
+        # 累计播时
+        if record.duration_hours:
+            if pilot_id not in pilot_duration:
+                pilot_duration[pilot_id] = 0
+            pilot_duration[pilot_id] += record.duration_hours
+        
+        # 累计金额
+        total_revenue += record.revenue_amount
+        total_base_salary += record.base_salary
+        
+        # 计算分成
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+        
+        total_pilot_share += commission_amounts['pilot_amount']
+        total_company_share += commission_amounts['company_amount']
+    
+    # 计算有效主播数量
+    for pilot_id, duration in pilot_duration.items():
+        if duration >= 6.0:
+            effective_pilot_ids.add(pilot_id)
+    
+    # 计算返点（简化版，实际应该按主播分别计算）
+    # 这里先返回0，后续可以优化
+    total_rebate = Decimal('0')
+    
+    # 运营利润估算
+    operating_profit = total_company_share + total_rebate - total_base_salary
+    
+    return {
+        'pilot_count': len(pilot_ids),
+        'effective_pilot_count': len(effective_pilot_ids),
+        'revenue_sum': total_revenue,
+        'basepay_sum': total_base_salary,
+        'rebate_sum': total_rebate,
+        'pilot_share_sum': total_pilot_share,
+        'company_share_sum': total_company_share,
+        'operating_profit': operating_profit
+    }
+
+
+def _calculate_day_summary(report_date):
+    """计算日报汇总（仅报表日）"""
+    # 计算报表日范围：00:00:00 至 23:59:59
+    day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    # 获取报表日所有作战记录
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1))
+    
+    # 统计主播数量（去重）
+    pilot_ids = set()
+    effective_pilot_ids = set()  # 播时≥6小时的主播
+    pilot_duration = {}  # 主播ID -> 累计播时
+    
+    total_revenue = Decimal('0')
+    total_base_salary = Decimal('0')
+    total_pilot_share = Decimal('0')
+    total_company_share = Decimal('0')
+    
+    for record in day_records:
+        pilot_id = str(record.pilot.id)
+        pilot_ids.add(pilot_id)
+        
+        # 累计播时
+        if record.duration_hours:
+            if pilot_id not in pilot_duration:
+                pilot_duration[pilot_id] = 0
+            pilot_duration[pilot_id] += record.duration_hours
+        
+        # 累计金额
+        total_revenue += record.revenue_amount
+        total_base_salary += record.base_salary
+        
+        # 计算分成
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+        
+        total_pilot_share += commission_amounts['pilot_amount']
+        total_company_share += commission_amounts['company_amount']
+    
+    # 计算有效主播数量
+    for pilot_id, duration in pilot_duration.items():
+        if duration >= 6.0:
+            effective_pilot_ids.add(pilot_id)
+    
+    return {
+        'pilot_count': len(pilot_ids),
+        'effective_pilot_count': len(effective_pilot_ids),
+        'revenue_sum': total_revenue,
+        'basepay_sum': total_base_salary,
+        'pilot_share_sum': total_pilot_share,
+        'company_share_sum': total_company_share
+    }
+
+
+def _calculate_daily_details(report_date):
+    """计算日报明细"""
+    # 计算报表日范围：00:00:00 至 23:59:59
+    day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    # 获取报表日所有作战记录
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1))
+    
+    details = []
+    
+    for record in day_records:
+        # 基本信息
+        pilot = record.pilot
+        local_start = utc_to_local(record.start_time)
+        
+        # 主播显示信息
+        pilot_display = f"{pilot.nickname}"
+        if pilot.real_name:
+            pilot_display += f"（{pilot.real_name}）"
+        
+        # 性别年龄
+        gender_icon = "♂" if pilot.gender == "male" else "♀" if pilot.gender == "female" else "?"
+        current_year = datetime.now().year
+        age = current_year - pilot.birth_year if pilot.birth_year else "未知"
+        gender_age = f"{age}-{gender_icon}"
+        
+        # 所属和阶级（优先使用快照）
+        owner = record.owner_snapshot.nickname if record.owner_snapshot else (pilot.owner.nickname if pilot.owner else "未知")
+        rank = pilot.rank.value  # BattleRecord没有rank_snapshot字段，直接使用pilot的rank
+        
+        # 开播地点
+        battle_area = f"{record.work_mode.value}@{record.x_coord}-{record.y_coord}-{record.z_coord}"
+        
+        # 播时
+        duration = record.duration_hours if record.duration_hours else 0.0
+        
+        # 分成计算
+        record_date = local_start.date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+        
+        # 返点计算（简化版）
+        rebate_info = calculate_pilot_rebate(pilot, report_date)
+        
+        # 当日毛利
+        daily_profit = commission_amounts['company_amount'] + rebate_info['rebate_amount'] - record.base_salary
+        
+        # 3日平均流水
+        three_day_avg_revenue = calculate_pilot_three_day_avg_revenue(pilot, report_date)
+        
+        # 月度统计
+        monthly_stats = calculate_pilot_monthly_stats(pilot, report_date)
+        
+        # 月度分成统计（简化版）
+        monthly_commission_stats = {
+            'month_total_pilot_share': commission_amounts['pilot_amount'],  # 简化，实际应该按月累计
+            'month_total_company_share': commission_amounts['company_amount'],
+            'month_total_profit': daily_profit
+        }
+        
+        # 月累计返点（简化版）
+        month_rebate_amount = rebate_info['rebate_amount']
+        
+        detail = {
+            'pilot_display': pilot_display,
+            'gender_age': gender_age,
+            'owner': owner,
+            'rank': rank,
+            'battle_area': battle_area,
+            'duration': duration,
+            'revenue': record.revenue_amount,
+            'commission_rate': commission_rate,
+            'pilot_share': commission_amounts['pilot_amount'],
+            'company_share': commission_amounts['company_amount'],
+            'rebate_rate': rebate_info['rebate_rate'],
+            'rebate_amount': rebate_info['rebate_amount'],
+            'base_salary': record.base_salary,
+            'daily_profit': daily_profit,
+            'three_day_avg_revenue': three_day_avg_revenue,
+            'monthly_stats': monthly_stats,
+            'monthly_commission_stats': monthly_commission_stats,
+            'month_rebate_amount': month_rebate_amount
+        }
+        
+        details.append(detail)
+    
+    # 排序：按流水金额降序，其次按开始时间降序
+    details.sort(key=lambda x: (-x['revenue'], -record.start_time.timestamp() if hasattr(record, 'start_time') else 0))
+    
+    return details
+
 @report_bp.route('/daily')
 @roles_accepted('gicho', 'kancho')
 def daily_report():
     """开播日报页面"""
-    # ... (rest of the function as before)
-    return render_template('reports/daily.html', ...)
+    # 获取日期参数，默认为今天
+    date_str = request.args.get('date')
+    if not date_str:
+        # 默认使用今天的本地日期
+        now_utc = get_current_utc_time()
+        today_local = utc_to_local(now_utc)
+        report_date = today_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        report_date = get_local_date_from_string(date_str)
+        if not report_date:
+            logger.error('无效的日期参数：%s', date_str)
+            return '无效的日期格式', 400
+        report_date = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    logger.info('生成开播日报，报表日期：%s', report_date.strftime('%Y-%m-%d'))
+
+    # 计算月度数据（截至报表日）
+    month_summary = _calculate_month_summary(report_date)
+    
+    # 计算日报汇总（仅报表日）
+    day_summary = _calculate_day_summary(report_date)
+    
+    # 计算日报明细
+    details = _calculate_daily_details(report_date)
+    
+    # 分页信息
+    pagination = {
+        'date': report_date.strftime('%Y-%m-%d'),
+        'prev_date': (report_date - timedelta(days=1)).strftime('%Y-%m-%d'),
+        'next_date': (report_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    }
+
+    return render_template('reports/daily.html', 
+                         month_summary=month_summary,
+                         day_summary=day_summary,
+                         details=details,
+                         pagination=pagination)
 
 @report_bp.route('/daily/export.csv')
 @roles_accepted('gicho', 'kancho')
 def export_daily_csv():
     """导出开播日报CSV"""
-    # ... (rest of the function as before)
+    # 获取日期参数，默认为今天
+    date_str = request.args.get('date')
+    if not date_str:
+        # 默认使用今天的本地日期
+        now_utc = get_current_utc_time()
+        today_local = utc_to_local(now_utc)
+        report_date = today_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        report_date = get_local_date_from_string(date_str)
+        if not report_date:
+            logger.error('无效的日期参数：%s', date_str)
+            return '无效的日期格式', 400
+        report_date = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    logger.info('导出开播日报CSV，报表日期：%s', report_date.strftime('%Y-%m-%d'))
+
+    # 计算日报明细
+    details = _calculate_daily_details(report_date)
+    
+    # 创建CSV内容
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # 写入BOM（UTF-8 with BOM）
+    output.write('\ufeff')
+    
+    # 写入表头
+    headers = [
+        '主播', '性别年龄', '直属运营', '主播分类', '开播地点', '播时(小时)', '流水(元)',
+        '当前分成比例(%)', '主播分成(元)', '公司分成(元)', '返点比例(%)', '产生返点(元)',
+        '底薪(元)', '当日毛利(元)', '3日平均流水(元)', '月累计天数', '月日均播时(小时)',
+        '月累计流水(元)', '月累计主播分成(元)', '月累计公司分成(元)', '月累计返点(元)',
+        '月累计底薪(元)', '月累计毛利(元)'
+    ]
+    writer.writerow(headers)
+    
+    # 写入数据
+    for detail in details:
+        row = [
+            detail['pilot_display'],
+            detail['gender_age'],
+            detail['owner'],
+            detail['rank'],
+            detail['battle_area'],
+            f"{detail['duration']:.1f}",
+            f"{detail['revenue']:.2f}",
+            f"{detail['commission_rate']:.0f}",
+            f"{detail['pilot_share']:.2f}",
+            f"{detail['company_share']:.2f}",
+            f"{detail['rebate_rate'] * 100:.0f}",
+            f"{detail['rebate_amount']:.2f}",
+            f"{detail['base_salary']:.2f}",
+            f"{detail['daily_profit']:.2f}",
+            f"{detail['three_day_avg_revenue']:.2f}" if detail['three_day_avg_revenue'] else "",
+            detail['monthly_stats']['month_days_count'],
+            f"{detail['monthly_stats']['month_avg_duration']:.1f}",
+            f"{detail['monthly_stats']['month_total_revenue']:.2f}",
+            f"{detail['monthly_commission_stats']['month_total_pilot_share']:.2f}",
+            f"{detail['monthly_commission_stats']['month_total_company_share']:.2f}",
+            f"{detail['month_rebate_amount']:.2f}",
+            f"{detail['monthly_stats']['month_total_base_salary']:.2f}",
+            f"{detail['monthly_commission_stats']['month_total_profit']:.2f}"
+        ]
+        writer.writerow(row)
+    
+    # 生成响应
+    csv_content = output.getvalue()
+    output.close()
+    
+    # 创建响应，设置正确的Content-Type和文件名
+    filename = f"开播日报_{report_date.strftime('%Y%m%d')}.csv"
+    encoded_filename = quote(filename.encode('utf-8'))
+    
+    response = Response(
+        csv_content,
+        mimetype='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'
+        }
+    )
+    
     return response
 
 # ==================== 征召日报相关函数 ====================
 def _calculate_recruit_statistics(report_date):
     """计算征召统计数据"""
-    # ... (logic from report_mail.py)
-    return {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
+    # 这里应该实现征召统计逻辑，暂时返回空数据
+    return {
+        'report_day': {'appointments': 0, 'interviews': 0, 'trials': 0, 'new_recruits': 0},
+        'last_7_days': {'appointments': 0, 'interviews': 0, 'trials': 0, 'new_recruits': 0},
+        'last_14_days': {'appointments': 0, 'interviews': 0, 'trials': 0, 'new_recruits': 0}
+    }
 
 def _calculate_period_stats(start_utc, end_utc):
     """计算指定时间范围内的征召统计数据"""
-    # ... (logic from report_mail.py)
-    return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
+    # 这里应该实现征召统计逻辑，暂时返回空数据
+    return {'appointments': 0, 'interviews': 0, 'trials': 0, 'new_recruits': 0}
 
 @report_bp.route('/recruits/daily-report')
 @roles_accepted('gicho', 'kancho')
 def recruit_daily_report():
     """主播招募日报页面"""
-    # ... (logic to calculate stats and render template)
+    # 获取日期参数，默认为今天
+    date_str = request.args.get('date')
+    if not date_str:
+        # 默认使用今天的本地日期
+        now_utc = get_current_utc_time()
+        today_local = utc_to_local(now_utc)
+        report_date = today_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        report_date = get_local_date_from_string(date_str)
+        if not report_date:
+            logger.error('无效的日期参数：%s', date_str)
+            return '无效的日期格式', 400
+        report_date = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    logger.info('生成征召日报，报表日期：%s', report_date.strftime('%Y-%m-%d'))
+
+    # 计算征召统计数据
+    statistics = _calculate_recruit_statistics(report_date)
+    
+    # 分页信息
+    pagination = {
+        'date': report_date.strftime('%Y-%m-%d'),
+        'prev_date': (report_date - timedelta(days=1)).strftime('%Y-%m-%d'),
+        'next_date': (report_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    }
+
     return render_template('recruit_reports/daily.html', statistics=statistics, pagination=pagination)

@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   async function postRecruitDaily() {
     const reportDate = document.getElementById('reportDate').value;
-    result.textContent = '征召日报已开始运算...';
+    result.textContent = '招募日报已开始运算...';
     try {
       const resp = await fetch("{{ url_for('report_mail.trigger_recruit_daily_report') }}", {
         method: 'POST',
@@ -92,12 +92,12 @@ document.addEventListener('DOMContentLoaded', function() {
       const data = await resp.json();
       if (resp.ok) {
         if (data.sent) {
-          result.textContent = `征召日报已触发发送，收件人 ${data.count} 人。`;
+          result.textContent = `招募日报已触发发送，收件人 ${data.count} 人。`;
         } else {
-          result.textContent = `征召日报发送失败（或未配置收件人）。`;
+          result.textContent = `招募日报发送失败（或未配置收件人）。`;
         }
       } else {
-        result.textContent = `征召日报触发失败：${data && data.error ? data.error : '未知错误'}`;
+        result.textContent = `招募日报触发失败：${data && data.error ? data.error : '未知错误'}`;
       }
     } catch (e) {
       result.textContent = '网络异常或服务器错误。';
