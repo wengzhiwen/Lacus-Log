@@ -309,7 +309,7 @@ def _calculate_daily_details(report_date):
             pilot_display += f"（{pilot.real_name}）"
 
         # 性别年龄
-        gender_icon = "♂" if pilot.gender == "male" else "♀" if pilot.gender == "female" else "?"
+        gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
         current_year = datetime.now().year
         age = current_year - pilot.birth_year if pilot.birth_year else "未知"
         gender_age = f"{age}-{gender_icon}"
