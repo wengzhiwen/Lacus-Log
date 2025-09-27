@@ -462,11 +462,40 @@ def export_daily_csv():
 def _calculate_recruit_statistics(report_date):
     """计算征召统计数据"""
     # 这里应该实现征召统计逻辑，暂时返回空数据
-    return {
+    statistics = {
         'report_day': {'appointments': 0, 'interviews': 0, 'trials': 0, 'new_recruits': 0},
         'last_7_days': {'appointments': 0, 'interviews': 0, 'trials': 0, 'new_recruits': 0},
         'last_14_days': {'appointments': 0, 'interviews': 0, 'trials': 0, 'new_recruits': 0}
     }
+    
+    # 计算百分比（基于report_day和last_7_days的对比）
+    percentages = {
+        'report_day': {},
+        'last_7_days': {}
+    }
+    
+    # 计算report_day相对于last_7_days的百分比
+    for key in ['appointments', 'interviews', 'trials', 'new_recruits']:
+        report_value = statistics['report_day'][key]
+        last_7_value = statistics['last_7_days'][key]
+        
+        if last_7_value > 0:
+            percentages['report_day'][key] = round((report_value / last_7_value) * 100, 1)
+        else:
+            percentages['report_day'][key] = 0.0
+    
+    # 计算last_7_days相对于last_14_days的百分比
+    for key in ['appointments', 'interviews', 'trials', 'new_recruits']:
+        last_7_value = statistics['last_7_days'][key]
+        last_14_value = statistics['last_14_days'][key]
+        
+        if last_14_value > 0:
+            percentages['last_7_days'][key] = round((last_7_value / last_14_value) * 100, 1)
+        else:
+            percentages['last_7_days'][key] = 0.0
+    
+    statistics['percentages'] = percentages
+    return statistics
 
 def _calculate_period_stats(start_utc, end_utc):
     """计算指定时间范围内的征召统计数据"""
