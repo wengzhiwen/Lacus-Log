@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block title %}开播月报 - {{ pagination.month }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">📊 开播月报</h1>
+  <p class="text-muted">{{ report_month.strftime('%Y年%m月') }}</p>
+</div>
+
+<!-- 月份导航 -->
+<div class="date-navigation">
+  <div class="date-controls">
+    <a href="{{ url_for('report.monthly_report', month=pagination.prev_month) }}" class="btn btn-secondary btn-sm">← 上个月</a>
+    <input type="month" id="monthSelector" value="{{ pagination.month }}" class="date-input">
+    <a href="{{ url_for('report.monthly_report', month=pagination.next_month) }}" class="btn btn-secondary btn-sm">下个月 →</a>
+  </div>
+  <div class="export-actions">
+    <a href="{{ url_for('report.export_monthly_csv', month=pagination.month) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+  </div>
+</div>
+
+<!-- 月度汇总数据 -->
+<div class="summary-section">
+  <h2 class="section-title">{{ report_month.strftime('%Y年%m月') }} 月度汇总</h2>
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="card-label">总主播数量</div>
+      <div class="card-value">{{ month_summary.pilot_count }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计流水</div>
+      <div class="card-value {% if month_summary.revenue_sum < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(month_summary.revenue_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计底薪支出</div>
+      <div class="card-value {% if month_summary.basepay_sum < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(month_summary.basepay_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计返点</div>
+      <div class="card-value {% if month_summary.rebate_sum < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(month_summary.rebate_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计主播分成</div>
+      <div class="card-value {% if month_summary.pilot_share_sum < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(month_summary.pilot_share_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">累计公司分成</div>
+      <div class="card-value {% if month_summary.company_share_sum < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(month_summary.company_share_sum) }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">运营利润估算</div>
+      <div class="card-value {% if month_summary.operating_profit < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(month_summary.operating_profit) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- 月报明细 -->
+<div class="details-section">
+  <h2 class="section-title">月报明细</h2>
+  {% if details %}
+  <div class="table-container">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th class="fixed-col">主播</th>
+          <th>性别年龄</th>
+          <th>直属运营</th>
+          <th>主播分类</th>
+          <th>月累计开播记录数</th>
+          <th>月均播时(小时)</th>
+          <th>月累计流水(元)</th>
+          <th>月累计主播分成(元)</th>
+          <th>月累计公司分成(元)</th>
+          <th>月最新返点比例(%)</th>
+          <th>月累计返点(元)</th>
+          <th>月累计底薪(元)</th>
+          <th>月累计毛利(元)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for detail in details %}
+        <tr>
+          <td class="fixed-col">
+            <a href="{{ url_for('pilot.pilot_performance', pilot_id=detail.pilot_id) }}" class="pilot-link">
+              {{ detail.pilot_display }}
+            </a>
+          </td>
+          <td>{{ detail.gender_age }}</td>
+          <td>{{ detail.owner }}</td>
+          <td>{{ detail.rank | normalize_rank }}</td>
+          <td>{{ detail.records_count }}</td>
+          <td>{{ "{:.1f}".format(detail.avg_duration) }}小时</td>
+          <td class="{% if detail.total_revenue < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(detail.total_revenue) }}</td>
+          <td class="{% if detail.total_pilot_share < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(detail.total_pilot_share) }}</td>
+          <td class="{% if detail.total_company_share < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(detail.total_company_share) }}</td>
+          <td>{{ "{:.0f}".format(detail.rebate_rate * 100) }}%</td>
+          <td class="{% if detail.rebate_amount < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(detail.rebate_amount) }}</td>
+          <td class="{% if detail.total_base_salary < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(detail.total_base_salary) }}</td>
+          <td class="{% if detail.total_profit < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(detail.total_profit) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>本月暂无开播记录</p>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+/* 月份导航样式 */
+.date-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--table-header);
+  border-radius: 8px;
+}
+
+.date-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.export-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 汇总卡片样式 */
+.summary-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+/* 明细表格样式 */
+.details-section {
+  margin: 24px 0;
+}
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1500px;
+}
+
+.report-table th,
+.report-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.report-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.report-table th.fixed-col,
+.report-table td.fixed-col {
+  position: sticky;
+  left: 0;
+  background: #fff; /* 不透明底色，避免被遮挡时透出 */
+  background-clip: padding-box;
+  min-width: 120px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 提升层叠顺序，确保首列在横向滚动时不被内容遮挡 */
+.report-table td.fixed-col { z-index: 4; }
+.report-table th.fixed-col { z-index: 5; }
+
+/* 分隔视觉，横向滚动时更清晰 */
+.report-table td.fixed-col { box-shadow: 2px 0 0 #eee; }
+.report-table th.fixed-col { box-shadow: 2px 0 0 #ddd; }
+
+.report-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+/* 主播链接样式 */
+.pilot-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pilot-link:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
+/* 负数样式 */
+.negative-value {
+  color: #dc3545 !important;
+  font-weight: 600;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .date-navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .summary-card {
+    padding: 12px;
+  }
+
+  .card-value {
+    font-size: 20px;
+  }
+
+  .report-table {
+    font-size: 12px;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 8px 6px;
+  }
+}
+</style>
+
+<script>
+// 月份选择器事件
+document.getElementById('monthSelector').addEventListener('change', function() {
+  const selectedMonth = this.value;
+  if (selectedMonth) {
+    window.location.href = '{{ url_for("report.monthly_report") }}?month=' + selectedMonth;
+  }
+});
+</script>
+{% endblock %}

@@ -563,6 +563,226 @@ def _get_recruit_records_for_detail(report_date, range_param, metric, recruiter_
     return get_recruit_records_for_detail(report_date, range_param, metric, recruiter_id)
 
 
+# ==================== 开播月报相关函数 ====================
+def get_local_month_from_string(month_str):
+    """将月份字符串解析为本地日期对象"""
+    if not month_str:
+        return None
+    try:
+        return datetime.strptime(month_str, '%Y-%m')
+    except ValueError:
+        return None
+
+
+def get_battle_records_for_month(year, month):
+    """获取指定月份的所有开播记录"""
+    # 计算月范围：当月1号00:00 至 当月最后一天23:59:59
+    month_start = datetime(year, month, 1, 0, 0, 0, 0)
+    if month == 12:
+        next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
+    else:
+        next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
+    month_end = next_month_start - timedelta(microseconds=1)
+    
+    return get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1))
+
+
+def calculate_pilot_monthly_commission_stats(pilot, year, month):
+    """计算主播月度分成统计数据（按日计算后累加）"""
+    month_start = datetime(year, month, 1, 0, 0, 0, 0)
+    if month == 12:
+        next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
+    else:
+        next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
+    month_end = next_month_start - timedelta(microseconds=1)
+    
+    # 获取该主播当月所有开播记录
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1)).filter(pilot=pilot)
+    
+    total_pilot_share = Decimal('0')
+    total_company_share = Decimal('0')
+    total_base_salary = Decimal('0')
+    
+    for record in month_records:
+        # 按每条记录的日期计算分成
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+        
+        total_pilot_share += commission_amounts['pilot_amount']
+        total_company_share += commission_amounts['company_amount']
+        total_base_salary += record.base_salary
+    
+    return {
+        'total_pilot_share': total_pilot_share,
+        'total_company_share': total_company_share,
+        'total_base_salary': total_base_salary
+    }
+
+
+def calculate_pilot_monthly_rebate_stats(pilot, year, month):
+    """计算主播月度返点统计"""
+    if month == 12:
+        next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
+    else:
+        next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
+    month_end = next_month_start - timedelta(microseconds=1)
+    
+    # 使用现有的返点计算逻辑，以月末日期为准
+    return calculate_pilot_rebate(pilot, month_end)
+
+
+def _calculate_monthly_summary(year, month):
+    """计算月度汇总数据"""
+    # 获取当月所有开播记录
+    month_records = get_battle_records_for_month(year, month)
+    
+    # 统计主播数量（去重）
+    pilot_ids = set()
+    pilot_duration = {}  # 主播ID -> 累计播时
+    pilot_records_count = {}  # 主播ID -> 开播记录数
+    
+    total_revenue = Decimal('0')
+    total_base_salary = Decimal('0')
+    total_pilot_share = Decimal('0')
+    total_company_share = Decimal('0')
+    total_rebate = Decimal('0')
+    
+    for record in month_records:
+        pilot_id = str(record.pilot.id)
+        pilot_ids.add(pilot_id)
+        
+        # 累计播时和记录数
+        if record.duration_hours:
+            if pilot_id not in pilot_duration:
+                pilot_duration[pilot_id] = 0
+            pilot_duration[pilot_id] += record.duration_hours
+        
+        if pilot_id not in pilot_records_count:
+            pilot_records_count[pilot_id] = 0
+        pilot_records_count[pilot_id] += 1
+        
+        # 累计金额
+        total_revenue += record.revenue_amount
+        total_base_salary += record.base_salary
+        
+        # 计算分成
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+        
+        total_pilot_share += commission_amounts['pilot_amount']
+        total_company_share += commission_amounts['company_amount']
+    
+    # 计算返点（简化版，实际应该按主播分别计算）
+    total_rebate = Decimal('0')
+    
+    # 运营利润估算
+    operating_profit = total_company_share + total_rebate - total_base_salary
+    
+    return {
+        'pilot_count': len(pilot_ids),
+        'revenue_sum': total_revenue,
+        'basepay_sum': total_base_salary,
+        'rebate_sum': total_rebate,
+        'pilot_share_sum': total_pilot_share,
+        'company_share_sum': total_company_share,
+        'operating_profit': operating_profit
+    }
+
+
+def _calculate_monthly_details(year, month):
+    """计算月度明细数据"""
+    # 获取当月所有开播记录
+    month_records = get_battle_records_for_month(year, month)
+    
+    # 按主播分组统计
+    pilot_stats = {}
+    
+    for record in month_records:
+        pilot_id = str(record.pilot.id)
+        
+        if pilot_id not in pilot_stats:
+            pilot_stats[pilot_id] = {
+                'pilot': record.pilot,
+                'records_count': 0,
+                'total_duration': 0,
+                'total_revenue': Decimal('0'),
+                'total_base_salary': Decimal('0')
+            }
+        
+        # 累计统计
+        pilot_stats[pilot_id]['records_count'] += 1
+        if record.duration_hours:
+            pilot_stats[pilot_id]['total_duration'] += record.duration_hours
+        pilot_stats[pilot_id]['total_revenue'] += record.revenue_amount
+        pilot_stats[pilot_id]['total_base_salary'] += record.base_salary
+    
+    details = []
+    
+    for pilot_id, stats in pilot_stats.items():
+        pilot = stats['pilot']
+        
+        # 主播显示信息
+        pilot_display = f"{pilot.nickname}"
+        if pilot.real_name:
+            pilot_display += f"（{pilot.real_name}）"
+        
+        # 性别年龄（当前的）
+        gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
+        current_year = datetime.now().year
+        age = current_year - pilot.birth_year if pilot.birth_year else "未知"
+        gender_age = f"{age}-{gender_icon}"
+        
+        # 直属运营（当前的）
+        owner = pilot.owner.nickname if pilot.owner else "未知"
+        
+        # 主播分类（当前的）
+        rank = pilot.rank.value
+        
+        # 月累计开播记录数
+        records_count = stats['records_count']
+        
+        # 月均播时（月总播时/月累计开播记录数）
+        avg_duration = stats['total_duration'] / records_count if records_count > 0 else 0
+        
+        # 月累计流水
+        total_revenue = stats['total_revenue']
+        
+        # 月累计分成数据（按日计算后累加）
+        commission_stats = calculate_pilot_monthly_commission_stats(pilot, year, month)
+        
+        # 月最新返点比例和累计返点
+        rebate_stats = calculate_pilot_monthly_rebate_stats(pilot, year, month)
+        
+        # 月累计毛利
+        total_profit = commission_stats['total_company_share'] + rebate_stats['rebate_amount'] - commission_stats['total_base_salary']
+        
+        detail = {
+            'pilot_id': pilot_id,
+            'pilot_display': pilot_display,
+            'gender_age': gender_age,
+            'owner': owner,
+            'rank': rank,
+            'records_count': records_count,
+            'avg_duration': round(avg_duration, 1),
+            'total_revenue': total_revenue,
+            'total_pilot_share': commission_stats['total_pilot_share'],
+            'total_company_share': commission_stats['total_company_share'],
+            'rebate_rate': rebate_stats['rebate_rate'],
+            'rebate_amount': rebate_stats['rebate_amount'],
+            'total_base_salary': commission_stats['total_base_salary'],
+            'total_profit': total_profit
+        }
+        
+        details.append(detail)
+    
+    # 排序：按月累计毛利升序（亏钱的排前面）
+    details.sort(key=lambda x: x['total_profit'])
+    
+    return details
+
+
 # _calculate_period_stats 函数已移至 utils/recruit_stats.py
 
 
@@ -678,3 +898,115 @@ def recruit_report_detail():
                            recruiter_name=recruiter_name,
                            recruits=recruits,
                            return_url=return_url)
+
+
+@report_bp.route('/monthly')
+@roles_accepted('gicho', 'kancho')
+def monthly_report():
+    """开播月报页面"""
+    # 获取月份参数，默认为当前月
+    month_str = request.args.get('month')
+    if not month_str:
+        # 默认使用当前月
+        now_utc = get_current_utc_time()
+        today_local = utc_to_local(now_utc)
+        report_month = today_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        report_month = get_local_month_from_string(month_str)
+        if not report_month:
+            logger.error('无效的月份参数：%s', month_str)
+            return '无效的月份格式', 400
+        report_month = report_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    logger.info('生成开播月报，报表月份：%s', report_month.strftime('%Y-%m'))
+
+    # 计算月度汇总数据
+    month_summary = _calculate_monthly_summary(report_month.year, report_month.month)
+
+    # 计算月度明细
+    details = _calculate_monthly_details(report_month.year, report_month.month)
+
+    # 分页信息
+    pagination = {
+        'month': report_month.strftime('%Y-%m'),
+        'prev_month': (report_month.replace(day=1) - timedelta(days=1)).strftime('%Y-%m'),
+        'next_month': (report_month.replace(day=28) + timedelta(days=4)).replace(day=1).strftime('%Y-%m')
+    }
+
+    return render_template('reports/monthly.html', 
+                          month_summary=month_summary, 
+                          details=details, 
+                          pagination=pagination,
+                          report_month=report_month)
+
+
+@report_bp.route('/monthly/export.csv')
+@roles_accepted('gicho', 'kancho')
+def export_monthly_csv():
+    """导出开播月报CSV"""
+    # 获取月份参数，默认为当前月
+    month_str = request.args.get('month')
+    if not month_str:
+        # 默认使用当前月
+        now_utc = get_current_utc_time()
+        today_local = utc_to_local(now_utc)
+        report_month = today_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        report_month = get_local_month_from_string(month_str)
+        if not report_month:
+            logger.error('无效的月份参数：%s', month_str)
+            return '无效的月份格式', 400
+        report_month = report_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    logger.info('导出开播月报CSV，报表月份：%s', report_month.strftime('%Y-%m'))
+
+    # 计算月度明细
+    details = _calculate_monthly_details(report_month.year, report_month.month)
+
+    # 创建CSV内容
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # 写入BOM（UTF-8 with BOM）
+    output.write('\ufeff')
+
+    # 写入表头
+    headers = [
+        '主播', '性别年龄', '直属运营', '主播分类', '月累计开播记录数', '月均播时(小时)', 
+        '月累计流水(元)', '月累计主播分成(元)', '月累计公司分成(元)', '月最新返点比例(%)', 
+        '月累计返点(元)', '月累计底薪(元)', '月累计毛利(元)'
+    ]
+    writer.writerow(headers)
+
+    # 写入数据
+    for detail in details:
+        row = [
+            detail['pilot_display'], 
+            detail['gender_age'], 
+            detail['owner'], 
+            detail['rank'], 
+            detail['records_count'],
+            f"{detail['avg_duration']:.1f}",
+            f"{detail['total_revenue']:.2f}", 
+            f"{detail['total_pilot_share']:.2f}", 
+            f"{detail['total_company_share']:.2f}",
+            f"{detail['rebate_rate'] * 100:.0f}",
+            f"{detail['rebate_amount']:.2f}", 
+            f"{detail['total_base_salary']:.2f}",
+            f"{detail['total_profit']:.2f}"
+        ]
+        writer.writerow(row)
+
+    # 生成响应
+    csv_content = output.getvalue()
+    output.close()
+
+    # 创建响应，设置正确的Content-Type和文件名
+    filename = f"开播月报_{report_month.strftime('%Y%m')}.csv"
+    encoded_filename = quote(filename.encode('utf-8'))
+
+    response = Response(csv_content, 
+                       mimetype='text/csv; charset=utf-8', 
+                       headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
+
+    return response

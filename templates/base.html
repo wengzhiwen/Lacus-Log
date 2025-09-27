@@ -34,6 +34,7 @@
       <a class="navlink" href="{{ url_for('announcement.export_page') }}">📅通告-通告导出</a>
       <a class="navlink" href="{{ url_for('battle_record.list_battle_records') }}">📒开播-开播记录</a>
       <a class="navlink" href="{{ url_for('report.daily_report') }}">📒开播-开播日报</a>
+      <a class="navlink" href="{{ url_for('report.monthly_report') }}">📊开播-开播月报</a>
       {% if current_user.has_role('gicho') %}
       <a class="navlink" href="{{ url_for('report_mail.mail_reports_page') }}">📧邮件报告</a>
       {% endif %}
