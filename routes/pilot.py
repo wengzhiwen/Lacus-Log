@@ -31,6 +31,7 @@ def _record_changes(pilot, old_data, user, ip_address):
         'nickname': pilot.nickname,
         'real_name': pilot.real_name,
         'gender': pilot.gender.value if pilot.gender else None,
+        'hometown': pilot.hometown,
         'birth_year': pilot.birth_year,
         'owner': str(pilot.owner.id) if pilot.owner else None,
         'platform': pilot.platform.value if pilot.platform else None,
@@ -193,6 +194,7 @@ def new_pilot():
             nickname = request.form.get('nickname', '').strip()
             real_name = request.form.get('real_name', '').strip() or None
             gender = request.form.get('gender')
+            hometown = request.form.get('hometown', '').strip() or None
             birth_year = request.form.get('birth_year')
             owner_id = request.form.get('owner') or None
             platform = request.form.get('platform')
@@ -218,6 +220,9 @@ def new_pilot():
 
             if gender:
                 pilot.gender = Gender(int(gender))
+
+            if hometown:
+                pilot.hometown = hometown
 
             if birth_year:
                 pilot.birth_year = int(birth_year)
@@ -279,6 +284,7 @@ def edit_pilot(pilot_id):
                 'nickname': pilot.nickname,
                 'real_name': pilot.real_name,
                 'gender': pilot.gender.value if pilot.gender else None,
+                'hometown': pilot.hometown,
                 'birth_year': pilot.birth_year,
                 'owner': str(pilot.owner.id) if pilot.owner else None,
                 'platform': pilot.platform.value if pilot.platform else None,
@@ -292,6 +298,7 @@ def edit_pilot(pilot_id):
                 nickname = request.form.get('nickname', '').strip()
                 real_name = request.form.get('real_name', '').strip() or None
                 gender = request.form.get('gender')
+                hometown = request.form.get('hometown', '').strip() or None
                 birth_year = request.form.get('birth_year')
                 owner_id = request.form.get('owner') or None
                 platform = request.form.get('platform')
@@ -316,6 +323,8 @@ def edit_pilot(pilot_id):
 
                 if gender:
                     pilot.gender = Gender(int(gender))
+
+                pilot.hometown = hometown
 
                 if birth_year:
                     pilot.birth_year = int(birth_year)
@@ -605,7 +614,7 @@ def pilot_commission_edit(pilot_id, commission_id):
                 if commission_rate is not None:
                     try:
                         commission_rate = float(commission_rate)
-                        if not (0 <= commission_rate <= 50):
+                        if not 0 <= commission_rate <= 50:
                             flash('分成比例必须在0-50之间', 'error')
                             return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
                     except ValueError:

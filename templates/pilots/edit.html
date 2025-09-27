@@ -47,6 +47,14 @@
           </div>
           
           <div class="form-group">
+            <label for="hometown" class="form-label">籍贯</label>
+            <input type="text" id="hometown" name="hometown" class="form-input" 
+                   value="{{ pilot.hometown or '' }}" 
+                   placeholder="请输入籍贯" maxlength="20">
+            <div class="form-help">最多20个字符</div>
+          </div>
+          
+          <div class="form-group">
             <label for="birth_year" class="form-label">出生年</label>
             <input type="number" id="birth_year" name="birth_year" class="form-input" 
                    value="{{ pilot.birth_year or '' }}" 
@@ -249,6 +257,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   const form = document.querySelector('.pilot-form-content');
   const nicknameInput = document.getElementById('nickname');
+  const hometownInput = document.getElementById('hometown');
   const birthYearInput = document.getElementById('birth_year');
   
   // 昵称验证
@@ -258,6 +267,16 @@ document.addEventListener('DOMContentLoaded', function() {
       this.setCustomValidity('昵称不能超过20个字符');
     } else if (value.length === 0) {
       this.setCustomValidity('昵称不能为空');
+    } else {
+      this.setCustomValidity('');
+    }
+  });
+  
+  // 籍贯验证
+  hometownInput.addEventListener('input', function() {
+    const value = this.value.trim();
+    if (value.length > 20) {
+      this.setCustomValidity('籍贯不能超过20个字符');
     } else {
       this.setCustomValidity('');
     }

@@ -2,8 +2,7 @@
 import enum
 from datetime import datetime
 
-from mongoengine import (BooleanField, DateTimeField, Document, EnumField,
-                         FloatField, IntField, ReferenceField, StringField)
+from mongoengine import (BooleanField, DateTimeField, Document, EnumField, FloatField, IntField, ReferenceField, StringField)
 
 from utils.timezone_helper import get_current_utc_time
 
@@ -38,12 +37,12 @@ class Rank(enum.Enum):
     TRAINEE = "试播主播"
     INTERN = "实习主播"
     OFFICIAL = "正式主播"
-    
+
     # 历史兼容值（读老写新）
     CANDIDATE_OLD = "候补机师"  # 映射到 CANDIDATE
-    TRAINEE_OLD = "训练机师"    # 映射到 TRAINEE
-    INTERN_OLD = "实习机师"     # 映射到 INTERN
-    OFFICIAL_OLD = "正式机师"   # 映射到 OFFICIAL
+    TRAINEE_OLD = "训练机师"  # 映射到 TRAINEE
+    INTERN_OLD = "实习机师"  # 映射到 INTERN
+    OFFICIAL_OLD = "正式机师"  # 映射到 OFFICIAL
 
 
 class Status(enum.Enum):
@@ -53,12 +52,12 @@ class Status(enum.Enum):
     RECRUITED = "已招募"
     CONTRACTED = "已签约"
     FALLEN = "流失"
-    
+
     # 历史兼容值（读老写新）
     NOT_RECRUITED_OLD = "未征召"  # 映射到 NOT_RECRUITED
     NOT_RECRUITING_OLD = "不征召"  # 映射到 NOT_RECRUITING
-    RECRUITED_OLD = "已征召"      # 映射到 RECRUITED
-    FALLEN_OLD = "已阵亡"         # 映射到 FALLEN
+    RECRUITED_OLD = "已征召"  # 映射到 RECRUITED
+    FALLEN_OLD = "已阵亡"  # 映射到 FALLEN
 
 
 class Pilot(Document):
@@ -68,6 +67,7 @@ class Pilot(Document):
     nickname = StringField(required=True, unique=True, max_length=20)
     real_name = StringField(max_length=20)
     gender = EnumField(Gender, default=Gender.FEMALE)
+    hometown = StringField(max_length=20)  # 籍贯
     birth_year = IntField()
 
     # 关联信息字段
@@ -218,7 +218,7 @@ class Pilot(Document):
         """获取有效的主播分类（兼容历史数据）"""
         if not rank_value:
             return None
-        
+
         # 历史数据映射
         old_to_new_mapping = {
             "候补机师": Rank.CANDIDATE,
@@ -226,11 +226,11 @@ class Pilot(Document):
             "实习机师": Rank.INTERN,
             "正式机师": Rank.OFFICIAL,
         }
-        
+
         # 如果是历史数据，返回映射后的新值
         if rank_value in old_to_new_mapping:
             return old_to_new_mapping[rank_value]
-        
+
         # 如果是新数据，直接返回
         try:
             return Rank(rank_value)
@@ -242,7 +242,7 @@ class Pilot(Document):
         """获取有效的状态（兼容历史数据）"""
         if not status_value:
             return None
-        
+
         # 历史数据映射
         old_to_new_mapping = {
             "未征召": Status.NOT_RECRUITED,
@@ -250,11 +250,11 @@ class Pilot(Document):
             "已征召": Status.RECRUITED,
             "已阵亡": Status.FALLEN,
         }
-        
+
         # 如果是历史数据，返回映射后的新值
         if status_value in old_to_new_mapping:
             return old_to_new_mapping[status_value]
-        
+
         # 如果是新数据，直接返回
         try:
             return Status(status_value)
@@ -309,6 +309,7 @@ class PilotChangeLog(Document):
             'nickname': '昵称',
             'real_name': '姓名',
             'gender': '性别',
+            'hometown': '籍贯',
             'birth_year': '出生年',
             'owner': '直属运营',
             'platform': '开播平台',
