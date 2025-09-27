@@ -446,6 +446,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     defaultData.z_coord = a.z_coord || '';
                     console.log('[BR] set default coords:', defaultData);
                     initializeBattleAreaSelects();
+
+                    // 设置底薪默认值150元
+                    const baseSalaryInput = document.getElementById('base_salary');
+                    if (baseSalaryInput) {
+                        baseSalaryInput.value = '150';
+                    }
                 })
                 .catch(err => console.error('[BR] fetch announcement detail error:', err));
         });

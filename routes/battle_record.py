@@ -223,6 +223,7 @@ def new_battle_record():
                 'z_coord': related_announcement.z_coord,
                 'work_mode': WorkMode.OFFLINE,
                 'owner_snapshot': related_announcement.pilot.owner,
+                'base_salary': Decimal('150'),  # 从通告新建时底薪默认150元
             })
             logger.debug(f"从通告 {announcement_id} 预填作战记录数据")
         except Announcement.DoesNotExist:
