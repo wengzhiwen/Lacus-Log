@@ -14,11 +14,9 @@ from flask import Blueprint, Response, render_template, request, url_for
 from flask_security import roles_accepted
 
 from models.battle_record import BattleRecord
-from utils.commission_helper import (calculate_commission_amounts,
-                                     get_pilot_commission_rate_for_date)
+from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 # 创建日志器（按模块分文件）
 logger = get_logger('report')
@@ -341,11 +339,33 @@ def _calculate_daily_details(report_date):
         # 月度统计
         monthly_stats = calculate_pilot_monthly_stats(pilot, report_date)
 
-        # 月度分成统计（简化版）
+        # 月度分成统计（计算该主播当月的真实累计分成）
+        # 获取该主播当月所有开播记录
+        month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        pilot_month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1)).filter(pilot=pilot)
+
+        # 计算月累计分成
+        month_total_pilot_share = Decimal('0')
+        month_total_company_share = Decimal('0')
+        month_total_base_salary = Decimal('0')
+
+        for month_record in pilot_month_records:
+            month_record_date = utc_to_local(month_record.start_time).date()
+            month_commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, month_record_date)
+            month_commission_amounts = calculate_commission_amounts(month_record.revenue_amount, month_commission_rate)
+
+            month_total_pilot_share += month_commission_amounts['pilot_amount']
+            month_total_company_share += month_commission_amounts['company_amount']
+            month_total_base_salary += month_record.base_salary
+
+        # 计算月累计毛利
+        month_total_profit = month_total_company_share + rebate_info['rebate_amount'] - month_total_base_salary
+
         monthly_commission_stats = {
-            'month_total_pilot_share': commission_amounts['pilot_amount'],  # 简化，实际应该按月累计
-            'month_total_company_share': commission_amounts['company_amount'],
-            'month_total_profit': daily_profit
+            'month_total_pilot_share': month_total_pilot_share,
+            'month_total_company_share': month_total_company_share,
+            'month_total_profit': month_total_profit
         }
 
         # 月累计返点（简化版）
