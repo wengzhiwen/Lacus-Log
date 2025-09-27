@@ -16,7 +16,8 @@
       {% set report_date = request.args.get('report_date') %}
       {% set report_range = request.args.get('report_range') %}
       {% set report_metric = request.args.get('report_metric') %}
-      <a class="btn btn-secondary" href="{{ url_for('report.recruit_report_detail', date=report_date, range=report_range, metric=report_metric) }}">
+      {% set report_recruiter = request.args.get('report_recruiter') %}
+      <a class="btn btn-secondary" href="{{ url_for('report.recruit_report_detail', date=report_date, range=report_range, metric=report_metric, recruiter=report_recruiter) }}">
         <span>←</span>
         返回日报详情
       </a>

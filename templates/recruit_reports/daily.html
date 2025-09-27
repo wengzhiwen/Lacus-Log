@@ -11,9 +11,22 @@
 <!-- 日期导航 -->
 <div class="date-navigation">
   <div class="date-controls">
-    <a href="{{ url_for('report.recruit_daily_report', date=pagination.prev_date) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+    <a href="{{ url_for('report.recruit_daily_report', date=pagination.prev_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">← 前一日</a>
     <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
-    <a href="{{ url_for('report.recruit_daily_report', date=pagination.next_date) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+    <a href="{{ url_for('report.recruit_daily_report', date=pagination.next_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+  </div>
+  
+  <!-- 招募负责人筛选器 -->
+  <div class="recruiter-filter">
+    <label for="recruiterSelector" class="filter-label">招募负责人：</label>
+    <select id="recruiterSelector" class="recruiter-select">
+      <option value="all" {% if selected_recruiter == 'all' %}selected{% endif %}>全部</option>
+      {% for user in users %}
+        <option value="{{ user.id }}" {% if selected_recruiter == user.id|string %}selected{% endif %}>
+          {{ user.nickname or user.username }}
+        </option>
+      {% endfor %}
+    </select>
   </div>
 </div>
 
@@ -140,6 +153,28 @@
   border: 1px solid var(--gray);
   border-radius: 6px;
   font-size: 14px;
+}
+
+/* 招募负责人筛选器样式 */
+.recruiter-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.recruiter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  min-width: 120px;
 }
 
 /* 统计表格样式 */
@@ -270,6 +305,16 @@
     gap: 12px;
   }
 
+  .recruiter-filter {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .recruiter-select {
+    flex: 1;
+    max-width: 200px;
+  }
+
   .statistics-table {
     font-size: 12px;
   }
@@ -316,15 +361,24 @@
 // 日期选择器事件
 document.getElementById('dateSelector').addEventListener('change', function() {
   const selectedDate = this.value;
+  const selectedRecruiter = document.getElementById('recruiterSelector').value;
   if (selectedDate) {
-    window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + selectedDate;
+    window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + selectedDate + '&recruiter=' + selectedRecruiter;
   }
+});
+
+// 招募负责人筛选器事件
+document.getElementById('recruiterSelector').addEventListener('change', function() {
+  const selectedRecruiter = this.value;
+  const currentDate = '{{ pagination.date }}';
+  window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + currentDate + '&recruiter=' + selectedRecruiter;
 });
 
 // 跳转到详情页面
 function goToDetail(range, metric) {
   const currentDate = '{{ pagination.date }}';
-  const detailUrl = '{{ url_for("report.recruit_report_detail") }}?date=' + currentDate + '&range=' + range + '&metric=' + metric;
+  const selectedRecruiter = document.getElementById('recruiterSelector').value;
+  const detailUrl = '{{ url_for("report.recruit_report_detail") }}?date=' + currentDate + '&range=' + range + '&metric=' + metric + '&recruiter=' + selectedRecruiter;
   window.location.href = detailUrl;
 }
 </script>

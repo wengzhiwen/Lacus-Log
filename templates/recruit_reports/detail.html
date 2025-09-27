@@ -22,7 +22,7 @@
   {% if recruits %}
     <div class="recruit-groups">
       <div class="recruit-group">
-        <h3 class="group-title">{{ page_title }}</h3>
+        <h3 class="group-title">招募记录列表</h3>
         <div class="record-cards">
           {% for recruit in recruits %}
             <a href="#" class="record-card" onclick="goToRecruitDetail('{{ recruit.id }}')">
@@ -286,7 +286,7 @@
 function goToRecruitDetail(recruitId) {
   const detailUrl = '{{ url_for("recruit.detail_recruit", recruit_id="PLACEHOLDER") }}'.replace('PLACEHOLDER', recruitId);
   // 添加来源参数，用于返回按钮逻辑
-  const urlWithParams = detailUrl + '?from=recruit_report_detail&report_date={{ report_date }}&report_range={{ range_param }}&report_metric={{ metric }}';
+  const urlWithParams = detailUrl + '?from=recruit_report_detail&report_date={{ report_date }}&report_range={{ range_param }}&report_metric={{ metric }}&report_recruiter={{ recruiter_id }}';
   window.location.href = urlWithParams;
 }
 </script>

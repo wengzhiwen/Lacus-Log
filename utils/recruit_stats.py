@@ -12,51 +12,64 @@ from models.recruit import Recruit, BroadcastDecision, FinalDecision
 from utils.timezone_helper import local_to_utc, get_current_utc_time, utc_to_local
 
 
-def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime) -> Dict[str, int]:
+def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recruiter_id: str = None) -> Dict[str, int]:
     """计算指定时间范围内的招募统计数据
     
     Args:
         start_utc: 开始时间（UTC）
         end_utc: 结束时间（UTC）
+        recruiter_id: 招募负责人ID，为None时统计全部
         
     Returns:
         dict: 包含约面、到面、试播、新开播的统计数据
     """
+    # 构建基础查询条件
+    base_query = {}
+    if recruiter_id and recruiter_id != 'all':
+        base_query['recruiter'] = recruiter_id
+
     # 约面：当天创建的招募数量
-    appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
+    appointments_query = {**base_query, 'created_at__gte': start_utc, 'created_at__lt': end_utc}
+    appointments = Recruit.objects.filter(**appointments_query).count()
 
     # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
     # 新六步制：使用 interview_decision_time
     # 历史兼容：使用 training_decision_time_old
-    interviews_query = (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
-                        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
+    interviews_query = Q(**base_query) & (
+        Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
+    )
     interviews = Recruit.objects.filter(interviews_query).count()
 
     # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
     # 新六步制：使用 broadcast_decision_time
     # 历史兼容：使用 final_decision_time
-    trials_query = (Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
-                    | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
+    trials_query = Q(**base_query) & (
+        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc)
+    )
     trials = Recruit.objects.filter(trials_query).count()
 
     # 新开播：当天在开播决策中决定招募的数量（不招募不算）
     # 新六步制：使用 broadcast_decision_time 和 broadcast_decision
     # 历史兼容：使用 final_decision_time 和 final_decision
-    new_recruits_query = (
+    new_recruits_query = Q(**base_query) & (
         Q(broadcast_decision_time__gte=start_utc,
           broadcast_decision_time__lt=end_utc,
           broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
-        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
+    )
     new_recruits = Recruit.objects.filter(new_recruits_query).count()
 
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
 
 
-def calculate_recruit_stats_for_date(target_date: datetime) -> Dict[str, int]:
+def calculate_recruit_stats_for_date(target_date: datetime, recruiter_id: str = None) -> Dict[str, int]:
     """计算指定日期的招募统计数据
     
     Args:
         target_date: 目标日期（本地时间）
+        recruiter_id: 招募负责人ID，为None时统计全部
         
     Returns:
         dict: 包含约面、到面、试播、新开播的统计数据
@@ -68,14 +81,15 @@ def calculate_recruit_stats_for_date(target_date: datetime) -> Dict[str, int]:
     date_start_utc = local_to_utc(date_start)
     date_end_utc = local_to_utc(date_end)
 
-    return calculate_recruit_period_stats(date_start_utc, date_end_utc)
+    return calculate_recruit_period_stats(date_start_utc, date_end_utc, recruiter_id)
 
 
-def calculate_recruit_daily_stats(report_date: datetime) -> Dict[str, Any]:
+def calculate_recruit_daily_stats(report_date: datetime, recruiter_id: str = None) -> Dict[str, Any]:
     """计算指定日期的招募日报统计数据（包含多时间维度和百分比）
     
     Args:
         report_date: 报表日期（本地时间）
+        recruiter_id: 招募负责人ID，为None时统计全部
         
     Returns:
         dict: 包含报表日、近7日、近14日的统计数据，以及百分比数据
@@ -94,9 +108,9 @@ def calculate_recruit_daily_stats(report_date: datetime) -> Dict[str, Any]:
     last_14_days_start_utc = local_to_utc(last_14_days_start)
 
     # 计算各时间维度的数据
-    report_day_stats = calculate_recruit_period_stats(report_day_start_utc, report_day_end_utc)
-    last_7_days_stats = calculate_recruit_period_stats(last_7_days_start_utc, report_day_end_utc)
-    last_14_days_stats = calculate_recruit_period_stats(last_14_days_start_utc, report_day_end_utc)
+    report_day_stats = calculate_recruit_period_stats(report_day_start_utc, report_day_end_utc, recruiter_id)
+    last_7_days_stats = calculate_recruit_period_stats(last_7_days_start_utc, report_day_end_utc, recruiter_id)
+    last_14_days_stats = calculate_recruit_period_stats(last_14_days_start_utc, report_day_end_utc, recruiter_id)
 
     # 构建基础统计数据
     statistics = {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
@@ -126,6 +140,74 @@ def calculate_recruit_daily_stats(report_date: datetime) -> Dict[str, Any]:
 
     statistics['percentages'] = percentages
     return statistics
+
+
+def get_recruit_records_for_detail(report_date: datetime, range_param: str, metric: str, recruiter_id: str = None) -> list:
+    """获取招募详情页面的记录列表
+    
+    Args:
+        report_date: 报表日期（本地时间）
+        range_param: 统计范围（report_day / last_7_days / last_14_days）
+        metric: 指标类型（appointments / interviews / trials / new_recruits）
+        recruiter_id: 招募负责人ID，为None时统计全部
+        
+    Returns:
+        list: 招募记录列表
+    """
+    # 构建基础查询条件
+    base_query = {}
+    if recruiter_id and recruiter_id != 'all':
+        base_query['recruiter'] = recruiter_id
+
+    # 计算时间范围
+    if range_param == 'report_day':
+        start_date = report_date
+        end_date = start_date + timedelta(days=1)
+    elif range_param == 'last_7_days':
+        start_date = report_date - timedelta(days=6)
+        end_date = report_date + timedelta(days=1)
+    elif range_param == 'last_14_days':
+        start_date = report_date - timedelta(days=13)
+        end_date = report_date + timedelta(days=1)
+    else:
+        return []
+
+    # 转换为UTC时间
+    start_utc = local_to_utc(start_date)
+    end_utc = local_to_utc(end_date)
+
+    # 根据指标类型构建查询
+    if metric == 'appointments':
+        # 约面：按创建时间筛选
+        query = {**base_query, 'created_at__gte': start_utc, 'created_at__lt': end_utc}
+        recruits = Recruit.objects.filter(**query).order_by('-created_at')
+    elif metric == 'interviews':
+        # 到面：按面试决策时间筛选
+        interviews_query = Q(**base_query) & (
+            Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+            | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
+        )
+        recruits = Recruit.objects.filter(interviews_query).order_by('-interview_decision_time', '-training_decision_time_old')
+    elif metric == 'trials':
+        # 试播：按开播决策时间筛选
+        trials_query = Q(**base_query) & (
+            Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
+            | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc)
+        )
+        recruits = Recruit.objects.filter(trials_query).order_by('-broadcast_decision_time', '-final_decision_time')
+    elif metric == 'new_recruits':
+        # 新开播：按开播决策时间筛选，且决策为招募
+        new_recruits_query = Q(**base_query) & (
+            Q(broadcast_decision_time__gte=start_utc,
+              broadcast_decision_time__lt=end_utc,
+              broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
+            | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
+        )
+        recruits = Recruit.objects.filter(new_recruits_query).order_by('-broadcast_decision_time', '-final_decision_time')
+    else:
+        return []
+
+    return list(recruits)
 
 
 def calculate_recruit_today_stats() -> Dict[str, int]:

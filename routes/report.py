@@ -484,17 +484,62 @@ def export_daily_csv():
 
 
 # ==================== 征召日报相关函数 ====================
-def _calculate_recruit_statistics(report_date):
+def _calculate_recruit_statistics(report_date, recruiter_id=None):
     """计算招募统计数据
     
     Args:
         report_date: 报表日期（本地时间）
+        recruiter_id: 招募负责人ID，为None时统计全部
         
     Returns:
         dict: 包含报表日、近7日、近14日的统计数据，以及百分比数据
     """
     from utils.recruit_stats import calculate_recruit_daily_stats
-    return calculate_recruit_daily_stats(report_date)
+    return calculate_recruit_daily_stats(report_date, recruiter_id)
+
+
+def _get_recruit_users():
+    """获取招募负责人用户列表
+    
+    Returns:
+        list: 用户列表，包含管理员和运营
+    """
+    from models.user import Role, User
+
+    # 获取管理员和运营角色
+    gicho_role = Role.objects(name='gicho').first()
+    kancho_role = Role.objects(name='kancho').first()
+
+    # 获取所有管理员和运营用户
+    users = []
+    if gicho_role:
+        users.extend(User.objects(roles=gicho_role, active=True))
+    if kancho_role:
+        users.extend(User.objects(roles=kancho_role, active=True))
+
+    # 去重并按昵称排序
+    unique_users = {}
+    for user in users:
+        if user.id not in unique_users:
+            unique_users[user.id] = user
+
+    return sorted(unique_users.values(), key=lambda u: u.nickname or u.username)
+
+
+def _get_recruit_records_for_detail(report_date, range_param, metric, recruiter_id=None):
+    """获取招募详情页面的记录列表
+    
+    Args:
+        report_date: 报表日期（本地时间）
+        range_param: 统计范围（report_day / last_7_days / last_14_days）
+        metric: 指标类型（appointments / interviews / trials / new_recruits）
+        recruiter_id: 招募负责人ID，为None时统计全部
+        
+    Returns:
+        list: 招募记录列表
+    """
+    from utils.recruit_stats import get_recruit_records_for_detail
+    return get_recruit_records_for_detail(report_date, range_param, metric, recruiter_id)
 
 
 # _calculate_period_stats 函数已移至 utils/recruit_stats.py
@@ -518,10 +563,18 @@ def recruit_daily_report():
             return '无效的日期格式', 400
         report_date = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    logger.info('生成征召日报，报表日期：%s', report_date.strftime('%Y-%m-%d'))
+    # 获取招募负责人筛选参数
+    recruiter_id = request.args.get('recruiter', 'all')
+    if recruiter_id == '':
+        recruiter_id = 'all'
+
+    logger.info('生成征召日报，报表日期：%s，招募负责人：%s', report_date.strftime('%Y-%m-%d'), recruiter_id)
 
     # 计算征召统计数据
-    statistics = _calculate_recruit_statistics(report_date)
+    statistics = _calculate_recruit_statistics(report_date, recruiter_id)
+
+    # 获取用户列表用于筛选器
+    users = _get_recruit_users()
 
     # 分页信息
     pagination = {
@@ -530,7 +583,7 @@ def recruit_daily_report():
         'next_date': (report_date + timedelta(days=1)).strftime('%Y-%m-%d')
     }
 
-    return render_template('recruit_reports/daily.html', statistics=statistics, pagination=pagination)
+    return render_template('recruit_reports/daily.html', statistics=statistics, pagination=pagination, users=users, selected_recruiter=recruiter_id)
 
 
 @report_bp.route('/recruits/daily-report/detail')
@@ -541,6 +594,7 @@ def recruit_report_detail():
     date_str = request.args.get('date')
     range_param = request.args.get('range')  # report_day, last_7_days, last_14_days
     metric = request.args.get('metric')  # appointments, interviews, trials, new_recruits
+    recruiter_id = request.args.get('recruiter', 'all')
 
     # 验证参数
     if not date_str or not range_param or not metric:
@@ -566,75 +620,40 @@ def recruit_report_detail():
         logger.error('无效的指标参数：%s', metric)
         return '无效的指标参数', 400
 
-    logger.info('生成招募日报详情：日期=%s，范围=%s，指标=%s', date_str, range_param, metric)
+    logger.info('生成招募日报详情：日期=%s，范围=%s，指标=%s，招募负责人=%s', date_str, range_param, metric, recruiter_id)
 
-    # 计算时间范围
-    if range_param == 'report_day':
-        start_date = report_date
-        end_date = report_date + timedelta(days=1)
-    elif range_param == 'last_7_days':
-        start_date = report_date - timedelta(days=6)  # 包含报表日，共7天
-        end_date = report_date + timedelta(days=1)
-    else:  # last_14_days
-        start_date = report_date - timedelta(days=13)  # 包含报表日，共14天
-        end_date = report_date + timedelta(days=1)
-
-    # 转换为UTC时间
-    start_utc = local_to_utc(start_date)
-    end_utc = local_to_utc(end_date)
-
-    # 根据指标类型查询招募记录
-    recruits = _get_recruits_by_metric(metric, start_utc, end_utc)
+    # 获取招募记录
+    recruits = _get_recruit_records_for_detail(report_date, range_param, metric, recruiter_id)
 
     # 构建页面标题
     range_names = {'report_day': '报表日', 'last_7_days': '近7日', 'last_14_days': '近14日'}
     metric_names = {'appointments': '约面', 'interviews': '到面', 'trials': '试播', 'new_recruits': '新开播'}
 
-    page_title = f"{report_date.strftime('%Y年%m月%d日')} {range_names[range_param]} {metric_names[metric]}：{len(recruits)}"
+    # 获取招募负责人信息
+    recruiter_name = ''
+    if recruiter_id and recruiter_id != 'all':
+        from models.user import User
+        try:
+            recruiter = User.objects.get(id=recruiter_id)
+            recruiter_name = recruiter.nickname or recruiter.username
+        except Exception:
+            recruiter_name = '未知'
+
+    # 构建页面标题
+    if recruiter_name:
+        page_title = f"{report_date.strftime('%Y年%m月%d日')} {range_names[range_param]} {metric_names[metric]}（{recruiter_name}）：{len(recruits)}"
+    else:
+        page_title = f"{report_date.strftime('%Y年%m月%d日')} {range_names[range_param]} {metric_names[metric]}：{len(recruits)}"
 
     # 构建返回URL
-    return_url = url_for('report.recruit_daily_report', date=date_str)
+    return_url = url_for('report.recruit_daily_report', date=date_str, recruiter=recruiter_id)
 
     return render_template('recruit_reports/detail.html',
                            page_title=page_title,
                            report_date=date_str,
                            range_param=range_param,
                            metric=metric,
+                           recruiter_id=recruiter_id,
+                           recruiter_name=recruiter_name,
                            recruits=recruits,
                            return_url=return_url)
-
-
-def _get_recruits_by_metric(metric, start_utc, end_utc):
-    """根据指标类型获取招募记录"""
-    from mongoengine import Q
-
-    from models.recruit import BroadcastDecision, FinalDecision, Recruit
-
-    if metric == 'appointments':
-        # 约面：当天创建的招募数量
-        recruits = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).order_by('-created_at')
-
-    elif metric == 'interviews':
-        # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
-        query = (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
-                 | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
-        recruits = Recruit.objects.filter(query).order_by('-interview_decision_time', '-training_decision_time_old')
-
-    elif metric == 'trials':
-        # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
-        query = (Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
-                 | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
-        recruits = Recruit.objects.filter(query).order_by('-broadcast_decision_time', '-final_decision_time')
-
-    elif metric == 'new_recruits':
-        # 新开播：当天在开播决策中决定招募的数量（不招募不算）
-        query = (Q(broadcast_decision_time__gte=start_utc,
-                   broadcast_decision_time__lt=end_utc,
-                   broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
-                 | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
-        recruits = Recruit.objects.filter(query).order_by('-broadcast_decision_time', '-final_decision_time')
-
-    else:
-        recruits = []
-
-    return list(recruits)
