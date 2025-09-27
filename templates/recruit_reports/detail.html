@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-content">
+    <div class="header-left">
+      <a href="{{ return_url }}" class="btn btn-secondary btn-sm">← 返回日报</a>
+    </div>
+    <div class="header-center">
+      <h1 class="page-title">{{ page_title }}</h1>
+    </div>
+    <div class="header-right">
+      <!-- 预留空间，保持布局平衡 -->
+    </div>
+  </div>
+</div>
+
+<!-- 招募记录列表 -->
+<div class="recruits-section">
+  {% if recruits %}
+    <div class="recruit-groups">
+      <div class="recruit-group">
+        <h3 class="group-title">{{ page_title }}</h3>
+        <div class="record-cards">
+          {% for recruit in recruits %}
+            <a href="#" class="record-card" onclick="goToRecruitDetail('{{ recruit.id }}')">
+              <div class="card-header">
+                <div class="record-time">
+                  {% if metric == 'appointments' %}
+                    <div class="start-time">创建：{{ recruit.created_at | local_datetime('%m月%d日 %H:%M') }}</div>
+                  {% elif metric == 'interviews' %}
+                    <div class="start-time">面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+                  {% elif metric == 'trials' %}
+                    <div class="start-time">开播决策：{{ recruit.get_effective_broadcast_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+                  {% elif metric == 'new_recruits' %}
+                    <div class="start-time">开播决策：{{ recruit.get_effective_broadcast_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+                  {% endif %}
+                </div>
+                <div class="record-info">
+                  <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+                  <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
+                  <div class="status-line">
+                    <span class="status-badge status-{{ recruit.get_effective_status().value.replace(' ', '') }}">{{ recruit.get_effective_status().value }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card-footer">
+                <div></div>
+                <div class="card-arrow">→</div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">暂无数据</div>
+      <div class="empty-description">该时间段内没有相关的招募记录</div>
+      <a href="{{ return_url }}" class="btn btn-primary">返回日报</a>
+    </div>
+  {% endif %}
+</div>
+
+<style>
+/* 页面头部样式 */
+.page-header {
+  margin-bottom: 24px;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-left {
+  flex: 0 0 auto;
+}
+
+.header-center {
+  flex: 1;
+  text-align: center;
+}
+
+.header-right {
+  flex: 0 0 auto;
+  width: 100px; /* 与左侧按钮宽度保持一致 */
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+/* 招募记录列表样式（与招募列表保持一致） */
+.recruits-section {
+  margin-top: 24px;
+}
+
+.recruit-groups {
+  margin-bottom: 20px;
+}
+
+.recruit-group {
+  margin-bottom: 24px;
+}
+
+.group-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand);
+}
+
+/* 卡片列表（对齐招募列表） */
+.record-cards { 
+  display: block; 
+}
+
+.record-card {
+  display: block;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.record-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+  border-color: var(--brand);
+}
+
+.record-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.record-time { 
+  flex: 0 0 auto; 
+}
+
+.start-time { 
+  font-size: 16px; 
+  font-weight: 600; 
+  color: var(--text); 
+  margin-bottom: 2px; 
+}
+
+.record-info { 
+  flex: 1; 
+  text-align: right; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: flex-end; 
+}
+
+.pilot-name { 
+  font-size: 14px; 
+  font-weight: 500; 
+  color: var(--text); 
+  line-height: 1.2; 
+  margin-bottom: 2px; 
+}
+
+.meta-line { 
+  font-size: 12px; 
+  color: var(--muted); 
+  line-height: 1.1; 
+}
+
+.status-line { 
+  display: flex; 
+  gap: 4px; 
+  margin-top: 4px; 
+  flex-wrap: wrap; 
+  justify-content: flex-end; 
+}
+
+.status-badge { 
+  padding: 2px 6px; 
+  border-radius: 3px; 
+  font-size: 10px; 
+  font-weight: 500; 
+}
+
+/* 状态样式（与招募列表保持一致） */
+.status-待面试 { background: #e3f2fd; color: #1565c0; }
+.status-待预约试播 { background: #f3e5f5; color: #7b1fa2; }
+.status-待试播 { background: #fff3e0; color: #ef6c00; }
+.status-待预约开播 { background: #e8f5e8; color: #2e7d32; }
+.status-待开播 { background: #fff8e1; color: #f57c00; }
+.status-已结束 { background: var(--muted); color: white; }
+
+.record-card .card-footer { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  border-top: 1px solid var(--table-header); 
+  padding-top: 12px; 
+}
+
+.card-arrow {
+  font-size: 16px;
+  color: var(--muted);
+  transition: color 0.2s ease;
+}
+
+.record-card:hover .card-arrow { 
+  color: var(--brand); 
+}
+
+/* 空状态样式 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.empty-description {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* 移动端适配（与招募列表保持一致） */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .header-left,
+  .header-center,
+  .header-right {
+    flex: none;
+    width: auto;
+  }
+  
+  .page-title {
+    font-size: 20px;
+  }
+  
+  .record-card .card-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .record-info { 
+    text-align: right; 
+    align-items: flex-end; 
+  }
+}
+</style>
+
+<script>
+// 跳转到招募详情页面
+function goToRecruitDetail(recruitId) {
+  const detailUrl = '{{ url_for("recruit.detail_recruit", recruit_id="PLACEHOLDER") }}'.replace('PLACEHOLDER', recruitId);
+  // 添加来源参数，用于返回按钮逻辑
+  const urlWithParams = detailUrl + '?from=recruit_report_detail&report_date={{ report_date }}&report_range={{ range_param }}&report_metric={{ metric }}';
+  window.location.href = urlWithParams;
+}
+</script>
+{% endblock %}

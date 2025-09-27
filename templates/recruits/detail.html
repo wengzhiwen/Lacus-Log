@@ -11,10 +11,21 @@
 {% block content %}
 <section class="recruit-detail">
   <div class="back-nav">
-    <a class="btn btn-secondary" href="{{ url_for('recruit.list_recruits') }}">
-      <span>←</span>
-      返回招募列表
-    </a>
+    {% set from_param = request.args.get('from') %}
+    {% if from_param == 'recruit_report_detail' %}
+      {% set report_date = request.args.get('report_date') %}
+      {% set report_range = request.args.get('report_range') %}
+      {% set report_metric = request.args.get('report_metric') %}
+      <a class="btn btn-secondary" href="{{ url_for('report.recruit_report_detail', date=report_date, range=report_range, metric=report_metric) }}">
+        <span>←</span>
+        返回日报详情
+      </a>
+    {% else %}
+      <a class="btn btn-secondary" href="{{ url_for('recruit.list_recruits') }}">
+        <span>←</span>
+        返回招募列表
+      </a>
+    {% endif %}
   </div>
 
   <!-- 主播信息卡片 -->

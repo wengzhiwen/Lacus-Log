@@ -34,48 +34,48 @@
       <tbody>
         <tr>
           <td class="range-label">报表日</td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('report_day', 'appointments')">
             {{ statistics.report_day.appointments }}
             <div class="percentage">{{ statistics.percentages.report_day.appointments }}%</div>
           </td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('report_day', 'interviews')">
             {{ statistics.report_day.interviews }}
             <div class="percentage">{{ statistics.percentages.report_day.interviews }}%</div>
           </td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('report_day', 'trials')">
             {{ statistics.report_day.trials }}
             <div class="percentage">{{ statistics.percentages.report_day.trials }}%</div>
           </td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('report_day', 'new_recruits')">
             {{ statistics.report_day.new_recruits }}
             <div class="percentage">{{ statistics.percentages.report_day.new_recruits }}%</div>
           </td>
         </tr>
         <tr>
           <td class="range-label">近7日</td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'appointments')">
             {{ statistics.last_7_days.appointments }}
             <div class="percentage">{{ statistics.percentages.last_7_days.appointments }}%</div>
           </td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'interviews')">
             {{ statistics.last_7_days.interviews }}
             <div class="percentage">{{ statistics.percentages.last_7_days.interviews }}%</div>
           </td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'trials')">
             {{ statistics.last_7_days.trials }}
             <div class="percentage">{{ statistics.percentages.last_7_days.trials }}%</div>
           </td>
-          <td class="stat-value">
+          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'new_recruits')">
             {{ statistics.last_7_days.new_recruits }}
             <div class="percentage">{{ statistics.percentages.last_7_days.new_recruits }}%</div>
           </td>
         </tr>
         <tr>
           <td class="range-label">近14日</td>
-          <td class="stat-value">{{ statistics.last_14_days.appointments }}</td>
-          <td class="stat-value">{{ statistics.last_14_days.interviews }}</td>
-          <td class="stat-value">{{ statistics.last_14_days.trials }}</td>
-          <td class="stat-value">{{ statistics.last_14_days.new_recruits }}</td>
+          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'appointments')">{{ statistics.last_14_days.appointments }}</td>
+          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'interviews')">{{ statistics.last_14_days.interviews }}</td>
+          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'trials')">{{ statistics.last_14_days.trials }}</td>
+          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'new_recruits')">{{ statistics.last_14_days.new_recruits }}</td>
         </tr>
       </tbody>
     </table>
@@ -296,6 +296,20 @@
     font-size: 20px;
   }
 }
+
+/* 可点击单元格样式 */
+.stat-value.clickable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.stat-value.clickable:hover {
+  background-color: var(--hover-bg);
+}
+
+.stat-value.clickable:active {
+  background-color: var(--active-bg);
+}
 </style>
 
 <script>
@@ -306,5 +320,12 @@ document.getElementById('dateSelector').addEventListener('change', function() {
     window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + selectedDate;
   }
 });
+
+// 跳转到详情页面
+function goToDetail(range, metric) {
+  const currentDate = '{{ pagination.date }}';
+  const detailUrl = '{{ url_for("report.recruit_report_detail") }}?date=' + currentDate + '&range=' + range + '&metric=' + metric;
+  window.location.href = detailUrl;
+}
 </script>
 {% endblock %}

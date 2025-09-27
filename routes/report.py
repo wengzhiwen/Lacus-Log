@@ -10,13 +10,15 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import quote
 
-from flask import Blueprint, Response, render_template, request
+from flask import Blueprint, Response, render_template, request, url_for
 from flask_security import roles_accepted
 
 from models.battle_record import BattleRecord
-from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
+from utils.commission_helper import (calculate_commission_amounts,
+                                     get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 # 创建日志器（按模块分文件）
 logger = get_logger('report')
@@ -529,3 +531,110 @@ def recruit_daily_report():
     }
 
     return render_template('recruit_reports/daily.html', statistics=statistics, pagination=pagination)
+
+
+@report_bp.route('/recruits/daily-report/detail')
+@roles_accepted('gicho', 'kancho')
+def recruit_report_detail():
+    """主播招募日报详情页面"""
+    # 获取参数
+    date_str = request.args.get('date')
+    range_param = request.args.get('range')  # report_day, last_7_days, last_14_days
+    metric = request.args.get('metric')  # appointments, interviews, trials, new_recruits
+
+    # 验证参数
+    if not date_str or not range_param or not metric:
+        logger.error('缺少必要参数：date=%s, range=%s, metric=%s', date_str, range_param, metric)
+        return '缺少必要参数', 400
+
+    # 验证日期格式
+    report_date = get_local_date_from_string(date_str)
+    if not report_date:
+        logger.error('无效的日期参数：%s', date_str)
+        return '无效的日期格式', 400
+    report_date = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 验证范围参数
+    valid_ranges = ['report_day', 'last_7_days', 'last_14_days']
+    if range_param not in valid_ranges:
+        logger.error('无效的范围参数：%s', range_param)
+        return '无效的范围参数', 400
+
+    # 验证指标参数
+    valid_metrics = ['appointments', 'interviews', 'trials', 'new_recruits']
+    if metric not in valid_metrics:
+        logger.error('无效的指标参数：%s', metric)
+        return '无效的指标参数', 400
+
+    logger.info('生成招募日报详情：日期=%s，范围=%s，指标=%s', date_str, range_param, metric)
+
+    # 计算时间范围
+    if range_param == 'report_day':
+        start_date = report_date
+        end_date = report_date + timedelta(days=1)
+    elif range_param == 'last_7_days':
+        start_date = report_date - timedelta(days=6)  # 包含报表日，共7天
+        end_date = report_date + timedelta(days=1)
+    else:  # last_14_days
+        start_date = report_date - timedelta(days=13)  # 包含报表日，共14天
+        end_date = report_date + timedelta(days=1)
+
+    # 转换为UTC时间
+    start_utc = local_to_utc(start_date)
+    end_utc = local_to_utc(end_date)
+
+    # 根据指标类型查询招募记录
+    recruits = _get_recruits_by_metric(metric, start_utc, end_utc)
+
+    # 构建页面标题
+    range_names = {'report_day': '报表日', 'last_7_days': '近7日', 'last_14_days': '近14日'}
+    metric_names = {'appointments': '约面', 'interviews': '到面', 'trials': '试播', 'new_recruits': '新开播'}
+
+    page_title = f"{report_date.strftime('%Y年%m月%d日')} {range_names[range_param]} {metric_names[metric]}：{len(recruits)}"
+
+    # 构建返回URL
+    return_url = url_for('report.recruit_daily_report', date=date_str)
+
+    return render_template('recruit_reports/detail.html',
+                           page_title=page_title,
+                           report_date=date_str,
+                           range_param=range_param,
+                           metric=metric,
+                           recruits=recruits,
+                           return_url=return_url)
+
+
+def _get_recruits_by_metric(metric, start_utc, end_utc):
+    """根据指标类型获取招募记录"""
+    from mongoengine import Q
+
+    from models.recruit import BroadcastDecision, FinalDecision, Recruit
+
+    if metric == 'appointments':
+        # 约面：当天创建的招募数量
+        recruits = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).order_by('-created_at')
+
+    elif metric == 'interviews':
+        # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
+        query = (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+                 | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
+        recruits = Recruit.objects.filter(query).order_by('-interview_decision_time', '-training_decision_time_old')
+
+    elif metric == 'trials':
+        # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
+        query = (Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
+                 | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
+        recruits = Recruit.objects.filter(query).order_by('-broadcast_decision_time', '-final_decision_time')
+
+    elif metric == 'new_recruits':
+        # 新开播：当天在开播决策中决定招募的数量（不招募不算）
+        query = (Q(broadcast_decision_time__gte=start_utc,
+                   broadcast_decision_time__lt=end_utc,
+                   broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
+                 | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
+        recruits = Recruit.objects.filter(query).order_by('-broadcast_decision_time', '-final_decision_time')
+
+    else:
+        recruits = []
+
+    return list(recruits)
