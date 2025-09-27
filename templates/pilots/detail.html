@@ -151,6 +151,10 @@
         <span class="btn-icon">💰</span>
         分成管理
       </a>
+      <a class="btn btn-primary" href="{{ url_for('pilot.pilot_performance', pilot_id=pilot.id) }}">
+        <span class="btn-icon">📊</span>
+        业绩查看
+      </a>
       <button class="btn btn-secondary" onclick="showChanges()">
         <span class="btn-icon">📜</span>
         变更记录

@@ -352,6 +352,7 @@ def _calculate_daily_details(report_date):
         month_rebate_amount = rebate_info['rebate_amount']
 
         detail = {
+            'pilot_id': str(pilot.id),
             'pilot_display': pilot_display,
             'gender_age': gender_age,
             'owner': owner,

@@ -126,7 +126,11 @@
       <tbody>
         {% for detail in details %}
         <tr>
-          <td class="fixed-col">{{ detail.pilot_display }}</td>
+          <td class="fixed-col">
+            <a href="{{ url_for('pilot.pilot_performance', pilot_id=detail.pilot_id) }}" class="pilot-link">
+              {{ detail.pilot_display }}
+            </a>
+          </td>
           <td>{{ detail.gender_age }}</td>
           <td>{{ detail.owner }}</td>
           <td>{{ detail.rank }}</td>
@@ -298,6 +302,18 @@
   text-align: center;
   padding: 40px;
   color: var(--muted);
+}
+
+/* 主播链接样式 */
+.pilot-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pilot-link:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
 }
 
 /* 移动端适配 */

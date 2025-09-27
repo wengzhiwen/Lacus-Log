@@ -26,7 +26,8 @@
           <div class="value">
             {% set age_str = '(' ~ battle_record.pilot.age ~ ')' if battle_record.pilot.age else '' %}
             {% set gender_icon = '♂' if battle_record.pilot.gender.value == 0 else ('♀' if battle_record.pilot.gender.value == 1 else '?') %}
-            {{ battle_record.pilot.nickname }}{{ age_str }}[{{ battle_record.pilot.status.value }}]{{ gender_icon }}
+            <span>{{ battle_record.pilot.nickname }}{{ age_str }}[{{ battle_record.pilot.status.value }}]{{ gender_icon }}</span>
+            <a href="{{ url_for('pilot.pilot_performance', pilot_id=battle_record.pilot.id) }}" class="performance-link">业绩查看</a>
           </div>
         </div>
         <div class="detail-item">
@@ -259,6 +260,22 @@
 
 .link:hover {
   color: var(--brand-dark);
+}
+
+.performance-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-size: 12px;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--brand);
+  border-radius: 3px;
+}
+
+.performance-link:hover {
+  color: var(--brand-dark);
+  background: var(--brand);
+  color: white;
 }
 
 .notes-content {

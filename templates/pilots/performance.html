@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}主播业绩 - {{ pilot_info.nickname }} - Lacus-Log{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">📊 主播业绩</h1>
+</div>
+
+<!-- 主播基本信息（压缩高度） -->
+<div class="pilot-header">
+  <div class="pilot-basic-info">
+    <div class="pilot-name">
+      {{ pilot_info.nickname }}
+      {% if pilot_info.real_name %}
+        （{{ pilot_info.real_name }}）
+      {% endif %}
+    </div>
+    <div class="pilot-details">
+      <span class="age-gender">{{ pilot_info.age }}岁{{ pilot_info.gender_icon }}</span>
+      {% if pilot_info.hometown %}
+        <span class="hometown">{{ pilot_info.hometown }}</span>
+      {% endif %}
+      <span class="owner-rank">{{ pilot_info.owner }}[{{ pilot_info.rank }}]</span>
+    </div>
+  </div>
+</div>
+
+<!-- 统计卡片区域 -->
+<div class="stats-section">
+  <!-- 本月统计 -->
+  <div class="summary-section">
+    <h2 class="section-title">本月统计（月初至今日）</h2>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="card-label">开播记录数</div>
+        <div class="card-value">{{ month_stats.record_count }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">开播时数</div>
+        <div class="card-value">{{ month_stats.total_hours }}h</div>
+        <div class="card-sub">{{ month_stats.avg_hours }}h/记录</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计流水</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_revenue) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(month_stats.daily_avg_revenue) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计底薪</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_basepay) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计返点</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_rebate) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计公司分成</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_company_share) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">运营利润估算</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.operating_profit) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 近7日统计 -->
+  <div class="summary-section">
+    <h2 class="section-title">近7日统计</h2>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="card-label">开播记录数</div>
+        <div class="card-value">{{ week_stats.record_count }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">开播时数</div>
+        <div class="card-value">{{ week_stats.total_hours }}h</div>
+        <div class="card-sub">{{ week_stats.avg_hours }}h/记录</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计流水</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_revenue) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(week_stats.daily_avg_revenue) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计底薪</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_basepay) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计公司分成</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_company_share) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">近日盈亏（不计返点）</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.operating_profit) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 近3日统计 -->
+  <div class="summary-section">
+    <h2 class="section-title">近3日统计</h2>
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="card-label">开播记录数</div>
+        <div class="card-value">{{ three_day_stats.record_count }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">开播时数</div>
+        <div class="card-value">{{ three_day_stats.total_hours }}h</div>
+        <div class="card-sub">{{ three_day_stats.avg_hours }}h/记录</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计流水</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_revenue) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(three_day_stats.daily_avg_revenue) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计底薪</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_basepay) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计公司分成</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_company_share) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">近日盈亏（不计返点）</div>
+        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.operating_profit) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 最近开播记录 -->
+<div class="summary-section">
+  <h2 class="section-title">最近开播记录</h2>
+  {% if recent_records %}
+    <div class="record-cards">
+      {% for record in recent_records %}
+      <a href="{{ url_for('battle_record.detail_battle_record', record_id=record.id) }}" class="record-card">
+        <div class="card-header">
+          <div class="record-time">
+            <div class="start-time">{{ record.start_time.strftime('%m月%d日 %H:%M') }}</div>
+            <div class="duration">{{ record.duration_hours }}小时</div>
+          </div>
+          <div class="record-info">
+            <div class="pilot-name">{{ pilot_info.nickname }}{% if pilot_info.real_name %}（{{ pilot_info.real_name }}）{% endif %}</div>
+            <div class="meta-line">[{{ pilot_info.owner }}][{{ pilot_info.rank }}]</div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="revenue">
+            <span class="amount">¥{{ "{:,.2f}".format(record.revenue_amount) }}</span>
+            {% if record.base_salary and record.base_salary > 0 %}
+            <span class="base-salary">底薪¥{{ "{:,.2f}".format(record.base_salary) }}</span>
+            {% endif %}
+          </div>
+          <div class="card-arrow">→</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">暂无开播记录</div>
+    </div>
+  {% endif %}
+</div>
+
+<style>
+/* 主播基本信息样式（压缩高度） */
+.pilot-header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+}
+
+.pilot-basic-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pilot-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.pilot-details {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.age-gender {
+  font-weight: 600;
+}
+
+.hometown::before {
+  content: "· ";
+}
+
+.owner-rank::before {
+  content: "· ";
+}
+
+/* 统计卡片样式（与开播日报保持一致） */
+.stats-section {
+  margin-bottom: 30px;
+}
+
+.summary-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.card-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* 开播记录卡片样式 */
+.record-cards {
+  padding: 0;
+}
+
+.record-card {
+  display: block;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--table-header);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.record-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+  border-color: var(--brand);
+}
+
+.record-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.record-time {
+  flex: 0 0 auto;
+}
+
+.start-time {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.duration {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.record-info {
+  flex: 1;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.pilot-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.meta-line {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.1;
+}
+
+.record-card .card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--table-header);
+  padding-top: 12px;
+}
+
+.revenue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.amount {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--hud-green);
+}
+
+.base-salary {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card-arrow {
+  font-size: 18px;
+  color: var(--muted);
+  transition: color 0.2s ease;
+}
+
+.record-card:hover .card-arrow {
+  color: var(--brand);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .pilot-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  
+  .summary-card {
+    padding: 12px;
+  }
+  
+  .card-value {
+    font-size: 20px;
+  }
+  
+  .record-cards {
+    padding: 0;
+  }
+  
+  .record-card .card-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .record-info {
+    text-align: right;
+    align-items: flex-end;
+  }
+}
+</style>
+{% endblock %}
