@@ -32,11 +32,6 @@
   <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
-      <div class="pilot-avatar">
-        <span class="avatar-icon">
-          {% if recruit.pilot.gender.value == 0 %}♂{% elif recruit.pilot.gender.value == 1 %}♀{% else %}?{% endif %}
-        </span>
-      </div>
       <div class="pilot-main-info">
         <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
         <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
@@ -54,14 +49,6 @@
       <div class="info-item">
         <span class="info-label">直属运营：</span>
         <span class="info-value">{{ recruit.pilot.owner.nickname or recruit.pilot.owner.username if recruit.pilot.owner else '无' }}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">主播分类：</span>
-        <span class="info-value">{{ recruit.pilot.rank.value }}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">当前状态：</span>
-        <span class="info-value">{{ recruit.pilot.status.value }}</span>
       </div>
     </div>
   </div>
@@ -409,8 +396,8 @@
 
 .pilot-basic-info .info-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   font-size: 14px;
 }
 
