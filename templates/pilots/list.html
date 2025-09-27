@@ -115,8 +115,8 @@
           </div>
           <div class="card-footer">
             <div class="badges">
-              <span class="rank-badge rank-{{ pilot.rank.value.replace(' ', '') }}">{{ pilot.rank.value }}</span>
-              <span class="status-badge status-{{ pilot.status.value.replace(' ', '') }}">{{ pilot.status.value }}</span>
+              <span class="rank-badge rank-{{ (pilot.rank.value | normalize_rank).replace(' ', '') }}">{{ pilot.rank.value | normalize_rank }}</span>
+              <span class="status-badge status-{{ (pilot.status.value | normalize_status).replace(' ', '') }}">{{ pilot.status.value | normalize_status }}</span>
             </div>
             <div class="card-arrow">→</div>
           </div>
@@ -279,6 +279,11 @@
 .rank-训练机师 { color: #FFA500; }
 .rank-实习机师 { color: var(--green); }
 .rank-正式机师 { color: var(--brand); }
+/* 新用语样式 */
+.rank-候选人 { color: var(--muted); }
+.rank-试播主播 { color: #FFA500; }
+.rank-实习主播 { color: var(--green); }
+.rank-正式主播 { color: var(--brand); }
 
 /* 状态徽章样式 */
 .status-未征召 { color: var(--muted); }
@@ -286,6 +291,11 @@
 .status-已征召 { color: var(--warn); }
 .status-已签约 { color: var(--hud-green); }
 .status-已阵亡 { color: var(--error); }
+/* 新用语样式 */
+.status-未招募 { color: var(--muted); }
+.status-不招募 { color: var(--error); }
+.status-已招募 { color: var(--warn); }
+.status-流失 { color: var(--error); }
 
 .pilot-card:hover .card-arrow {
   color: var(--brand);

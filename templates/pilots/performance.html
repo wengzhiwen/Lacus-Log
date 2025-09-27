@@ -21,7 +21,7 @@
       {% if pilot_info.hometown %}
         <span class="hometown">{{ pilot_info.hometown }}</span>
       {% endif %}
-      <span class="owner-rank">{{ pilot_info.owner }}[{{ pilot_info.rank }}]</span>
+      <span class="owner-rank">{{ pilot_info.owner }}[{{ pilot_info.rank | normalize_rank }}]</span>
     </div>
   </div>
 </div>

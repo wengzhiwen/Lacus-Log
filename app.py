@@ -169,6 +169,29 @@ def create_app() -> Flask:
         """将UTC时间转换为适合HTML time输入框的格式"""
         return get_local_time_for_input(utc_dt)
 
+    # 注册用语转换过滤器
+    @flask_app.template_filter('normalize_rank')
+    def normalize_rank_filter(rank_value):
+        """将主播分类旧用语转换为新用语显示"""
+        rank_mapping = {
+            '候补机师': '候选人',
+            '训练机师': '试播主播',
+            '实习机师': '实习主播',
+            '正式机师': '正式主播',
+        }
+        return rank_mapping.get(rank_value, rank_value)
+
+    @flask_app.template_filter('normalize_status')
+    def normalize_status_filter(status_value):
+        """将主播状态旧用语转换为新用语显示"""
+        status_mapping = {
+            '未征召': '未招募',
+            '不征召': '不招募',
+            '已征召': '已招募',
+            '已阵亡': '流失',
+        }
+        return status_mapping.get(status_value, status_value)
+
     # 注册全局错误处理器
     def _render_500(error):
         """统一记录并渲染 500 错误页面。"""

@@ -25,8 +25,8 @@
         <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
         <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
         <div class="pilot-badges">
-          <span class="rank-badge rank-{{ recruit.pilot.rank.value.replace(' ', '') }}">{{ recruit.pilot.rank.value }}</span>
-          <span class="status-badge status-{{ recruit.pilot.status.value.replace(' ', '') }}">{{ recruit.pilot.status.value }}</span>
+          <span class="rank-badge rank-{{ (recruit.pilot.rank.value | normalize_rank).replace(' ', '') }}">{{ recruit.pilot.rank.value | normalize_rank }}</span>
+          <span class="status-badge status-{{ (recruit.pilot.status.value | normalize_status).replace(' ', '') }}">{{ recruit.pilot.status.value | normalize_status }}</span>
         </div>
       </div>
     </div>

@@ -133,7 +133,7 @@
           </td>
           <td>{{ detail.gender_age }}</td>
           <td>{{ detail.owner }}</td>
-          <td>{{ detail.rank }}</td>
+          <td>{{ detail.rank | normalize_rank }}</td>
           <td>{{ detail.battle_area }}</td>
           <td>{{ "%.1f"|format(detail.duration) if detail.duration else "0.0" }}小时</td>
           <td>¥{{ "{:,.2f}".format(detail.revenue) }}</td>
