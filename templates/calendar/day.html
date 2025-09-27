@@ -183,7 +183,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 点击跳转到详情页
         slotEl.addEventListener('click', function() {
-          window.location.href = `{{ url_for('announcement.announcement_detail', announcement_id='PLACEHOLDER') }}`.replace('PLACEHOLDER', slotData.id);
+          const currentDate = new URLSearchParams(window.location.search).get('date') || formatDate(new Date());
+          window.location.href = `{{ url_for('announcement.announcement_detail', announcement_id='PLACEHOLDER') }}?from=calendar&date=${currentDate}`.replace('PLACEHOLDER', slotData.id);
         });
         
         timelineEl.appendChild(slotEl);

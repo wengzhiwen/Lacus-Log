@@ -267,7 +267,15 @@ def announcement_detail(announcement_id):
             # 这是父事件，找到所有子事件
             related_announcements = Announcement.objects(parent_announcement=announcement).order_by('start_time')
 
-        return render_template('announcements/detail.html', announcement=announcement, related_announcements=related_announcements)
+        # 获取来源参数
+        from_param = request.args.get('from')
+        date_param = request.args.get('date')
+
+        return render_template('announcements/detail.html', 
+                             announcement=announcement, 
+                             related_announcements=related_announcements,
+                             from_param=from_param,
+                             date_param=date_param)
     except DoesNotExist:
         abort(404)
 
@@ -562,7 +570,14 @@ def edit_announcement(announcement_id):
                     flash('更新通告成功', 'success')
                     logger.info('用户%s更新通告：%s', current_user.username, announcement.id)
 
-                return redirect(url_for('announcement.announcement_detail', announcement_id=announcement_id))
+                # 获取来源参数，决定返回位置
+                from_param = request.args.get('from')
+                date_param = request.args.get('date')
+                
+                if from_param == 'calendar' and date_param:
+                    return redirect(url_for('announcement.announcement_detail', announcement_id=announcement_id, **{'from': 'calendar', 'date': date_param}))
+                else:
+                    return redirect(url_for('announcement.announcement_detail', announcement_id=announcement_id))
 
             except (ValueError, ValidationError) as e:
                 flash(f'数据验证失败：{str(e)}', 'error')
@@ -606,7 +621,14 @@ def delete_announcement(announcement_id):
             flash('删除通告成功', 'success')
             logger.info('用户%s删除通告：%s', current_user.username, announcement.id)
 
-        return redirect(url_for('announcement.list_announcements'))
+        # 获取来源参数，决定返回位置
+        from_param = request.form.get('from')
+        date_param = request.form.get('date')
+        
+        if from_param == 'calendar' and date_param:
+            return redirect(url_for('calendar.day_view', date=date_param))
+        else:
+            return redirect(url_for('announcement.list_announcements'))
 
     except DoesNotExist:
         abort(404)

@@ -6,9 +6,15 @@
 <div class="container">
     <div class="header">
         <div class="breadcrumb">
+            {% if request.args.get('from') == 'calendar' and request.args.get('date') %}
+            <a href="{{ url_for('calendar.day_view') }}?date={{ request.args.get('date') }}">日历</a>
+            <span class="separator">></span>
+            <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}?from=calendar&date={{ request.args.get('date') }}">通告详情</a>
+            {% else %}
             <a href="{{ url_for('announcement.list_announcements') }}">通告计划</a>
             <span class="separator">></span>
             <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}">通告详情</a>
+            {% endif %}
             <span class="separator">></span>
             <span>编辑通告</span>
         </div>
