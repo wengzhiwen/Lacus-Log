@@ -2,6 +2,7 @@
 
 提取日历数据聚合的公共方法，统一处理不同时间粒度的数据。
 """
+# pylint: disable=no-member
 
 from calendar import monthrange
 from datetime import datetime, timedelta
@@ -193,7 +194,7 @@ def _build_daily_timelines(relevant_announcements, date):
             'id': str(announcement.id),
             'area_display': f"{announcement.x_coord}-{announcement.y_coord}-{announcement.z_coord}",
             'pilot_display':
-            f"{announcement.pilot.nickname}[{announcement.pilot.owner.username if announcement.pilot.owner else '无'}]-{announcement.pilot.rank.value}",
+            f"{announcement.pilot.nickname}[{announcement.pilot.owner.nickname if announcement.pilot.owner else '无'}]-{announcement.pilot.rank.value}",
             'start_hour': day_start_hour,
             'end_hour': day_end_hour,
             'duration': day_end_hour - day_start_hour + 1,

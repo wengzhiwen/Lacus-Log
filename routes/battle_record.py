@@ -553,7 +553,7 @@ def api_pilot_filters():
         kancho = Role.objects(name='kancho').first()
         role_list = [r for r in [gicho, kancho] if r]
         owners = User.objects(roles__in=role_list).order_by('username') if role_list else []
-        owners_data = [{'id': str(owner.id), 'name': owner.username} for owner in owners]
+        owners_data = [{'id': str(owner.id), 'name': owner.nickname or owner.username} for owner in owners]
 
         # 获取所有阶级选项
         from models.pilot import Rank
@@ -687,7 +687,7 @@ def api_announcement_detail(announcement_id):
                 # 按需求：选中关联通告时参战形式预设为线下
                 'work_mode': WorkMode.OFFLINE.value,
                 'owner_id': str(announcement.pilot.owner.id) if announcement.pilot.owner else '',
-                'owner_name': announcement.pilot.owner.username if announcement.pilot.owner else ''
+                'owner_name': announcement.pilot.owner.nickname or announcement.pilot.owner.username if announcement.pilot.owner else ''
             }
         })
 
