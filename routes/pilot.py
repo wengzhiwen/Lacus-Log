@@ -122,14 +122,34 @@ def list_pilots():
     if rank_filter:
         try:
             rank_enum = Rank(rank_filter)
-            query = query.filter(rank=rank_enum)
+            # 兼容性筛选：同时筛选新用语和对应的旧用语
+            if rank_enum == Rank.CANDIDATE:
+                query = query.filter(rank__in=[Rank.CANDIDATE, Rank.CANDIDATE_OLD])
+            elif rank_enum == Rank.TRAINEE:
+                query = query.filter(rank__in=[Rank.TRAINEE, Rank.TRAINEE_OLD])
+            elif rank_enum == Rank.INTERN:
+                query = query.filter(rank__in=[Rank.INTERN, Rank.INTERN_OLD])
+            elif rank_enum == Rank.OFFICIAL:
+                query = query.filter(rank__in=[Rank.OFFICIAL, Rank.OFFICIAL_OLD])
+            else:
+                query = query.filter(rank=rank_enum)
         except ValueError:
             pass
 
     if status_filter:
         try:
             status_enum = Status(status_filter)
-            query = query.filter(status=status_enum)
+            # 兼容性筛选：同时筛选新用语和对应的旧用语
+            if status_enum == Status.NOT_RECRUITED:
+                query = query.filter(status__in=[Status.NOT_RECRUITED, Status.NOT_RECRUITED_OLD])
+            elif status_enum == Status.NOT_RECRUITING:
+                query = query.filter(status__in=[Status.NOT_RECRUITING, Status.NOT_RECRUITING_OLD])
+            elif status_enum == Status.RECRUITED:
+                query = query.filter(status__in=[Status.RECRUITED, Status.RECRUITED_OLD])
+            elif status_enum == Status.FALLEN:
+                query = query.filter(status__in=[Status.FALLEN, Status.FALLEN_OLD])
+            else:
+                query = query.filter(status=status_enum)
         except ValueError:
             pass
 
@@ -152,6 +172,22 @@ def list_pilots():
     # 获取筛选选项
     user_choices = _get_user_choices()
 
+    # 只显示新用语的筛选选项
+    rank_choices = [
+        (Rank.CANDIDATE.value, Rank.CANDIDATE.value),
+        (Rank.TRAINEE.value, Rank.TRAINEE.value),
+        (Rank.INTERN.value, Rank.INTERN.value),
+        (Rank.OFFICIAL.value, Rank.OFFICIAL.value),
+    ]
+    
+    status_choices = [
+        (Status.NOT_RECRUITED.value, Status.NOT_RECRUITED.value),
+        (Status.NOT_RECRUITING.value, Status.NOT_RECRUITING.value),
+        (Status.RECRUITED.value, Status.RECRUITED.value),
+        (Status.CONTRACTED.value, Status.CONTRACTED.value),
+        (Status.FALLEN.value, Status.FALLEN.value),
+    ]
+
     return render_template('pilots/list.html',
                            pilots=pilots,
                            rank_filter=rank_filter,
@@ -159,8 +195,8 @@ def list_pilots():
                            owner_filter=owner_filter,
                            days_filter=days_filter,
                            user_choices=user_choices,
-                           rank_choices=[(r.value, r.value) for r in Rank],
-                           status_choices=[(s.value, s.value) for s in Status])
+                           rank_choices=rank_choices,
+                           status_choices=status_choices)
 
 
 @pilot_bp.route('/<pilot_id>')

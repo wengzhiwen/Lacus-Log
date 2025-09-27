@@ -11,7 +11,7 @@ from flask_security import current_user, roles_accepted
 
 from models.announcement import Announcement
 from models.battle_record import BattleRecord, BattleRecordChangeLog
-from models.pilot import Pilot, WorkMode
+from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
@@ -100,10 +100,24 @@ def list_battle_records():
         except Exception:
             pass
 
-    # 阶级筛选
+    # 阶级筛选 - 兼容性筛选
     if rank_filter:
-        pilots_with_rank = Pilot.objects.filter(rank=rank_filter)
-        query = query.filter(pilot__in=pilots_with_rank)
+        try:
+            rank_enum = Rank(rank_filter)
+            # 兼容性筛选：同时筛选新用语和对应的旧用语
+            if rank_enum == Rank.CANDIDATE:
+                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.CANDIDATE, Rank.CANDIDATE_OLD])
+            elif rank_enum == Rank.TRAINEE:
+                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.TRAINEE, Rank.TRAINEE_OLD])
+            elif rank_enum == Rank.INTERN:
+                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.INTERN, Rank.INTERN_OLD])
+            elif rank_enum == Rank.OFFICIAL:
+                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.OFFICIAL, Rank.OFFICIAL_OLD])
+            else:
+                pilots_with_rank = Pilot.objects.filter(rank=rank_enum)
+            query = query.filter(pilot__in=pilots_with_rank)
+        except ValueError:
+            pass
 
     # 主播筛选
     if pilot_filter:
@@ -555,9 +569,13 @@ def api_pilot_filters():
         owners = User.objects(roles__in=role_list).order_by('username') if role_list else []
         owners_data = [{'id': str(owner.id), 'name': owner.nickname or owner.username} for owner in owners]
 
-        # 获取所有阶级选项
-        from models.pilot import Rank
-        ranks_data = [{'value': rank.value, 'name': rank.value} for rank in Rank]
+        # 获取所有阶级选项 - 只显示新用语
+        ranks_data = [
+            {'value': Rank.CANDIDATE.value, 'name': Rank.CANDIDATE.value},
+            {'value': Rank.TRAINEE.value, 'name': Rank.TRAINEE.value},
+            {'value': Rank.INTERN.value, 'name': Rank.INTERN.value},
+            {'value': Rank.OFFICIAL.value, 'name': Rank.OFFICIAL.value},
+        ]
 
         return jsonify({'success': True, 'owners': owners_data, 'ranks': ranks_data})
 
@@ -585,7 +603,21 @@ def api_pilots_filtered():
                 pass
 
         if rank:
-            query = query.filter(rank=rank)
+            try:
+                rank_enum = Rank(rank)
+                # 兼容性筛选：同时筛选新用语和对应的旧用语
+                if rank_enum == Rank.CANDIDATE:
+                    query = query.filter(rank__in=[Rank.CANDIDATE, Rank.CANDIDATE_OLD])
+                elif rank_enum == Rank.TRAINEE:
+                    query = query.filter(rank__in=[Rank.TRAINEE, Rank.TRAINEE_OLD])
+                elif rank_enum == Rank.INTERN:
+                    query = query.filter(rank__in=[Rank.INTERN, Rank.INTERN_OLD])
+                elif rank_enum == Rank.OFFICIAL:
+                    query = query.filter(rank__in=[Rank.OFFICIAL, Rank.OFFICIAL_OLD])
+                else:
+                    query = query.filter(rank=rank_enum)
+            except ValueError:
+                pass
 
         # 排序：已征召/已签约排前，其他状态排后，状态相同的按主播昵称字典顺序
         pilots = query.order_by('nickname')

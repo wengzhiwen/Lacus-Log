@@ -9,7 +9,7 @@ from mongoengine import DoesNotExist, ValidationError
 
 from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
 from models.battle_area import BattleArea
-from models.pilot import Pilot
+from models.pilot import Pilot, Rank
 from models.user import User
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
@@ -931,9 +931,13 @@ def get_pilot_filters():
         owner_choices = sorted(list(owners), key=lambda x: x[1])
         owner_options = [{'id': owner_id, 'name': owner_name} for owner_id, owner_name in owner_choices]
 
-        # 阶级选项（显示所有阶级枚举，按枚举顺序）
-        from models.pilot import Rank
-        rank_options = [rank.value for rank in Rank]
+        # 阶级选项（只显示新用语）
+        rank_options = [
+            Rank.CANDIDATE.value,
+            Rank.TRAINEE.value,
+            Rank.INTERN.value,
+            Rank.OFFICIAL.value,
+        ]
 
         return jsonify({'success': True, 'owners': owner_options, 'ranks': rank_options})
     except Exception as e:
@@ -961,7 +965,21 @@ def get_pilots_filtered():
                 pass
 
         if rank:
-            query = query.filter(rank=rank)
+            try:
+                rank_enum = Rank(rank)
+                # 兼容性筛选：同时筛选新用语和对应的旧用语
+                if rank_enum == Rank.CANDIDATE:
+                    query = query.filter(rank__in=[Rank.CANDIDATE, Rank.CANDIDATE_OLD])
+                elif rank_enum == Rank.TRAINEE:
+                    query = query.filter(rank__in=[Rank.TRAINEE, Rank.TRAINEE_OLD])
+                elif rank_enum == Rank.INTERN:
+                    query = query.filter(rank__in=[Rank.INTERN, Rank.INTERN_OLD])
+                elif rank_enum == Rank.OFFICIAL:
+                    query = query.filter(rank__in=[Rank.OFFICIAL, Rank.OFFICIAL_OLD])
+                else:
+                    query = query.filter(rank=rank_enum)
+            except ValueError:
+                pass
 
         # 按所属、阶级、昵称排序
         pilots = query.order_by('owner', 'rank', 'nickname')
