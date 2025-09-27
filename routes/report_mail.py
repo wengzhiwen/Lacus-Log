@@ -8,18 +8,16 @@ from datetime import datetime, timedelta
 from math import floor
 from typing import List
 
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+from flask import (Blueprint, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_required
-from mongoengine import Q
 
 from models.announcement import Announcement
 from models.battle_record import BattleRecord
-from models.recruit import BroadcastDecision, FinalDecision, Recruit
 from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.timezone_helper import get_current_utc_time, utc_to_local
 
 logger = get_logger('report_mail')
 
@@ -176,71 +174,11 @@ def _calculate_recruit_statistics(report_date):
     Returns:
         dict: 包含报表日、近7日、近14日的统计数据
     """
-
-    # 计算时间范围
-    report_day_start = report_date
-    report_day_end = report_day_start + timedelta(days=1)
-
-    last_7_days_start = report_date - timedelta(days=6)  # 包含报表日，共7天
-    last_14_days_start = report_date - timedelta(days=13)  # 包含报表日，共14天
-
-    # 转换为UTC时间范围
-    report_day_start_utc = local_to_utc(report_day_start)
-    report_day_end_utc = local_to_utc(report_day_end)
-    last_7_days_start_utc = local_to_utc(last_7_days_start)
-    last_14_days_start_utc = local_to_utc(last_14_days_start)
-
-    # 计算报表日数据
-    report_day_stats = _calculate_period_stats(report_day_start_utc, report_day_end_utc)
-
-    # 计算近7日数据
-    last_7_days_stats = _calculate_period_stats(last_7_days_start_utc, report_day_end_utc)
-
-    # 计算近14日数据
-    last_14_days_stats = _calculate_period_stats(last_14_days_start_utc, report_day_end_utc)
-
-    return {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
+    from utils.recruit_stats import calculate_recruit_daily_stats
+    return calculate_recruit_daily_stats(report_date)
 
 
-def _calculate_period_stats(start_utc, end_utc):
-    """计算指定时间范围内的招募统计数据
-    
-    Args:
-        start_utc: 开始时间（UTC）
-        end_utc: 结束时间（UTC）
-        
-    Returns:
-        dict: 包含约面、到面、试播、新开播的统计数据
-    """
-
-    # 约面：当天创建的招募数量
-    appointments = Recruit.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc).count()
-
-    # 到面：当天发生的面试决策数量（新六步制 + 历史兼容）
-    # 新六步制：使用 interview_decision_time
-    # 历史兼容：使用 training_decision_time_old
-    interviews_query = (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
-                        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
-    interviews = Recruit.objects.filter(interviews_query).count()
-
-    # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
-    # 新六步制：使用 broadcast_decision_time
-    # 历史兼容：使用 final_decision_time
-    trials_query = (Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
-                    | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc))
-    trials = Recruit.objects.filter(trials_query).count()
-
-    # 新开播：当天在开播决策中决定招募的数量（不招募不算）
-    # 新六步制：使用 broadcast_decision_time 和 broadcast_decision
-    # 历史兼容：使用 final_decision_time 和 final_decision
-    new_recruits_query = (
-        Q(broadcast_decision_time__gte=start_utc,
-          broadcast_decision_time__lt=end_utc,
-          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
-        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
-    new_recruits = Recruit.objects.filter(new_recruits_query).count()
-
-    return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
+# _calculate_period_stats 函数已移至 utils/recruit_stats.py
 
 
 def _build_unstarted_markdown(items: List[dict]) -> str:

@@ -9,10 +9,8 @@ from flask_security.utils import hash_password
 from models.announcement import Announcement
 from models.battle_record import BattleRecord
 from models.pilot import Pilot, Rank, Status
-from models.recruit import FinalDecision, Recruit
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('main')
 
@@ -78,36 +76,12 @@ def _calculate_dashboard_data():
     candidate_not_recruited = Pilot.objects(rank=Rank.CANDIDATE, status=Status.NOT_RECRUITED).count()
     trainee_serving = Pilot.objects(rank=Rank.TRAINEE, status__in=serving_status).count()
 
-    # 征召统计（使用本地时间进行日期归属，与征召日报保持一致）
-    # 获取今日的本地时间范围
-    current_local = utc_to_local(now)
-    today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_local_end = today_local_start + timedelta(days=1)
-
-    # 转换为UTC时间范围
-    today_start_utc = local_to_utc(today_local_start)
-    today_end_utc = local_to_utc(today_local_end)
-
-    # 今日约面：今日创建的征召数量
-    recruit_today_appointments = Recruit.objects(created_at__gte=today_start_utc, created_at__lt=today_end_utc).count()
-
-    # 今日到面：今日发生的面试决策数量（新六步制 + 历史兼容）
-    from mongoengine import Q
-    interviews_query = (
-        Q(interview_decision_time__gte=today_start_utc, interview_decision_time__lt=today_end_utc) |
-        Q(training_decision_time_old__gte=today_start_utc, training_decision_time_old__lt=today_end_utc)
-    )
-    recruit_today_interviews = Recruit.objects.filter(interviews_query).count()
-
-    # 今日新开播：今日在开播决策中决定征召的数量（不征召不算）
-    from models.recruit import BroadcastDecision
-    new_recruits_query = (
-        Q(broadcast_decision_time__gte=today_start_utc, broadcast_decision_time__lt=today_end_utc,
-          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]) |
-        Q(final_decision_time__gte=today_start_utc, final_decision_time__lt=today_end_utc,
-          final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
-    )
-    recruit_today_new_recruits = Recruit.objects.filter(new_recruits_query).count()
+    # 征召统计（使用统一的工具函数）
+    from utils.recruit_stats import calculate_recruit_today_stats
+    today_recruit_stats = calculate_recruit_today_stats()
+    recruit_today_appointments = today_recruit_stats['appointments']
+    recruit_today_interviews = today_recruit_stats['interviews']
+    recruit_today_new_recruits = today_recruit_stats['new_recruits']
 
     return {
         # 作战计划统计（保留现有键名以兼容模板）
