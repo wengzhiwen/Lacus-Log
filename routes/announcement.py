@@ -27,10 +27,9 @@ def _get_client_ip():
 
 
 def _record_changes(announcement, old_data, user, ip_address):
-    """记录通告字段变更"""
+    """记录通告字段变更（主播字段不再记录变更）"""
     changes = []
     field_mapping = {
-        'pilot': str(announcement.pilot.id) if announcement.pilot else None,
         'battle_area': str(announcement.battle_area.id) if announcement.battle_area else None,
         'x_coord': announcement.x_coord,
         'y_coord': announcement.y_coord,
@@ -427,9 +426,8 @@ def edit_announcement(announcement_id):
             # 获取编辑范围：this_only（仅这一次） 或 future_all（未来所有）
             edit_scope = request.form.get('edit_scope', 'this_only')
 
-            # 记录原始数据用于变更记录
+            # 记录原始数据用于变更记录（主播字段不再记录变更）
             old_data = {
-                'pilot': str(announcement.pilot.id) if announcement.pilot else None,
                 'battle_area': str(announcement.battle_area.id) if announcement.battle_area else None,
                 'x_coord': announcement.x_coord,
                 'y_coord': announcement.y_coord,
@@ -466,19 +464,18 @@ def edit_announcement(announcement_id):
                 logger.debug('编辑通告表单数据 - pilot_id: %s, battle_area_id: %s, start_time: %s, duration_hours: %s', pilot_id, battle_area_id, start_time_str,
                              duration_hours)
 
-                # 基础验证
-                if not pilot_id or not battle_area_id or not start_time_str or not duration_hours:
-                    logger.debug('必填项验证失败 - pilot_id: %s, battle_area_id: %s, start_time: %s, duration_hours: %s', pilot_id, battle_area_id, start_time_str,
+                # 基础验证（主播字段已改为只读，无需验证）
+                if not battle_area_id or not start_time_str or not duration_hours:
+                    logger.debug('必填项验证失败 - battle_area_id: %s, start_time: %s, duration_hours: %s', battle_area_id, start_time_str,
                                  duration_hours)
                     flash('请填写所有必填项', 'error')
                     return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
 
                 # 获取关联对象
                 try:
-                    pilot = Pilot.objects.get(id=pilot_id)
                     battle_area = BattleArea.objects.get(id=battle_area_id)
                 except DoesNotExist:
-                    flash('机师或战斗区域不存在', 'error')
+                    flash('战斗区域不存在', 'error')
                     return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
 
                 # 权限检查：管理员和运营都可以编辑所有通告
@@ -500,9 +497,9 @@ def edit_announcement(announcement_id):
                         flash('时间格式错误', 'error')
                         return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
 
-                    # 更新所有未来通告的数据
+                    # 更新所有未来通告的数据（主播字段保持不变）
                     for ann in future_announcements:
-                        ann.pilot = pilot
+                        # 主播字段保持原值不变
                         ann.battle_area = battle_area
                         ann.x_coord = battle_area.x_coord
                         ann.y_coord = battle_area.y_coord
@@ -542,8 +539,7 @@ def edit_announcement(announcement_id):
                     logger.info('用户%s更新未来循环通告：%s（共%d个）', current_user.username, announcement.id, len(future_announcements))
 
                 else:
-                    # 仅编辑这一次
-                    announcement.pilot = pilot
+                    # 仅编辑这一次（主播字段保持不变）
                     announcement.battle_area = battle_area
                     announcement.x_coord = battle_area.x_coord
                     announcement.y_coord = battle_area.y_coord
