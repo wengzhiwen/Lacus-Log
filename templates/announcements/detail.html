@@ -6,7 +6,7 @@
 <div class="container">
     <div class="header">
         <div class="breadcrumb">
-            <a href="{{ url_for('announcement.list_announcements') }}">通告计划</a>
+            <a href="{{ url_for('announcement.list_announcements') }}">通告管理</a>
             <span class="separator">></span>
             <span>通告详情</span>
         </div>
@@ -27,7 +27,7 @@
                 </div>
 
                 <div class="info-item">
-                    <label>所属：</label>
+                    <label>直属运营：</label>
                     <div class="value">
                         {% if announcement.pilot.owner %}
                         {{ announcement.pilot.owner.nickname or announcement.pilot.owner.username }}
@@ -45,7 +45,7 @@
                 </div>
 
                 <div class="info-item">
-                    <label>平台：</label>
+                    <label>开播平台：</label>
                     <div class="value">{{ announcement.pilot.platform.value }}</div>
                 </div>
             </div>

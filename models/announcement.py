@@ -546,13 +546,13 @@ class AnnouncementChangeLog(Document):
     def field_display_name(self):
         """字段显示名称"""
         mapping = {
-            'pilot': '关联主播',
-            'battle_area': '关联开播地点',
+            'pilot': '主播',
+            'battle_area': '开播地点',
             'x_coord': '基地',
             'y_coord': '场地',
             'z_coord': '坐席',
             'start_time': '开始时间',
-            'duration_hours': '计划时长',
+            'duration_hours': '时长',
             'recurrence_type': '重复类型',
             'recurrence_pattern': '重复模式',
             'recurrence_end': '重复结束时间',

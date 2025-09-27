@@ -21,7 +21,7 @@ calendar_bp = Blueprint('calendar', __name__)
 @roles_accepted('gicho', 'kancho')
 def index():
     """日历主页，默认进入周视图"""
-    logger.debug('用户进入作战计划日历：%s', getattr(current_user, 'username', 'anonymous'))
+    logger.debug('用户进入通告日历：%s', getattr(current_user, 'username', 'anonymous'))
     return render_template('calendar/week.html')
 
 

@@ -32,11 +32,11 @@ def aggregate_monthly_data(year, month):
     first_day_utc = local_to_utc(first_day)
     last_day_utc = local_to_utc(last_day)
 
-    # 查询当月的所有作战计划
+    # 查询当月的所有通告
     announcements = Announcement.objects(start_time__gte=first_day_utc, start_time__lte=last_day_utc).only('start_time', 'pilot', 'x_coord', 'y_coord',
                                                                                                            'z_coord')
 
-    # 按日期统计作战计划数量
+    # 按日期统计通告数量
     daily_counts = {}
     for announcement in announcements:
         # 转换为本地时间
@@ -66,17 +66,17 @@ def aggregate_weekly_data(date):
     week_start_utc = local_to_utc(week_start)
     week_end_utc = local_to_utc(week_end)
 
-    # 查询当周的所有作战计划
+    # 查询当周的所有通告
     announcements = Announcement.objects(start_time__gte=week_start_utc, start_time__lte=week_end_utc).only('start_time', 'pilot', 'battle_area', 'x_coord',
                                                                                                             'y_coord', 'z_coord')
 
-    # 获取所有可用的战斗区域
+    # 获取所有可用的开播地点
     available_areas = BattleArea.objects(availability='可用').only('x_coord', 'y_coord', 'z_coord')
 
-    # 按日期统计作战计划数量和可用区域
+    # 按日期统计通告数量和可用区域
     weekly_data = _initialize_weekly_data(week_start)
 
-    # 统计每日的作战计划和使用的区域
+    # 统计每日的通告和使用的区域
     for announcement in announcements:
         local_start = utc_to_local(announcement.start_time)
         date_key = local_start.strftime('%Y-%m-%d')

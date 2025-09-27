@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}月视图 - 通告计划日历{% endblock %}
+{% block title %}月视图 - 通告日历{% endblock %}
 {% block content %}
 <section class="calendar-container">
   <div class="calendar-header">
-    <h1 class="page-title">通告计划日历</h1>
+    <h1 class="page-title">通告日历</h1>
     <div class="view-controls">
       <a href="{{ url_for('calendar.month_view') }}" class="btn btn-sm btn-primary">月视图</a>
       <a href="{{ url_for('calendar.week_view') }}" class="btn btn-sm">周视图</a>
@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       dayEl.innerHTML = `
         <div class="day-number">${day}</div>
-        <div class="day-count">${count > 0 ? count + '计划' : ''}</div>
+        <div class="day-count">${count > 0 ? count + '通告' : ''}</div>
       `;
 
       // 点击跳转到日视图

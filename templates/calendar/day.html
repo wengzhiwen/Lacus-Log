@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}日视图 - 通告计划日历{% endblock %}
+{% block title %}日视图 - 通告日历{% endblock %}
 {% block content %}
 <section class="calendar-container">
   <div class="calendar-header">
-    <h1 class="page-title">通告计划日历</h1>
+    <h1 class="page-title">通告日历</h1>
     <div class="view-controls">
       <a href="{{ url_for('calendar.month_view') }}" class="btn btn-sm">月视图</a>
       <a href="{{ url_for('calendar.week_view') }}" class="btn btn-sm">周视图</a>
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
     dataRowsEl.innerHTML = '';
 
     if (!data.area_timelines || Object.keys(data.area_timelines).length === 0) {
-      dataRowsEl.innerHTML = '<div class="no-data">当日暂无通告计划安排</div>';
+      dataRowsEl.innerHTML = '<div class="no-data">当日暂无通告安排</div>';
       return;
     }
 

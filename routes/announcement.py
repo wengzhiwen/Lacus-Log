@@ -291,7 +291,7 @@ def new_announcement():
                 return _render_new_template(form=request.form)
 
             if not battle_area_id:
-                flash('请选择战斗区域', 'error')
+                flash('请选择开播地点', 'error')
                 return _render_new_template(form=request.form)
 
             if not start_time_str:
@@ -307,7 +307,7 @@ def new_announcement():
                 pilot = Pilot.objects.get(id=pilot_id)
                 battle_area = BattleArea.objects.get(id=battle_area_id)
             except DoesNotExist:
-                flash('机师或战斗区域不存在', 'error')
+                flash('主播或开播地点不存在', 'error')
                 return _render_new_template(form=request.form)
 
             # 权限检查：管理员和运营都可以为所有主播创建通告
@@ -931,8 +931,8 @@ def get_pilots_filtered():
         owner_id = request.args.get('owner')
         rank = request.args.get('rank')
 
-        # 基础查询：只显示已征召或已签约的机师
-        query = Pilot.objects(status__in=['已征召', '已签约'])
+        # 基础查询：只显示已招募或已签约的主播（兼容历史状态）
+        query = Pilot.objects(status__in=['已招募', '已签约', '已征召'])
 
         # 应用筛选条件
         if owner_id:

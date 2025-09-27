@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}通告计划管理{% endblock %}
+{% block title %}通告管理{% endblock %}
 
 {% block content %}
 <section class="announcement-management">
     <!-- 页面头部 -->
     <div class="page-header">
-        <h1 class="page-title">通告计划管理</h1>
+        <h1 class="page-title">通告管理</h1>
     </div>
 
     <!-- 筛选器（默认折叠） -->
@@ -84,7 +84,7 @@
     <!-- 搜索框（与机师管理一致的UI） -->
     <div class="search-bar">
         <div class="search-input-group">
-            <input type="text" id="announcement-pilot-search" class="search-input" placeholder="搜索机师昵称或真实姓名..." />
+            <input type="text" id="announcement-pilot-search" class="search-input" placeholder="搜索主播昵称或真实姓名..." />
             <button type="button" class="search-button" onclick="performAnnouncementSearch()">
                 <span class="search-icon">🔍</span>
             </button>
@@ -119,7 +119,7 @@
 
                     <div class="announcement-body">
                         <div class="coords">
-                            <span class="coord-label">作战区域：</span>
+                            <span class="coord-label">开播地点：</span>
                             <span class="coords-value">{{ announcement.x_coord }}-{{ announcement.y_coord }}-{{ announcement.z_coord }}</span>
                         </div>
                         {% if announcement.recurrence_type.value != '无重复' %}

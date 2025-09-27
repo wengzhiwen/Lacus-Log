@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}周视图 - 通告计划日历{% endblock %}
+{% block title %}周视图 - 通告日历{% endblock %}
 {% block content %}
 <section class="calendar-container">
   <div class="calendar-header">
-    <h1 class="page-title">通告计划日历</h1>
+    <h1 class="page-title">通告日历</h1>
     <div class="view-controls">
       <a href="{{ url_for('calendar.month_view') }}" class="btn btn-sm">月视图</a>
       <a href="{{ url_for('calendar.week_view') }}" class="btn btn-sm btn-primary">周视图</a>
@@ -111,11 +111,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="day-stats">
           <div class="stat-item">
             <span class="stat-number">${announmentCount}</span>
-            <span class="stat-label">作战计划</span>
+            <span class="stat-label">通告</span>
           </div>
           <div class="stat-item">
             <span class="stat-number">${availableCount}</span>
-            <span class="stat-label">未使用区域</span>
+            <span class="stat-label">未使用坐席</span>
           </div>
         </div>
       `;
