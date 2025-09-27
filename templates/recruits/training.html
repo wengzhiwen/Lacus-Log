@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}训练征召 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}试播招募 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
 {% block content %}
 <section class="training-recruit">
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">
       <span>←</span>
-      返回征召详情
+      返回招募详情
     </a>
   </div>
 
-  <h1 class="title">训练征召</h1>
+  <h1 class="title">试播招募</h1>
 
-  <!-- 机师信息卡片 -->
+  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -34,22 +34,22 @@
         <span class="info-value">{{ recruit.appointment_time | local_datetime('%Y-%m-%d %H:%M') }}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">征召渠道：</span>
+        <span class="info-label">招募渠道：</span>
         <span class="info-value">{{ recruit.channel.value }}</span>
       </div>
     </div>
   </div>
 
-  <!-- 训练征召表单 -->
+  <!-- 试播招募表单 -->
   <form method="POST" action="{{ url_for('recruit.training_recruit', recruit_id=recruit.id) }}" class="training-form" id="training_form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
     <div class="form-section">
-      <h3 class="section-title">训练征召决策</h3>
+      <h3 class="section-title">试播招募决策</h3>
       
       <div class="form-row">
         <div class="form-group full-width">
-          <label for="training_decision_maker">训练征召决策人</label>
+          <label for="training_decision_maker">试播招募决策人</label>
           <input type="text" id="training_decision_maker" value="{{ current_user.nickname or current_user.username }}" readonly>
           <small class="form-help">只读展示，不可编辑</small>
         </div>
@@ -57,7 +57,7 @@
 
       <div class="form-row">
         <div class="form-group full-width">
-          <label for="training_decision">训练征召决策 <span class="required">*</span></label>
+          <label for="training_decision">试播招募决策 <span class="required">*</span></label>
           <select name="training_decision" id="training_decision" required onchange="toggleTrainingFields()">
             <option value="">-- 请选择决策 --</option>
             {% for value, text in training_decision_choices %}
@@ -68,13 +68,13 @@
       </div>
     </div>
 
-    <!-- 训练时间 -->
+    <!-- 试播时间 -->
     <div class="form-section" id="training_time_section" style="display: none;">
-      <h3 class="section-title">训练安排</h3>
+      <h3 class="section-title">试播安排</h3>
       
       <div class="form-row">
         <div class="form-group">
-          <label for="training_time">训练时间 <span class="required">*</span></label>
+          <label for="training_time">试播时间 <span class="required">*</span></label>
           <input type="datetime-local" name="training_time" id="training_time" 
                  value="{{ default_training_time | local_datetime_for_input }}">
           <small class="form-help">试播时间，不能早于预约时间</small>
@@ -82,15 +82,15 @@
       </div>
     </div>
 
-    <!-- 机师基本信息 -->
+    <!-- 主播基本信息 -->
     <div class="form-section" id="pilot_info_section" style="display: none;">
-      <h3 class="section-title">机师基本信息</h3>
+      <h3 class="section-title">主播基本信息</h3>
       
       <div class="form-row">
         <div class="form-group">
           <label for="real_name">真实姓名 <span class="required">*</span></label>
           <input type="text" name="real_name" id="real_name" maxlength="20" 
-                 value="{{ recruit.pilot.real_name or '' }}" placeholder="请填写机师真实姓名">
+                 value="{{ recruit.pilot.real_name or '' }}" placeholder="请填写主播真实姓名">
         </div>
         <div class="form-group">
           <label for="birth_year">出生年 <span class="required">*</span></label>
@@ -104,9 +104,9 @@
 
       <div class="form-row">
         <div class="form-group full-width">
-          <label for="work_mode">参战形式 <span class="required">*</span></label>
+          <label for="work_mode">开播方式 <span class="required">*</span></label>
           <select name="work_mode" id="work_mode">
-            <option value="">-- 请选择参战形式 --</option>
+            <option value="">-- 请选择开播方式 --</option>
             {% for value, text in work_mode_choices %}
             <option value="{{ value }}" {% if recruit.pilot.work_mode and recruit.pilot.work_mode.value == value %}selected{% endif %}>{{ text }}</option>
             {% endfor %}
@@ -139,11 +139,11 @@
       <div class="info-box" id="recruit_info" style="display: none;">
         <div class="info-icon">ℹ️</div>
         <div class="info-content">
-          <div class="info-title">征召为训练机师后将自动执行：</div>
+          <div class="info-title">招募为试播主播后将自动执行：</div>
           <ul class="info-list">
-            <li>该机师的阶级将自动变更为<strong>训练机师</strong></li>
-            <li>该机师的状态将自动变更为<strong>已征召</strong></li>
-            <li>该征召记录的状态将变更为<strong>训练征召中</strong></li>
+            <li>该主播的主播分类将自动变更为<strong>试播主播</strong></li>
+            <li>该主播的状态将自动变更为<strong>已招募</strong></li>
+            <li>该招募记录的状态将变更为<strong>试播招募中</strong></li>
           </ul>
         </div>
       </div>
@@ -151,11 +151,11 @@
       <div class="warning-box" id="not_recruit_info" style="display: none;">
         <div class="warning-icon">⚠️</div>
         <div class="warning-content">
-          <div class="warning-title">选择不征召后将自动执行：</div>
+          <div class="warning-title">选择不招募后将自动执行：</div>
           <ul class="warning-list">
-            <li>该机师的状态将自动变更为<strong>不征召</strong></li>
-            <li>该征召记录的状态将变更为<strong>已结束</strong></li>
-            <li>征召流程将终止，无法再进行后续步骤</li>
+            <li>该主播的状态将自动变更为<strong>不招募</strong></li>
+            <li>该招募记录的状态将变更为<strong>已结束</strong></li>
+            <li>招募流程将终止，无法再进行后续步骤</li>
           </ul>
         </div>
       </div>
@@ -242,12 +242,12 @@
   font-weight: 500;
 }
 
-.rank-候补机师, .rank-trainee { background: var(--table-header); color: var(--text); }
-.rank-训练机师, .rank-实习机师, .rank-正式机师 { background: var(--brand); color: white; }
+.rank-候选人, .rank-trainee { background: var(--table-header); color: var(--text); }
+.rank-试播主播, .rank-实习主播, .rank-正式主播 { background: var(--brand); color: white; }
 
-.status-未征召 { background: var(--table-header); color: var(--text); }
-.status-已征召, .status-已签约 { background: var(--hud-green); color: white; }
-.status-不征召, .status-已阵亡 { background: var(--error); color: white; }
+.status-未招募 { background: var(--table-header); color: var(--text); }
+.status-已招募, .status-已签约 { background: var(--hud-green); color: white; }
+.status-不招募, .status-流失 { background: var(--error); color: white; }
 
 .pilot-basic-info {
   display: grid;
@@ -443,7 +443,7 @@ function toggleTrainingFields() {
   const recruitInfo = document.getElementById('recruit_info');
   const notRecruitInfo = document.getElementById('not_recruit_info');
   
-  if (decision === '征召为训练机师') {
+  if (decision === '招募为试播主播') {
     trainingTimeSection.style.display = 'block';
     pilotInfoSection.style.display = 'block';
     recruitInfo.style.display = 'flex';
@@ -454,7 +454,7 @@ function toggleTrainingFields() {
     document.getElementById('real_name').setAttribute('required', '');
     document.getElementById('birth_year').setAttribute('required', '');
     document.getElementById('work_mode').setAttribute('required', '');
-  } else if (decision === '不征召') {
+  } else if (decision === '不招募') {
     trainingTimeSection.style.display = 'none';
     pilotInfoSection.style.display = 'none';
     recruitInfo.style.display = 'none';

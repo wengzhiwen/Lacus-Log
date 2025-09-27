@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}新建机师 - Lacus-Log{% endblock %}
+{% block title %}新建主播 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="pilot-form">
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
       <span>←</span>
-      返回机师列表
+      返回主播列表
     </a>
   </div>
 
   <div class="form-container">
     <div class="form-header">
-      <h1 class="form-title">新建机师</h1>
+      <h1 class="form-title">新建主播</h1>
     </div>
 
     <form method="post" class="pilot-form-content">
@@ -69,7 +69,7 @@
             </select>
             <div class="form-help">
               {% if current_user.has_role('kancho') and not current_user.has_role('gicho') %}
-              舰长创建的机师默认属于自己
+              运营创建的主播默认属于自己
               {% endif %}
             </div>
           </div>
@@ -100,23 +100,23 @@
           </div>
           
           <div class="form-group">
-            <label for="rank" class="form-label">阶级</label>
+            <label for="rank" class="form-label">主播分类</label>
             <select id="rank" name="rank" class="form-select">
-              <option value="候补机师" {% if form and form.rank == '候补机师' %}selected{% endif %}>候补机师</option>
-              <option value="训练机师" {% if form and form.rank == '训练机师' %}selected{% endif %}>训练机师</option>
-              <option value="实习机师" {% if form and form.rank == '实习机师' %}selected{% endif %}>实习机师</option>
-              <option value="正式机师" {% if form and form.rank == '正式机师' %}selected{% endif %}>正式机师</option>
+              <option value="候选人" {% if form and form.rank == '候选人' %}selected{% endif %}>候选人</option>
+              <option value="试播主播" {% if form and form.rank == '试播主播' %}selected{% endif %}>试播主播</option>
+              <option value="实习主播" {% if form and form.rank == '实习主播' %}selected{% endif %}>实习主播</option>
+              <option value="正式主播" {% if form and form.rank == '正式主播' %}selected{% endif %}>正式主播</option>
             </select>
           </div>
           
           <div class="form-group">
             <label for="status" class="form-label">状态</label>
             <select id="status" name="status" class="form-select">
-              <option value="未征召" {% if form and form.status == '未征召' %}selected{% endif %}>未征召</option>
-              <option value="不征召" {% if form and form.status == '不征召' %}selected{% endif %}>不征召</option>
-              <option value="已征召" {% if form and form.status == '已征召' %}selected{% endif %}>已征召</option>
+              <option value="未招募" {% if form and form.status == '未招募' %}selected{% endif %}>未招募</option>
+              <option value="不招募" {% if form and form.status == '不招募' %}selected{% endif %}>不招募</option>
+              <option value="已招募" {% if form and form.status == '已招募' %}selected{% endif %}>已招募</option>
               <option value="已签约" {% if form and form.status == '已签约' %}selected{% endif %}>已签约</option>
-              <option value="已阵亡" {% if form and form.status == '已阵亡' %}selected{% endif %}>已阵亡</option>
+              <option value="流失" {% if form and form.status == '流失' %}selected{% endif %}>流失</option>
             </select>
           </div>
         </div>
@@ -126,7 +126,7 @@
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">
           <span class="btn-icon">✓</span>
-          创建机师
+          创建主播
         </button>
         <a href="{{ url_for('pilot.list_pilots') }}" class="btn btn-secondary">
           <span class="btn-icon">✕</span>

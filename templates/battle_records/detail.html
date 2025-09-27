@@ -1,22 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}作战记录详情 - Lacus-Log{% endblock %}
+{% block title %}开播记录详情 - Lacus-Log{% endblock %}
 {% block content %}
 <div class="container">
   <div class="header">
     <div class="breadcrumb">
-      <a href="{{ url_for('battle_record.list_battle_records') }}">作战记录</a>
+      <a href="{{ url_for('battle_record.list_battle_records') }}">开播记录</a>
       <span class="separator">></span>
-      <span>作战记录详情</span>
+      <span>开播记录详情</span>
     </div>
   </div>
 
 <section class="battle-record-detail">
   <!-- 页面头部 -->
   <div class="page-header">
-    <h1 class="page-title">作战记录详情</h1>
+    <h1 class="page-title">开播记录详情</h1>
   </div>
 
-  <!-- 作战记录信息 -->
+  <!-- 开播记录信息 -->
   <div class="detail-card">
     <div class="card-section">
       <h3 class="section-title">基本信息</h3>
@@ -38,7 +38,7 @@
           <label>关联通告</label>
           <div class="value">
             {% if related_announcement_deleted %}
-              关联作战计划已被删除
+              关联通告计划已被删除
             {% elif related_announcement %}
               {% set weekday_map = {'0':'日','1':'一','2':'二','3':'三','4':'四','5':'五','6':'六'} %}
               {% set weekday_idx = related_announcement.start_time|local_datetime('%w') %}
@@ -74,22 +74,22 @@
     </div>
 
     <div class="card-section">
-      <h3 class="section-title">作战区域</h3>
+      <h3 class="section-title">开播地点</h3>
       <div class="detail-grid">
         <div class="detail-item">
           <label>参战形式</label>
           <div class="value">{{ battle_record.work_mode.value }}</div>
         </div>
         <div class="detail-item">
-          <label>X坐标</label>
+          <label>基地</label>
           <div class="value">{{ battle_record.x_coord }}</div>
         </div>
         <div class="detail-item">
-          <label>Y坐标</label>
+          <label>场地</label>
           <div class="value">{{ battle_record.y_coord }}</div>
         </div>
         <div class="detail-item">
-          <label>Z坐标</label>
+          <label>坐席</label>
           <div class="value">{{ battle_record.z_coord }}</div>
         </div>
         <div class="detail-item full-width">
@@ -178,7 +178,7 @@
       <h3>确认删除</h3>
     </div>
     <div class="modal-body">
-      <p>确定要删除这条作战记录吗？此操作不可恢复。</p>
+      <p>确定要删除这条开播记录吗？此操作不可恢复。</p>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="hideDeleteModal()">取消</button>

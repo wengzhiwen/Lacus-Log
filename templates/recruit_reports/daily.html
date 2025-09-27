@@ -1,25 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}机师征召日报 - {{ pagination.date }}{% endblock %}
+{% block title %}主播招募日报 - {{ pagination.date }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">📊 机师征召日报</h1>
+  <h1 class="page-title">📊 主播招募日报</h1>
   <p class="text-muted">{{ pagination.date }}</p>
 </div>
 
 <!-- 日期导航 -->
 <div class="date-navigation">
   <div class="date-controls">
-    <a href="{{ url_for('recruit.recruit_daily_report', date=pagination.prev_date) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+    <a href="{{ url_for('report_mail.trigger_recruit_daily_report', date=pagination.prev_date) }}" class="btn btn-secondary btn-sm">← 前一日</a>
     <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
-    <a href="{{ url_for('recruit.recruit_daily_report', date=pagination.next_date) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+    <a href="{{ url_for('report_mail.trigger_recruit_daily_report', date=pagination.next_date) }}" class="btn btn-secondary btn-sm">后一日 →</a>
   </div>
 </div>
 
-<!-- 征召统计表格 -->
+<!-- 招募统计表格 -->
 <div class="statistics-section">
-  <h2 class="section-title">征召统计</h2>
+  <h2 class="section-title">招募统计</h2>
   <div class="table-container">
     <table class="statistics-table">
       <thead>
@@ -90,28 +90,28 @@
       <div class="card-icon">📅</div>
       <div class="card-content">
         <h3>约面</h3>
-        <p>当天创建的征召数量</p>
+        <p>当天创建的招募数量</p>
       </div>
     </div>
     <div class="explanation-card">
       <div class="card-icon">👥</div>
       <div class="card-content">
         <h3>到面</h3>
-        <p>当天发生的面试决策数量（完成面试决策的数量，不论是决定预约训练，还是决定不征召都算）</p>
+        <p>当天发生的面试决策数量（完成面试决策的数量，不论是决定预约试播，还是决定不招募都算）</p>
       </div>
     </div>
     <div class="explanation-card">
       <div class="card-icon">🎯</div>
       <div class="card-content">
         <h3>试播</h3>
-        <p>当天发生的开播决策数量（完成开播决策的数量，不论是决定征召，还是决定不征召）</p>
+        <p>当天发生的开播决策数量（完成开播决策的数量，不论是决定招募，还是决定不招募）</p>
       </div>
     </div>
     <div class="explanation-card">
       <div class="card-icon">🚀</div>
       <div class="card-content">
         <h3>新开播</h3>
-        <p>当天在开播决策中决定征召的数量（不征召不算）</p>
+        <p>当天在开播决策中决定招募的数量（不招募不算）</p>
       </div>
     </div>
   </div>

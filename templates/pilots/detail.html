@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-{% block title %}机师详情 - {{ pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}主播详情 - {{ pilot.nickname }} - Lacus-Log{% endblock %}
 {% block content %}
 <section class="pilot-detail">
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
       <span>←</span>
-      返回机师列表
+      返回主播列表
     </a>
   </div>
 
@@ -57,19 +57,19 @@
       <h3 class="section-title">业务信息</h3>
       <div class="info-grid">
         <div class="info-item">
-          <div class="info-label">所属</div>
+          <div class="info-label">直属运营</div>
           <div class="info-value">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无' }}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">战区</div>
+          <div class="info-label">开播平台</div>
           <div class="info-value">{{ pilot.platform.value }}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">参战形式</div>
+          <div class="info-label">开播方式</div>
           <div class="info-value">{{ pilot.work_mode.value }}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">阶级</div>
+          <div class="info-label">主播分类</div>
           <div class="info-value rank-{{ pilot.rank.value.replace(' ', '') }}">{{ pilot.rank.value }}</div>
         </div>
         <div class="info-item">
@@ -91,7 +91,7 @@
           <div class="commission-calculation">
             <div class="calc-item">
               <span class="calc-value">{{ "%.1f"|format(calculation_info.pilot_income) }}%</span>
-              <span class="calc-label">机师收入</span>
+              <span class="calc-label">主播收入</span>
             </div>
             <div class="calc-item">
               <span class="calc-value">{{ "%.1f"|format(calculation_info.company_income) }}%</span>
@@ -137,10 +137,10 @@
         <span class="btn-icon">✏️</span>
         编辑
       </a>
-      {% if pilot.status.value == '未征召' %}
+      {% if pilot.status.value == '未招募' %}
       <a class="btn btn-primary" href="{{ url_for('recruit.start_recruit', pilot_id=pilot.id) }}">
         <span class="btn-icon">🎯</span>
-        启动征召
+        启动招募
       </a>
       {% endif %}
       <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_commission_index', pilot_id=pilot.id) }}">
@@ -268,7 +268,7 @@
   }
 }
 
-/* 机师详情页面样式 */
+/* 主播详情页面样式 */
 .pilot-detail {
   max-width: 800px;
   margin: 0 auto;
@@ -333,18 +333,18 @@
   font-weight: 500;
 }
 
-/* 阶级徽章样式 */
-.rank-候补机师 { background: var(--table-header); color: var(--muted); }
-.rank-训练机师 { background: #FFF3CD; color: #856404; }
-.rank-实习机师 { background: #D4EDDA; color: #155724; }
-.rank-正式机师 { background: var(--brand); color: #fff; }
+/* 主播分类徽章样式 */
+.rank-候选人 { background: var(--table-header); color: var(--muted); }
+.rank-试播主播 { background: #FFF3CD; color: #856404; }
+.rank-实习主播 { background: #D4EDDA; color: #155724; }
+.rank-正式主播 { background: var(--brand); color: #fff; }
 
 /* 状态徽章样式 */
-.status-未征召 { background: var(--table-header); color: var(--muted); }
-.status-不征召 { background: #F8D7DA; color: #721C24; }
-.status-已征召 { background: #FFF3CD; color: #856404; }
+.status-未招募 { background: var(--table-header); color: var(--muted); }
+.status-不招募 { background: #F8D7DA; color: #721C24; }
+.status-已招募 { background: #FFF3CD; color: #856404; }
 .status-已签约 { background: #D1ECF1; color: #0C5460; }
-.status-已阵亡 { background: #F8D7DA; color: #721C24; }
+.status-流失 { background: #F8D7DA; color: #721C24; }
 
 .info-section {
   margin-bottom: 24px;

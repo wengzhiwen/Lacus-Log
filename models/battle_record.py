@@ -10,9 +10,9 @@ from .user import User
 
 
 class BattleRecord(Document):
-    """作战记录模型
+    """开播记录模型
     
-    记录机师（主播）实际参与作战（直播）的结果数据。
+    记录主播实际参与开播的结果数据。
     所有日期时间在数据库中存储为UTC，界面显示和输入为GMT+8。
     """
 
@@ -29,14 +29,14 @@ class BattleRecord(Document):
     base_salary = DecimalField(min_value=0, precision=2, default=Decimal('0.00'))
 
     # 坐标快照字段（仅线下必填；线上可为空）
-    x_coord = StringField(required=False, max_length=50)
-    y_coord = StringField(required=False, max_length=50)
-    z_coord = StringField(required=False, max_length=50)
+    x_coord = StringField(required=False, max_length=50)  # 基地
+    y_coord = StringField(required=False, max_length=50)  # 场地
+    z_coord = StringField(required=False, max_length=50)  # 坐席
 
-    # 参战形式（可从主播复制，但允许修改）
+    # 开播方式（可从主播复制，但允许修改）
     work_mode = EnumField(WorkMode, required=True)
 
-    # 所属快照（从主播复制，仅显示不可编辑；可为空表示机师无所属）
+    # 直属运营快照（从主播复制，仅显示不可编辑；可为空表示主播无直属运营）
     owner_snapshot = ReferenceField(User, required=False)
 
     # 登记人（首次登记的操作人，仅显示不可编辑）
@@ -92,10 +92,10 @@ class BattleRecord(Document):
             if self.base_salary < 0:
                 raise ValueError("底薪金额不能为负数")
 
-        # 作战区域坐标：仅线下必填
+        # 开播地点坐标：仅线下必填
         if self.work_mode == WorkMode.OFFLINE:
             if not (self.x_coord and self.y_coord and self.z_coord):
-                raise ValueError("线下开播时必须填写X/Y/Z坐标")
+                raise ValueError("线下开播时必须填写基地/场地/坐席")
         else:
             # 线上：确保为空，避免误保存
             self.x_coord = self.x_coord or ''
@@ -117,7 +117,7 @@ class BattleRecord(Document):
 
     @property
     def battle_location(self):
-        """返回作战区域位置字符串"""
+        """返回开播地点位置字符串"""
         return f"{self.x_coord}-{self.y_coord}-{self.z_coord}"
 
     def update_from_announcement(self, announcement):

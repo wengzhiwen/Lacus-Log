@@ -3,8 +3,7 @@ import enum
 import json
 from datetime import datetime, timedelta
 
-from mongoengine import (DateTimeField, Document, EnumField, FloatField,
-                         ReferenceField, StringField)
+from mongoengine import (DateTimeField, Document, EnumField, FloatField, ReferenceField, StringField)
 
 from utils.timezone_helper import get_current_utc_time
 
@@ -24,7 +23,7 @@ class RecurrenceType(enum.Enum):
 class Announcement(Document):
     """通告模型
 
-    通告（作战计划）的核心数据模型，支持重复事件管理、时间冲突检查、
+    通告的核心数据模型，支持重复事件管理、时间冲突检查、
     坐标快照等功能，类似日历应用的事件管理。
     """
 
@@ -33,9 +32,9 @@ class Announcement(Document):
     battle_area = ReferenceField(BattleArea, required=True)
 
     # 坐标快照字段（用于显示，避免关联数据变更影响历史记录）
-    x_coord = StringField(required=True, max_length=50)
-    y_coord = StringField(required=True, max_length=50)
-    z_coord = StringField(required=True, max_length=50)
+    x_coord = StringField(required=True, max_length=50)  # 基地
+    y_coord = StringField(required=True, max_length=50)  # 场地
+    z_coord = StringField(required=True, max_length=50)  # 坐席
 
     # 时间信息字段
     start_time = DateTimeField(required=True)
@@ -119,7 +118,7 @@ class Announcement(Document):
                 if self.recurrence_end > max_span:
                     raise ValueError("重复跨度不能超过60天")
 
-        # 从关联的战斗区域复制坐标快照
+        # 从关联的开播地点复制坐标快照
         if self.battle_area and not self.x_coord:
             self.x_coord = self.battle_area.x_coord
             self.y_coord = self.battle_area.y_coord
@@ -264,7 +263,7 @@ class Announcement(Document):
                         'conflict_end': min(end_time, other_end)
                     })
 
-                # 检查机师冲突
+                # 检查主播冲突
                 if other.pilot.id == self.pilot.id:
                     conflicts['pilot_conflicts'].append({
                         'announcement': other,
@@ -547,11 +546,11 @@ class AnnouncementChangeLog(Document):
     def field_display_name(self):
         """字段显示名称"""
         mapping = {
-            'pilot': '关联机师',
-            'battle_area': '关联战斗区域',
-            'x_coord': 'X坐标',
-            'y_coord': 'Y坐标',
-            'z_coord': 'Z坐标',
+            'pilot': '关联主播',
+            'battle_area': '关联开播地点',
+            'x_coord': '基地',
+            'y_coord': '场地',
+            'z_coord': '坐席',
             'start_time': '开始时间',
             'duration_hours': '计划时长',
             'recurrence_type': '重复类型',

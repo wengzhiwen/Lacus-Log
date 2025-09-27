@@ -7,7 +7,7 @@
     <h1 class="page-title">用户管理</h1>
     <a class="btn btn-primary" href="{{ url_for('admin.users_new') }}">
       <span class="btn-icon">+</span>
-      新增舰长
+      新增运营
     </a>
   </div>
 
@@ -18,8 +18,8 @@
         <label class="filter-label">角色筛选</label>
         <select class="filter-select" name="role" onchange="this.form.submit()">
           <option value="">全部用户</option>
-          <option value="gicho" {% if selected_role=='gicho' %}selected{% endif %}>议长</option>
-          <option value="kancho" {% if selected_role=='kancho' %}selected{% endif %}>舰长</option>
+          <option value="gicho" {% if selected_role=='gicho' %}selected{% endif %}>管理员</option>
+          <option value="kancho" {% if selected_role=='kancho' %}selected{% endif %}>运营</option>
         </select>
       </div>
     </form>
@@ -56,7 +56,7 @@
       <div class="empty-state">
         <div class="empty-icon">👥</div>
         <div class="empty-title">暂无用户</div>
-        <div class="empty-description">点击上方"新增舰长"按钮创建第一个用户</div>
+        <div class="empty-description">点击上方"新增运营"按钮创建第一个用户</div>
       </div>
     {% endif %}
   </div>

@@ -190,8 +190,8 @@ def list_announcements():
     # 构建查询
     query = Announcement.objects
 
-    # 权限控制：议长和舰长都可以看到所有通告
-    # （根据技术设计文档权限矩阵，舰长权限与议长相同）
+    # 权限控制：管理员和运营都可以看到所有通告
+    # （根据技术设计文档权限矩阵，运营权限与管理员相同）
 
     # 应用筛选条件
     if owner_filter:
@@ -255,8 +255,8 @@ def announcement_detail(announcement_id):
     try:
         announcement = Announcement.objects.get(id=announcement_id)
 
-        # 权限检查：议长和舰长都可以查看所有通告
-        # （根据技术设计文档权限矩阵，舰长权限与议长相同）
+        # 权限检查：管理员和运营都可以查看所有通告
+        # （根据技术设计文档权限矩阵，运营权限与管理员相同）
 
         # 查找关联的循环事件
         related_announcements = []
@@ -310,8 +310,8 @@ def new_announcement():
                 flash('机师或战斗区域不存在', 'error')
                 return _render_new_template(form=request.form)
 
-            # 权限检查：议长和舰长都可以为所有机师创建通告
-            # （根据技术设计文档权限矩阵，舰长权限与议长相同）
+            # 权限检查：管理员和运营都可以为所有主播创建通告
+            # （根据技术设计文档权限矩阵，运营权限与管理员相同）
 
             # 解析时间（将用户输入的GMT+8时间转换为UTC时间）
             start_time = parse_local_datetime(start_time_str)
@@ -412,8 +412,8 @@ def edit_announcement(announcement_id):
     try:
         announcement = Announcement.objects.get(id=announcement_id)
 
-        # 权限检查：议长和舰长都可以编辑所有通告
-        # （根据技术设计文档权限矩阵，舰长权限与议长相同）
+        # 权限检查：管理员和运营都可以编辑所有通告
+        # （根据技术设计文档权限矩阵，运营权限与管理员相同）
 
         if request.method == 'POST':
             # 获取编辑范围：this_only（仅这一次） 或 future_all（未来所有）
@@ -473,8 +473,8 @@ def edit_announcement(announcement_id):
                     flash('机师或战斗区域不存在', 'error')
                     return render_template('announcements/edit.html', announcement=announcement, battle_area_choices=_get_battle_area_choices())
 
-                # 权限检查：议长和舰长都可以编辑所有通告
-                # （根据技术设计文档权限矩阵，舰长权限与议长相同）
+                # 权限检查：管理员和运营都可以编辑所有通告
+                # （根据技术设计文档权限矩阵，运营权限与管理员相同）
 
                 # 解析时间（将用户输入的GMT+8时间转换为UTC时间）
                 start_time = parse_local_datetime(start_time_str)
@@ -584,8 +584,8 @@ def delete_announcement(announcement_id):
     try:
         announcement = Announcement.objects.get(id=announcement_id)
 
-        # 权限检查：议长和舰长都可以删除所有通告
-        # （根据技术设计文档权限矩阵，舰长权限与议长相同）
+        # 权限检查：管理员和运营都可以删除所有通告
+        # （根据技术设计文档权限矩阵，运营权限与管理员相同）
 
         # 获取删除范围：this_only（仅这一次） 或 future_all（未来所有）
         delete_scope = request.form.get('delete_scope', 'this_only')
@@ -807,8 +807,8 @@ def announcement_changes(announcement_id):
     try:
         announcement = Announcement.objects.get(id=announcement_id)
 
-        # 权限检查：议长和舰长都可以查看所有通告的变更记录
-        # （根据技术设计文档权限矩阵，舰长权限与议长相同）
+        # 权限检查：管理员和运营都可以查看所有通告的变更记录
+        # （根据技术设计文档权限矩阵，运营权限与管理员相同）
 
         # 获取最近100条变更记录
         changes = AnnouncementChangeLog.objects(announcement_id=announcement).order_by('-change_time').limit(100)

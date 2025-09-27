@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}机师分成管理 - {{ pilot.nickname }}{% endblock %}
+{% block title %}主播分成管理 - {{ pilot.nickname }}{% endblock %}
 
 {% block content %}
 <section class="commission-management">
   <!-- 页面头部 -->
   <div class="page-header">
     <div class="header-content">
-      <h1 class="page-title">机师分成管理 - {{ pilot.nickname }}</h1>
+      <h1 class="page-title">主播分成管理 - {{ pilot.nickname }}</h1>
       <a href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}" class="btn btn-secondary">
         <span class="btn-icon">←</span>
-        返回机师详情
+        返回主播详情
       </a>
     </div>
   </div>
@@ -27,7 +27,7 @@
       </div>
       <div class="summary-item">
         <div class="summary-value pilot-income">{{ "%.1f"|format(calculation_info.pilot_income) }}%</div>
-        <div class="summary-label">机师收入</div>
+        <div class="summary-label">主播收入</div>
       </div>
       <div class="summary-item">
         <div class="summary-value company-income">{{ "%.1f"|format(calculation_info.company_income) }}%</div>

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}作战计划管理{% endblock %}
+{% block title %}通告计划管理{% endblock %}
 
 {% block content %}
 <section class="announcement-management">
     <!-- 页面头部 -->
     <div class="page-header">
-        <h1 class="page-title">作战计划管理</h1>
+        <h1 class="page-title">通告计划管理</h1>
     </div>
 
     <!-- 筛选器（默认折叠） -->
@@ -18,8 +18,8 @@
             {% endfor %}
         {% endif %}
         {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
-        {% if x_filter %}{% set _ = selected_items.append('X:' + x_filter) %}{% endif %}
-        {% if y_filter %}{% set _ = selected_items.append('Y:' + y_filter) %}{% endif %}
+        {% if x_filter %}{% set _ = selected_items.append('基地:' + x_filter) %}{% endif %}
+        {% if y_filter %}{% set _ = selected_items.append('场地:' + y_filter) %}{% endif %}
         {% if time_scope %}
             {% if time_scope == 'two_days' %}{% set _ = selected_items.append('这两天') %}
             {% elif time_scope == 'now' %}{% set _ = selected_items.append('现在开始') %}

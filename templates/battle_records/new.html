@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}登记作战记录{% endblock %}
+{% block title %}登记开播记录{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="header">
         <div class="breadcrumb">
-            <a href="{{ url_for('battle_record.list_battle_records') }}">作战记录</a>
+            <a href="{{ url_for('battle_record.list_battle_records') }}">开播记录</a>
             <span class="separator">></span>
-            <span>登记作战记录</span>
+            <span>登记开播记录</span>
         </div>
     </div>
 
@@ -58,7 +58,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
-                        <input type="text" id="pilot_search" placeholder="输入机师昵称或真实姓名进行筛选">
+                        <input type="text" id="pilot_search" placeholder="输入主播昵称或真实姓名进行筛选">
                     </div>
                 </div>
 
@@ -118,9 +118,9 @@
                 </div>
             </div>
 
-            <!-- 作战区域 -->
+            <!-- 开播地点 -->
             <div class="form-section">
-                <h3>作战区域</h3>
+                <h3>开播地点</h3>
 
                 <div class="form-row">
                     <div class="form-group">
@@ -135,23 +135,23 @@
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="x_coord">X坐标：</label>
+                        <label for="x_coord">基地：</label>
                         <select name="x_coord" id="x_coord">
-                            <option value="">请选择X坐标</option>
+                            <option value="">请选择基地</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="y_coord">Y坐标：</label>
+                        <label for="y_coord">场地：</label>
                         <select name="y_coord" id="y_coord" disabled>
-                            <option value="">请先选择X坐标</option>
+                            <option value="">请先选择基地</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="z_coord">Z坐标：</label>
+                        <label for="z_coord">坐席：</label>
                         <select name="z_coord" id="z_coord" disabled>
-                            <option value="">请先选择Y坐标</option>
+                            <option value="">请先选择场地</option>
                         </select>
                     </div>
                 </div>
@@ -197,7 +197,7 @@
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">
                     <span class="btn-icon">💾</span>
-                    登记作战记录
+                    登记开播记录
                 </button>
                 <a href="{{ url_for('battle_record.list_battle_records') }}" class="btn btn-secondary">取消</a>
             </div>
@@ -453,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializePage() {
-    // 普通入口加载所有机师并初始化本地搜索
+    // 普通入口加载所有主播并初始化本地搜索
     if (document.getElementById('pilot') && !document.getElementById('pilot').hasAttribute('data-prefilled')) {
         loadAllPilots();
         initPilotLocalSearch();
@@ -461,7 +461,7 @@ function initializePage() {
     loadBattleAreaData();
 }
 
-// 加载全部机师用于本地筛选
+// 加载全部主播用于本地筛选
 function loadAllPilots() {
     fetch(`{{ url_for('battle_record.api_pilots_filtered') }}`)
         .then(response => response.json())
@@ -515,7 +515,7 @@ function initPilotLocalSearch() {
     input.addEventListener('input', applyFilter);
 }
 
-// 构建机师显示文本：昵称(年龄)真实姓名[阶级]性别icon
+// 构建主播显示文本：昵称(年龄)真实姓名[主播分类]性别icon
 function buildPilotDisplay(p) {
     const nickname = p.nickname || '';
     const agePart = p.age ? `(${p.age})` : '';
@@ -537,7 +537,7 @@ function loadBattleAreaData() {
                 initializeBattleAreaSelects();
             }
         })
-        .catch(error => console.error('加载作战区域数据失败:', error));
+        .catch(error => console.error('加载开播地点数据失败:', error));
 }
 
 function initializeBattleAreaSelects() {
@@ -546,8 +546,8 @@ function initializeBattleAreaSelects() {
     const zSelect = document.getElementById('z_coord');
     console.log('[BR] initializeBattleAreaSelects with defaultData:', defaultData);
     
-    // 填充X坐标
-    xSelect.innerHTML = '<option value="">请选择X坐标</option>';
+    // 填充基地
+    xSelect.innerHTML = '<option value="">请选择基地</option>';
     Object.keys(battleAreaData).sort().forEach(x => {
         const option = document.createElement('option');
         option.value = x;
@@ -558,18 +558,18 @@ function initializeBattleAreaSelects() {
         xSelect.appendChild(option);
     });
     
-    // 监听X坐标变化
+    // 监听基地变化
     xSelect.addEventListener('change', function() {
         updateYCoords(this.value);
     });
     
-    // 监听Y坐标变化
+    // 监听场地变化
     ySelect.addEventListener('change', function() {
         const xCoord = xSelect.value;
         updateZCoords(xCoord, this.value);
     });
     
-    // 如果有默认X坐标，触发联动
+    // 如果有默认基地，触发联动
     if (defaultData.x_coord) {
         updateYCoords(defaultData.x_coord);
     }
@@ -580,8 +580,8 @@ function updateYCoords(xCoord) {
     const zSelect = document.getElementById('z_coord');
     console.log('[BR] updateYCoords for X=', xCoord);
     
-    ySelect.innerHTML = '<option value="">请选择Y坐标</option>';
-    zSelect.innerHTML = '<option value="">请先选择Y坐标</option>';
+    ySelect.innerHTML = '<option value="">请选择场地</option>';
+    zSelect.innerHTML = '<option value="">请先选择场地</option>';
     zSelect.disabled = true;
     
     if (xCoord && battleAreaData[xCoord]) {
@@ -596,7 +596,7 @@ function updateYCoords(xCoord) {
             ySelect.appendChild(option);
         });
         
-        // 如果有默认Y坐标，触发联动
+        // 如果有默认场地，触发联动
         if (defaultData.y_coord) {
             updateZCoords(xCoord, defaultData.y_coord);
         }
@@ -609,7 +609,7 @@ function updateZCoords(xCoord, yCoord) {
     const zSelect = document.getElementById('z_coord');
     console.log('[BR] updateZCoords for X,Y =', xCoord, yCoord);
     
-    zSelect.innerHTML = '<option value="">请选择Z坐标</option>';
+    zSelect.innerHTML = '<option value="">请选择坐席</option>';
     
     if (xCoord && yCoord && battleAreaData[xCoord] && battleAreaData[xCoord][yCoord]) {
         zSelect.disabled = false;
@@ -641,7 +641,7 @@ function updateCharacterCount() {
     }
 }
 
-// 参战形式影响作战区域可编辑性
+// 开播方式影响开播地点可编辑性
 function handleWorkModeChange() {
     const wmEl = document.getElementById('work_mode');
     const wm = wmEl ? wmEl.value : '';
@@ -660,11 +660,11 @@ function handleWorkModeChange() {
     if (isOnline) {
         if (xSelect) xSelect.value = '';
         if (ySelect) {
-            ySelect.innerHTML = '<option value="">请先选择X坐标</option>';
+            ySelect.innerHTML = '<option value="">请先选择基地</option>';
             ySelect.value = '';
         }
         if (zSelect) {
-            zSelect.innerHTML = '<option value="">请先选择Y坐标</option>';
+            zSelect.innerHTML = '<option value="">请先选择场地</option>';
             zSelect.value = '';
         }
     }

@@ -16,7 +16,7 @@ battle_area_bp = Blueprint('battle_area', __name__)
 @battle_area_bp.route('/')
 @roles_accepted('gicho')
 def list_areas():
-    """战斗区域列表（仅议长可访问）"""
+    """开播地点列表（仅管理员可访问）"""
     filters = persist_and_restore_filters(
         'battle_areas_list',
         allowed_keys=['x', 'y', 'availability'],
@@ -64,7 +64,7 @@ def list_areas():
 @battle_area_bp.route('/<area_id>')
 @roles_accepted('gicho')
 def area_detail(area_id):
-    """战斗区域详情（仅议长）"""
+    """开播地点详情（仅管理员）"""
     try:
         area = BattleArea.objects.get(id=area_id)
         return render_template('areas/detail.html', area=area)
@@ -75,7 +75,7 @@ def area_detail(area_id):
 @battle_area_bp.route('/new', methods=['GET', 'POST'])
 @roles_accepted('gicho')
 def new_area():
-    """新建战斗区域（仅议长）"""
+    """新建开播地点（仅管理员）"""
     if request.method == 'POST':
         try:
             x_coord = (request.form.get('x_coord') or '').strip()
@@ -111,7 +111,7 @@ def new_area():
 @battle_area_bp.route('/<area_id>/edit', methods=['GET', 'POST'])
 @roles_accepted('gicho')
 def edit_area(area_id):
-    """编辑战斗区域（仅议长）"""
+    """编辑开播地点（仅管理员）"""
     try:
         area = BattleArea.objects.get(id=area_id)
         if request.method == 'POST':
@@ -155,7 +155,7 @@ def edit_area(area_id):
 @battle_area_bp.route('/<area_id>/generate', methods=['GET', 'POST'])
 @roles_accepted('gicho')
 def generate_areas(area_id):
-    """批量生成战斗区域（仅议长）
+    """批量生成开播地点（仅管理员）
 
     输入：源战斗区域 X/Y（不可编辑），Z起始、Z结束（数字）
     步骤：校验 -> 预检查重复 -> 批量保存 -> 显示结果

@@ -6,7 +6,7 @@
 <div class="container">
     <div class="header">
         <div class="breadcrumb">
-            <a href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
+            <a href="{{ url_for('announcement.list_announcements') }}">通告计划</a>
             <span class="separator">></span>
             <span>新建通告</span>
         </div>
@@ -19,28 +19,28 @@
             <div class="form-section">
                 <h3>基础信息</h3>
                 
-                <!-- 机师本地搜索（替代所属/阶级筛选） -->
+                <!-- 主播本地搜索（替代直属运营/主播分类筛选） -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
-                        <input type="text" id="pilot_search" placeholder="输入机师昵称或真实姓名进行筛选">
+                        <input type="text" id="pilot_search" placeholder="输入主播昵称或真实姓名进行筛选">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="pilot" class="required">机师：</label>
+                        <label for="pilot" class="required">主播：</label>
                         <select name="pilot" id="pilot" required>
-                            <option value="">请选择机师</option>
+                            <option value="">请选择主播</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="x_coord" class="required">X坐标：</label>
+                        <label for="x_coord" class="required">基地：</label>
                         <select name="x_coord" id="x_coord" required>
-                            <option value="">请选择X坐标</option>
+                            <option value="">请选择基地</option>
                             {% set sorted_x_coords = battle_area_choices.keys()|sort %}
                             {% for x_coord in sorted_x_coords %}
                             <option value="{{ x_coord }}" {% if (form and form.x_coord == x_coord) or (not form and loop.first) %}selected{% endif %}>{{ x_coord }}</option>
@@ -49,16 +49,16 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="y_coord" class="required">Y坐标：</label>
+                        <label for="y_coord" class="required">场地：</label>
                         <select name="y_coord" id="y_coord" required disabled>
-                            <option value="">请先选择X坐标</option>
+                            <option value="">请先选择基地</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="z_coord" class="required">Z坐标：</label>
+                        <label for="z_coord" class="required">坐席：</label>
                         <select name="battle_area" id="battle_area" required disabled>
-                            <option value="">请先选择Y坐标</option>
+                            <option value="">请先选择场地</option>
                         </select>
                     </div>
                 </div>
@@ -480,8 +480,8 @@ document.getElementById('x_coord').addEventListener('change', function() {
     const ySelect = document.getElementById('y_coord');
     const zSelect = document.getElementById('battle_area');
     
-    ySelect.innerHTML = '<option value="">请选择Y坐标</option>';
-    zSelect.innerHTML = '<option value="">请先选择Y坐标</option>';
+    ySelect.innerHTML = '<option value="">请选择场地</option>';
+    zSelect.innerHTML = '<option value="">请先选择场地</option>';
     ySelect.disabled = !x;
     zSelect.disabled = true;
     
@@ -512,7 +512,7 @@ document.getElementById('y_coord').addEventListener('change', function() {
     const y = this.value;
     const zSelect = document.getElementById('battle_area');
     
-    zSelect.innerHTML = '<option value="">请选择Z坐标</option>';
+    zSelect.innerHTML = '<option value="">请选择坐席</option>';
     zSelect.disabled = !y;
     
     if (x && y) {
@@ -719,10 +719,10 @@ document.getElementById('announcementForm').addEventListener('submit', function(
     }
 });
 
-// 机师本地搜索 + 列表加载
+// 主播本地搜索 + 列表加载
 function loadAllPilots(callback) {
     const pilotSelect = document.getElementById('pilot');
-    pilotSelect.innerHTML = '<option value="">请选择机师</option>';
+    pilotSelect.innerHTML = '<option value="">请选择主播</option>';
     
     fetch('/announcements/api/pilots-filtered')
         .then(response => response.json())
@@ -750,7 +750,7 @@ function initPilotLocalSearch() {
     
     function applyFilter() {
         const keyword = (input.value || '').trim().toLowerCase();
-        pilotSelect.innerHTML = '<option value="">请选择机师</option>';
+        pilotSelect.innerHTML = '<option value="">请选择主播</option>';
         const source = (window.__annAllPilots || []);
         const filtered = keyword
             ? source.filter(p => (p.nickname || '').toLowerCase().includes(keyword) || (p.real_name || '').toLowerCase().includes(keyword))
@@ -768,7 +768,7 @@ function initPilotLocalSearch() {
     input.addEventListener('input', applyFilter);
 }
 
-// 构建机师显示文本：昵称(年龄)真实姓名[阶级]性别icon
+// 构建主播显示文本：昵称(年龄)真实姓名[主播分类]性别icon
 function buildPilotDisplay(p) {
     const nickname = p.nickname || '';
     const agePart = p.age ? `(${p.age})` : '';
@@ -860,7 +860,7 @@ window.addEventListener('load', function() {
         }, 100);
     }
     
-    // 加载机师列表（本地搜索），并在加载完成后恢复机师选择
+    // 加载主播列表（本地搜索），并在加载完成后恢复主播选择
     loadAllPilots(function() {
         if (formData.pilot) {
             const pilotSelect = document.getElementById('pilot');
@@ -876,14 +876,14 @@ window.addEventListener('load', function() {
             xSelect.value = formData.x_coord;
             xSelect.dispatchEvent(new Event('change'));
             
-            // 等待Y坐标加载后恢复Y坐标选择
+            // 等待场地加载后恢复场地选择
             setTimeout(function() {
                 if (formData.y_coord) {
                     const ySelect = document.getElementById('y_coord');
                     ySelect.value = formData.y_coord;
                     ySelect.dispatchEvent(new Event('change'));
                     
-                    // 等待Z坐标加载后恢复battle_area选择
+                    // 等待坐席加载后恢复battle_area选择
                     setTimeout(function() {
                         if (formData.battle_area) {
                             const battleAreaSelect = document.getElementById('battle_area');

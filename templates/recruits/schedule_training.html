@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}预约训练 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}预约试播 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
 
 {% block content %}
 <section class="schedule-training">
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">
       <span>←</span>
-      返回征召详情
+      返回招募详情
     </a>
   </div>
 
-  <h1 class="title">预约训练</h1>
+  <h1 class="title">预约试播</h1>
 
-  <!-- 机师信息卡片 -->
+  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -36,13 +36,13 @@
         <span class="info-value">{{ recruit.pilot.gender_display }}{% if recruit.pilot.age %}/{{ recruit.pilot.age }}岁{% endif %}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">所属：</span>
+        <span class="info-label">直属运营：</span>
         <span class="info-value">{% if recruit.pilot.owner %}{{ recruit.pilot.owner.nickname or recruit.pilot.owner.username }}{% else %}未分配{% endif %}</span>
       </div>
     </div>
   </div>
 
-  <!-- 预约训练表单 -->
+  <!-- 预约试播表单 -->
   <form method="POST" action="{{ url_for('recruit.schedule_training', recruit_id=recruit.id) }}" class="recruit-form" id="schedule-training-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
@@ -51,12 +51,12 @@
       
       <div class="form-row">
         <div class="form-group">
-          <label for="scheduled_training_decision_maker">预约训练决策人</label>
+          <label for="scheduled_training_decision_maker">预约试播决策人</label>
           <input type="text" name="scheduled_training_decision_maker" id="scheduled_training_decision_maker" 
                  value="{{ current_user.nickname or current_user.username }}" readonly>
         </div>
         <div class="form-group">
-          <label for="scheduled_training_time">预约训练时间 <span class="required">*</span></label>
+          <label for="scheduled_training_time">预约试播时间 <span class="required">*</span></label>
           <input type="datetime-local" name="scheduled_training_time" id="scheduled_training_time" 
                  value="{{ default_time }}" required>
         </div>
@@ -64,13 +64,13 @@
     </div>
 
     <div class="form-section">
-      <h3 class="section-title">参战形式</h3>
+      <h3 class="section-title">开播方式</h3>
       
       <div class="form-row">
         <div class="form-group">
-          <label for="work_mode">参战形式 <span class="required">*</span></label>
+          <label for="work_mode">开播方式 <span class="required">*</span></label>
           <select name="work_mode" id="work_mode" required>
-            <option value="">-- 请选择参战形式 --</option>
+            <option value="">-- 请选择开播方式 --</option>
             {% for value, label in work_mode_choices %}
             <option value="{{ value }}">{{ label }}</option>
             {% endfor %}
@@ -182,13 +182,13 @@
   font-weight: 500;
 }
 
-.rank-候补机师 { background: var(--muted); color: white; }
-.rank-训练机师 { background: var(--brand); color: white; }
-.rank-实习机师 { background: var(--hud-green); color: white; }
-.rank-正式机师 { background: var(--danger); color: white; }
+.rank-候选人 { background: var(--muted); color: white; }
+.rank-试播主播 { background: var(--brand); color: white; }
+.rank-实习主播 { background: var(--hud-green); color: white; }
+.rank-正式主播 { background: var(--danger); color: white; }
 
-.status-未征召 { background: var(--muted); color: white; }
-.status-已征召 { background: var(--hud-green); color: white; }
+.status-未招募 { background: var(--muted); color: white; }
+.status-已招募 { background: var(--hud-green); color: white; }
 .status-已签约 { background: var(--brand); color: white; }
 
 .pilot-basic-info {

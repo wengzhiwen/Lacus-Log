@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}作战日报 - {{ pagination.date }}{% endblock %}
+{% block title %}开播日报 - {{ pagination.date }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">📊 作战日报</h1>
+  <h1 class="page-title">📊 开播日报</h1>
   <p class="text-muted">{{ pagination.date }}</p>
 </div>
 
@@ -25,11 +25,11 @@
   <h2 class="section-title">本月数据（截至{{ pagination.date }}）</h2>
   <div class="summary-cards">
     <div class="summary-card">
-      <div class="card-label">总机师数量</div>
+      <div class="card-label">总主播数量</div>
       <div class="card-value">{{ month_summary.pilot_count }}</div>
     </div>
     <div class="summary-card">
-      <div class="card-label">有效机师数量</div>
+      <div class="card-label">有效主播数量</div>
       <div class="card-value">{{ month_summary.effective_pilot_count }}</div>
     </div>
     <div class="summary-card">
@@ -45,7 +45,7 @@
       <div class="card-value">¥{{ "{:,.2f}".format(month_summary.rebate_sum) }}</div>
     </div>
     <div class="summary-card">
-      <div class="card-label">累计机师分成</div>
+      <div class="card-label">累计主播分成</div>
       <div class="card-value">¥{{ "{:,.2f}".format(month_summary.pilot_share_sum) }}</div>
     </div>
     <div class="summary-card">
@@ -64,11 +64,11 @@
   <h2 class="section-title">{{ pagination.date }} 日报汇总</h2>
   <div class="summary-cards">
     <div class="summary-card">
-      <div class="card-label">总机师数量</div>
+      <div class="card-label">总主播数量</div>
       <div class="card-value">{{ day_summary.pilot_count }}</div>
     </div>
     <div class="summary-card">
-      <div class="card-label">有效机师数量</div>
+      <div class="card-label">有效主播数量</div>
       <div class="card-value">{{ day_summary.effective_pilot_count }}</div>
     </div>
     <div class="summary-card">
@@ -80,7 +80,7 @@
       <div class="card-value">¥{{ "{:,.2f}".format(day_summary.basepay_sum) }}</div>
     </div>
     <div class="summary-card">
-      <div class="card-label">累计机师分成</div>
+      <div class="card-label">累计主播分成</div>
       <div class="card-value">¥{{ "{:,.2f}".format(day_summary.pilot_share_sum) }}</div>
     </div>
     <div class="summary-card">
@@ -98,15 +98,15 @@
     <table class="report-table">
       <thead>
         <tr>
-          <th class="fixed-col">机师</th>
+          <th class="fixed-col">主播</th>
           <th>性别年龄</th>
-          <th>所属</th>
-          <th>阶级</th>
-          <th>作战区域</th>
+          <th>直属运营</th>
+          <th>主播分类</th>
+          <th>开播地点</th>
           <th>播时</th>
           <th>流水</th>
           <th>当前分成比例</th>
-          <th>机师分成</th>
+          <th>主播分成</th>
           <th>公司分成</th>
           <th>返点比例</th>
           <th>产生返点</th>
@@ -116,7 +116,7 @@
           <th>月累计天数</th>
           <th>月日均播时</th>
           <th>月累计流水</th>
-          <th>月累计机师分成</th>
+          <th>月累计主播分成</th>
           <th>月累计公司分成</th>
           <th>月累计返点</th>
           <th>月累计底薪</th>
@@ -156,7 +156,7 @@
   </div>
   {% else %}
   <div class="empty-state">
-    <p>今日暂无作战记录</p>
+    <p>今日暂无开播记录</p>
   </div>
   {% endif %}
 </div>

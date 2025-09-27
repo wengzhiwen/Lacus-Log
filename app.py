@@ -32,7 +32,7 @@ def create_app() -> Flask:
     - 连接MongoDB
     - 配置Flask-Security-Too
     - 注册蓝图
-    - 创建默认角色与默认议长
+    - 创建默认角色与默认管理员
     """
     # 读取 .env
     load_dotenv()
@@ -117,13 +117,13 @@ def create_app() -> Flask:
     @flask_app.template_filter('role_display_name')
     def role_display_name(role_name):
         """将角色英文代码转换为中文显示名称"""
-        role_mapping = {'gicho': '议长', 'kancho': '舰长'}
+        role_mapping = {'gicho': '管理员', 'kancho': '运营'}
         return role_mapping.get(role_name, role_name)
 
     @flask_app.template_filter('roles_display_names')
     def roles_display_names(roles):
         """将角色列表转换为中文显示名称列表"""
-        role_mapping = {'gicho': '议长', 'kancho': '舰长'}
+        role_mapping = {'gicho': '管理员', 'kancho': '运营'}
         if isinstance(roles, list):
             return [role_mapping.get(role.name if hasattr(role, 'name') else role, role.name if hasattr(role, 'name') else role) for role in roles]
         return [role_mapping.get(roles, roles)]
@@ -212,7 +212,7 @@ def create_app() -> Flask:
         from flask import render_template
         return render_template('errors/403.html'), 403
 
-    # 启动时确保角色与默认议长存在（需要应用上下文以支持密码哈希等）
+    # 启动时确保角色与默认管理员存在（需要应用上下文以支持密码哈希等）
     with flask_app.app_context():
         ensure_initial_roles_and_admin(user_datastore)
 

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}机师-作战计划导出 - Lacus-Log{% endblock %}
+{% block title %}主播-通告计划导出 - Lacus-Log{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="header">
         <div class="breadcrumb">
-            <a href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
+            <a href="{{ url_for('announcement.list_announcements') }}">通告计划</a>
             <span class="separator">></span>
-            <span>作战计划导出</span>
+            <span>通告计划导出</span>
         </div>
     </div>
 
@@ -15,11 +15,11 @@
         <form method="POST" id="exportForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             
-            <!-- 机师选择 -->
+            <!-- 主播选择 -->
             <div class="form-section">
-                <h3>机师选择</h3>
+                <h3>主播选择</h3>
                 
-                <!-- 机师筛选器 -->
+                <!-- 主播筛选器 -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="owner_filter">所属筛选：</label>
@@ -37,9 +37,9 @@
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="pilot_id" class="required">机师：</label>
+                        <label for="pilot_id" class="required">主播：</label>
                         <select name="pilot_id" id="pilot_id" required>
-                            <option value="">请选择机师</option>
+                            <option value="">请选择主播</option>
                         </select>
                     </div>
                 </div>
@@ -273,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
         monthSelect.appendChild(option);
     }
     
-    // 机师筛选功能（复用作战计划页面的逻辑）
+    // 主播筛选功能（复用通告计划页面的逻辑）
     function loadPilotFilters(callback) {
         // 加载所属和阶级选项
         fetch('/announcements/api/pilot-filters')
@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         rankSelect.appendChild(option);
                     });
                     
-                    // 加载所有机师（默认显示所有已征召/已签约的机师）
+                    // 加载所有主播（默认显示所有已招募/已签约的主播）
                     loadPilots('', '', callback);
                 }
             })
@@ -305,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadPilots(ownerId = '', rank = '', callback) {
         const pilotSelect = document.getElementById('pilot_id');
-        pilotSelect.innerHTML = '<option value="">请选择机师</option>';
+        pilotSelect.innerHTML = '<option value="">请选择主播</option>';
         
         let url = '/announcements/api/pilots-filtered?';
         if (ownerId) url += `owner=${ownerId}&`;
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadPilots(ownerId, rank);
     });
     
-    // 初始化时加载筛选器和机师列表
+    // 初始化时加载筛选器和主播列表
     loadPilotFilters();
 });
 </script>

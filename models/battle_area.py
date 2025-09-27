@@ -11,10 +11,10 @@ class Availability(enum.Enum):
 
 
 class BattleArea(Document):
-    """战斗区域模型
+    """开播地点模型
 
-    - X/Y/Z 三段坐标，均为字符串且必填
-    - X+Y+Z 复合唯一键
+    - 基地/场地/坐席 三段坐标，均为字符串且必填
+    - 基地+场地+坐席 复合唯一键
     - 可用性枚举，默认可用
     - 创建/更新时间戳
     """
@@ -66,11 +66,11 @@ class BattleArea(Document):
 
         # 字段必填控制（StringField required 已管控，再增加最小长度校验）
         if not self.x_coord:
-            raise ValueError("X坐标为必填项")
+            raise ValueError("基地为必填项")
         if not self.y_coord:
-            raise ValueError("Y坐标为必填项")
+            raise ValueError("场地为必填项")
         if not self.z_coord:
-            raise ValueError("Z坐标为必填项")
+            raise ValueError("坐席为必填项")
 
     def save(self, *args, **kwargs):
         """保存时更新修改时间"""

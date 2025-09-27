@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block title %}机师征召 - Lacus-Log{% endblock %}
+{% block title %}主播招募 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="recruits-list">
-  <!-- 页面头部对齐作战记录样式 -->
+  <!-- 页面头部对齐开播记录样式 -->
   <div class="page-header">
-    <h1 class="page-title">机师征召</h1>
+    <h1 class="page-title">主播招募</h1>
   </div>
 
   <!-- 筛选器（默认折叠，样式对齐作战记录） -->
@@ -21,7 +21,7 @@
     <form class="filter-form is-collapsed" id="filter-form" method="get" action="{{ url_for('recruit.list_recruits') }}">
       <div class="filter-row">
         <div class="filter-group">
-          <label class="filter-label" for="status">征召状态</label>
+          <label class="filter-label" for="status">招募状态</label>
           <select class="filter-select" name="status" id="status" onchange="this.form.submit()">
             {% for value, text in status_choices %}
             <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ text }}</option>
@@ -38,10 +38,10 @@
     <button class="quick-nav-btn" onclick="scrollToGroup('pending-interview')">待面试</button>
     {% endif %}
     {% if grouped_recruits.pending_training_schedule %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training-schedule')">待预约训练</button>
+    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training-schedule')">待预约试播</button>
     {% endif %}
     {% if grouped_recruits.pending_training %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training')">待训练</button>
+    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training')">待试播</button>
     {% endif %}
     {% if grouped_recruits.pending_broadcast_schedule %}
     <button class="quick-nav-btn" onclick="scrollToGroup('pending-broadcast-schedule')">待预约开播</button>
@@ -57,7 +57,7 @@
     {% endif %}
   </div>
 
-  <!-- 征召列表（分组显示） -->
+  <!-- 招募列表（分组显示） -->
   <div class="recruit-groups">
     {% if grouped_recruits.pending_interview %}
     <div class="recruit-group" id="pending-interview">
@@ -91,7 +91,7 @@
 
     {% if grouped_recruits.pending_training_schedule %}
     <div class="recruit-group" id="pending-training-schedule">
-      <h3 class="group-title">待预约训练</h3>
+      <h3 class="group-title">待预约试播</h3>
       <div class="record-cards">
         {% for recruit in grouped_recruits.pending_training_schedule %}
         <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
@@ -105,7 +105,7 @@
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
-                <span class="status-badge status-待预约训练">待预约训练</span>
+                <span class="status-badge status-待预约试播">待预约试播</span>
               </div>
             </div>
           </div>
@@ -121,21 +121,21 @@
 
     {% if grouped_recruits.pending_training %}
     <div class="recruit-group" id="pending-training">
-      <h3 class="group-title">待训练</h3>
+      <h3 class="group-title">待试播</h3>
       <div class="record-cards">
         {% for recruit in grouped_recruits.pending_training %}
         <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
           <div class="card-header">
             <div class="record-time">
               <div class="start-time {% if recruit.get_effective_scheduled_training_time() and recruit.get_effective_scheduled_training_time() < current_utc - timedelta(hours=24) %}overdue{% endif %}">
-                训练：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}
+                试播：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}
               </div>
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
-                <span class="status-badge status-待训练">待训练</span>
+                <span class="status-badge status-待试播">待试播</span>
               </div>
             </div>
           </div>
@@ -158,7 +158,7 @@
           <div class="card-header">
             <div class="record-time">
               <div class="start-time">
-                训练决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}
+                试播决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}
               </div>
             </div>
             <div class="record-info">
@@ -220,12 +220,12 @@
               {% set effective_status = recruit.get_effective_status() %}
               {% if effective_status.value == '待面试' %}
               <div class="start-time overdue">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待预约训练' %}
+              {% elif effective_status.value == '待预约试播' %}
               <div class="start-time overdue">面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待训练' %}
-              <div class="start-time overdue">训练：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+              {% elif effective_status.value == '待试播' %}
+              <div class="start-time overdue">试播：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}</div>
               {% elif effective_status.value == '待预约开播' %}
-              <div class="start-time overdue">训练决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+              <div class="start-time overdue">试播决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
               {% elif effective_status.value == '待开播' %}
               <div class="start-time overdue">开播：{{ recruit.get_effective_scheduled_broadcast_time() | local_datetime('%m月%d日 %H:%M') }}</div>
               {% endif %}
@@ -281,20 +281,20 @@
   {% if not grouped_recruits.pending_interview and not grouped_recruits.pending_training_schedule and not grouped_recruits.pending_training and not grouped_recruits.pending_broadcast_schedule and not grouped_recruits.pending_broadcast and not grouped_recruits.overdue and not grouped_recruits.ended %}
       <div class="empty-state">
         <div class="empty-icon">📋</div>
-        <div class="empty-title">暂无征召记录</div>
+        <div class="empty-title">暂无招募记录</div>
         <div class="empty-description">
           {% if current_status == '进行中' %}
-          当前没有进行中的征召，可以从机师详情页启动新的征召。
+          当前没有进行中的招募，可以从主播详情页启动新的招募。
       {% elif current_status == '鸽' %}
-      当前没有超时的征召记录。
+      当前没有超时的招募记录。
       {% elif current_status == '已结束' %}
-      当前没有已结束的征召记录。
+      当前没有已结束的招募记录。
           {% else %}
-          当前筛选条件下没有征召记录。
+          当前筛选条件下没有招募记录。
           {% endif %}
         </div>
         <div class="empty-actions">
-          <a class="btn btn-primary" href="{{ url_for('pilot.list_pilots') }}">前往机师管理</a>
+          <a class="btn btn-primary" href="{{ url_for('pilot.list_pilots') }}">前往主播管理</a>
         </div>
       </div>
     {% endif %}

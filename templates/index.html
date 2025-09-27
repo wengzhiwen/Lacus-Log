@@ -6,7 +6,7 @@
   <div class="cards">
     <div class="card" id="recruitCard" style="cursor: pointer;">
       <div class="card-header">
-        <div class="card-title">征召统计</div>
+        <div class="card-title">招募统计</div>
         <div class="card-icon">📋</div>
       </div>
       <div class="card-body">
@@ -28,13 +28,13 @@
     </div>
     <div class="card" id="todayCard" style="cursor: pointer;">
       <div class="card-header">
-        <div class="card-title">作战计划统计</div>
+        <div class="card-title">通告计划统计</div>
         <div class="card-icon">📊</div>
       </div>
       <div class="card-body">
         <div class="main-data">
           <div class="main-value">{{ dashboard_data.today_count }}</div>
-          <div class="main-label">今日作战计划</div>
+          <div class="main-label">今日通告计划</div>
         </div>
         <div class="sub-data">
           <div class="sub-item">
@@ -52,7 +52,7 @@
     </div>
     <div class="card" id="battleRecordCard" style="cursor: pointer;">
       <div class="card-header">
-        <div class="card-title">作战记录统计</div>
+        <div class="card-title">开播记录统计</div>
         <div class="card-icon">📈</div>
       </div>
       <div class="card-body">
@@ -75,7 +75,7 @@
 
     <div class="card">
       <div class="card-header">
-        <div class="card-title">机师统计</div>
+        <div class="card-title">主播统计</div>
         <div class="card-icon">👩‍✈️</div>
       </div>
       <div class="card-body">
@@ -86,11 +86,11 @@
         <div class="sub-data">
           <div class="sub-item">
             <div class="sub-value">{{ dashboard_data.pilot_intern_serving_count }}</div>
-            <div class="sub-label">实习机师</div>
+            <div class="sub-label">实习主播</div>
           </div>
           <div class="sub-item">
             <div class="sub-value">{{ dashboard_data.pilot_official_serving_count }}</div>
-            <div class="sub-label">正式机师</div>
+            <div class="sub-label">正式主播</div>
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@
 
     <div class="card">
       <div class="card-header">
-        <div class="card-title">候补机师统计</div>
+        <div class="card-title">候选人统计</div>
         <div class="card-icon">🧑‍🚀</div>
       </div>
       <div class="card-body">
@@ -109,7 +109,7 @@
         <div class="sub-data">
           <div class="sub-item">
             <div class="sub-value">{{ dashboard_data.trainee_serving_count }}</div>
-            <div class="sub-label">训练机师</div>
+            <div class="sub-label">试播主播</div>
           </div>
         </div>
       </div>
@@ -119,7 +119,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // 设置征召统计卡片的点击事件
+  // 设置招募统计卡片的点击事件
   const recruitCard = document.getElementById('recruitCard');
   if (recruitCard) {
     recruitCard.addEventListener('click', function() {
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // 设置今日作战计划卡片的点击事件
+  // 设置今日通告计划卡片的点击事件
   const todayCard = document.getElementById('todayCard');
   if (todayCard) {
     const today = new Date().toISOString().split('T')[0];
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // 设置作战记录统计卡片的点击事件
+  // 设置开播记录统计卡片的点击事件
   const battleRecordCard = document.getElementById('battleRecordCard');
   if (battleRecordCard) {
     battleRecordCard.addEventListener('click', function() {

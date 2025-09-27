@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block title %}作战记录 - Lacus-Log{% endblock %}
+{% block title %}开播记录 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="battle-record-management">
   <!-- 页面头部 -->
   <div class="page-header">
-    <h1 class="page-title">作战记录</h1>
+    <h1 class="page-title">开播记录</h1>
   </div>
 
   <!-- 筛选器（默认折叠） -->
@@ -12,14 +12,14 @@
     {% set selected_items = [] %}
     {% if current_filters.owner and current_filters.owner != 'all' %}
       {% if current_filters.owner == 'self' %}
-        {% set _ = selected_items.append('所属:自己') %}
+        {% set _ = selected_items.append('直属运营:自己') %}
       {% else %}
         {% for owner in owners %}
-          {% if owner.id|string == current_filters.owner %}{% set _ = selected_items.append('所属:' + (owner.nickname or owner.username)) %}{% endif %}
+          {% if owner.id|string == current_filters.owner %}{% set _ = selected_items.append('直属运营:' + (owner.nickname or owner.username)) %}{% endif %}
         {% endfor %}
       {% endif %}
     {% endif %}
-    {% if current_filters.rank %}{% set _ = selected_items.append('阶级:' + current_filters.rank) %}{% endif %}
+    {% if current_filters.rank %}{% set _ = selected_items.append('主播分类:' + current_filters.rank) %}{% endif %}
     {% if current_filters.pilot %}{% set _ = selected_items.append('主播已选') %}{% endif %}
     {% if current_filters.time %}
       {% if current_filters.time == 'today' %}{% set _ = selected_items.append('今天') %}

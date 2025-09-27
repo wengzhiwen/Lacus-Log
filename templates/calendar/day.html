@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}日视图 - 作战计划日历{% endblock %}
+{% block title %}日视图 - 通告计划日历{% endblock %}
 {% block content %}
 <section class="calendar-container">
   <div class="calendar-header">
-    <h1 class="page-title">作战计划日历</h1>
+    <h1 class="page-title">通告计划日历</h1>
     <div class="view-controls">
       <a href="{{ url_for('calendar.month_view') }}" class="btn btn-sm">月视图</a>
       <a href="{{ url_for('calendar.week_view') }}" class="btn btn-sm">周视图</a>
@@ -20,7 +20,7 @@
   <div class="day-calendar">
     <!-- 时间标题行 -->
     <div class="time-header-row">
-      <div class="area-header">战斗区域</div>
+      <div class="area-header">开播地点</div>
       <div class="time-header-scroll">
         <div class="time-slots">
           <div class="time-slot">0</div>
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
     dataRowsEl.innerHTML = '';
 
     if (!data.area_timelines || Object.keys(data.area_timelines).length === 0) {
-      dataRowsEl.innerHTML = '<div class="no-data">当日暂无作战计划安排</div>';
+      dataRowsEl.innerHTML = '<div class="no-data">当日暂无通告计划安排</div>';
       return;
     }
 
@@ -125,11 +125,11 @@ document.addEventListener('DOMContentLoaded', function() {
       const [x1, y1, z1] = a.split('-');
       const [x2, y2, z2] = b.split('-');
       
-      // 按X, Y, Z坐标排序
+      // 按基地, 场地, 坐席排序
       if (x1 !== x2) return x1.localeCompare(x2);
       if (y1 !== y2) return y1.localeCompare(y2);
       
-      // Z坐标数值排序
+      // 坐席数值排序
       const z1Num = parseFloat(z1);
       const z2Num = parseFloat(z2);
       
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const timelineEl = document.createElement('div');
       timelineEl.className = 'timeline-grid';
       
-      // 为该区域的每个作战计划创建元素
+      // 为该区域的每个通告计划创建元素
       timeline.slots.forEach(slotData => {
         const slotEl = document.createElement('div');
         slotEl.className = 'time-slot-item occupied';

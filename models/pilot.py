@@ -26,31 +26,43 @@ class Platform(enum.Enum):
 
 
 class WorkMode(enum.Enum):
-    """参战形式枚举"""
+    """开播方式枚举"""
     OFFLINE = "线下"
     ONLINE = "线上"
     UNKNOWN = "未知"
 
 
 class Rank(enum.Enum):
-    """阶级枚举"""
-    CANDIDATE = "候补机师"
-    TRAINEE = "训练机师"
-    INTERN = "实习机师"
-    OFFICIAL = "正式机师"
+    """主播分类枚举"""
+    CANDIDATE = "候选人"
+    TRAINEE = "试播主播"
+    INTERN = "实习主播"
+    OFFICIAL = "正式主播"
+    
+    # 历史兼容值（读老写新）
+    CANDIDATE_OLD = "候补机师"  # 映射到 CANDIDATE
+    TRAINEE_OLD = "训练机师"    # 映射到 TRAINEE
+    INTERN_OLD = "实习机师"     # 映射到 INTERN
+    OFFICIAL_OLD = "正式机师"   # 映射到 OFFICIAL
 
 
 class Status(enum.Enum):
     """状态枚举"""
-    NOT_RECRUITED = "未征召"
-    NOT_RECRUITING = "不征召"
-    RECRUITED = "已征召"
+    NOT_RECRUITED = "未招募"
+    NOT_RECRUITING = "不招募"
+    RECRUITED = "已招募"
     CONTRACTED = "已签约"
-    FALLEN = "已阵亡"
+    FALLEN = "流失"
+    
+    # 历史兼容值（读老写新）
+    NOT_RECRUITED_OLD = "未征召"  # 映射到 NOT_RECRUITED
+    NOT_RECRUITING_OLD = "不征召"  # 映射到 NOT_RECRUITING
+    RECRUITED_OLD = "已征召"      # 映射到 RECRUITED
+    FALLEN_OLD = "已阵亡"         # 映射到 FALLEN
 
 
 class Pilot(Document):
-    """机师模型"""
+    """主播模型"""
 
     # 基础信息字段
     nickname = StringField(required=True, unique=True, max_length=20)
@@ -101,21 +113,21 @@ class Pilot(Document):
         """数据验证和业务规则检查"""
         super().clean()
 
-        # 阶级规则：实习机师和正式机师必须有所属、战区不能是未知、参战形式不能是未知
+        # 主播分类规则：实习主播和正式主播必须有直属运营、开播地点不能是未知、开播方式不能是未知
         if self.rank in [Rank.INTERN, Rank.OFFICIAL]:
             if not self.owner:
-                raise ValueError("实习机师和正式机师必须有所属")
+                raise ValueError("实习主播和正式主播必须有直属运营")
             if self.platform == Platform.UNKNOWN:
-                raise ValueError("实习机师和正式机师的战区不能是未知")
+                raise ValueError("实习主播和正式主播的开播地点不能是未知")
             if self.work_mode == WorkMode.UNKNOWN:
-                raise ValueError("实习机师和正式机师的参战形式不能是未知")
+                raise ValueError("实习主播和正式主播的开播方式不能是未知")
 
-        # 状态规则：已征召和已签约状态必须填写姓名和出生年
+        # 状态规则：已招募和已签约状态必须填写姓名和出生年
         if self.status in [Status.RECRUITED, Status.CONTRACTED]:
             if not self.real_name:
-                raise ValueError("已征召和已签约状态必须填写姓名")
+                raise ValueError("已招募和已签约状态必须填写姓名")
             if not self.birth_year:
-                raise ValueError("已征召和已签约状态必须填写出生年")
+                raise ValueError("已招募和已签约状态必须填写出生年")
 
         # 出生年份验证（距今60年前到距今10年前）
         if self.birth_year:
@@ -141,9 +153,131 @@ class Pilot(Document):
         mapping = {Gender.MALE: "男", Gender.FEMALE: "女", Gender.UNKNOWN: "不明确"}
         return mapping.get(self.gender, "未知")
 
+    @property
+    def rank_display(self):
+        """主播分类显示名称（兼容历史数据）"""
+        # 读老写新：读取时映射历史数据，写入时使用新数据
+        if self.rank == Rank.CANDIDATE:
+            return "候选人"
+        elif self.rank == Rank.TRAINEE:
+            return "试播主播"
+        elif self.rank == Rank.INTERN:
+            return "实习主播"
+        elif self.rank == Rank.OFFICIAL:
+            return "正式主播"
+        else:
+            return self.rank.value if self.rank else "未知"
+
+    @property
+    def status_display(self):
+        """状态显示名称（兼容历史数据）"""
+        # 读老写新：读取时映射历史数据，写入时使用新数据
+        if self.status == Status.NOT_RECRUITED:
+            return "未招募"
+        elif self.status == Status.NOT_RECRUITING:
+            return "不招募"
+        elif self.status == Status.RECRUITED:
+            return "已招募"
+        elif self.status == Status.CONTRACTED:
+            return "已签约"
+        elif self.status == Status.FALLEN:
+            return "流失"
+        else:
+            return self.status.value if self.status else "未知"
+
+    @property
+    def work_mode_display(self):
+        """开播方式显示名称（兼容历史数据）"""
+        # 读老写新：读取时映射历史数据，写入时使用新数据
+        if self.work_mode == WorkMode.OFFLINE:
+            return "线下"
+        elif self.work_mode == WorkMode.ONLINE:
+            return "线上"
+        elif self.work_mode == WorkMode.UNKNOWN:
+            return "未知"
+        else:
+            return self.work_mode.value if self.work_mode else "未知"
+
+    @property
+    def platform_display(self):
+        """开播地点显示名称（兼容历史数据）"""
+        # 读老写新：读取时映射历史数据，写入时使用新数据
+        if self.platform == Platform.KUAISHOU:
+            return "快手"
+        elif self.platform == Platform.DOUYIN:
+            return "抖音"
+        elif self.platform == Platform.OTHER:
+            return "其他"
+        elif self.platform == Platform.UNKNOWN:
+            return "未知"
+        else:
+            return self.platform.value if self.platform else "未知"
+
+    @classmethod
+    def get_effective_rank(cls, rank_value):
+        """获取有效的主播分类（兼容历史数据）"""
+        if not rank_value:
+            return None
+        
+        # 历史数据映射
+        old_to_new_mapping = {
+            "候补机师": Rank.CANDIDATE,
+            "训练机师": Rank.TRAINEE,
+            "实习机师": Rank.INTERN,
+            "正式机师": Rank.OFFICIAL,
+        }
+        
+        # 如果是历史数据，返回映射后的新值
+        if rank_value in old_to_new_mapping:
+            return old_to_new_mapping[rank_value]
+        
+        # 如果是新数据，直接返回
+        try:
+            return Rank(rank_value)
+        except ValueError:
+            return None
+
+    @classmethod
+    def get_effective_status(cls, status_value):
+        """获取有效的状态（兼容历史数据）"""
+        if not status_value:
+            return None
+        
+        # 历史数据映射
+        old_to_new_mapping = {
+            "未征召": Status.NOT_RECRUITED,
+            "不征召": Status.NOT_RECRUITING,
+            "已征召": Status.RECRUITED,
+            "已阵亡": Status.FALLEN,
+        }
+        
+        # 如果是历史数据，返回映射后的新值
+        if status_value in old_to_new_mapping:
+            return old_to_new_mapping[status_value]
+        
+        # 如果是新数据，直接返回
+        try:
+            return Status(status_value)
+        except ValueError:
+            return None
+
+    def get_effective_rank_display(self):
+        """获取有效的主播分类显示名称（兼容历史数据）"""
+        effective_rank = self.get_effective_rank(self.rank.value if self.rank else None)
+        if effective_rank:
+            return effective_rank.value
+        return "未知"
+
+    def get_effective_status_display(self):
+        """获取有效的状态显示名称（兼容历史数据）"""
+        effective_status = self.get_effective_status(self.status.value if self.status else None)
+        if effective_status:
+            return effective_status.value
+        return "未知"
+
 
 class PilotChangeLog(Document):
-    """机师变更记录模型"""
+    """主播变更记录模型"""
 
     pilot_id = ReferenceField(Pilot, required=True)
     user_id = ReferenceField(User, required=True)
@@ -176,17 +310,17 @@ class PilotChangeLog(Document):
             'real_name': '姓名',
             'gender': '性别',
             'birth_year': '出生年',
-            'owner': '所属',
-            'platform': '战区',
-            'work_mode': '参战形式',
-            'rank': '阶级',
+            'owner': '直属运营',
+            'platform': '开播平台',
+            'work_mode': '开播方式',
+            'rank': '主播分类',
             'status': '状态',
         }
         return mapping.get(self.field_name, self.field_name)
 
 
 class PilotCommission(Document):
-    """机师分成调整记录模型"""
+    """主播分成调整记录模型"""
 
     # 关联字段
     pilot_id = ReferenceField(Pilot, required=True)
@@ -257,7 +391,7 @@ class PilotCommission(Document):
 
 
 class PilotCommissionChangeLog(Document):
-    """机师分成调整记录变更日志模型"""
+    """主播分成调整记录变更日志模型"""
 
     commission_id = ReferenceField(PilotCommission, required=True)
     user_id = ReferenceField(User, required=True)

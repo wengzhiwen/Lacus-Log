@@ -148,7 +148,7 @@ def list_battle_records():
     total_count = query.count()
 
     # 获取筛选器选项数据
-    # 只列出拥有 议长/舰长 角色的用户
+    # 只列出拥有 管理员/运营 角色的用户
     gicho = Role.objects(name='gicho').first()
     kancho = Role.objects(name='kancho').first()
     role_list = [r for r in [gicho, kancho] if r]
@@ -548,7 +548,7 @@ def view_battle_record_changes(record_id):
 def api_pilot_filters():
     """获取主播筛选器数据"""
     try:
-        # 获取所有舰长和议长作为所属选项
+        # 获取所有运营和管理员作为直属运营选项
         gicho = Role.objects(name='gicho').first()
         kancho = Role.objects(name='kancho').first()
         role_list = [r for r in [gicho, kancho] if r]

@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}启动征召 - {{ pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}启动招募 - {{ pilot.nickname }} - Lacus-Log{% endblock %}
 {% block content %}
 <section class="start-recruit">
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}">
       <span>←</span>
-      返回机师详情
+      返回主播详情
     </a>
   </div>
 
-  <h1 class="title">启动征召</h1>
+  <h1 class="title">启动招募</h1>
 
-  <!-- 机师信息卡片 -->
+  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -34,22 +34,22 @@
         <span class="info-value">{{ pilot.gender_display }}{% if pilot.age %}/{{ pilot.age }}岁{% endif %}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">所属：</span>
+        <span class="info-label">直属运营：</span>
         <span class="info-value">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无' }}</span>
       </div>
     </div>
   </div>
 
-  <!-- 征召表单 -->
+  <!-- 招募表单 -->
   <form method="POST" action="{{ url_for('recruit.create_recruit', pilot_id=pilot.id) }}" class="recruit-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
     <div class="form-section">
-      <h3 class="section-title">征召信息</h3>
+      <h3 class="section-title">招募信息</h3>
       
       <div class="form-row">
         <div class="form-group">
-          <label for="recruiter">征召负责人 <span class="required">*</span></label>
+          <label for="recruiter">招募负责人 <span class="required">*</span></label>
           <select name="recruiter" id="recruiter" required>
             {% for value, label in recruiter_choices %}
             <option value="{{ value }}" {% if value == current_user.id|string %}selected{% endif %}>{{ label }}</option>
@@ -68,7 +68,7 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label for="channel">征召渠道 <span class="required">*</span></label>
+          <label for="channel">招募渠道 <span class="required">*</span></label>
           <select name="channel" id="channel" required>
             <option value="">请选择</option>
             {% for value, label in channel_choices %}
@@ -99,7 +99,7 @@
 <!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}">返回</a>
-  <button type="submit" form="recruit_form" class="btn btn-primary">创建征召</button>
+  <button type="submit" form="recruit_form" class="btn btn-primary">创建招募</button>
 </div>
 
 <style>
@@ -175,12 +175,12 @@
   font-weight: 500;
 }
 
-.rank-候补机师, .rank-trainee { background: var(--table-header); color: var(--text); }
-.rank-训练机师, .rank-实习机师, .rank-正式机师 { background: var(--brand); color: white; }
+.rank-候选人, .rank-trainee { background: var(--table-header); color: var(--text); }
+.rank-试播主播, .rank-实习主播, .rank-正式主播 { background: var(--brand); color: white; }
 
-.status-未征召 { background: var(--table-header); color: var(--text); }
-.status-已征召, .status-已签约 { background: var(--hud-green); color: white; }
-.status-不征召, .status-已阵亡 { background: var(--error); color: white; }
+.status-未招募 { background: var(--table-header); color: var(--text); }
+.status-已招募, .status-已签约 { background: var(--hud-green); color: white; }
+.status-不招募, .status-流失 { background: var(--error); color: white; }
 
 .pilot-basic-info {
   display: grid;

@@ -6,7 +6,7 @@
 <div class="container">
     <div class="header">
         <div class="breadcrumb">
-            <a href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
+            <a href="{{ url_for('announcement.list_announcements') }}">通告计划</a>
             <span class="separator">></span>
             <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}">通告详情</a>
             <span class="separator">></span>
@@ -22,7 +22,7 @@
             <div class="form-section">
                 <h3>基础信息</h3>
                 
-                <!-- 机师筛选器（参照新建页三联动） -->
+                <!-- 主播筛选器（参照新建页三联动） -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="owner_filter">所属筛选：</label>
@@ -40,18 +40,18 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="pilot" class="required">机师：</label>
+                        <label for="pilot" class="required">主播：</label>
                         <select name="pilot" id="pilot" required>
-                            <option value="">请选择机师</option>
+                            <option value="">请选择主播</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="x_coord" class="required">X坐标：</label>
+                        <label for="x_coord" class="required">基地：</label>
                         <select name="x_coord" id="x_coord" required>
-                            <option value="">请选择X坐标</option>
+                            <option value="">请选择基地</option>
                             {% for x_coord in battle_area_choices.keys()|sort %}
                             <option value="{{ x_coord }}" {% if announcement.x_coord == x_coord %}selected{% endif %}>{{ x_coord }}</option>
                             {% endfor %}
@@ -59,16 +59,16 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="y_coord" class="required">Y坐标：</label>
+                        <label for="y_coord" class="required">场地：</label>
                         <select name="y_coord" id="y_coord" required>
-                            <option value="">请选择Y坐标</option>
+                            <option value="">请选择场地</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="z_coord" class="required">Z坐标：</label>
+                        <label for="z_coord" class="required">坐席：</label>
                         <select name="z_coord" id="z_coord" required>
-                            <option value="">请选择Z坐标</option>
+                            <option value="">请选择坐席</option>
                         </select>
                         <!-- 隐藏字段用于后端验证 -->
                         <input type="hidden" name="battle_area" id="battle_area" value="{{ announcement.battle_area.id if announcement.battle_area else '' }}">
@@ -498,8 +498,8 @@ document.getElementById('x_coord').addEventListener('change', function() {
     const ySelect = document.getElementById('y_coord');
     const zSelect = document.getElementById('z_coord');
     
-    ySelect.innerHTML = '<option value="">请选择Y坐标</option>';
-    zSelect.innerHTML = '<option value="">请先选择Y坐标</option>';
+    ySelect.innerHTML = '<option value="">请选择场地</option>';
+    zSelect.innerHTML = '<option value="">请先选择场地</option>';
     ySelect.disabled = !x;
     zSelect.disabled = true;
     
@@ -518,7 +518,7 @@ document.getElementById('x_coord').addEventListener('change', function() {
                         ySelect.appendChild(option);
                     });
                     
-                    // 如果选中了Y坐标，自动加载Z坐标
+                    // 如果选中了场地，自动加载坐席
                     if (ySelect.value) {
                         ySelect.dispatchEvent(new Event('change'));
                     }
@@ -533,7 +533,7 @@ document.getElementById('y_coord').addEventListener('change', function() {
     const y = this.value;
     const zSelect = document.getElementById('z_coord');
     
-    zSelect.innerHTML = '<option value="">请选择Z坐标</option>';
+    zSelect.innerHTML = '<option value="">请选择坐席</option>';
     zSelect.disabled = !y;
     
     if (x && y) {
@@ -556,7 +556,7 @@ document.getElementById('y_coord').addEventListener('change', function() {
     }
 });
 
-// 当Z坐标选择改变时，更新隐藏的battle_area字段
+// 当坐席选择改变时，更新隐藏的battle_area字段
 document.getElementById('z_coord').addEventListener('change', function() {
     const battleAreaInput = document.getElementById('battle_area');
     battleAreaInput.value = this.value;
@@ -569,7 +569,7 @@ window.addEventListener('load', function() {
     }
 });
 
-// 机师筛选功能（与新建页保持一致）
+// 主播筛选功能（与新建页保持一致）
 function loadPilotFilters(callback) {
     fetch('/announcements/api/pilot-filters')
         .then(response => response.json())
@@ -594,7 +594,7 @@ function loadPilotFilters(callback) {
                     rankSelect.appendChild(option);
                 });
 
-                // 加载所有机师
+                // 加载所有主播
                 loadPilots('', '', callback);
             }
         })
@@ -603,7 +603,7 @@ function loadPilotFilters(callback) {
 
 function loadPilots(ownerId = '', rank = '', callback) {
     const pilotSelect = document.getElementById('pilot');
-    pilotSelect.innerHTML = '<option value="">请选择机师</option>';
+    pilotSelect.innerHTML = '<option value="">请选择主播</option>';
 
     let url = '/announcements/api/pilots-filtered?';
     if (ownerId) url += `owner=${ownerId}&`;
@@ -642,7 +642,7 @@ document.getElementById('rank_filter').addEventListener('change', function() {
     loadPilots(ownerId, rank);
 });
 
-// 页面加载时初始化机师筛选并回填当前机师
+// 页面加载时初始化主播筛选并回填当前主播
 window.addEventListener('load', function() {
     loadPilotFilters(function() {
         if (currentPilotId) {

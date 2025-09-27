@@ -120,7 +120,7 @@ class User(Document):
     def get_emails_by_role(cls, role_name: str | None = None, only_active: bool = True):
         """按角色名获取邮箱列表；不传角色名时返回全部用户邮箱。
 
-        - role_name: 角色名，如 'gicho'（议长）、'kancho'（舰长）
+        - role_name: 角色名，如 'gicho'（管理员）、'kancho'（运营）
         - only_active: 是否仅返回激活用户的邮箱
 
         返回去重后的邮箱字符串列表（忽略空值）。

@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block title %}机师管理 - Lacus-Log{% endblock %}
+{% block title %}主播管理 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="pilot-management">
   <!-- 页面头部 -->
   <div class="page-header">
-    <h1 class="page-title">机师管理</h1>
+    <h1 class="page-title">主播管理</h1>
   </div>
 
   <!-- 筛选器（默认折叠） -->
@@ -14,7 +14,7 @@
     {% if status_filter %}{% set _ = selected_items.append(status_filter) %}{% endif %}
     {% if owner_filter %}
       {% if owner_filter == 'none' %}
-        {% set _ = selected_items.append('无所属') %}
+        {% set _ = selected_items.append('无直属运营') %}
       {% else %}
         {% for value, display in user_choices %}
           {% if value and owner_filter == value %}{% set _ = selected_items.append(display) %}{% endif %}
@@ -34,9 +34,9 @@
     </button>
     <form class="filter-form is-collapsed" id="filter-form" method="get">
       <div class="filter-group">
-        <label class="filter-label">阶级筛选</label>
+        <label class="filter-label">主播分类筛选</label>
         <select class="filter-select" name="rank" onchange="this.form.submit()">
-          <option value="">全部阶级</option>
+          <option value="">全部主播分类</option>
           {% for value, display in rank_choices %}
           <option value="{{ value }}" {% if rank_filter==value %}selected{% endif %}>{{ display }}</option>
           {% endfor %}
@@ -55,10 +55,10 @@
       
       {% if current_user.has_role('gicho') %}
       <div class="filter-group">
-        <label class="filter-label">所属筛选</label>
+        <label class="filter-label">直属运营筛选</label>
         <select class="filter-select" name="owner" onchange="this.form.submit()">
-          <option value="">全部所属</option>
-          <option value="none" {% if owner_filter=='none' %}selected{% endif %}>无所属</option>
+          <option value="">全部直属运营</option>
+          <option value="none" {% if owner_filter=='none' %}selected{% endif %}>无直属运营</option>
           {% for value, display in user_choices %}
           {% if value %}
           <option value="{{ value }}" {% if owner_filter==value %}selected{% endif %}>{{ display }}</option>

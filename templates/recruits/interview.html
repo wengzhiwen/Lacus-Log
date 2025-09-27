@@ -7,13 +7,13 @@
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">
       <span>←</span>
-      返回征召详情
+      返回招募详情
     </a>
   </div>
 
   <h1 class="title">面试决策</h1>
 
-  <!-- 机师信息卡片 -->
+  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -36,7 +36,7 @@
         <span class="info-value">{{ recruit.pilot.gender_display }}{% if recruit.pilot.age %}/{{ recruit.pilot.age }}岁{% endif %}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">所属：</span>
+        <span class="info-label">直属运营：</span>
         <span class="info-value">{% if recruit.pilot.owner %}{{ recruit.pilot.owner.nickname or recruit.pilot.owner.username }}{% else %}未分配{% endif %}</span>
       </div>
     </div>
@@ -67,12 +67,12 @@
       </div>
     </div>
 
-    <!-- 机师基本信息（当选择预约训练时显示） -->
+    <!-- 主播基本信息（当选择预约试播时显示） -->
     <div class="form-section" id="pilot-basic-info" style="display: none;">
-      <h3 class="section-title">机师基本信息</h3>
+      <h3 class="section-title">主播基本信息</h3>
       <div class="info-notice">
-        <small>该机师的阶级将自动变更为训练机师</small><br>
-        <small>该机师的状态将自动变更为已征召</small>
+        <small>该主播的主播分类将自动变更为试播主播</small><br>
+        <small>该主播的状态将自动变更为已招募</small>
       </div>
       
       <div class="form-row">
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 监听面试决策变化
     interviewDecision.addEventListener('change', function() {
-        if (this.value === '预约训练') {
+        if (this.value === '预约试播') {
             pilotBasicInfo.style.display = 'block';
             realNameInput.required = true;
             birthYearInput.required = true;
@@ -145,19 +145,19 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (decision === '预约训练') {
+        if (decision === '预约试播') {
             const realName = realNameInput.value.trim();
             const birthYear = birthYearInput.value;
             
             if (!realName) {
                 e.preventDefault();
-                alert('预约训练时必须填写真实姓名');
+                alert('预约试播时必须填写真实姓名');
                 return;
             }
             
             if (!birthYear) {
                 e.preventDefault();
-                alert('预约训练时必须填写出生年');
+                alert('预约试播时必须填写出生年');
                 return;
             }
         }
@@ -243,13 +243,13 @@ document.addEventListener('DOMContentLoaded', function() {
   font-weight: 500;
 }
 
-.rank-候补机师 { background: var(--muted); color: white; }
-.rank-训练机师 { background: var(--brand); color: white; }
-.rank-实习机师 { background: var(--hud-green); color: white; }
-.rank-正式机师 { background: var(--danger); color: white; }
+.rank-候选人 { background: var(--muted); color: white; }
+.rank-试播主播 { background: var(--brand); color: white; }
+.rank-实习主播 { background: var(--hud-green); color: white; }
+.rank-正式主播 { background: var(--danger); color: white; }
 
-.status-未征召 { background: var(--muted); color: white; }
-.status-已征召 { background: var(--hud-green); color: white; }
+.status-未招募 { background: var(--muted); color: white; }
+.status-已招募 { background: var(--hud-green); color: white; }
 .status-已签约 { background: var(--brand); color: white; }
 
 .pilot-basic-info {

@@ -36,7 +36,7 @@
         <span class="info-value">{{ recruit.pilot.gender_display }}{% if recruit.pilot.age %}/{{ recruit.pilot.age }}岁{% endif %}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">所属：</span>
+        <span class="info-label">直属运营：</span>
         <span class="info-value">{% if recruit.pilot.owner %}{{ recruit.pilot.owner.nickname or recruit.pilot.owner.username }}{% else %}未分配{% endif %}</span>
       </div>
     </div>
@@ -63,32 +63,35 @@
             <option value="{{ value }}">{{ label }}</option>
             {% endfor %}
           </select>
+          <div class="help-text">
+            <small>实习主播是指仍然有大学或其他学院全日制学校学籍的主播。</small>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 机师分配信息（当选择正式机师或实习机师时显示） -->
+    <!-- 主播分配信息（当选择正式主播或实习主播时显示） -->
     <div class="form-section" id="pilot-assignment-info" style="display: none;">
-      <h3 class="section-title">机师分配信息</h3>
+      <h3 class="section-title">主播分配信息</h3>
       <div class="info-notice">
-        <small>该机师的阶级将根据决策自动设置</small><br>
-        <small>该机师的状态将自动变更为已征召</small>
+        <small>该主播的主播分类将根据决策自动设置</small><br>
+        <small>该主播的状态将自动变更为已招募</small>
       </div>
       
       <div class="form-row">
         <div class="form-group">
-          <label for="owner">所属 <span class="required">*</span></label>
+          <label for="owner">直属运营 <span class="required">*</span></label>
           <select name="owner" id="owner">
-            <option value="">-- 请选择所属 --</option>
+            <option value="">-- 请选择直属运营 --</option>
             {% for value, label in owner_choices %}
             <option value="{{ value }}">{{ label }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="form-group">
-          <label for="platform">平台 <span class="required">*</span></label>
+          <label for="platform">开播平台 <span class="required">*</span></label>
           <select name="platform" id="platform">
-            <option value="">-- 请选择平台 --</option>
+            <option value="">-- 请选择开播平台 --</option>
             <option value="快手">快手</option>
             <option value="抖音">抖音</option>
             <option value="其他">其他</option>
@@ -132,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 监听开播决策变化
     broadcastDecision.addEventListener('change', function() {
-        if (this.value === '正式机师' || this.value === '实习机师') {
+        if (this.value === '正式主播' || this.value === '实习主播') {
             pilotAssignmentInfo.style.display = 'block';
             ownerSelect.required = true;
             platformSelect.required = true;
@@ -153,19 +156,19 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (decision === '正式机师' || decision === '实习机师') {
+        if (decision === '正式主播' || decision === '实习主播') {
             const owner = ownerSelect.value;
             const platform = platformSelect.value;
             
             if (!owner) {
                 e.preventDefault();
-                alert('选择正式机师或实习机师时必须选择所属');
+                alert('选择正式主播或实习主播时必须选择所属');
                 return;
             }
             
             if (!platform) {
                 e.preventDefault();
-                alert('选择正式机师或实习机师时必须选择平台');
+                alert('选择正式主播或实习主播时必须选择平台');
                 return;
             }
         }

@@ -1,22 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}批量生成战斗区域 - Lacus-Log{% endblock %}
+{% block title %}批量生成开播地点 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="area-generate">
-  <div class="page-header"><h1 class="page-title">批量生成战斗区域</h1></div>
+  <div class="page-header"><h1 class="page-title">批量生成开播地点</h1></div>
 
   <div class="info-card">
-    <div class="row"><span class="label">源 X</span><span class="value">{{ src.x_coord }}</span></div>
-    <div class="row"><span class="label">源 Y</span><span class="value">{{ src.y_coord }}</span></div>
+    <div class="row"><span class="label">源基地</span><span class="value">{{ src.x_coord }}</span></div>
+    <div class="row"><span class="label">源场地</span><span class="value">{{ src.y_coord }}</span></div>
   </div>
 
   <form method="post" class="form-card">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
-      <label>Z坐标开始</label>
+      <label>坐席开始</label>
       <input type="number" name="z_start" required>
     </div>
     <div class="form-group">
-      <label>Z坐标结束</label>
+      <label>坐席结束</label>
       <input type="number" name="z_end" required>
     </div>
 

@@ -6,7 +6,7 @@
 <div class="container">
     <div class="header">
         <div class="breadcrumb">
-            <a href="{{ url_for('announcement.list_announcements') }}">作战计划</a>
+            <a href="{{ url_for('announcement.list_announcements') }}">通告计划</a>
             <span class="separator">></span>
             <span>通告详情</span>
         </div>
@@ -18,7 +18,7 @@
             <h3>基础信息</h3>
             <div class="info-grid">
                 <div class="info-item">
-                    <label>机师：</label>
+                    <label>主播：</label>
                     <div class="value">
                         {% set age_str = '(' ~ announcement.pilot.age ~ ')' if announcement.pilot.age else '' %}
                         {% set gender_icon = '♂' if announcement.pilot.gender.value == 0 else ('♀' if announcement.pilot.gender.value == 1 else '?') %}
@@ -38,7 +38,7 @@
                 </div>
 
                 <div class="info-item">
-                    <label>作战区域：</label>
+                    <label>开播地点：</label>
                     <div class="value coords">
                         {{ announcement.x_coord }}-{{ announcement.y_coord }}-{{ announcement.z_coord }}
                     </div>
@@ -142,7 +142,7 @@
         {% endif %}
 
         <a href="{{ url_for('battle_record.new_battle_record', announcement_id=announcement.id) }}" class="btn btn-hud">
-            登录作战记录
+            登录开播记录
         </a>
 
         <button type="button" class="btn btn-warning" onclick="showDeleteModal()">删除</button>

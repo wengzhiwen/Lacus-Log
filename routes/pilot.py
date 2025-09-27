@@ -25,7 +25,7 @@ def _get_client_ip():
 
 
 def _record_changes(pilot, old_data, user, ip_address):
-    """记录机师字段变更"""
+    """记录主播字段变更"""
     changes = []
     field_mapping = {
         'nickname': pilot.nickname,
@@ -52,12 +52,12 @@ def _record_changes(pilot, old_data, user, ip_address):
 
     if changes:
         PilotChangeLog.objects.insert(changes)
-        logger.info('记录机师变更：%s，共%d个字段', pilot.nickname, len(changes))
+        logger.info('记录主播变更：%s，共%d个字段', pilot.nickname, len(changes))
 
 
 def _check_pilot_permission(_pilot):
-    """检查用户对机师的操作权限"""
-    # 议长与舰长权限一致：均可访问/编辑所有机师
+    """检查用户对主播的操作权限"""
+    # 管理员与运营权限一致：均可访问/编辑所有主播
     if current_user.has_role('gicho') or current_user.has_role('kancho'):
         return True
     return False
@@ -72,17 +72,17 @@ def _get_user_choices():
     if current_user.has_role('kancho') or current_user.has_role('gicho'):
         choices.append((str(current_user.id), current_user.nickname or current_user.username))
 
-    # 第三顺位：其他活跃舰长/议长（昵称字典顺序）
+    # 第三顺位：其他活跃运营/管理员（昵称字典顺序）
     active_users = [u for u in users if u.active and u.id != current_user.id and (u.has_role('kancho') or u.has_role('gicho'))]
     active_users.sort(key=lambda x: x.nickname or x.username)
     for user in active_users:
         choices.append((str(user.id), user.nickname or user.username))
 
-    # 第四顺位：其他非活跃舰长/议长（昵称字典顺序，标记[阵亡]）
+    # 第四顺位：其他非活跃运营/管理员（昵称字典顺序，标记[流失]）
     inactive_users = [u for u in users if not u.active and u.id != current_user.id and (u.has_role('kancho') or u.has_role('gicho'))]
     inactive_users.sort(key=lambda x: x.nickname or x.username)
     for user in inactive_users:
-        display_name = f"{user.nickname or user.username}[阵亡]"
+        display_name = f"{user.nickname or user.username}[流失]"
         choices.append((str(user.id), display_name))
 
     return choices
@@ -91,7 +91,7 @@ def _get_user_choices():
 @pilot_bp.route('/')
 @roles_accepted('gicho', 'kancho')
 def list_pilots():
-    """机师列表页面"""
+    """主播列表页面"""
     # 获取并持久化筛选参数（会话）
     filters = persist_and_restore_filters(
         'pilots_list',
@@ -111,7 +111,7 @@ def list_pilots():
     # 构建查询
     query = Pilot.objects
 
-    # 权限控制：议长与舰长权限一致，不做按所属的强制过滤
+    # 权限控制：管理员与运营权限一致，不做按直属运营的强制过滤
 
     # 应用筛选条件
     if rank_filter:
@@ -161,7 +161,7 @@ def list_pilots():
 @pilot_bp.route('/<pilot_id>')
 @roles_accepted('gicho', 'kancho')
 def pilot_detail(pilot_id):
-    """机师详情页面"""
+    """主播详情页面"""
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
@@ -186,7 +186,7 @@ def pilot_detail(pilot_id):
 @pilot_bp.route('/new', methods=['GET', 'POST'])
 @roles_accepted('gicho', 'kancho')
 def new_pilot():
-    """新建机师"""
+    """新建主播"""
     if request.method == 'POST':
         try:
             # 获取表单数据
@@ -210,7 +210,7 @@ def new_pilot():
                 flash('该昵称已存在', 'error')
                 return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
 
-            # 创建机师对象
+            # 创建主播对象
             pilot = Pilot(nickname=nickname)
 
             if real_name:
@@ -230,7 +230,7 @@ def new_pilot():
                     flash('所属用户不存在', 'error')
                     return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
             elif current_user.has_role('kancho') and not current_user.has_role('gicho'):
-                # 舰长新建的机师默认属于自己
+                # 运营新建的主播默认属于自己
                 pilot.owner = current_user
 
             if platform:
@@ -245,10 +245,10 @@ def new_pilot():
             if status:
                 pilot.status = Status(status)
 
-            # 保存机师
+            # 保存主播
             pilot.save()
-            flash('创建机师成功', 'success')
-            logger.info('用户%s创建机师：%s', current_user.username, nickname)
+            flash('创建主播成功', 'success')
+            logger.info('用户%s创建主播：%s', current_user.username, nickname)
             return redirect(url_for('pilot.list_pilots'))
 
         except (ValueError, ValidationError) as e:
@@ -256,7 +256,7 @@ def new_pilot():
             return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
         except Exception as e:
             flash(f'创建失败：{str(e)}', 'error')
-            logger.error('创建机师失败：%s', str(e))
+            logger.error('创建主播失败：%s', str(e))
             return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
 
     return render_template('pilots/new.html', user_choices=_get_user_choices())
@@ -265,7 +265,7 @@ def new_pilot():
 @pilot_bp.route('/<pilot_id>/edit', methods=['GET', 'POST'])
 @roles_accepted('gicho', 'kancho')
 def edit_pilot(pilot_id):
-    """编辑机师"""
+    """编辑主播"""
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
@@ -310,7 +310,7 @@ def edit_pilot(pilot_id):
                     flash('该昵称已存在', 'error')
                     return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
 
-                # 更新机师数据
+                # 更新主播数据
                 pilot.nickname = nickname
                 pilot.real_name = real_name
 
@@ -344,14 +344,14 @@ def edit_pilot(pilot_id):
                 if status:
                     pilot.status = Status(status)
 
-                # 保存机师
+                # 保存主播
                 pilot.save()
 
                 # 记录变更
                 _record_changes(pilot, old_data, current_user, _get_client_ip())
 
-                flash('更新机师成功', 'success')
-                logger.info('用户%s更新机师：%s', current_user.username, nickname)
+                flash('更新主播成功', 'success')
+                logger.info('用户%s更新主播：%s', current_user.username, nickname)
                 return redirect(url_for('pilot.pilot_detail', pilot_id=pilot_id))
 
             except (ValueError, ValidationError) as e:
@@ -359,7 +359,7 @@ def edit_pilot(pilot_id):
                 return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
             except Exception as e:
                 flash(f'更新失败：{str(e)}', 'error')
-                logger.error('更新机师失败：%s', str(e))
+                logger.error('更新主播失败：%s', str(e))
                 return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
 
         return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
@@ -370,7 +370,7 @@ def edit_pilot(pilot_id):
 @pilot_bp.route('/<pilot_id>/changes')
 @roles_accepted('gicho', 'kancho')
 def pilot_changes(pilot_id):
-    """机师变更记录"""
+    """主播变更记录"""
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
@@ -394,7 +394,7 @@ def pilot_changes(pilot_id):
             } for change in changes]
         })
     except DoesNotExist:
-        return jsonify({'success': False, 'error': '机师不存在'}), 404
+        return jsonify({'success': False, 'error': '主播不存在'}), 404
     except Exception as e:
         logger.error('获取变更记录失败：%s', str(e))
         return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
@@ -430,11 +430,11 @@ def _record_commission_changes(commission, old_data, user, ip_address):
 
 
 def _get_pilot_current_commission_rate(pilot_id):
-    """获取机师当前有效的分成比例"""
+    """获取主播当前有效的分成比例"""
     # 获取当前UTC时间
     current_time = get_current_utc_time()
 
-    # 查询机师的所有有效调整记录，按调整日升序排列
+    # 查询主播的所有有效调整记录，按调整日升序排列
     commissions = PilotCommission.objects(pilot_id=pilot_id, is_active=True).order_by('adjustment_date')
 
     # 使用更安全的方法检查是否有记录
@@ -459,15 +459,15 @@ def _get_pilot_current_commission_rate(pilot_id):
 
 
 def _calculate_commission_distribution(commission_rate):
-    """根据分成比例计算机师和公司的收入分配"""
+    """根据分成比例计算主播和公司的收入分配"""
     # 固定参数
     BASE_RATE = 50.0  # 50%
     COMPANY_RATE = 42.0  # 42%
 
-    # 机师收入 = (分成比例/50%) * 42%
+    # 主播收入 = (分成比例/50%) * 42%
     pilot_income = (commission_rate / BASE_RATE) * COMPANY_RATE
 
-    # 公司收入 = 42% - 机师收入
+    # 公司收入 = 42% - 主播收入
     company_income = COMPANY_RATE - pilot_income
 
     return {'pilot_income': pilot_income, 'company_income': company_income, 'calculation_formula': f'({commission_rate}%/50%) * 42% = {pilot_income:.1f}%'}
@@ -479,7 +479,7 @@ def _calculate_commission_distribution(commission_rate):
 @pilot_bp.route('/<pilot_id>/commission/')
 @roles_accepted('gicho', 'kancho')
 def pilot_commission_index(pilot_id):
-    """机师分成管理页面"""
+    """主播分成管理页面"""
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
@@ -557,7 +557,7 @@ def pilot_commission_new(pilot_id):
                 commission.save()
 
                 flash('创建分成调整记录成功', 'success')
-                logger.info('用户%s为机师%s创建分成调整记录：%s%%', current_user.username, pilot.nickname, commission_rate)
+                logger.info('用户%s为主播%s创建分成调整记录：%s%%', current_user.username, pilot.nickname, commission_rate)
                 return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
 
             except (ValueError, ValidationError) as e:
@@ -623,7 +623,7 @@ def pilot_commission_edit(pilot_id, commission_id):
                 _record_commission_changes(commission, old_data, current_user, _get_client_ip())
 
                 flash('更新分成调整记录成功', 'success')
-                logger.info('用户%s更新机师%s的分成调整记录', current_user.username, pilot.nickname)
+                logger.info('用户%s更新主播%s的分成调整记录', current_user.username, pilot.nickname)
                 return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
 
             except Exception as e:
@@ -665,7 +665,7 @@ def pilot_commission_delete(pilot_id, commission_id):
         _record_commission_changes(commission, old_data, current_user, _get_client_ip())
 
         flash('删除分成调整记录成功', 'success')
-        logger.info('用户%s软删除机师%s的分成调整记录', current_user.username, pilot.nickname)
+        logger.info('用户%s软删除主播%s的分成调整记录', current_user.username, pilot.nickname)
         return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
 
     except DoesNotExist:
@@ -700,7 +700,7 @@ def pilot_commission_restore(pilot_id, commission_id):
         _record_commission_changes(commission, old_data, current_user, _get_client_ip())
 
         flash('恢复分成调整记录成功', 'success')
-        logger.info('用户%s恢复机师%s的分成调整记录', current_user.username, pilot.nickname)
+        logger.info('用户%s恢复主播%s的分成调整记录', current_user.username, pilot.nickname)
         return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
 
     except DoesNotExist:
@@ -710,7 +710,7 @@ def pilot_commission_restore(pilot_id, commission_id):
 @pilot_bp.route('/<pilot_id>/commission/current')
 @roles_accepted('gicho', 'kancho')
 def pilot_commission_current(pilot_id):
-    """获取机师当前分成信息API"""
+    """获取主播当前分成信息API"""
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
@@ -731,7 +731,7 @@ def pilot_commission_current(pilot_id):
         })
 
     except DoesNotExist:
-        return jsonify({'success': False, 'error': '机师不存在'}), 404
+        return jsonify({'success': False, 'error': '主播不存在'}), 404
     except Exception as e:
         logger.error('获取当前分成信息失败：%s', str(e))
         return jsonify({'success': False, 'error': '获取当前分成信息失败'}), 500

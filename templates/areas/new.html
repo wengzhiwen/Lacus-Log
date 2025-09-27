@@ -1,20 +1,20 @@
 {% extends 'base.html' %}
-{% block title %}新建战斗区域 - Lacus-Log{% endblock %}
+{% block title %}新建开播地点 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="area-form">
-  <div class="page-header"><h1 class="page-title">新建战斗区域</h1></div>
+  <div class="page-header"><h1 class="page-title">新建开播地点</h1></div>
   <form id="area-create-form" method="post" class="form-card">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
-      <label>X坐标</label>
+      <label>基地</label>
       <input type="text" name="x_coord" value="{{ (form and form.get('x_coord')) or '' }}" required>
     </div>
     <div class="form-group">
-      <label>Y坐标</label>
+      <label>场地</label>
       <input type="text" name="y_coord" value="{{ (form and form.get('y_coord')) or '' }}" required>
     </div>
     <div class="form-group">
-      <label>Z坐标</label>
+      <label>坐席</label>
       <input type="text" name="z_coord" value="{{ (form and form.get('z_coord')) or '' }}" required>
     </div>
     <div class="form-group">

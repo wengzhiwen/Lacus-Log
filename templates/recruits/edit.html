@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}编辑征召 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}编辑招募 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
 {% block content %}
 <section class="edit-recruit">
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">
       <span>←</span>
-      返回征召详情
+      返回招募详情
     </a>
   </div>
 
-  <h1 class="title">编辑征召</h1>
+  <h1 class="title">编辑招募</h1>
 
-  <!-- 机师信息卡片 -->
+  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -34,22 +34,22 @@
         <span class="info-value">{{ recruit.pilot.gender_display }}{% if recruit.pilot.age %}/{{ recruit.pilot.age }}岁{% endif %}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">所属：</span>
+        <span class="info-label">直属运营：</span>
         <span class="info-value">{{ recruit.pilot.owner.nickname or recruit.pilot.owner.username if recruit.pilot.owner else '无' }}</span>
       </div>
     </div>
   </div>
 
-  <!-- 征召表单 -->
+  <!-- 招募表单 -->
   <form method="POST" action="{{ url_for('recruit.update_recruit', recruit_id=recruit.id) }}" class="recruit-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
     <div class="form-section">
-      <h3 class="section-title">征召信息</h3>
+      <h3 class="section-title">招募信息</h3>
       
       <div class="form-row">
         <div class="form-group">
-          <label for="recruiter">征召负责人 <span class="required">*</span></label>
+          <label for="recruiter">招募负责人 <span class="required">*</span></label>
           <select name="recruiter" id="recruiter" required>
             {% for value, label in recruiter_choices %}
             <option value="{{ value }}" {% if value == recruit.recruiter.id|string %}selected{% endif %}>{{ label }}</option>
@@ -68,7 +68,7 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label for="channel">征召渠道 <span class="required">*</span></label>
+          <label for="channel">招募渠道 <span class="required">*</span></label>
           <select name="channel" id="channel" required>
             {% for value, label in channel_choices %}
             <option value="{{ value }}" {% if value == recruit.channel.value %}selected{% endif %}>{{ label }}</option>
@@ -87,12 +87,12 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label>征召状态</label>
+          <label>招募状态</label>
           <div class="readonly-field">
             <span class="status-badge status-{{ recruit.get_effective_status().value.replace(' ', '') }}">{{ recruit.get_effective_status().value }}</span>
           </div>
           <div class="help-text">
-            <small>征召状态只能通过决策步骤进行流转，不可手动修改</small>
+            <small>招募状态只能通过决策步骤进行流转，不可手动修改</small>
           </div>
         </div>
       </div>
@@ -100,11 +100,11 @@
       {# 按状态逐步开放可编辑字段 #}
       {% set effective_status = recruit.get_effective_status().value %}
 
-      {# 待训练及之后：允许编辑预约训练时间 #}
-      {% if effective_status in ['待训练', '待预约开播', '待开播'] %}
+      {# 待试播及之后：允许编辑预约试播时间 #}
+      {% if effective_status in ['待试播', '待预约开播', '待开播'] %}
       <div class="form-row">
         <div class="form-group">
-          <label for="scheduled_training_time">预约训练时间</label>
+          <label for="scheduled_training_time">预约试播时间</label>
           <input type="datetime-local" name="scheduled_training_time" id="scheduled_training_time"
                  value="{{ recruit.get_effective_scheduled_training_time() | local_datetime_for_input }}">
           <div class="help-text">
@@ -131,11 +131,11 @@
       {% if recruit.status.value == '训练征召中' %}
       <div class="form-row">
         <div class="form-group">
-          <label for="training_time">训练时间</label>
+          <label for="training_time">试播时间</label>
           <input type="datetime-local" name="training_time" id="training_time"
                  value="{{ recruit.training_time | default(None) | local_datetime_for_input }}">
           <div class="help-text">
-            <small>仅在“训练征召中”状态下显示，留空可清除训练时间</small>
+            <small>仅在“试播招募中”状态下显示，留空可清除试播时间</small>
           </div>
         </div>
       </div>

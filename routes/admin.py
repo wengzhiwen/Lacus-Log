@@ -16,7 +16,7 @@ admin_bp = Blueprint('admin', __name__)
 @admin_bp.route('/users')
 @roles_required('gicho')
 def users_list():
-    """用户列表（仅议长可见）。"""
+    """用户列表（仅管理员可见）。"""
     role = request.args.get('role')
     query = User.objects
     if role:
@@ -32,7 +32,7 @@ def users_list():
 @admin_bp.route('/users/new', methods=['GET', 'POST'])
 @roles_required('gicho')
 def users_new():
-    """新增舰长。"""
+    """新增运营。"""
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         nickname = request.form.get('nickname', '').strip()
@@ -63,7 +63,7 @@ def users_new():
 
         kancho = Role.objects(name='kancho').first()
         if kancho is None:
-            flash('系统缺少角色：舰长', 'error')
+            flash('系统缺少角色：运营', 'error')
             return render_template('users/new.html', form=request.form)
 
         user = User(username=username,
@@ -73,8 +73,8 @@ def users_new():
                     roles=[kancho],
                     active=True)
         user.save()
-        flash('创建舰长成功', 'success')
-        logger.info('议长创建舰长：%s', username)
+        flash('创建运营成功', 'success')
+        logger.info('管理员创建运营：%s', username)
         return redirect(url_for('admin.users_list'))
 
     return render_template('users/new.html')
@@ -111,13 +111,13 @@ def users_toggle_active(user_id: str):
     try:
         user = User.objects.get(id=user_id)
 
-        # 安全检查：不能停用最后一个议长
+        # 安全检查：不能停用最后一个管理员
         if user.has_role('gicho') and not user.active:
             gicho_role = Role.objects(name='gicho').first()
             active_gicho_count = User.objects(roles=gicho_role,
                                               active=True).count()
             if active_gicho_count <= 1:
-                flash('不能停用最后一个议长', 'error')
+                flash('不能停用最后一个管理员', 'error')
                 return redirect(url_for('admin.users_list'))
 
         user.active = not user.active

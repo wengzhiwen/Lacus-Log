@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block title %}战斗区域管理 - Lacus-Log{% endblock %}
+{% block title %}开播地点管理 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="area-management">
   <!-- 页面头部 -->
   <div class="page-header">
-    <h1 class="page-title">战斗区域管理</h1>
+    <h1 class="page-title">开播地点管理</h1>
   </div>
 
   <!-- 筛选器（默认折叠） -->
@@ -22,7 +22,7 @@
 
     <form class="filter-form is-collapsed" id="filter-form" method="get">
       <div class="filter-group">
-        <label class="filter-label">X坐标</label>
+        <label class="filter-label">基地</label>
         <select class="filter-select" name="x" onchange="this.form.submit()">
           <option value="">全部</option>
           {% for x in x_choices %}
@@ -32,7 +32,7 @@
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">Y坐标</label>
+        <label class="filter-label">场地</label>
         <select class="filter-select" name="y" onchange="this.form.submit()">
           <option value="">全部</option>
           {% for y in y_choices %}

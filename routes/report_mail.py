@@ -1,5 +1,5 @@
 """
-议长专用 - 邮件报告模块（未开播提醒）
+管理员专用 - 邮件报告模块（未开播提醒）
 
 本模块提供基于按钮触发的离线报表，通过邮件发送结果。
 """
@@ -142,13 +142,13 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
 *本报表由 Lacus-Log 系统自动生成*
 """
 
-    # 获取收件人：舰长和议长
+    # 获取收件人：运营和管理员
     recipients = []
-    recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 议长
-    recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 舰长
+    recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 管理员
+    recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 运营
 
     if not recipients:
-        logger.error('收件人为空，未找到任何舰长或议长的邮箱')
+        logger.error('收件人为空，未找到任何运营或管理员的邮箱')
         return {'sent': False, 'count': 0}
 
     # 去重
@@ -261,7 +261,7 @@ def _build_unstarted_markdown(items: List[dict]) -> str:
 @report_mail_bp.route('/mail')
 @roles_required('gicho')
 def mail_reports_page():
-    """展示邮件报告入口页面（仅议长可见）。"""
+    """展示邮件报告入口页面（仅管理员可见）。"""
     # 读取 MongoDB 中的下一次触发计划（UTC），界面显示为 GMT+8
     try:
         now_minute = get_current_utc_time().strftime('%Y%m%d%H%M')
