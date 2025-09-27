@@ -36,9 +36,9 @@
     
     <form class="filter-form is-collapsed" id="filter-form" method="get">
       <div class="filter-group">
-        <label class="filter-label">所属筛选</label>
+        <label class="filter-label">直属运营筛选</label>
         <select class="filter-select" name="owner" onchange="this.form.submit()">
-          <option value="all" {% if current_filters.owner == 'all' %}selected{% endif %}>全部所属</option>
+          <option value="all" {% if current_filters.owner == 'all' %}selected{% endif %}>全部</option>
           <option value="self" {% if current_filters.owner == 'self' %}selected{% endif %}>自己</option>
           {% for owner in owners %}
           <option value="{{ owner.id }}" {% if current_filters.owner == owner.id|string %}selected{% endif %}>{{ owner.nickname or owner.username }}</option>
@@ -47,13 +47,13 @@
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">阶级筛选</label>
+        <label class="filter-label">主播分类筛选</label>
         <select class="filter-select" name="rank" id="rank-filter" onchange="updatePilotFilter(); this.form.submit()">
-          <option value="">全部阶级</option>
-          <option value="候补机师" {% if current_filters.rank == '候补机师' %}selected{% endif %}>候补机师</option>
-          <option value="训练机师" {% if current_filters.rank == '训练机师' %}selected{% endif %}>训练机师</option>
-          <option value="实习机师" {% if current_filters.rank == '实习机师' %}selected{% endif %}>实习机师</option>
-          <option value="正式机师" {% if current_filters.rank == '正式机师' %}selected{% endif %}>正式机师</option>
+          <option value="">全部</option>
+          <option value="候选人" {% if current_filters.rank == '候选人' %}selected{% endif %}>候选人</option>
+          <option value="试播主播" {% if current_filters.rank == '试播主播' %}selected{% endif %}>试播主播</option>
+          <option value="实习主播" {% if current_filters.rank == '实习主播' %}selected{% endif %}>实习主播</option>
+          <option value="正式主播" {% if current_filters.rank == '正式主播' %}selected{% endif %}>正式主播</option>
         </select>
       </div>
 
@@ -75,10 +75,10 @@
     </form>
   </div>
 
-  <!-- 作战记录列表 -->
+  <!-- 开播记录列表 -->
   <div class="battle-record-list">
     {% if battle_records %}
-      <!-- 作战记录卡片列表 -->
+      <!-- 开播记录卡片列表 -->
       <div class="record-cards">
         {% for record in battle_records %}
         <a href="{{ url_for('battle_record.detail_battle_record', record_id=record.id|string) }}" class="record-card">
@@ -116,19 +116,19 @@
     {% else %}
       <div class="empty-state">
         <div class="empty-icon">📊</div>
-        <div class="empty-title">暂无作战记录</div>
-        <div class="empty-description">点击下方"登记作战记录"按钮创建第一条记录</div>
+        <div class="empty-title">暂无开播记录</div>
+        <div class="empty-description">点击下方"登记开播记录"按钮创建第一条记录</div>
       </div>
     {% endif %}
   </div>
 </section>
 
-<!-- 底部footbar：登记作战记录按钮 -->
+<!-- 底部footbar：登记开播记录按钮 -->
 <div class="footbar">
   <div class="inner">
     <a class="btn btn-primary" href="{{ url_for('battle_record.new_battle_record') }}">
       <span class="btn-icon">+</span>
-      登记作战记录
+      登记开播记录
     </a>
   </div>
 </div>

@@ -47,7 +47,7 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>所属</label>
+                        <label>直属运营</label>
                         <div class="readonly-value" id="owner_display">
                             {{ (related_announcement.pilot.owner.nickname or related_announcement.pilot.owner.username) if related_announcement.pilot.owner else '无' }}
                         </div>
@@ -124,9 +124,9 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="work_mode" class="required">参战形式：</label>
+                        <label for="work_mode" class="required">开播方式：</label>
                         <select name="work_mode" id="work_mode" required>
-                            <option value="">请选择参战形式</option>
+                            <option value="">请选择开播方式</option>
                             <option value="线下" {% if default_data.work_mode and default_data.work_mode.value == '线下' %}selected{% endif %}>线下</option>
                             <option value="线上" {% if default_data.work_mode and default_data.work_mode.value == '线上' %}selected{% endif %}>线上</option>
                         </select>

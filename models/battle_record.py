@@ -175,7 +175,7 @@ class BattleRecordChangeLog(Document):
             'x_coord': 'X坐标',
             'y_coord': 'Y坐标',
             'z_coord': 'Z坐标',
-            'work_mode': '参战形式',
+            'work_mode': '开播方式',
             'notes': '备注',
         }
         return mapping.get(self.field_name, self.field_name)

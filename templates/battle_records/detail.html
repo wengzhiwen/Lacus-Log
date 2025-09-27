@@ -30,7 +30,7 @@
           </div>
         </div>
         <div class="detail-item">
-          <label>所属</label>
+          <label>直属运营</label>
           <div class="value">{{ (battle_record.owner_snapshot.nickname or battle_record.owner_snapshot.username) if battle_record.owner_snapshot else '无' }}</div>
         </div>
         
@@ -38,7 +38,7 @@
           <label>关联通告</label>
           <div class="value">
             {% if related_announcement_deleted %}
-              关联通告计划已被删除
+              关联通告已被删除
             {% elif related_announcement %}
               {% set weekday_map = {'0':'日','1':'一','2':'二','3':'三','4':'四','5':'五','6':'六'} %}
               {% set weekday_idx = related_announcement.start_time|local_datetime('%w') %}
@@ -77,7 +77,7 @@
       <h3 class="section-title">开播地点</h3>
       <div class="detail-grid">
         <div class="detail-item">
-          <label>参战形式</label>
+          <label>开播方式</label>
           <div class="value">{{ battle_record.work_mode.value }}</div>
         </div>
         <div class="detail-item">

@@ -24,7 +24,7 @@ battle_record_bp = Blueprint('battle_record', __name__)
 
 
 def log_battle_record_change(battle_record, field_name, old_value, new_value, user_id, ip_address):
-    """记录作战记录变更日志"""
+    """记录开播记录变更日志"""
     try:
         change_log = BattleRecordChangeLog(battle_record_id=battle_record,
                                            user_id=user_id,
@@ -33,9 +33,9 @@ def log_battle_record_change(battle_record, field_name, old_value, new_value, us
                                            new_value=str(new_value) if new_value is not None else '',
                                            ip_address=ip_address)
         change_log.save()
-        logger.debug(f"记录作战记录变更: {field_name} {old_value} -> {new_value}")
+        logger.debug(f"记录开播记录变更: {field_name} {old_value} -> {new_value}")
     except Exception as e:
-        logger.error(f"记录作战记录变更失败: {e}")
+        logger.error(f"记录开播记录变更失败: {e}")
 
 
 def get_time_rounded_to_half_hour(dt, backward=True):  # pylint: disable=unused-argument
@@ -67,8 +67,8 @@ def get_time_rounded_to_half_hour(dt, backward=True):  # pylint: disable=unused-
 @battle_record_bp.route('/')
 @roles_accepted('gicho', 'kancho')
 def list_battle_records():
-    """作战记录列表页"""
-    logger.info(f"用户 {current_user.username} 访问作战记录列表")
+    """开播记录列表页"""
+    logger.info(f"用户 {current_user.username} 访问开播记录列表")
 
     # 获取并持久化筛选参数（会话）
     filters = persist_and_restore_filters(
@@ -306,24 +306,24 @@ def create_battle_record():
 
         battle_record.save()
 
-        logger.info(f"作战记录创建成功，ID: {battle_record.id}")
-        flash('作战记录创建成功', 'success')
+        logger.info(f"开播记录创建成功，ID: {battle_record.id}")
+        flash('开播记录创建成功', 'success')
 
         return redirect(url_for('battle_record.detail_battle_record', record_id=battle_record.id))
 
     except Exception as e:
-        logger.error(f"创建作战记录失败: {e}")
-        flash('创建作战记录失败，请重试', 'error')
+        logger.error(f"创建开播记录失败: {e}")
+        flash('创建开播记录失败，请重试', 'error')
         return redirect(url_for('battle_record.new_battle_record'))
 
 
 @battle_record_bp.route('/<record_id>')
 @roles_accepted('gicho', 'kancho')
 def detail_battle_record(record_id):
-    """作战记录详情页"""
+    """开播记录详情页"""
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
-        logger.info(f"用户 {current_user.username} 查看作战记录详情 {record_id}")
+        logger.info(f"用户 {current_user.username} 查看开播记录详情 {record_id}")
 
         # 安全处理关联通告：若已被删除，则不触发模板中的懒加载异常
         related_announcement = None
@@ -335,24 +335,24 @@ def detail_battle_record(record_id):
         except Exception as e:  # mongoengine.errors.DoesNotExist 等
             related_announcement_deleted = True
             # 提升为 WARNING，并带上堆栈，确保写入日志文件
-            logger.warning(f"作战记录 {record_id} 的关联通告不存在，显示已删除占位。原因: {e}", exc_info=True)
+            logger.warning(f"开播记录 {record_id} 的关联通告不存在，显示已删除占位。原因: {e}", exc_info=True)
 
         return render_template('battle_records/detail.html',
                                battle_record=battle_record,
                                related_announcement=related_announcement,
                                related_announcement_deleted=related_announcement_deleted)
     except BattleRecord.DoesNotExist:
-        flash('作战记录不存在', 'error')
+        flash('开播记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))
 
 
 @battle_record_bp.route('/<record_id>/edit')
 @roles_accepted('gicho', 'kancho')
 def edit_battle_record(record_id):
-    """编辑作战记录页"""
+    """编辑开播记录页"""
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
-        logger.info(f"用户 {current_user.username} 编辑作战记录 {record_id}")
+        logger.info(f"用户 {current_user.username} 编辑开播记录 {record_id}")
 
         # 安全处理关联通告，避免模板中解引用触发异常
         related_announcement = None
@@ -362,24 +362,24 @@ def edit_battle_record(record_id):
             _ = related_announcement.id if related_announcement else None
         except Exception as e:
             related_announcement_deleted = True
-            logger.warning(f"作战记录 {record_id} 的关联通告不存在（编辑页），显示已删除占位。原因: {e}", exc_info=True)
+            logger.warning(f"开播记录 {record_id} 的关联通告不存在（编辑页），显示已删除占位。原因: {e}", exc_info=True)
 
         return render_template('battle_records/edit.html',
                                battle_record=battle_record,
                                related_announcement=related_announcement,
                                related_announcement_deleted=related_announcement_deleted)
     except BattleRecord.DoesNotExist:
-        flash('作战记录不存在', 'error')
+        flash('开播记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))
 
 
 @battle_record_bp.route('/<record_id>/update', methods=['POST'])
 @roles_accepted('gicho', 'kancho')
 def update_battle_record(record_id):
-    """更新作战记录"""
+    """更新开播记录"""
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
-        logger.info(f"用户 {current_user.username} 更新作战记录 {record_id}")
+        logger.info(f"用户 {current_user.username} 更新开播记录 {record_id}")
 
         # 记录变更前的值
         # 注意：直接访问 related_announcement 可能触发懒加载并在目标不存在时抛异常
@@ -417,7 +417,7 @@ def update_battle_record(record_id):
             _tmp_ann = battle_record.related_announcement
             _ = _tmp_ann.id if _tmp_ann else None
         except Exception as e:
-            logger.warning(f"作战记录 {record_id} 的关联通告在保存时检测为不存在，自动清空该引用。原因: {e}", exc_info=True)
+            logger.warning(f"开播记录 {record_id} 的关联通告在保存时检测为不存在，自动清空该引用。原因: {e}", exc_info=True)
             battle_record.related_announcement = None
 
         # 更新时间
@@ -437,12 +437,12 @@ def update_battle_record(record_id):
         if base_salary_str:
             battle_record.base_salary = Decimal(base_salary_str)
 
-        # 更新参战形式
+        # 更新开播方式
         work_mode = request.form.get('work_mode')
         if work_mode:
             battle_record.work_mode = WorkMode(work_mode)
 
-        # 根据参战形式更新坐标：线下必填，线上可空（若线上则清空为后端一致性）
+        # 根据开播方式更新坐标：线下必填，线上可空（若线上则清空为后端一致性）
         if battle_record.work_mode == WorkMode.OFFLINE:
             x_coord = request.form.get('x_coord')
             y_coord = request.form.get('y_coord')
@@ -472,53 +472,53 @@ def update_battle_record(record_id):
             if old_value != new_value:
                 log_battle_record_change(battle_record, field_name, old_value, new_value, current_user, client_ip)
 
-        flash('作战记录更新成功', 'success')
+        flash('开播记录更新成功', 'success')
         return redirect(url_for('battle_record.detail_battle_record', record_id=record_id))
 
     except BattleRecord.DoesNotExist:
-        flash('作战记录不存在', 'error')
+        flash('开播记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))
     except Exception as e:
-        logger.error(f"更新作战记录失败: {e}")
-        flash('更新作战记录失败，请重试', 'error')
+        logger.error(f"更新开播记录失败: {e}")
+        flash('更新开播记录失败，请重试', 'error')
         return redirect(url_for('battle_record.edit_battle_record', record_id=record_id))
 
 
 @battle_record_bp.route('/<record_id>/delete', methods=['POST'])
 @roles_accepted('gicho', 'kancho')
 def delete_battle_record(record_id):
-    """删除作战记录"""
+    """删除开播记录"""
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
-        logger.info(f"用户 {current_user.username} 删除作战记录 {record_id}")
+        logger.info(f"用户 {current_user.username} 删除开播记录 {record_id}")
 
         # 删除相关的变更记录
         BattleRecordChangeLog.objects.filter(battle_record_id=battle_record).delete()
 
-        # 删除作战记录
+        # 删除开播记录
         battle_record.delete()
 
-        flash('作战记录删除成功', 'success')
+        flash('开播记录删除成功', 'success')
         return redirect(url_for('battle_record.list_battle_records'))
 
     except BattleRecord.DoesNotExist:
-        flash('作战记录不存在', 'error')
+        flash('开播记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))
     except Exception as e:
-        logger.error(f"删除作战记录失败: {e}")
-        flash('删除作战记录失败，请重试', 'error')
+        logger.error(f"删除开播记录失败: {e}")
+        flash('删除开播记录失败，请重试', 'error')
         return redirect(url_for('battle_record.detail_battle_record', record_id=record_id))
 
 
 @battle_record_bp.route('/<record_id>/changes')
 @roles_accepted('gicho', 'kancho')
 def view_battle_record_changes(record_id):
-    """查看作战记录变更记录"""
+    """查看开播记录变更记录"""
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
         changes = BattleRecordChangeLog.objects.filter(battle_record_id=battle_record).order_by('-change_time').limit(100)
 
-        logger.info(f"用户 {current_user.username} 查看作战记录变更记录 {record_id}")
+        logger.info(f"用户 {current_user.username} 查看开播记录变更记录 {record_id}")
 
         return jsonify({
             'success':
@@ -534,9 +534,9 @@ def view_battle_record_changes(record_id):
         })
 
     except BattleRecord.DoesNotExist:
-        return jsonify({'success': False, 'error': '作战记录不存在'}), 404
+        return jsonify({'success': False, 'error': '开播记录不存在'}), 404
     except Exception as e:
-        logger.error(f"获取作战记录变更记录失败: {e}")
+        logger.error(f"获取开播记录变更记录失败: {e}")
         return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
 
 
@@ -575,7 +575,7 @@ def api_pilots_filtered():
         rank = request.args.get('rank')
 
         # 构建查询条件
-        query = Pilot.objects.filter(status__in=['已征召', '已签约'])
+        query = Pilot.objects.filter(status__in=['已招募', '已签约', '已征召'])
 
         if owner_id and owner_id != 'all':
             try:
@@ -623,11 +623,11 @@ def api_pilots_filtered():
 @battle_record_bp.route('/api/battle-areas')
 @roles_accepted('gicho', 'kancho')
 def api_battle_areas():
-    """获取作战区域数据（三联选择）"""
+    """获取开播地点数据（三联选择）"""
     try:
         from models.battle_area import Availability, BattleArea
 
-        # 获取所有可用的作战区域
+        # 获取所有可用的开播地点
         areas = BattleArea.objects.filter(availability=Availability.ENABLED).order_by('x_coord', 'y_coord', 'z_coord')
 
         # 构建三级联动数据结构
@@ -662,8 +662,8 @@ def api_battle_areas():
         return jsonify({'success': True, 'areas': result})
 
     except Exception as e:
-        logger.error(f"获取作战区域数据失败: {e}")
-        return jsonify({'success': False, 'error': '获取作战区域数据失败'}), 500
+        logger.error(f"获取开播地点数据失败: {e}")
+        return jsonify({'success': False, 'error': '获取开播地点数据失败'}), 500
 
 
 @battle_record_bp.route('/api/announcements/<announcement_id>')
@@ -769,5 +769,5 @@ def api_related_announcements():
         return jsonify({'success': True, 'announcements': merged})
 
     except Exception as e:
-        logger.error(f"获取关联通告失败: {e}")
+        logger.error(f"获取关联开播记录失败: {e}")
         return jsonify({'success': False, 'error': '获取关联通告失败'}), 500
