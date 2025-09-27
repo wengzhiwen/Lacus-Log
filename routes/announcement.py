@@ -271,11 +271,11 @@ def announcement_detail(announcement_id):
         from_param = request.args.get('from')
         date_param = request.args.get('date')
 
-        return render_template('announcements/detail.html', 
-                             announcement=announcement, 
-                             related_announcements=related_announcements,
-                             from_param=from_param,
-                             date_param=date_param)
+        return render_template('announcements/detail.html',
+                               announcement=announcement,
+                               related_announcements=related_announcements,
+                               from_param=from_param,
+                               date_param=date_param)
     except DoesNotExist:
         abort(404)
 
@@ -573,7 +573,7 @@ def edit_announcement(announcement_id):
                 # 获取来源参数，决定返回位置
                 from_param = request.args.get('from')
                 date_param = request.args.get('date')
-                
+
                 if from_param == 'calendar' and date_param:
                     return redirect(url_for('announcement.announcement_detail', announcement_id=announcement_id, **{'from': 'calendar', 'date': date_param}))
                 else:
@@ -624,7 +624,7 @@ def delete_announcement(announcement_id):
         # 获取来源参数，决定返回位置
         from_param = request.form.get('from')
         date_param = request.form.get('date')
-        
+
         if from_param == 'calendar' and date_param:
             return redirect(url_for('calendar.day_view', date=date_param))
         else:
