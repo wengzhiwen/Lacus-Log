@@ -133,12 +133,16 @@
   </div>
 </section>
 
-<!-- 底部footbar：新主播按钮 -->
+<!-- 底部footbar：新主播按钮和导出按钮 -->
 <div class="footbar">
   <div class="inner">
     <a class="btn btn-primary" href="{{ url_for('pilot.new_pilot') }}">
       <span class="btn-icon">+</span>
       新主播
+    </a>
+    <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_export') }}">
+      <span class="btn-icon">📊</span>
+      导出（CSV）
     </a>
   </div>
 </div>
@@ -312,7 +316,7 @@
   padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
   z-index: 100;
 }
-.footbar .inner { display: flex; justify-content: center; }
+.footbar .inner { display: flex; justify-content: center; gap: 12px; }
 .container { padding-bottom: 88px; }
 </style>
 <script>

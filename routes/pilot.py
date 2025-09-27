@@ -1,14 +1,11 @@
 # pylint: disable=no-member
 from datetime import timedelta
 
-from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
-                   request, url_for)
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, ValidationError
 
-from models.pilot import (Gender, Pilot, PilotChangeLog, PilotCommission,
-                          PilotCommissionChangeLog, Platform, Rank, Status,
-                          WorkMode)
+from models.pilot import (Gender, Pilot, PilotChangeLog, PilotCommission, PilotCommissionChangeLog, Platform, Rank, Status, WorkMode)
 from models.user import User
 from utils.logging_setup import get_logger
 from utils.timezone_helper import get_current_utc_time
@@ -97,7 +94,12 @@ def list_pilots():
     filters = persist_and_restore_filters(
         'pilots_list',
         allowed_keys=['rank', 'status', 'owner', 'days'],
-        default_filters={'rank': '', 'status': '', 'owner': '', 'days': ''},
+        default_filters={
+            'rank': '',
+            'status': '',
+            'owner': '',
+            'days': ''
+        },
     )
 
     rank_filter = filters.get('rank') or None
@@ -779,3 +781,71 @@ def pilot_commission_changes(pilot_id, commission_id):
     except Exception as e:
         logger.error('获取变更记录失败：%s', str(e))
         return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
+
+
+@pilot_bp.route('/export')
+@roles_accepted('gicho', 'kancho')
+def pilot_export():
+    """导出所有主播数据为CSV文件"""
+    try:
+        from datetime import datetime
+        import csv
+        import io
+
+        # 获取所有主播数据
+        pilots = Pilot.objects.all().order_by('-created_at')
+
+        # 创建CSV内容
+        output = io.StringIO()
+
+        # 写入BOM头，确保Excel正确显示中文
+        output.write('\ufeff')
+
+        # 创建CSV写入器
+        writer = csv.writer(output)
+
+        # 写入表头
+        headers = ['昵称', '姓名', '性别', '出生年', '籍贯', '开播平台', '直属运营昵称', '开播方式', '主播分类', '状态', '当前分成比例']
+        writer.writerow(headers)
+
+        # 写入数据行
+        for pilot in pilots:
+            # 获取当前分成比例
+            current_rate, _, _ = _get_pilot_current_commission_rate(str(pilot.id))
+
+            # 性别显示
+            gender_display = '男' if pilot.gender.value == 0 else '女' if pilot.gender.value == 1 else '不明确'
+
+            # 直属运营昵称
+            owner_nickname = pilot.owner.nickname if pilot.owner else '无'
+
+            # 构建数据行
+            row = [
+                pilot.nickname or '', pilot.real_name or '', gender_display, pilot.birth_year or '', pilot.hometown or '',
+                pilot.platform.value if pilot.platform else '', owner_nickname, pilot.work_mode.value if pilot.work_mode else '',
+                pilot.rank.value if pilot.rank else '', pilot.status.value if pilot.status else '', f'{current_rate}%'
+            ]
+            writer.writerow(row)
+
+        # 获取CSV内容
+        csv_content = output.getvalue()
+        output.close()
+
+        # 生成文件名
+        now = datetime.now()
+        filename = f'主播数据导出_{now.strftime("%Y%m%d_%H%M%S")}.csv'
+        # 使用URL编码的文件名，避免HTTP头编码问题
+        import urllib.parse
+        encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
+
+        # 创建响应
+        from flask import Response
+        response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
+
+        logger.info('主播数据导出成功，共导出 %d 条记录', pilots.count())
+        return response
+
+    except Exception as e:
+        logger.error('导出主播数据失败：%s', str(e))
+        flash('导出失败，请稍后重试', 'error')
+        return redirect(url_for('pilot.pilot_list'))
