@@ -17,6 +17,7 @@ from models.battle_record import BattleRecord
 from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.cache_helper import cached_monthly_report
 
 # 创建日志器（按模块分文件）
 logger = get_logger('report')
@@ -193,6 +194,7 @@ def calculate_pilot_monthly_stats(pilot, report_date, owner_id=None):
     }
 
 
+@cached_monthly_report()
 def _calculate_month_summary(report_date, owner_id=None):
     """计算月度数据（截至报表日）"""
     # 计算月范围：当月1号00:00 至 报表日23:59:59
@@ -259,6 +261,7 @@ def _calculate_month_summary(report_date, owner_id=None):
     }
 
 
+@cached_monthly_report()
 def _calculate_day_summary(report_date, owner_id=None):
     """计算日报汇总（仅报表日）"""
     # 计算报表日范围：00:00:00 至 23:59:59
@@ -315,6 +318,7 @@ def _calculate_day_summary(report_date, owner_id=None):
     }
 
 
+@cached_monthly_report()
 def _calculate_daily_details(report_date, owner_id=None):
     """计算日报明细"""
     # 计算报表日范围：00:00:00 至 23:59:59
@@ -679,6 +683,7 @@ def calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id=None):
     return calculate_pilot_rebate(pilot, month_end, owner_id)
 
 
+@cached_monthly_report()
 def _calculate_monthly_summary(year, month, owner_id=None):
     """计算月度汇总数据"""
     # 获取当月所有开播记录
@@ -738,6 +743,7 @@ def _calculate_monthly_summary(year, month, owner_id=None):
     }
 
 
+@cached_monthly_report()
 def _calculate_monthly_details(year, month, owner_id=None):
     """计算月度明细数据"""
     # 获取当月所有开播记录

@@ -12,6 +12,7 @@ from utils.logging_setup import get_logger
 from utils.timezone_helper import get_current_utc_time, utc_to_local, local_to_utc
 from utils.filter_state import persist_and_restore_filters
 from utils.commission_helper import get_pilot_commission_rate_for_date, calculate_commission_amounts
+from utils.cache_helper import cached_pilot_performance
 
 logger = get_logger('pilot')
 
@@ -891,6 +892,7 @@ def pilot_export():
         return redirect(url_for('pilot.pilot_list'))
 
 
+@cached_pilot_performance()
 def _calculate_pilot_rebate(pilot, end_date):
     """计算主播返点"""
     try:
@@ -940,6 +942,7 @@ def _calculate_pilot_rebate(pilot, end_date):
         return {'rebate_rate': 0, 'rebate_amount': 0, 'valid_days': 0, 'total_hours': 0, 'total_revenue': 0}
 
 
+@cached_pilot_performance()
 def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
     """计算主播业绩统计"""
     try:
