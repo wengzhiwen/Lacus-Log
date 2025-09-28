@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">📊 主播业绩</h1>
+  <h1 class="page-title">🎤 {{ pilot_info.nickname }} 业绩</h1>
 </div>
 
 <!-- 主播基本信息（压缩高度） -->
@@ -21,7 +21,8 @@
       {% if pilot_info.hometown %}
         <span class="hometown">{{ pilot_info.hometown }}</span>
       {% endif %}
-      <span class="owner-rank">{{ pilot_info.owner }}[{{ pilot_info.rank | normalize_rank }}]</span>
+      <span class="owner-rank">直属运营：{{ pilot_info.owner }} <br />
+        主播分类：{{ pilot_info.rank | normalize_rank }}</span>
     </div>
   </div>
 </div>
@@ -30,13 +31,13 @@
 <div class="stats-section">
   <!-- 本月统计 -->
   <div class="summary-section">
-    <h2 class="section-title">本月统计（月初至今日）</h2>
+    <h2 class="section-title">本月统计（全月 / 月初至报表日）</h2>
     <div class="summary-cards">
       <div class="summary-card">
         <div class="card-label">开播记录数</div>
         <div class="card-value">{{ month_stats.record_count }}</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card{% if month_stats.avg_hours < 7 and month_stats.operating_profit < 0 %} negative-value{% endif %}">
         <div class="card-label">开播时数</div>
         <div class="card-value">{{ month_stats.total_hours }}h</div>
         <div class="card-sub">{{ month_stats.avg_hours }}h/记录</div>
@@ -49,6 +50,7 @@
       <div class="summary-card">
         <div class="card-label">累计底薪</div>
         <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_basepay) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(month_stats.daily_avg_basepay) }}</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计返点</div>
@@ -58,9 +60,20 @@
         <div class="card-label">累计公司分成</div>
         <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_company_share) }}</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card{% if month_stats.operating_profit < 0 %} negative-value{% endif %}">
         <div class="card-label">运营利润估算</div>
         <div class="card-value">¥{{ "{:,.2f}".format(month_stats.operating_profit) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(month_stats.daily_avg_operating_profit) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 统计说明提示 -->
+  <div class="stats-notice">
+    <div class="notice-content">
+      <div class="notice-icon">ℹ️</div>
+      <div class="notice-text">
+        所有日均数据的分母为开播记录数（并非进行分日计算）。<br />近n日为最近的n条开播记录（并非自然日）。
       </div>
     </div>
   </div>
@@ -73,7 +86,7 @@
         <div class="card-label">开播记录数</div>
         <div class="card-value">{{ week_stats.record_count }}</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card{% if week_stats.avg_hours < 7 and week_stats.operating_profit < 0 %} negative-value{% endif %}">
         <div class="card-label">开播时数</div>
         <div class="card-value">{{ week_stats.total_hours }}h</div>
         <div class="card-sub">{{ week_stats.avg_hours }}h/记录</div>
@@ -86,14 +99,16 @@
       <div class="summary-card">
         <div class="card-label">累计底薪</div>
         <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_basepay) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(week_stats.daily_avg_basepay) }}</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计公司分成</div>
         <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_company_share) }}</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card{% if week_stats.operating_profit < 0 %} negative-value{% endif %}">
         <div class="card-label">近日盈亏（不计返点）</div>
         <div class="card-value">¥{{ "{:,.2f}".format(week_stats.operating_profit) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(week_stats.daily_avg_operating_profit) }}</div>
       </div>
     </div>
   </div>
@@ -106,7 +121,7 @@
         <div class="card-label">开播记录数</div>
         <div class="card-value">{{ three_day_stats.record_count }}</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card{% if three_day_stats.avg_hours < 7 and three_day_stats.operating_profit < 0 %} negative-value{% endif %}">
         <div class="card-label">开播时数</div>
         <div class="card-value">{{ three_day_stats.total_hours }}h</div>
         <div class="card-sub">{{ three_day_stats.avg_hours }}h/记录</div>
@@ -119,14 +134,16 @@
       <div class="summary-card">
         <div class="card-label">累计底薪</div>
         <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_basepay) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(three_day_stats.daily_avg_basepay) }}</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计公司分成</div>
         <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_company_share) }}</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card{% if three_day_stats.operating_profit < 0 %} negative-value{% endif %}">
         <div class="card-label">近日盈亏（不计返点）</div>
         <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.operating_profit) }}</div>
+        <div class="card-sub">日均¥{{ "{:,.2f}".format(three_day_stats.daily_avg_operating_profit) }}</div>
       </div>
     </div>
   </div>
@@ -208,12 +225,40 @@
 }
 
 .owner-rank::before {
-  content: "· ";
+  content: " ";
 }
 
 /* 统计卡片样式（与开播日报保持一致） */
 .stats-section {
   margin-bottom: 30px;
+}
+
+/* 统计说明提示样式 */
+.stats-notice {
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 20px 0;
+}
+
+.notice-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.notice-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.notice-text {
+  font-size: 14px;
+  color: #1976d2;
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 .summary-section {
@@ -245,6 +290,14 @@
 
 .summary-card:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.summary-card.negative-value {
+  border-color: #f44336;
+}
+
+.summary-card.negative-value:hover {
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.2);
 }
 
 .card-label {
@@ -392,6 +445,15 @@
   .pilot-details {
     flex-direction: column;
     gap: 4px;
+  }
+  
+  .stats-notice {
+    padding: 10px 12px;
+    margin: 16px 0;
+  }
+  
+  .notice-text {
+    font-size: 13px;
   }
   
   .summary-cards {

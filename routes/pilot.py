@@ -974,9 +974,11 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
                 'total_revenue': 0.0,
                 'daily_avg_revenue': 0.0,
                 'total_basepay': 0.0,
+                'daily_avg_basepay': 0.0,
                 'total_rebate': 0.0,
                 'total_company_share': 0.0,
-                'operating_profit': 0.0
+                'operating_profit': 0.0,
+                'daily_avg_operating_profit': 0.0
             }
         
         # 基础统计
@@ -1030,6 +1032,10 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
         
         logger.info(f"主播 {pilot.nickname} 最终统计: 公司分成={total_company_share}, 返点={total_rebate}, 运营利润={operating_profit}")
         
+        # 计算日均底薪和日均运营利润
+        daily_avg_basepay = round(total_basepay / actual_record_count, 2) if actual_record_count > 0 else 0.0
+        daily_avg_operating_profit = round(operating_profit / actual_record_count, 2) if actual_record_count > 0 else 0.0
+        
         return {
             'record_count': actual_record_count,
             'total_hours': round(total_hours, 1),
@@ -1037,9 +1043,11 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
             'total_revenue': round(total_revenue, 2),
             'daily_avg_revenue': daily_avg_revenue,
             'total_basepay': round(total_basepay, 2),
+            'daily_avg_basepay': daily_avg_basepay,
             'total_rebate': round(total_rebate, 2),
             'total_company_share': round(total_company_share, 2),
-            'operating_profit': round(operating_profit, 2)
+            'operating_profit': round(operating_profit, 2),
+            'daily_avg_operating_profit': daily_avg_operating_profit
         }
     except Exception as e:
         logger.error(f"计算主播业绩统计失败: {e}", exc_info=True)
@@ -1050,9 +1058,11 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
             'total_revenue': 0.0,
             'daily_avg_revenue': 0.0,
             'total_basepay': 0.0,
+            'daily_avg_basepay': 0.0,
             'total_rebate': 0.0,
             'total_company_share': 0.0,
-            'operating_profit': 0.0
+            'operating_profit': 0.0,
+            'daily_avg_operating_profit': 0.0
         }
 
 
