@@ -71,12 +71,24 @@
                         <label for="start_time" class="required">开始时间：</label>
                         <input type="datetime-local" name="start_time" id="start_time" required
                                value="{{ battle_record.start_time|local_datetime_for_input }}">
+                        <div class="time-quick-buttons">
+                            <button type="button" class="time-btn" data-target="start_time" data-minutes="5">+5</button>
+                            <button type="button" class="time-btn" data-target="start_time" data-minutes="15">+15</button>
+                            <button type="button" class="time-btn" data-target="start_time" data-minutes="30">+30</button>
+                            <button type="button" class="time-btn" data-target="start_time" data-minutes="60">+60</button>
+                        </div>
                     </div>
 
                     <div class="form-group">
                         <label for="end_time" class="required">结束时间：</label>
                         <input type="datetime-local" name="end_time" id="end_time" required
                                value="{{ battle_record.end_time|local_datetime_for_input }}">
+                        <div class="time-quick-buttons">
+                            <button type="button" class="time-btn" data-target="end_time" data-minutes="5">+5</button>
+                            <button type="button" class="time-btn" data-target="end_time" data-minutes="15">+15</button>
+                            <button type="button" class="time-btn" data-target="end_time" data-minutes="30">+30</button>
+                            <button type="button" class="time-btn" data-target="end_time" data-minutes="60">+60</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -313,6 +325,55 @@
     border-top: 1px solid var(--table-header);
 }
 
+/* 时间快捷按钮样式 */
+.time-quick-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.time-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--brand);
+    background: #fff;
+    color: var(--brand);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 48px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.time-btn:hover {
+    background: var(--brand);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.time-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(59, 130, 246, 0.3);
+}
+
+.time-btn.clicked {
+    background: var(--brand);
+    color: #fff;
+    animation: timeBtnClick 0.3s ease;
+}
+
+@keyframes timeBtnClick {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
 /* 移动端适配 */
 @media (max-width: 768px) {
     .form-row {
@@ -321,6 +382,17 @@
     
     .form-actions {
         flex-direction: column;
+    }
+    
+    .time-quick-buttons {
+        gap: 10px;
+    }
+    
+    .time-btn {
+        min-width: 44px;
+        min-height: 36px;
+        font-size: 11px;
+        padding: 6px 12px;
     }
 }
 </style>
@@ -338,6 +410,7 @@ let currentData = {
 document.addEventListener('DOMContentLoaded', function() {
     initializePage();
     updateCharacterCount();
+    initializeTimeButtons();
     
     // 监听备注字符计数
     document.getElementById('notes').addEventListener('input', updateCharacterCount);
@@ -500,6 +573,38 @@ function updateCharacterCount() {
     } else {
         counter.style.color = 'var(--muted)';
     }
+}
+
+// 初始化时间快捷按钮
+function initializeTimeButtons() {
+    const timeButtons = document.querySelectorAll('.time-btn');
+    timeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const minutes = parseInt(this.getAttribute('data-minutes'));
+            const targetInput = document.getElementById(targetId);
+            
+            if (targetInput && targetInput.value) {
+                // 解析当前时间
+                const currentTime = new Date(targetInput.value);
+                // 添加分钟
+                currentTime.setMinutes(currentTime.getMinutes() + minutes);
+                // 更新输入框值（使用本地时间格式）
+                const year = currentTime.getFullYear();
+                const month = String(currentTime.getMonth() + 1).padStart(2, '0');
+                const day = String(currentTime.getDate()).padStart(2, '0');
+                const hours = String(currentTime.getHours()).padStart(2, '0');
+                const mins = String(currentTime.getMinutes()).padStart(2, '0');
+                targetInput.value = `${year}-${month}-${day}T${hours}:${mins}`;
+                
+                // 添加点击效果
+                this.classList.add('clicked');
+                setTimeout(() => {
+                    this.classList.remove('clicked');
+                }, 300);
+            }
+        });
+    });
 }
 </script>
 {% endblock %}
