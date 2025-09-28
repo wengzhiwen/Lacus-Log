@@ -3,7 +3,7 @@
 
 本模块提供基于按钮触发的离线报表，通过邮件发送结果。
 """
-# pylint: disable=no-member
+# pylint: disable=no-member,consider-using-f-string
 from datetime import datetime, timedelta
 from math import floor
 from typing import List
@@ -215,7 +215,7 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
     if details:
         detail_table = """| 主播 | 性别年龄 | 直属运营 | 播时 | 流水 | 底薪 | 月累计天数 | 月日均播时 | 月累计底薪 | 月累计毛利 |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"""
-        
+
         for detail in details:
             row = (f"| {detail['pilot_display']} | {detail['gender_age']} | {detail['owner']} | "
                    f"{detail['duration']:.1f}小时 | ¥{detail['revenue']:,.2f} | ¥{detail['base_salary']:,.2f} | "
@@ -225,9 +225,7 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
     else:
         detail_table = "暂无开播记录"
 
-    return f"""# 开播日报
-
-## 本月数据（截至报表日）
+    return f"""## 本月数据（截至报表日）
 
 {month_table}
 
@@ -239,8 +237,7 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
 
 {detail_table}
 
----
-*本报表由 Lacus-Log 系统自动生成*"""
+"""
 
 
 def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler') -> dict:
@@ -271,7 +268,7 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
 
     # 计算开播日报数据（复用现有的计算逻辑）
     from routes.report import _calculate_month_summary, _calculate_day_summary, _calculate_daily_details
-    
+
     month_summary = _calculate_month_summary(report_date_obj)
     day_summary = _calculate_day_summary(report_date_obj)
     details = _calculate_daily_details(report_date_obj)
@@ -357,8 +354,8 @@ def mail_reports_page():
             recruit_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
         # 开播日报
-        daily_plan = (JobPlan.objects(job_code='daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
-            JobPlan.objects(job_code='daily_report').order_by('-fire_minute').first())
+        daily_plan = (JobPlan.objects(job_code='daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (JobPlan.objects(
+            job_code='daily_report').order_by('-fire_minute').first())
         daily_next_local = None
         if daily_plan:
             fire_dt_utc = datetime.strptime(daily_plan.fire_minute, '%Y%m%d%H%M')
