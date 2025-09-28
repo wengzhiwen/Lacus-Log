@@ -51,6 +51,9 @@ def init_scheduled_jobs(flask_app) -> None:
     # 征召日报：UTC 16:05 (GMT+8 00:05)
     recruit_daily_trigger = CronTrigger(hour=16, minute=5, timezone='UTC')
 
+    # 开播日报：UTC 16:02 (GMT+8 00:02)
+    daily_report_trigger = CronTrigger(hour=16, minute=2, timezone='UTC')
+
     # 工具：根据 CronTrigger 计算下一次运行时间（UTC）
     def _next_fire_utc(trigger) -> datetime:
         now_utc = get_current_utc_time()
@@ -91,6 +94,19 @@ def init_scheduled_jobs(flask_app) -> None:
             logger.info('定时任务 run_recruit_daily_report_job 完成：%s', result)
         plan_fire('daily_recruit_daily_report', _next_fire_utc(recruit_daily_trigger))
 
+    # 每天 GMT+8 00:02 执行开播日报 => UTC 16:02 (前一天)
+    def run_daily_report_wrapper():
+        # 延迟导入避免循环依赖
+        from routes.report_mail import run_daily_report_job
+        fire_dt_utc = get_current_utc_time().replace(second=0, microsecond=0)
+        if not consume_fire('daily_report', fire_dt_utc):
+            logger.info('跳过执行：daily_report（计划令牌不存在）')
+            return
+        with flask_app.app_context():
+            result = run_daily_report_job(triggered_by='scheduler@daily-00:02+08')
+            logger.info('定时任务 run_daily_report_job 完成：%s', result)
+        plan_fire('daily_report', _next_fire_utc(daily_report_trigger))
+
     sched.add_job(run_unstarted_wrapper, unstarted_trigger, id='daily_unstarted_report', replace_existing=True, max_instances=1)
     # 启动时写入下一次计划
     try:
@@ -103,6 +119,12 @@ def init_scheduled_jobs(flask_app) -> None:
         plan_fire('daily_recruit_daily_report', _next_fire_utc(recruit_daily_trigger))
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('写入征召日报下一次计划失败：%s', exc)
+
+    sched.add_job(run_daily_report_wrapper, daily_report_trigger, id='daily_report', replace_existing=True, max_instances=1)
+    try:
+        plan_fire('daily_report', _next_fire_utc(daily_report_trigger))
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('写入开播日报下一次计划失败：%s', exc)
 
     if not sched.running:
         sched.start(paused=False)

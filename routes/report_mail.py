@@ -178,6 +178,143 @@ def _calculate_recruit_statistics(report_date):
     return calculate_recruit_daily_stats(report_date)
 
 
+def _build_daily_report_markdown(month_summary, day_summary, details):
+    """将开播日报数据渲染为Markdown格式。
+    
+    Args:
+        month_summary: 月度数据
+        day_summary: 日报汇总数据
+        details: 日报明细数据
+        
+    Returns:
+        str: Markdown格式的邮件内容
+    """
+    # 月度数据表格
+    month_table = """| 指标 | 数值 |
+| --- | ---: |
+| 总主播数量 | {pilot_count} |
+| 有效主播数量 | {effective_pilot_count} |
+| 累计流水 | ¥{revenue_sum:,.2f} |
+| 累计底薪支出 | ¥{basepay_sum:,.2f} |
+| 累计返点 | ¥{rebate_sum:,.2f} |
+| 累计主播分成 | ¥{pilot_share_sum:,.2f} |
+| 累计公司分成 | ¥{company_share_sum:,.2f} |
+| 运营利润估算 | ¥{operating_profit:,.2f} |""".format(**month_summary)
+
+    # 日报汇总表格
+    day_table = """| 指标 | 数值 |
+| --- | ---: |
+| 总主播数量 | {pilot_count} |
+| 有效主播数量 | {effective_pilot_count} |
+| 累计流水 | ¥{revenue_sum:,.2f} |
+| 累计底薪支出 | ¥{basepay_sum:,.2f} |
+| 累计主播分成 | ¥{pilot_share_sum:,.2f} |
+| 累计公司分成 | ¥{company_share_sum:,.2f} |""".format(**day_summary)
+
+    # 明细表格（简化版，去掉用户要求的列）
+    if details:
+        detail_table = """| 主播 | 性别年龄 | 直属运营 | 播时 | 流水 | 底薪 | 月累计天数 | 月日均播时 | 月累计底薪 | 月累计毛利 |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"""
+        
+        for detail in details:
+            row = (f"| {detail['pilot_display']} | {detail['gender_age']} | {detail['owner']} | "
+                   f"{detail['duration']:.1f}小时 | ¥{detail['revenue']:,.2f} | ¥{detail['base_salary']:,.2f} | "
+                   f"{detail['monthly_stats']['month_days_count']} | {detail['monthly_stats']['month_avg_duration']:.1f}小时 | "
+                   f"¥{detail['monthly_stats']['month_total_base_salary']:,.2f} | ¥{detail['monthly_commission_stats']['month_total_profit']:,.2f} |")
+            detail_table += "\n" + row
+    else:
+        detail_table = "暂无开播记录"
+
+    return f"""# 开播日报
+
+## 本月数据（截至报表日）
+
+{month_table}
+
+## 日报汇总
+
+{day_table}
+
+## 日报明细
+
+{detail_table}
+
+---
+*本报表由 Lacus-Log 系统自动生成*"""
+
+
+def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler') -> dict:
+    """执行开播日报邮件发送任务。
+    
+    Args:
+        report_date: 报表日期字符串（YYYY-MM-DD格式），默认为昨天
+        triggered_by: 触发来源
+        
+    Returns:
+        dict: {"sent": bool, "count": int}
+    """
+    logger.info('触发开播日报邮件发送，来源：%s，报表日期：%s', triggered_by or '未知', report_date or '昨天')
+
+    # 确定报表日期
+    if not report_date:
+        # 默认发送昨天的报表
+        now_utc = get_current_utc_time()
+        yesterday_local = utc_to_local(now_utc) - timedelta(days=1)
+        report_date = yesterday_local.strftime('%Y-%m-%d')
+
+    # 解析报表日期
+    try:
+        report_date_obj = datetime.strptime(report_date, '%Y-%m-%d')
+    except ValueError:
+        logger.error('报表日期格式错误：%s', report_date)
+        return {'sent': False, 'count': 0}
+
+    # 计算开播日报数据（复用现有的计算逻辑）
+    from routes.report import _calculate_month_summary, _calculate_day_summary, _calculate_daily_details
+    
+    month_summary = _calculate_month_summary(report_date_obj)
+    day_summary = _calculate_day_summary(report_date_obj)
+    details = _calculate_daily_details(report_date_obj)
+
+    # 生成邮件内容
+    md_content = _build_daily_report_markdown(month_summary, day_summary, details)
+
+    # 添加说明文字
+    full_content = f"""# 开播日报
+
+**报表日期：** {report_date}
+
+{md_content}
+
+---
+*本报表由 Lacus-Log 系统自动生成*
+"""
+
+    # 获取收件人：运营和管理员
+    recipients = []
+    recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 管理员
+    recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 运营
+
+    if not recipients:
+        logger.error('收件人为空，未找到任何运营或管理员的邮箱')
+        return {'sent': False, 'count': 0}
+
+    # 去重
+    recipients = list(set(recipients))
+
+    # 生成邮件主题
+    subject = f"[Lacus-Log] 开播日报 - {report_date}"
+
+    # 发送邮件
+    ok = send_email_md(recipients, subject, full_content)
+    if ok:
+        logger.info('开播日报邮件已发送，收件人：%s', ', '.join(recipients))
+        return {'sent': True, 'count': len(recipients)}
+
+    logger.error('开播日报邮件发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
+    return {'sent': False, 'count': len(recipients)}
+
+
 # _calculate_period_stats 函数已移至 utils/recruit_stats.py
 
 
@@ -219,12 +356,21 @@ def mail_reports_page():
             fire_dt_utc = datetime.strptime(recruit_plan.fire_minute, '%Y%m%d%H%M')
             recruit_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
+        # 开播日报
+        daily_plan = (JobPlan.objects(job_code='daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
+            JobPlan.objects(job_code='daily_report').order_by('-fire_minute').first())
+        daily_next_local = None
+        if daily_plan:
+            fire_dt_utc = datetime.strptime(daily_plan.fire_minute, '%Y%m%d%H%M')
+            daily_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
+
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('读取任务下一次触发时间失败：%s', exc)
         unstarted_next_local = None
         recruit_next_local = None
+        daily_next_local = None
 
-    next_times = {'unstarted': unstarted_next_local, 'recruit_daily': recruit_next_local}
+    next_times = {'unstarted': unstarted_next_local, 'recruit_daily': recruit_next_local, 'daily_report': daily_next_local}
     return render_template('reports/mail_reports.html', next_times=next_times)
 
 
@@ -343,5 +489,19 @@ def trigger_recruit_daily_report():
     report_date = request.json.get('report_date') if request.is_json else None
 
     result = run_recruit_daily_report_job(report_date=report_date, triggered_by=username)
+    status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
+    return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
+
+
+@report_mail_bp.route('/mail/daily-report', methods=['POST'])
+@roles_required('gicho')
+def trigger_daily_report():
+    """触发开播日报邮件发送。"""
+    username = getattr(current_user, 'username', '未知')
+
+    # 获取请求参数
+    report_date = request.json.get('report_date') if request.is_json else None
+
+    result = run_daily_report_job(report_date=report_date, triggered_by=username)
     status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
     return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
