@@ -157,7 +157,7 @@
           <td>{{ "%.0f"|format(detail.rebate_rate * 100) }}%</td>
           <td>¥{{ "{:,.2f}".format(detail.rebate_amount) }}</td>
           <td>¥{{ "{:,.2f}".format(detail.base_salary) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.daily_profit) }}</td>
+          <td class="{% if detail.daily_profit < 0 %}text-danger{% endif %}">¥{{ "{:,.2f}".format(detail.daily_profit) }}</td>
           <td>{% if detail.three_day_avg_revenue %}¥{{ "{:,.2f}".format(detail.three_day_avg_revenue) }}{% endif %}</td>
           <td>{{ detail.monthly_stats.month_days_count }}</td>
           <td>{{ "%.1f"|format(detail.monthly_stats.month_avg_duration) }}小时</td>
@@ -166,7 +166,7 @@
           <td>¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_company_share) }}</td>
           <td>¥{{ "{:,.2f}".format(detail.month_rebate_amount) }}</td>
           <td>¥{{ "{:,.2f}".format(detail.monthly_stats.month_total_base_salary) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_profit) }}</td>
+          <td class="{% if detail.monthly_commission_stats.month_total_profit < 0 %}text-danger{% endif %}">¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_profit) }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -359,6 +359,12 @@
 .pilot-link:hover {
   color: var(--brand-dark);
   text-decoration: underline;
+}
+
+/* 负数红色显示 */
+.text-danger {
+  color: #dc3545 !important;
+  font-weight: 600;
 }
 
 /* 移动端适配 */

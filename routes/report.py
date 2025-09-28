@@ -426,8 +426,8 @@ def _calculate_daily_details(report_date, owner_id=None):
 
         details.append(detail)
 
-    # 排序：按流水金额降序，其次按开始时间降序
-    details.sort(key=lambda x: (-x['revenue'], -record.start_time.timestamp() if hasattr(record, 'start_time') else 0))
+    # 排序：按月累计毛利升序（亏钱的排前面），其次按流水金额降序
+    details.sort(key=lambda x: (x['monthly_commission_stats']['month_total_profit'], -x['revenue']))
 
     return details
 
