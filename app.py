@@ -16,11 +16,14 @@ from routes.pilot import pilot_bp
 from routes.recruit import recruit_bp
 from routes.report import report_bp
 from routes.report_mail import report_mail_bp
-from utils.bootstrap import ensure_initial_roles_and_admin
+from utils.bootstrap import (ensure_database_indexes,
+                             ensure_initial_roles_and_admin)
 from utils.logging_setup import init_logging
 from utils.scheduler import init_scheduled_jobs
 from utils.security import create_user_datastore, init_security
-from utils.timezone_helper import (format_local_date, format_local_datetime, format_local_time, get_local_date_for_input, get_local_datetime_for_input,
+from utils.timezone_helper import (format_local_date, format_local_datetime,
+                                   format_local_time, get_local_date_for_input,
+                                   get_local_datetime_for_input,
                                    get_local_time_for_input, utc_to_local)
 
 
@@ -235,8 +238,11 @@ def create_app() -> Flask:
         from flask import render_template
         return render_template('errors/403.html'), 403
 
-    # 启动时确保角色与默认管理员存在（需要应用上下文以支持密码哈希等）
+    # 启动时确保数据库索引和角色与默认管理员存在（需要应用上下文以支持密码哈希等）
     with flask_app.app_context():
+        # 首先确保数据库索引
+        ensure_database_indexes()
+        # 然后确保角色和默认管理员
         ensure_initial_roles_and_admin(user_datastore)
 
     # 初始化应用内置调度器（放在一切注册完成之后）

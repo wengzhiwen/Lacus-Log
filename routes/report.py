@@ -654,7 +654,7 @@ def calculate_pilot_monthly_commission_stats(pilot, year, month, owner_id=None):
     total_company_share = Decimal('0')
     total_base_salary = Decimal('0')
 
-    for record in month_records:
+    for record in pilot_month_records:
         # 按每条记录的日期计算分成
         record_date = utc_to_local(record.start_time).date()
         commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)

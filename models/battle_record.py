@@ -1,6 +1,7 @@
 from decimal import Decimal
 
-from mongoengine import (DateTimeField, DecimalField, Document, EnumField, ReferenceField, StringField)
+from mongoengine import (DateTimeField, DecimalField, Document, EnumField,
+                         ReferenceField, StringField)
 
 from utils.timezone_helper import get_current_utc_time
 
@@ -53,23 +54,41 @@ class BattleRecord(Document):
         'collection':
         'battle_records',
         'indexes': [
+            # 主要查询索引：时间范围查询（开播日报的核心查询）
+            {
+                'fields': ['start_time']
+            },
+            # 复合索引：时间 + 主播（用于主播相关的时间范围查询）
+            {
+                'fields': ['start_time', 'pilot']
+            },
+            # 复合索引：时间 + 直属运营快照（用于筛选查询）
+            {
+                'fields': ['start_time', 'owner_snapshot']
+            },
+            # 复合索引：主播 + 时间（用于主播业绩等查询）
             {
                 'fields': ['pilot', '-start_time']
             },
+            # 排序索引：时间 + 流水（用于列表排序）
             {
                 'fields': ['-start_time', '-revenue_amount']
             },
+            # 单字段索引：直属运营快照
             {
                 'fields': ['owner_snapshot']
             },
+            # 单字段索引：登记人
             {
                 'fields': ['registered_by']
             },
+            # 单字段索引：关联通告
             {
                 'fields': ['related_announcement']
             },
+            # 月度查询优化索引：年月 + 主播（用于月度统计）
             {
-                'fields': ['-start_time']
+                'fields': ['start_time', 'pilot', 'revenue_amount']
             },
         ],
     }

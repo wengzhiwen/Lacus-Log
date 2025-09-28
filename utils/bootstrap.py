@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 import logging
 
 from flask_security.utils import hash_password
@@ -7,6 +8,45 @@ from models.user import Role, User
 from utils.logging_setup import get_logger
 
 logger = get_logger('bootstrap')
+
+
+def ensure_database_indexes() -> None:
+    """确保所有模型的数据库索引被正确创建。
+    
+    根据项目约定，索引由各模块代码自行管理，在应用启动时统一确保创建。
+    """
+    logger.info('开始确保数据库索引创建...')
+
+    try:
+        # 确保核心模型索引
+        from models.announcement import Announcement
+        from models.battle_area import BattleArea
+        from models.battle_record import BattleRecord
+        from models.pilot import Pilot
+        from models.recruit import Recruit
+
+        # 按依赖顺序创建索引
+        models_to_index = [
+            (Role, 'Role'),
+            (User, 'User'),
+            (Pilot, 'Pilot'),
+            (BattleArea, 'BattleArea'),
+            (Announcement, 'Announcement'),
+            (BattleRecord, 'BattleRecord'),
+            (Recruit, 'Recruit'),
+        ]
+
+        for model_class, model_name in models_to_index:
+            try:
+                model_class.ensure_indexes()
+                logger.info('已确保 %s 模型索引创建', model_name)
+            except Exception as exc:
+                logger.error('确保 %s 模型索引失败：%s', model_name, exc)
+
+        logger.info('数据库索引确保完成')
+
+    except Exception as exc:
+        logger.error('确保数据库索引失败：%s', exc)
 
 
 def ensure_initial_roles_and_admin(user_datastore) -> None:
