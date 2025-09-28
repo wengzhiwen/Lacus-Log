@@ -34,23 +34,53 @@ def get_local_date_from_string(date_str):
         return None
 
 
-def get_battle_records_for_date_range(start_local_date, end_local_date):
-    """获取指定本地日期范围内的开播记录"""
+def get_battle_records_for_date_range(start_local_date, end_local_date, owner_id=None):
+    """获取指定本地日期范围内的开播记录
+    
+    Args:
+        start_local_date: 开始日期（本地时间）
+        end_local_date: 结束日期（本地时间）
+        owner_id: 直属运营用户ID，为None时不筛选
+    
+    Returns:
+        list: 开播记录列表
+    """
     start_utc = local_to_utc(start_local_date)
     end_utc = local_to_utc(end_local_date)
-    return BattleRecord.objects.filter(start_time__gte=start_utc, start_time__lt=end_utc)
+
+    # 基础时间范围查询
+    records = BattleRecord.objects.filter(start_time__gte=start_utc, start_time__lt=end_utc)
+
+    # 如果指定了直属运营筛选
+    if owner_id and owner_id != 'all':
+        from models.user import User
+        try:
+            owner_user = User.objects.get(id=owner_id)
+            # 在Python中进行筛选：开播记录的直属运营快照为指定用户，或者主播的当前直属运营为指定用户
+            filtered_records = []
+            for record in records:
+                # 优先使用快照，如果没有快照则使用主播当前的直属运营
+                record_owner = record.owner_snapshot if record.owner_snapshot else record.pilot.owner
+                if record_owner and str(record_owner.id) == str(owner_user.id):
+                    filtered_records.append(record)
+            return filtered_records
+        except User.DoesNotExist:
+            logger.warning('指定的直属运营用户不存在：%s', owner_id)
+            return []
+
+    return list(records)
 
 
-def calculate_pilot_three_day_avg_revenue(pilot, report_date):
+def calculate_pilot_three_day_avg_revenue(pilot, report_date, owner_id=None):
     """计算主播3日平均流水"""
     days_with_records = []
     for i in range(7):
         check_date = report_date - timedelta(days=i)
         check_date_start = check_date.replace(hour=0, minute=0, second=0, microsecond=0)
         check_date_end = check_date_start + timedelta(days=1)
-        daily_records = get_battle_records_for_date_range(check_date_start, check_date_end)
-        pilot_daily_records = daily_records.filter(pilot=pilot)
-        if pilot_daily_records.count() > 0:
+        daily_records = get_battle_records_for_date_range(check_date_start, check_date_end, owner_id)
+        pilot_daily_records = [record for record in daily_records if record.pilot.id == pilot.id]
+        if len(pilot_daily_records) > 0:
             daily_revenue = sum(record.revenue_amount for record in pilot_daily_records)
             days_with_records.append(daily_revenue)
             if len(days_with_records) >= 3:
@@ -61,12 +91,12 @@ def calculate_pilot_three_day_avg_revenue(pilot, report_date):
     return total_revenue / 3
 
 
-def calculate_pilot_rebate(pilot, report_date):
+def calculate_pilot_rebate(pilot, report_date, owner_id=None):
     """计算主播返点金额"""
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1))
-    pilot_month_records = month_records.filter(pilot=pilot)
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
     valid_days = set()
     total_duration = 0
     total_revenue = Decimal('0')
@@ -136,12 +166,12 @@ def calculate_pilot_rebate(pilot, report_date):
     }
 
 
-def calculate_pilot_monthly_stats(pilot, report_date):
+def calculate_pilot_monthly_stats(pilot, report_date, owner_id=None):
     """计算主播月度统计数据"""
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1))
-    pilot_month_records = month_records.filter(pilot=pilot)
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
     record_dates = set()
     total_duration = 0
     total_revenue = Decimal('0')
@@ -163,14 +193,14 @@ def calculate_pilot_monthly_stats(pilot, report_date):
     }
 
 
-def _calculate_month_summary(report_date):
+def _calculate_month_summary(report_date, owner_id=None):
     """计算月度数据（截至报表日）"""
     # 计算月范围：当月1号00:00 至 报表日23:59:59
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     # 获取本月所有作战记录
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1))
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
 
     # 统计主播数量（去重）
     pilot_ids = set()
@@ -229,14 +259,14 @@ def _calculate_month_summary(report_date):
     }
 
 
-def _calculate_day_summary(report_date):
+def _calculate_day_summary(report_date, owner_id=None):
     """计算日报汇总（仅报表日）"""
     # 计算报表日范围：00:00:00 至 23:59:59
     day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
     day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     # 获取报表日所有作战记录
-    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1))
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id)
 
     # 统计主播数量（去重）
     pilot_ids = set()
@@ -285,14 +315,14 @@ def _calculate_day_summary(report_date):
     }
 
 
-def _calculate_daily_details(report_date):
+def _calculate_daily_details(report_date, owner_id=None):
     """计算日报明细"""
     # 计算报表日范围：00:00:00 至 23:59:59
     day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
     day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     # 获取报表日所有作战记录
-    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1))
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id)
 
     details = []
 
@@ -328,22 +358,23 @@ def _calculate_daily_details(report_date):
         commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
 
         # 返点计算（简化版）
-        rebate_info = calculate_pilot_rebate(pilot, report_date)
+        rebate_info = calculate_pilot_rebate(pilot, report_date, owner_id)
 
         # 当日毛利
         daily_profit = commission_amounts['company_amount'] + rebate_info['rebate_amount'] - record.base_salary
 
         # 3日平均流水
-        three_day_avg_revenue = calculate_pilot_three_day_avg_revenue(pilot, report_date)
+        three_day_avg_revenue = calculate_pilot_three_day_avg_revenue(pilot, report_date, owner_id)
 
         # 月度统计
-        monthly_stats = calculate_pilot_monthly_stats(pilot, report_date)
+        monthly_stats = calculate_pilot_monthly_stats(pilot, report_date, owner_id)
 
         # 月度分成统计（计算该主播当月的真实累计分成）
         # 获取该主播当月所有开播记录
         month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-        pilot_month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1)).filter(pilot=pilot)
+        month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+        pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
 
         # 计算月累计分成
         month_total_pilot_share = Decimal('0')
@@ -419,16 +450,24 @@ def daily_report():
             return '无效的日期格式', 400
         report_date = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    logger.info('生成开播日报，报表日期：%s', report_date.strftime('%Y-%m-%d'))
+    # 获取直属运营筛选参数
+    owner_id = request.args.get('owner', 'all')
+    if owner_id == '':
+        owner_id = 'all'
+
+    logger.info('生成开播日报，报表日期：%s，直属运营：%s', report_date.strftime('%Y-%m-%d'), owner_id)
 
     # 计算月度数据（截至报表日）
-    month_summary = _calculate_month_summary(report_date)
+    month_summary = _calculate_month_summary(report_date, owner_id)
 
     # 计算日报汇总（仅报表日）
-    day_summary = _calculate_day_summary(report_date)
+    day_summary = _calculate_day_summary(report_date, owner_id)
 
     # 计算日报明细
-    details = _calculate_daily_details(report_date)
+    details = _calculate_daily_details(report_date, owner_id)
+
+    # 获取直属运营用户列表用于筛选器
+    owners = _get_recruit_users()
 
     # 分页信息
     pagination = {
@@ -437,7 +476,13 @@ def daily_report():
         'next_date': (report_date + timedelta(days=1)).strftime('%Y-%m-%d')
     }
 
-    return render_template('reports/daily.html', month_summary=month_summary, day_summary=day_summary, details=details, pagination=pagination)
+    return render_template('reports/daily.html',
+                           month_summary=month_summary,
+                           day_summary=day_summary,
+                           details=details,
+                           pagination=pagination,
+                           owners=owners,
+                           selected_owner=owner_id)
 
 
 @report_bp.route('/daily/export.csv')
@@ -458,10 +503,15 @@ def export_daily_csv():
             return '无效的日期格式', 400
         report_date = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    logger.info('导出开播日报CSV，报表日期：%s', report_date.strftime('%Y-%m-%d'))
+    # 获取直属运营筛选参数
+    owner_id = request.args.get('owner', 'all')
+    if owner_id == '':
+        owner_id = 'all'
+
+    logger.info('导出开播日报CSV，报表日期：%s，直属运营：%s', report_date.strftime('%Y-%m-%d'), owner_id)
 
     # 计算日报明细
-    details = _calculate_daily_details(report_date)
+    details = _calculate_daily_details(report_date, owner_id)
 
     # 创建CSV内容
     output = io.StringIO()
@@ -574,7 +624,7 @@ def get_local_month_from_string(month_str):
         return None
 
 
-def get_battle_records_for_month(year, month):
+def get_battle_records_for_month(year, month, owner_id=None):
     """获取指定月份的所有开播记录"""
     # 计算月范围：当月1号00:00 至 当月最后一天23:59:59
     month_start = datetime(year, month, 1, 0, 0, 0, 0)
@@ -583,11 +633,11 @@ def get_battle_records_for_month(year, month):
     else:
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
-    
-    return get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1))
+
+    return get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
 
 
-def calculate_pilot_monthly_commission_stats(pilot, year, month):
+def calculate_pilot_monthly_commission_stats(pilot, year, month, owner_id=None):
     """计算主播月度分成统计数据（按日计算后累加）"""
     month_start = datetime(year, month, 1, 0, 0, 0, 0)
     if month == 12:
@@ -595,91 +645,88 @@ def calculate_pilot_monthly_commission_stats(pilot, year, month):
     else:
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
-    
+
     # 获取该主播当月所有开播记录
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1)).filter(pilot=pilot)
-    
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
+
     total_pilot_share = Decimal('0')
     total_company_share = Decimal('0')
     total_base_salary = Decimal('0')
-    
+
     for record in month_records:
         # 按每条记录的日期计算分成
         record_date = utc_to_local(record.start_time).date()
         commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
         commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
-        
+
         total_pilot_share += commission_amounts['pilot_amount']
         total_company_share += commission_amounts['company_amount']
         total_base_salary += record.base_salary
-    
-    return {
-        'total_pilot_share': total_pilot_share,
-        'total_company_share': total_company_share,
-        'total_base_salary': total_base_salary
-    }
+
+    return {'total_pilot_share': total_pilot_share, 'total_company_share': total_company_share, 'total_base_salary': total_base_salary}
 
 
-def calculate_pilot_monthly_rebate_stats(pilot, year, month):
+def calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id=None):
     """计算主播月度返点统计"""
     if month == 12:
         next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
     else:
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
-    
+
     # 使用现有的返点计算逻辑，以月末日期为准
-    return calculate_pilot_rebate(pilot, month_end)
+    return calculate_pilot_rebate(pilot, month_end, owner_id)
 
 
-def _calculate_monthly_summary(year, month):
+def _calculate_monthly_summary(year, month, owner_id=None):
     """计算月度汇总数据"""
     # 获取当月所有开播记录
-    month_records = get_battle_records_for_month(year, month)
-    
+    month_records = get_battle_records_for_month(year, month, owner_id)
+
     # 统计主播数量（去重）
     pilot_ids = set()
     pilot_duration = {}  # 主播ID -> 累计播时
     pilot_records_count = {}  # 主播ID -> 开播记录数
-    
+
     total_revenue = Decimal('0')
     total_base_salary = Decimal('0')
     total_pilot_share = Decimal('0')
     total_company_share = Decimal('0')
     total_rebate = Decimal('0')
-    
+
     for record in month_records:
         pilot_id = str(record.pilot.id)
         pilot_ids.add(pilot_id)
-        
+
         # 累计播时和记录数
         if record.duration_hours:
             if pilot_id not in pilot_duration:
                 pilot_duration[pilot_id] = 0
             pilot_duration[pilot_id] += record.duration_hours
-        
+
         if pilot_id not in pilot_records_count:
             pilot_records_count[pilot_id] = 0
         pilot_records_count[pilot_id] += 1
-        
+
         # 累计金额
         total_revenue += record.revenue_amount
         total_base_salary += record.base_salary
-        
+
         # 计算分成
         record_date = utc_to_local(record.start_time).date()
         commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
         commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
-        
+
         total_pilot_share += commission_amounts['pilot_amount']
         total_company_share += commission_amounts['company_amount']
-    
+
     # 计算返点（简化版，实际应该按主播分别计算）
     total_rebate = Decimal('0')
-    
+
     # 运营利润估算
     operating_profit = total_company_share + total_rebate - total_base_salary
-    
+
     return {
         'pilot_count': len(pilot_ids),
         'revenue_sum': total_revenue,
@@ -691,17 +738,17 @@ def _calculate_monthly_summary(year, month):
     }
 
 
-def _calculate_monthly_details(year, month):
+def _calculate_monthly_details(year, month, owner_id=None):
     """计算月度明细数据"""
     # 获取当月所有开播记录
-    month_records = get_battle_records_for_month(year, month)
-    
+    month_records = get_battle_records_for_month(year, month, owner_id)
+
     # 按主播分组统计
     pilot_stats = {}
-    
+
     for record in month_records:
         pilot_id = str(record.pilot.id)
-        
+
         if pilot_id not in pilot_stats:
             pilot_stats[pilot_id] = {
                 'pilot': record.pilot,
@@ -710,54 +757,54 @@ def _calculate_monthly_details(year, month):
                 'total_revenue': Decimal('0'),
                 'total_base_salary': Decimal('0')
             }
-        
+
         # 累计统计
         pilot_stats[pilot_id]['records_count'] += 1
         if record.duration_hours:
             pilot_stats[pilot_id]['total_duration'] += record.duration_hours
         pilot_stats[pilot_id]['total_revenue'] += record.revenue_amount
         pilot_stats[pilot_id]['total_base_salary'] += record.base_salary
-    
+
     details = []
-    
+
     for pilot_id, stats in pilot_stats.items():
         pilot = stats['pilot']
-        
+
         # 主播显示信息
         pilot_display = f"{pilot.nickname}"
         if pilot.real_name:
             pilot_display += f"（{pilot.real_name}）"
-        
+
         # 性别年龄（当前的）
         gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
         current_year = datetime.now().year
         age = current_year - pilot.birth_year if pilot.birth_year else "未知"
         gender_age = f"{age}-{gender_icon}"
-        
+
         # 直属运营（当前的）
         owner = pilot.owner.nickname if pilot.owner else "未知"
-        
+
         # 主播分类（当前的）
         rank = pilot.rank.value
-        
+
         # 月累计开播记录数
         records_count = stats['records_count']
-        
+
         # 月均播时（月总播时/月累计开播记录数）
         avg_duration = stats['total_duration'] / records_count if records_count > 0 else 0
-        
+
         # 月累计流水
         total_revenue = stats['total_revenue']
-        
+
         # 月累计分成数据（按日计算后累加）
-        commission_stats = calculate_pilot_monthly_commission_stats(pilot, year, month)
-        
+        commission_stats = calculate_pilot_monthly_commission_stats(pilot, year, month, owner_id)
+
         # 月最新返点比例和累计返点
-        rebate_stats = calculate_pilot_monthly_rebate_stats(pilot, year, month)
-        
+        rebate_stats = calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id)
+
         # 月累计毛利
         total_profit = commission_stats['total_company_share'] + rebate_stats['rebate_amount'] - commission_stats['total_base_salary']
-        
+
         detail = {
             'pilot_id': pilot_id,
             'pilot_display': pilot_display,
@@ -774,12 +821,12 @@ def _calculate_monthly_details(year, month):
             'total_base_salary': commission_stats['total_base_salary'],
             'total_profit': total_profit
         }
-        
+
         details.append(detail)
-    
+
     # 排序：按月累计毛利升序（亏钱的排前面）
     details.sort(key=lambda x: x['total_profit'])
-    
+
     return details
 
 
@@ -933,11 +980,7 @@ def monthly_report():
         'next_month': (report_month.replace(day=28) + timedelta(days=4)).replace(day=1).strftime('%Y-%m')
     }
 
-    return render_template('reports/monthly.html', 
-                          month_summary=month_summary, 
-                          details=details, 
-                          pagination=pagination,
-                          report_month=report_month)
+    return render_template('reports/monthly.html', month_summary=month_summary, details=details, pagination=pagination, report_month=report_month)
 
 
 @report_bp.route('/monthly/export.csv')
@@ -971,29 +1014,15 @@ def export_monthly_csv():
     output.write('\ufeff')
 
     # 写入表头
-    headers = [
-        '主播', '性别年龄', '直属运营', '主播分类', '月累计开播记录数', '月均播时(小时)', 
-        '月累计流水(元)', '月累计主播分成(元)', '月累计公司分成(元)', '月最新返点比例(%)', 
-        '月累计返点(元)', '月累计底薪(元)', '月累计毛利(元)'
-    ]
+    headers = ['主播', '性别年龄', '直属运营', '主播分类', '月累计开播记录数', '月均播时(小时)', '月累计流水(元)', '月累计主播分成(元)', '月累计公司分成(元)', '月最新返点比例(%)', '月累计返点(元)', '月累计底薪(元)', '月累计毛利(元)']
     writer.writerow(headers)
 
     # 写入数据
     for detail in details:
         row = [
-            detail['pilot_display'], 
-            detail['gender_age'], 
-            detail['owner'], 
-            detail['rank'], 
-            detail['records_count'],
-            f"{detail['avg_duration']:.1f}",
-            f"{detail['total_revenue']:.2f}", 
-            f"{detail['total_pilot_share']:.2f}", 
-            f"{detail['total_company_share']:.2f}",
-            f"{detail['rebate_rate'] * 100:.0f}",
-            f"{detail['rebate_amount']:.2f}", 
-            f"{detail['total_base_salary']:.2f}",
-            f"{detail['total_profit']:.2f}"
+            detail['pilot_display'], detail['gender_age'], detail['owner'], detail['rank'], detail['records_count'], f"{detail['avg_duration']:.1f}",
+            f"{detail['total_revenue']:.2f}", f"{detail['total_pilot_share']:.2f}", f"{detail['total_company_share']:.2f}",
+            f"{detail['rebate_rate'] * 100:.0f}", f"{detail['rebate_amount']:.2f}", f"{detail['total_base_salary']:.2f}", f"{detail['total_profit']:.2f}"
         ]
         writer.writerow(row)
 
@@ -1005,8 +1034,6 @@ def export_monthly_csv():
     filename = f"开播月报_{report_month.strftime('%Y%m')}.csv"
     encoded_filename = quote(filename.encode('utf-8'))
 
-    response = Response(csv_content, 
-                       mimetype='text/csv; charset=utf-8', 
-                       headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
+    response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
 
     return response
