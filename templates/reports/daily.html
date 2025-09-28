@@ -141,7 +141,7 @@
         {% for detail in details %}
         <tr>
           <td class="fixed-col">
-            <a href="{{ url_for('pilot.pilot_performance', pilot_id=detail.pilot_id) }}" class="pilot-link">
+            <a href="{{ url_for('pilot.pilot_performance', pilot_id=detail.pilot_id, from='daily_report', date=pagination.date, owner=selected_owner) }}" class="pilot-link">
               {{ detail.pilot_display }}
             </a>
           </td>

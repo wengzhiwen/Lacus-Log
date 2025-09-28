@@ -4,7 +4,43 @@
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">🎤 {{ pilot_info.nickname }} 业绩</h1>
+  <div class="header-content">
+    <!-- 返回按钮 -->
+    <div class="back-nav">
+      {% set from_param = request.args.get('from') %}
+      {% if from_param == 'daily_report' %}
+        {% set date = request.args.get('date') %}
+        {% set owner = request.args.get('owner') %}
+        <a class="btn btn-secondary" href="{{ url_for('report.daily_report', date=date, owner=owner) }}">
+          <span>←</span>
+          返回
+        </a>
+      {% elif from_param == 'monthly_report' %}
+        {% set month = request.args.get('month') %}
+        <a class="btn btn-secondary" href="{{ url_for('report.monthly_report', month=month) }}">
+          <span>←</span>
+          返回
+        </a>
+      {% elif from_param == 'pilot_detail' %}
+        <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}">
+          <span>←</span>
+          返回
+        </a>
+      {% elif from_param == 'battle_record_detail' %}
+        {% set record_id = request.args.get('record_id') %}
+        <a class="btn btn-secondary" href="{{ url_for('battle_record.detail_battle_record', record_id=record_id) }}">
+          <span>←</span>
+          返回
+        </a>
+      {% else %}
+        <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
+          <span>←</span>
+          返回
+        </a>
+      {% endif %}
+    </div>
+    <h1 class="page-title">🎤 {{ pilot_info.nickname }} 业绩</h1>
+  </div>
 </div>
 
 <!-- 主播基本信息（压缩高度） -->
@@ -188,6 +224,53 @@
 </div>
 
 <style>
+/* 页面头部样式 */
+.page-header {
+  margin-bottom: 20px;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* 返回按钮样式 */
+.back-nav {
+  flex-shrink: 0;
+}
+
+.back-nav .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  color: #495057;
+  text-decoration: none;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.back-nav .btn:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+  color: #343a40;
+}
+
+.back-nav .btn span {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* 页面标题样式 */
+.page-title {
+  margin: 0;
+  flex: 1;
+}
+
 /* 主播基本信息样式（压缩高度） */
 .pilot-header {
   background: #fff;
@@ -452,6 +535,16 @@
 
 /* 移动端适配 */
 @media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .page-title {
+    font-size: 20px;
+  }
+  
   .pilot-details {
     flex-direction: column;
     gap: 4px;
