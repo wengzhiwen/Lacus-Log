@@ -179,7 +179,7 @@ def list_pilots():
         (Rank.INTERN.value, Rank.INTERN.value),
         (Rank.OFFICIAL.value, Rank.OFFICIAL.value),
     ]
-    
+
     status_choices = [
         (Status.NOT_RECRUITED.value, Status.NOT_RECRUITED.value),
         (Status.NOT_RECRUITING.value, Status.NOT_RECRUITING.value),
@@ -878,7 +878,9 @@ def pilot_export():
 
         # 创建响应
         from flask import Response
-        response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
+        response = Response(csv_content,
+                            mimetype='text/csv; charset=utf-8',
+                            headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
 
         logger.info('主播数据导出成功，共导出 %d 条记录', pilots.count())
         return response
@@ -896,17 +898,13 @@ def _calculate_pilot_rebate(pilot, end_date):
         month_start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_start_utc = local_to_utc(month_start)
         end_date_utc = local_to_utc(end_date.replace(hour=23, minute=59, second=59, microsecond=999999))
-        
-        records = BattleRecord.objects(
-            pilot=pilot,
-            start_time__gte=month_start_utc,
-            start_time__lte=end_date_utc
-        )
-        
+
+        records = BattleRecord.objects(pilot=pilot, start_time__gte=month_start_utc, start_time__lte=end_date_utc)
+
         # 计算返点指标
         total_revenue = sum(float(record.revenue_amount) for record in records)
         total_hours = sum(float(record.duration_hours or 0) for record in records)
-        
+
         # 计算有效天数（单次播时≥60分钟的自然日去重数）
         valid_days = set()
         for record in records:
@@ -914,7 +912,7 @@ def _calculate_pilot_rebate(pilot, end_date):
             if record.duration_hours and record.duration_hours >= 1.0:  # 60分钟 = 1小时
                 valid_days.add(local_start.date())
         valid_days_count = len(valid_days)
-        
+
         # 确定返点比例
         rebate_rate = 0
         if valid_days_count >= 22 and total_hours >= 130 and total_revenue >= 80000:
@@ -927,9 +925,9 @@ def _calculate_pilot_rebate(pilot, end_date):
             rebate_rate = 7
         elif valid_days_count >= 12 and total_hours >= 42 and total_revenue >= 1000:
             rebate_rate = 5
-        
+
         rebate_amount = total_revenue * (rebate_rate / 100)
-        
+
         return {
             'rebate_rate': rebate_rate,
             'rebate_amount': rebate_amount,
@@ -939,13 +937,7 @@ def _calculate_pilot_rebate(pilot, end_date):
         }
     except Exception as e:
         logger.error(f"计算主播返点失败: {e}")
-        return {
-            'rebate_rate': 0,
-            'rebate_amount': 0,
-            'valid_days': 0,
-            'total_hours': 0,
-            'total_revenue': 0
-        }
+        return {'rebate_rate': 0, 'rebate_amount': 0, 'valid_days': 0, 'total_hours': 0, 'total_revenue': 0}
 
 
 def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
@@ -959,12 +951,8 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
             month_start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             month_start_utc = local_to_utc(month_start)
             end_date_utc = local_to_utc(end_date.replace(hour=23, minute=59, second=59, microsecond=999999))
-            records = BattleRecord.objects(
-                pilot=pilot,
-                start_time__gte=month_start_utc,
-                start_time__lte=end_date_utc
-            )
-        
+            records = BattleRecord.objects(pilot=pilot, start_time__gte=month_start_utc, start_time__lte=end_date_utc)
+
         if not records:
             logger.info(f"主播 {pilot.nickname} 没有找到开播记录")
             return {
@@ -980,26 +968,26 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
                 'operating_profit': 0.0,
                 'daily_avg_operating_profit': 0.0
             }
-        
+
         # 基础统计
         actual_record_count = len(records)
         total_hours = sum(float(record.duration_hours or 0) for record in records)
         avg_hours = round(total_hours / actual_record_count, 1) if actual_record_count > 0 else 0.0
         total_revenue = sum(float(record.revenue_amount) for record in records)
         total_basepay = sum(float(record.base_salary) for record in records)
-        
+
         # 计算日均流水
         if actual_record_count:
             daily_avg_revenue = round(total_revenue / actual_record_count, 2)
         else:
             daily_avg_revenue = 0.0
-        
+
         logger.info(f"主播 {pilot.nickname} 基础统计: 记录数={actual_record_count}, 总时长={total_hours}, 总流水={total_revenue}, 总底薪={total_basepay}")
-        
+
         # 计算分成和返点
         total_company_share = 0.0
         total_rebate = 0.0
-        
+
         for record in records:
             try:
                 # 获取该记录日期的分成比例
@@ -1012,7 +1000,7 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
                 logger.error(f"计算记录 {record.id} 分成失败: {e}")
                 # 如果分成计算失败，使用默认值
                 total_company_share += float(record.revenue_amount) * 0.5  # 假设50%分成
-        
+
         # 计算返点（仅当月统计使用）
         if record_count is None:  # 只有本月统计才计算返点
             try:
@@ -1023,19 +1011,19 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
                 total_rebate = 0.0
         else:
             total_rebate = 0.0  # 近N日统计不计算返点
-        
+
         # 计算运营利润
         if record_count is None:  # 本月统计：运营利润 = 公司分成 + 返点 - 底薪
             operating_profit = total_company_share + total_rebate - total_basepay
         else:  # 近N日统计：近日盈亏 = 公司分成 - 底薪（不计返点）
             operating_profit = total_company_share - total_basepay
-        
+
         logger.info(f"主播 {pilot.nickname} 最终统计: 公司分成={total_company_share}, 返点={total_rebate}, 运营利润={operating_profit}")
-        
+
         # 计算日均底薪和日均运营利润
         daily_avg_basepay = round(total_basepay / actual_record_count, 2) if actual_record_count > 0 else 0.0
         daily_avg_operating_profit = round(operating_profit / actual_record_count, 2) if actual_record_count > 0 else 0.0
-        
+
         return {
             'record_count': actual_record_count,
             'total_hours': round(total_hours, 1),
@@ -1073,11 +1061,11 @@ def pilot_performance(pilot_id):
     try:
         pilot = Pilot.objects.get(id=pilot_id)
         logger.info(f"用户 {current_user.username} 查看主播业绩 {pilot_id}")
-        
+
         # 获取当前时间（GMT+8）
         now_utc = get_current_utc_time()
         now_local = utc_to_local(now_utc)
-        
+
         # 主播基本信息
         gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
         pilot_info = {
@@ -1087,27 +1075,28 @@ def pilot_performance(pilot_id):
             'gender_icon': gender_icon,
             'hometown': pilot.hometown,
             'owner': pilot.owner.nickname if pilot.owner else '无',
-            'rank': pilot.rank.value if pilot.rank else '未知'
+            'rank': pilot.rank.value if pilot.rank else '未知',
+            'status': pilot.get_effective_status_display()
         }
-        
+
         # 计算各种统计
         month_stats = _calculate_pilot_performance_stats(pilot, now_local)
         week_stats = _calculate_pilot_performance_stats(pilot, now_local, 7)
         three_day_stats = _calculate_pilot_performance_stats(pilot, now_local, 3)
-        
+
         # 获取最近30条开播记录
         recent_records = BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(30)
         recent_records_data = []
-        
+
         for record in recent_records:
             local_start = utc_to_local(record.start_time)
             local_end = utc_to_local(record.end_time)
-            
+
             # 获取分成信息
             record_date = local_start.date()
             commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
             commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
-            
+
             recent_records_data.append({
                 'id': str(record.id),
                 'start_time': local_start,
@@ -1121,15 +1110,15 @@ def pilot_performance(pilot_id):
                 'work_mode': record.work_mode.value if record.work_mode else '未知',
                 'battle_location': record.battle_location
             })
-        
+
         return render_template('pilots/performance.html',
-                             pilot=pilot,
-                             pilot_info=pilot_info,
-                             month_stats=month_stats,
-                             week_stats=week_stats,
-                             three_day_stats=three_day_stats,
-                             recent_records=recent_records_data)
-        
+                               pilot=pilot,
+                               pilot_info=pilot_info,
+                               month_stats=month_stats,
+                               week_stats=week_stats,
+                               three_day_stats=three_day_stats,
+                               recent_records=recent_records_data)
+
     except Pilot.DoesNotExist:
         flash('主播不存在', 'error')
         return redirect(url_for('pilot.list_pilots'))

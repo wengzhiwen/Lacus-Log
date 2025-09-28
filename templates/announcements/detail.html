@@ -22,7 +22,7 @@
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-main-info">
-        <div class="pilot-name">{{ announcement.pilot.nickname }}</div>
+        <div class="pilot-name"><a href="{{ url_for('pilot.pilot_detail', pilot_id=announcement.pilot.id, from='announcement_detail', announcement_id=announcement.id) }}">{{ announcement.pilot.nickname }}</a></div>
         <div class="pilot-real-name">{{ announcement.pilot.real_name or '未填写姓名' }}</div>
         <div class="pilot-badges">
           <span class="rank-badge rank-{{ announcement.pilot.rank.value.replace(' ', '') }}">{{ announcement.pilot.rank.value }}</span>
@@ -281,6 +281,15 @@
   font-weight: 600;
   color: var(--text);
   margin-bottom: 4px;
+}
+
+.pilot-name a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.pilot-name a:hover {
+  text-decoration: underline;
 }
 
 .pilot-real-name {

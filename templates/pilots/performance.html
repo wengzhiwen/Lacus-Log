@@ -11,7 +11,7 @@
 <div class="pilot-header">
   <div class="pilot-basic-info">
     <div class="pilot-name">
-      {{ pilot_info.nickname }}
+      <a href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id, from='performance') }}">{{ pilot_info.nickname }}</a>
       {% if pilot_info.real_name %}
         （{{ pilot_info.real_name }}）
       {% endif %}
@@ -22,7 +22,8 @@
         <span class="hometown">{{ pilot_info.hometown }}</span>
       {% endif %}
       <span class="owner-rank">直属运营：{{ pilot_info.owner }} <br />
-        主播分类：{{ pilot_info.rank | normalize_rank }}</span>
+        主播分类：{{ pilot_info.rank | normalize_rank }} <br />
+        主播状态：{{ pilot_info.status | normalize_status }}</span>
     </div>
   </div>
 </div>
@@ -207,6 +208,15 @@
   font-size: 20px;
   font-weight: 700;
   color: var(--text);
+}
+
+.pilot-name a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.pilot-name a:hover {
+  text-decoration: underline;
 }
 
 .pilot-details {

@@ -156,7 +156,8 @@ def get_pilot_basic_info(pilot):
             'rank': pilot.rank.value if pilot.rank else "未知",
             'owner': pilot.owner.nickname if pilot.owner else "无",
             'commission_rate': commission_rate,
-            'recruiter_name': recruiter_name
+            'recruiter_name': recruiter_name,
+            'status': pilot.get_effective_status_display()
         }
 
     except Exception as e:
@@ -215,6 +216,7 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
 - **分成比例**：{pilot_info['commission_rate']}%
 - **直属运营**：{pilot_info['owner']}
 - **招募负责人**：{pilot_info['recruiter_name']}
+- **主播状态**：{pilot_info['status']}
 
 ## 本月统计
 

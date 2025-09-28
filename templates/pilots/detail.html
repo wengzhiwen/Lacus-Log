@@ -3,10 +3,36 @@
 {% block content %}
 <section class="pilot-detail">
   <div class="back-nav">
-    <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
-      <span>←</span>
-      返回主播列表
-    </a>
+    {% set from_param = request.args.get('from') %}
+    {% if from_param == 'recruit_detail' %}
+      {% set recruit_id = request.args.get('recruit_id') %}
+      <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">
+        <span>←</span>
+        返回
+      </a>
+    {% elif from_param == 'announcement_detail' %}
+      {% set announcement_id = request.args.get('announcement_id') %}
+      <a class="btn btn-secondary" href="{{ url_for('announcement.announcement_detail', announcement_id=announcement_id) }}">
+        <span>←</span>
+        返回
+      </a>
+    {% elif from_param == 'battle_record_detail' %}
+      {% set record_id = request.args.get('record_id') %}
+      <a class="btn btn-secondary" href="{{ url_for('battle_record.detail_battle_record', record_id=record_id) }}">
+        <span>←</span>
+        返回
+      </a>
+    {% elif from_param == 'performance' %}
+      <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_performance', pilot_id=pilot.id) }}">
+        <span>←</span>
+        返回
+      </a>
+    {% else %}
+      <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
+        <span>←</span>
+        返回
+      </a>
+    {% endif %}
   </div>
 
   <div class="pilot-info-card">

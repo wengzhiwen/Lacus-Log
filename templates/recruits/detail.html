@@ -33,7 +33,7 @@
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-main-info">
-        <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+        <div class="pilot-name"><a href="{{ url_for('pilot.pilot_detail', pilot_id=recruit.pilot.id, from='recruit_detail', recruit_id=recruit.id) }}">{{ recruit.pilot.nickname }}</a></div>
         <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
         <div class="pilot-badges">
           <span class="rank-badge rank-{{ (recruit.pilot.rank.value | normalize_rank).replace(' ', '') }}">{{ recruit.pilot.rank.value | normalize_rank }}</span>
@@ -362,6 +362,15 @@
   font-weight: 600;
   color: var(--text);
   margin-bottom: 4px;
+}
+
+.pilot-name a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.pilot-name a:hover {
+  text-decoration: underline;
 }
 
 .pilot-real-name {
