@@ -249,6 +249,11 @@ def _calculate_month_summary(report_date, owner_id=None):
     # 运营利润估算
     operating_profit = total_company_share + total_rebate - total_base_salary
 
+    # 计算底薪流水转换率
+    conversion_rate = None
+    if total_base_salary > 0:
+        conversion_rate = int((total_revenue / total_base_salary) * 100)
+
     return {
         'pilot_count': len(pilot_ids),
         'effective_pilot_count': len(effective_pilot_ids),
@@ -257,7 +262,8 @@ def _calculate_month_summary(report_date, owner_id=None):
         'rebate_sum': total_rebate,
         'pilot_share_sum': total_pilot_share,
         'company_share_sum': total_company_share,
-        'operating_profit': operating_profit
+        'operating_profit': operating_profit,
+        'conversion_rate': conversion_rate
     }
 
 
@@ -308,13 +314,19 @@ def _calculate_day_summary(report_date, owner_id=None):
         if duration >= 6.0:
             effective_pilot_ids.add(pilot_id)
 
+    # 计算底薪流水转换率
+    conversion_rate = None
+    if total_base_salary > 0:
+        conversion_rate = int((total_revenue / total_base_salary) * 100)
+
     return {
         'pilot_count': len(pilot_ids),
         'effective_pilot_count': len(effective_pilot_ids),
         'revenue_sum': total_revenue,
         'basepay_sum': total_base_salary,
         'pilot_share_sum': total_pilot_share,
-        'company_share_sum': total_company_share
+        'company_share_sum': total_company_share,
+        'conversion_rate': conversion_rate
     }
 
 
@@ -732,6 +744,11 @@ def _calculate_monthly_summary(year, month, owner_id=None):
     # 运营利润估算
     operating_profit = total_company_share + total_rebate - total_base_salary
 
+    # 计算底薪流水转换率
+    conversion_rate = None
+    if total_base_salary > 0:
+        conversion_rate = int((total_revenue / total_base_salary) * 100)
+
     return {
         'pilot_count': len(pilot_ids),
         'revenue_sum': total_revenue,
@@ -739,7 +756,8 @@ def _calculate_monthly_summary(year, month, owner_id=None):
         'rebate_sum': total_rebate,
         'pilot_share_sum': total_pilot_share,
         'company_share_sum': total_company_share,
-        'operating_profit': operating_profit
+        'operating_profit': operating_profit,
+        'conversion_rate': conversion_rate
     }
 
 

@@ -34,6 +34,9 @@
     <div class="summary-card">
       <div class="card-label">累计底薪支出</div>
       <div class="card-value {% if month_summary.basepay_sum < 0 %}negative-value{% endif %}">¥{{ "{:,.2f}".format(month_summary.basepay_sum) }}</div>
+      {% if month_summary.conversion_rate is not none %}
+      <div class="card-sub">转换率{{ month_summary.conversion_rate }}%</div>
+      {% endif %}
     </div>
     <div class="summary-card">
       <div class="card-label">累计返点</div>
@@ -181,6 +184,12 @@
   font-size: 24px;
   font-weight: 700;
   color: var(--brand);
+}
+
+.card-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* 明细表格样式 */
