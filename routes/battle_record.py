@@ -16,6 +16,7 @@ from models.user import Role, User
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.james_alert import trigger_james_alert_if_needed
 
 # 创建日志器（按模块分文件）
 logger = get_logger('battle_record')
@@ -324,6 +325,9 @@ def create_battle_record():
         logger.info(f"开播记录创建成功，ID: {battle_record.id}")
         flash('开播记录创建成功', 'success')
 
+        # 触发詹姆斯关注警告检查（新建记录）
+        trigger_james_alert_if_needed(battle_record)
+
         return redirect(url_for('battle_record.detail_battle_record', record_id=battle_record.id))
 
     except Exception as e:
@@ -395,6 +399,15 @@ def update_battle_record(record_id):
     try:
         battle_record = BattleRecord.objects.get(id=record_id)
         logger.info(f"用户 {current_user.username} 更新开播记录 {record_id}")
+
+        # 保存编辑前的记录状态（用于詹姆斯关注检查）
+        old_record_data = {
+            'revenue_amount': battle_record.revenue_amount,
+            'base_salary': battle_record.base_salary,
+            'start_time': battle_record.start_time,
+            'end_time': battle_record.end_time,
+            'work_mode': battle_record.work_mode
+        }
 
         # 记录变更前的值
         # 注意：直接访问 related_announcement 可能触发懒加载并在目标不存在时抛异常
@@ -486,6 +499,22 @@ def update_battle_record(record_id):
             new_value = getattr(battle_record, field_name)
             if old_value != new_value:
                 log_battle_record_change(battle_record, field_name, old_value, new_value, current_user, client_ip)
+
+        # 触发詹姆斯关注警告检查（编辑记录）
+        # 创建伪记录对象来传递编辑前的数据
+        class OldRecord:
+            def __init__(self, data):
+                for key, value in data.items():
+                    setattr(self, key, value)
+                # 计算编辑前的播时
+                if hasattr(self, 'start_time') and hasattr(self, 'end_time') and self.start_time and self.end_time:
+                    duration = (self.end_time - self.start_time).total_seconds() / 3600
+                    self.duration_hours = round(duration, 1) if duration > 0 else 0
+                else:
+                    self.duration_hours = 0
+
+        old_record = OldRecord(old_record_data)
+        trigger_james_alert_if_needed(battle_record, old_record)
 
         flash('开播记录更新成功', 'success')
         return redirect(url_for('battle_record.detail_battle_record', record_id=record_id))
@@ -687,7 +716,7 @@ def api_battle_areas():
                 # Z坐标排序：如果是数字优先按数值排序
                 z_coords = x_coords[x_coord][y_coord]
                 try:
-                    z_coords.sort(key=lambda z: int(z))
+                    z_coords.sort(key=lambda z: int(z))  # pylint: disable=unnecessary-lambda
                 except ValueError:
                     z_coords.sort()  # 如果不是数字，按字典顺序排序
                 result[x_coord][y_coord] = z_coords
