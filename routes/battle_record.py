@@ -6,7 +6,8 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from flask import (Blueprint, flash, jsonify, redirect, render_template, request, url_for)
+from flask import (Blueprint, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_security import current_user, roles_accepted
 
 from models.announcement import Announcement
@@ -14,14 +15,66 @@ from models.battle_record import BattleRecord, BattleRecordChangeLog
 from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
 from utils.filter_state import persist_and_restore_filters
-from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 from utils.james_alert import trigger_james_alert_if_needed
+from utils.logging_setup import get_logger
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 # 创建日志器（按模块分文件）
 logger = get_logger('battle_record')
 
 battle_record_bp = Blueprint('battle_record', __name__)
+
+
+def validate_notes_required(start_time, end_time, revenue_amount, base_salary, related_announcement, notes):
+    """
+    验证备注是否必须填写
+    返回验证错误信息，如果无错误返回None
+    """
+    # 如果已有备注，直接通过
+    if notes and notes.strip():
+        return None
+
+    reasons = []
+
+    # 计算开播时长
+    if start_time and end_time:
+        duration = (end_time - start_time).total_seconds() / 3600
+        # 开播时长小于6.0小时
+        if duration < 6.0:
+            reasons.append("开播时长小于6.0小时")
+        # 开播时长大于等于9.0小时
+        elif duration >= 9.0:
+            reasons.append("开播时长大于等于9.0小时")
+
+    # 底薪不等于0也不等于150
+    if base_salary and base_salary != Decimal('0') and base_salary != Decimal('150'):
+        reasons.append("底薪不等于0也不等于150")
+
+    # 流水不等于0且小于100
+    if revenue_amount and revenue_amount != Decimal('0') and revenue_amount < Decimal('100'):
+        reasons.append("流水不等于0且小于100")
+
+    # 流水大于等于5000
+    if revenue_amount and revenue_amount >= Decimal('5000'):
+        reasons.append("流水大于等于5000")
+
+    # 如果有关联通告，检查开始时间与关联通告的开始时间相差超过6个小时
+    if related_announcement and hasattr(related_announcement, 'start_time') and related_announcement.start_time:
+        # 转换到本地时间进行比较（都转换为GMT+8）
+        announcement_start_local = utc_to_local(related_announcement.start_time)
+        record_start_local = utc_to_local(start_time)
+
+        # 计算时间差（取绝对值）
+        time_diff = abs((record_start_local - announcement_start_local).total_seconds() / 3600)
+        if time_diff > 6:
+            reasons.append("开播时间与关联通告时间相差超过6个小时")
+
+    # 如果有任何一个条件满足且备注为空，返回错误信息
+    if reasons:
+        return "因为" + "或".join(reasons) + "原因，必须填写备注"
+
+    return None
 
 
 def log_battle_record_change(battle_record, field_name, old_value, new_value, user_id, ip_address):
@@ -304,6 +357,13 @@ def create_battle_record():
                 flash('线下开播时必须选择X/Y/Z坐标', 'error')
                 return redirect(url_for('battle_record.new_battle_record'))
 
+        # 验证备注必填条件
+        validation_error = validate_notes_required(start_time_utc, end_time_utc, revenue_amount, base_salary, related_announcement,
+                                                   notes.strip() if notes else '')
+        if validation_error:
+            flash(validation_error, 'error')
+            return redirect(url_for('battle_record.new_battle_record'))
+
         # 创建作战记录
         battle_record = BattleRecord(
             pilot=pilot,
@@ -490,6 +550,13 @@ def update_battle_record(record_id):
         notes = request.form.get('notes', '')
         battle_record.notes = notes.strip()
 
+        # 验证备注必填条件
+        validation_error = validate_notes_required(battle_record.start_time, battle_record.end_time, battle_record.revenue_amount, battle_record.base_salary,
+                                                   battle_record.related_announcement, battle_record.notes)
+        if validation_error:
+            flash(validation_error, 'error')
+            return redirect(url_for('battle_record.edit_battle_record', record_id=record_id))
+
         battle_record.save()
 
         # 记录变更日志
@@ -503,6 +570,7 @@ def update_battle_record(record_id):
         # 触发詹姆斯关注警告检查（编辑记录）
         # 创建伪记录对象来传递编辑前的数据
         class OldRecord:
+
             def __init__(self, data):
                 for key, value in data.items():
                     setattr(self, key, value)
@@ -601,10 +669,22 @@ def api_pilot_filters():
 
         # 获取所有阶级选项 - 只显示新用语
         ranks_data = [
-            {'value': Rank.CANDIDATE.value, 'name': Rank.CANDIDATE.value},
-            {'value': Rank.TRAINEE.value, 'name': Rank.TRAINEE.value},
-            {'value': Rank.INTERN.value, 'name': Rank.INTERN.value},
-            {'value': Rank.OFFICIAL.value, 'name': Rank.OFFICIAL.value},
+            {
+                'value': Rank.CANDIDATE.value,
+                'name': Rank.CANDIDATE.value
+            },
+            {
+                'value': Rank.TRAINEE.value,
+                'name': Rank.TRAINEE.value
+            },
+            {
+                'value': Rank.INTERN.value,
+                'name': Rank.INTERN.value
+            },
+            {
+                'value': Rank.OFFICIAL.value,
+                'name': Rank.OFFICIAL.value
+            },
         ]
 
         return jsonify({'success': True, 'owners': owners_data, 'ranks': ranks_data})
