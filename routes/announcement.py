@@ -9,7 +9,7 @@ from mongoengine import DoesNotExist, ValidationError
 
 from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
 from models.battle_area import BattleArea
-from models.pilot import Pilot, Rank
+from models.pilot import Pilot, Rank, Status
 from models.user import User
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
@@ -1180,3 +1180,71 @@ def generate_export_table(pilot, year, month):
         table_data.append(row_data)
 
     return table_data, venue_info
+
+
+@announcement_bp.route('/cleanup')
+@roles_accepted('gicho', 'kancho')
+def cleanup_page():
+    """通告清理页面：列出状态为流失且从明天开始仍有通告的主播"""
+    # 计算“明天 00:00”的UTC时间
+    current_local = get_current_local_time()
+    tomorrow_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    tomorrow_utc_start = local_to_utc(tomorrow_local_start)
+
+    # 找出明天开始有通告的主播id集合
+    future_announcements = Announcement.objects(start_time__gte=tomorrow_utc_start).only('pilot')
+    pilot_id_to_count = {}
+    for ann in future_announcements:
+        if ann.pilot:
+            pid = str(ann.pilot.id)
+            pilot_id_to_count[pid] = pilot_id_to_count.get(pid, 0) + 1
+
+    # 过滤出状态为流失的主播
+    pilots = Pilot.objects(id__in=list(pilot_id_to_count.keys()), status__in=[Status.FALLEN, Status.FALLEN_OLD])
+
+    # 组装视图数据
+    items = []
+    for p in pilots:
+        owner_name = p.owner.nickname or p.owner.username if p.owner else '无所属'
+        items.append({
+            'id': str(p.id),
+            'nickname': p.nickname,
+            'real_name': p.real_name or '',
+            'owner_name': owner_name,
+            'future_count': pilot_id_to_count.get(str(p.id), 0)
+        })
+
+    # 显示按昵称排序
+    items.sort(key=lambda x: x['nickname'])
+
+    return render_template('announcements/cleanup.html', items=items)
+
+
+@announcement_bp.route('/cleanup/delete-future', methods=['POST'])
+@roles_accepted('gicho', 'kancho')
+def cleanup_delete_future():
+    """删除指定主播从明天开始的所有通告（不可恢复）"""
+    try:
+        pilot_id = request.form.get('pilot_id')
+        if not pilot_id:
+            flash('缺少参数：pilot_id', 'error')
+            return redirect(url_for('announcement.cleanup_page'))
+
+        # 计算“明天 00:00”的UTC时间
+        current_local = get_current_local_time()
+        tomorrow_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        tomorrow_utc_start = local_to_utc(tomorrow_local_start)
+
+        # 删除该主播从明天开始的所有通告
+        anns = Announcement.objects(pilot=pilot_id, start_time__gte=tomorrow_utc_start)
+        count = anns.count()
+        for ann in anns:
+            ann.delete()
+
+        flash(f'已删除该主播明天开始的所有通告，共{count}条', 'success')
+        logger.info('用户%s清理通告：pilot=%s，从明天开始删除共%d条', current_user.username, pilot_id, count)
+        return redirect(url_for('announcement.cleanup_page'))
+    except Exception as e:
+        logger.error('清理通告失败：%s', str(e))
+        flash(f'清理失败：{str(e)}', 'error')
+        return redirect(url_for('announcement.cleanup_page'))

@@ -154,12 +154,15 @@
     </div>
 </section>
 
-<!-- 底部footbar：新建通告按钮 -->
+<!-- 底部footbar：新建通告按钮 + 通告清理按钮 -->
 <div class="footbar">
     <div class="inner">
         <a class="btn btn-primary" href="{{ url_for('announcement.new_announcement') }}">
             <span class="btn-icon">+</span>
             新建通告
+        </a>
+        <a class="btn btn-outline" style="margin-left:12px;" href="{{ url_for('announcement.cleanup_page') }}">
+            通告清理
         </a>
     </div>
 </div>

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}通告清理{% endblock %}
+
+{% block content %}
+<section class="announcement-cleanup">
+    <div class="page-header">
+        <h1 class="page-title">通告清理</h1>
+    </div>
+
+    <div class="alert alert-warning" style="margin-bottom:12px;">
+        <div><strong>注意：</strong></div>
+        <div>1、只会清理明天开始（GMT+8）的通告</div>
+        <div>2、不论通告是否已经关联了开播记录都会被清理</div>
+        <div>3、该操作无法恢复</div>
+    </div>
+
+    {% if items %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>主播</th>
+                <th>直属运营</th>
+                <th>剩余通告数</th>
+                <th style="width:160px;">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.nickname }}{% if item.real_name %}（{{ item.real_name }}）{% endif %}</td>
+                <td>[{{ item.owner_name }}]</td>
+                <td>{{ item.future_count }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('announcement.cleanup_delete_future') }}" onsubmit="return confirm('确定删除该主播明天开始的所有通告吗？此操作不可恢复。');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="pilot_id" value="{{ item.id }}"/>
+                        <button type="submit" class="btn btn-danger">删除所有通告</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="text-align:center; color: var(--muted); padding:40px 10px;">
+        暂无需要清理的通告。
+    </div>
+    {% endif %}
+
+    <div class="footbar" style="position:static; box-shadow:none; border-top:none; padding:0; margin-top:16px;">
+        <div class="inner" style="justify-content:flex-start;">
+            <a class="btn btn-outline" href="{{ url_for('announcement.list_announcements') }}">返回通告管理</a>
+        </div>
+    </div>
+</section>
+
+<style>
+.table { width: 100%; background:#fff; border:1px solid var(--table-header); border-radius:8px; overflow:hidden; }
+.table th, .table td { padding:10px 12px; border-bottom:1px solid var(--table-header); font-size:14px; }
+.table thead th { background: var(--table-header); text-align:left; }
+.alert { background:#fff3cd; color:#856404; border:1px solid #ffeeba; padding:10px 12px; border-radius:6px; }
+</style>
+{% endblock %}
+
+
