@@ -6,8 +6,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from flask import (Blueprint, flash, jsonify, redirect, render_template,
-                   request, url_for)
+from flask import (Blueprint, flash, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
 
 from models.announcement import Announcement
@@ -17,8 +16,7 @@ from models.user import Role, User
 from utils.filter_state import persist_and_restore_filters
 from utils.james_alert import trigger_james_alert_if_needed
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 # 创建日志器（按模块分文件）
 logger = get_logger('battle_record')
@@ -127,18 +125,16 @@ def list_battle_records():
     # 获取并持久化筛选参数（会话）
     filters = persist_and_restore_filters(
         'battle_records_list',
-        allowed_keys=['owner', 'rank', 'pilot', 'time'],
+        allowed_keys=['owner', 'x', 'time'],
         default_filters={
             'owner': 'all',
-            'rank': '',
-            'pilot': '',
+            'x': '',
             'time': 'two_days'
         },
     )
 
     owner_filter = filters.get('owner') or 'all'
-    rank_filter = filters.get('rank') or ''
-    pilot_filter = filters.get('pilot') or ''
+    x_filter = filters.get('x') or ''
     time_filter = filters.get('time') or 'two_days'
 
     # 构建查询条件
@@ -154,32 +150,9 @@ def list_battle_records():
         except Exception:
             pass
 
-    # 阶级筛选 - 兼容性筛选
-    if rank_filter:
-        try:
-            rank_enum = Rank(rank_filter)
-            # 兼容性筛选：同时筛选新用语和对应的旧用语
-            if rank_enum == Rank.CANDIDATE:
-                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.CANDIDATE, Rank.CANDIDATE_OLD])
-            elif rank_enum == Rank.TRAINEE:
-                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.TRAINEE, Rank.TRAINEE_OLD])
-            elif rank_enum == Rank.INTERN:
-                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.INTERN, Rank.INTERN_OLD])
-            elif rank_enum == Rank.OFFICIAL:
-                pilots_with_rank = Pilot.objects.filter(rank__in=[Rank.OFFICIAL, Rank.OFFICIAL_OLD])
-            else:
-                pilots_with_rank = Pilot.objects.filter(rank=rank_enum)
-            query = query.filter(pilot__in=pilots_with_rank)
-        except ValueError:
-            pass
-
-    # 主播筛选
-    if pilot_filter:
-        try:
-            pilot = Pilot.objects.get(id=pilot_filter)
-            query = query.filter(pilot=pilot)
-        except Pilot.DoesNotExist:
-            pass
+    # 基地筛选（按X坐标快照）
+    if x_filter:
+        query = query.filter(x_coord=x_filter)
 
     # 时间筛选
     now_utc = get_current_utc_time()
@@ -199,10 +172,14 @@ def list_battle_records():
         range_start_utc = local_to_utc(yesterday_local_start)
         range_end_utc = local_to_utc(day_after_tomorrow_local_start)
         query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
-    elif time_filter == 'recent_7_days':
-        # 近7天
-        seven_days_ago = now_utc - timedelta(days=7)
-        query = query.filter(start_time__gte=seven_days_ago)
+    elif time_filter == 'seven_days':
+        # 近7天（从本地今天00:00起到未来7天00:00，与通告保持一致口径）
+        now_local = utc_to_local(now_utc)
+        today_local_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        seven_days_later_local_start = today_local_start + timedelta(days=7)
+        range_start_utc = local_to_utc(today_local_start)
+        range_end_utc = local_to_utc(seven_days_later_local_start)
+        query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
 
     # 排序：开始时间逆序，流水金额逆序
     query = query.order_by('-start_time', '-revenue_amount')
@@ -222,13 +199,16 @@ def list_battle_records():
     role_list = [r for r in [gicho, kancho] if r]
     owners = User.objects(roles__in=role_list).order_by('username') if role_list else []
 
+    # 基地（X坐标）选项：从现有 BattleRecord 快照中提取，以字典序排序
+    x_coords = sorted(list({br.x_coord for br in BattleRecord.objects.only('x_coord') if br.x_coord}))
+
     return render_template('battle_records/list.html',
                            battle_records=battle_records,
                            owners=owners,
+                           x_choices=[('', '全部基地')] + [(x, x) for x in x_coords],
                            current_filters={
                                'owner': owner_filter,
-                               'rank': rank_filter,
-                               'pilot': pilot_filter,
+                               'x': x_filter,
                                'time': time_filter
                            },
                            current_page=page,

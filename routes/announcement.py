@@ -137,28 +137,16 @@ def _get_filter_choices():
             owners.add((str(pilot.owner.id), pilot.owner.nickname or pilot.owner.username))
     owner_choices = [('', '全部所属')] + sorted(list(owners), key=lambda x: x[1])
 
-    # 阶级选择
-    ranks = set()
-    for pilot in pilots:
-        ranks.add(pilot.rank.value)
-    rank_choices = [('', '全部阶级')] + [(rank, rank) for rank in sorted(ranks)]
-
     # X坐标选择
     x_coords = set()
     for area in areas:
         x_coords.add(area.x_coord)
-    x_choices = [('', '全部X坐标')] + [(x, x) for x in sorted(x_coords)]
+    x_choices = [('', '全部基地')] + [(x, x) for x in sorted(x_coords)]
 
-    # Y坐标选择
-    y_coords = set()
-    for area in areas:
-        y_coords.add(area.y_coord)
-    y_choices = [('', '全部Y坐标')] + [(y, y) for y in sorted(y_coords)]
+    # 时间范围选择（保留“这两天”，新增“今天”和“近7天”）
+    time_choices = [('two_days', '这两天'), ('seven_days', '近7天'), ('today', '今天')]
 
-    # 时间范围选择
-    time_choices = [('two_days', '这两天'), ('now', '现在开始'), ('all', '全部')]
-
-    return {'owner_choices': owner_choices, 'rank_choices': rank_choices, 'x_choices': x_choices, 'y_choices': y_choices, 'time_choices': time_choices}
+    return {'owner_choices': owner_choices, 'x_choices': x_choices, 'time_choices': time_choices}
 
 
 @announcement_bp.route('/')
@@ -168,19 +156,15 @@ def list_announcements():
     # 获取并持久化筛选参数（会话）
     filters = persist_and_restore_filters(
         'announcements_list',
-        allowed_keys=['owner', 'rank', 'x', 'y', 'time'],
+        allowed_keys=['owner', 'x', 'time'],
         default_filters={
             'owner': '',
-            'rank': '',
             'x': '',
-            'y': '',
             'time': 'two_days'
         },
     )
     owner_filter = filters.get('owner') or None
-    rank_filter = filters.get('rank') or None
     x_filter = filters.get('x') or None
-    y_filter = filters.get('y') or None
     time_scope = filters.get('time') or 'two_days'
 
     # 分页参数（当前未使用，为未来分页功能预留）
@@ -202,24 +186,11 @@ def list_announcements():
         except DoesNotExist:
             pass
 
-    if rank_filter:
-        rank_pilots = Pilot.objects(rank=rank_filter)
-        pilot_ids = [pilot.id for pilot in rank_pilots]
-        query = query.filter(pilot__in=pilot_ids)
-
     if x_filter:
         query = query.filter(x_coord=x_filter)
 
-    if y_filter:
-        query = query.filter(y_coord=y_filter)
-
     # 时间筛选
-    if time_scope == 'now':
-        # 现在开始：显示开始时间>=当前本地时间的通告
-        current_local = get_current_local_time()
-        current_utc = local_to_utc(current_local)
-        query = query.filter(start_time__gte=current_utc)
-    elif time_scope == 'two_days':
+    if time_scope == 'two_days':
         # 这两天：昨天+今天+明天（本地时区边界）
         current_local = get_current_local_time()
         today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -227,6 +198,22 @@ def list_announcements():
         day_after_tomorrow_local_start = today_local_start + timedelta(days=2)
         range_start_utc = local_to_utc(yesterday_local_start)
         range_end_utc = local_to_utc(day_after_tomorrow_local_start)
+        query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
+    elif time_scope == 'today':
+        # 今天：本地时区的今天 00:00 到 明天 00:00
+        current_local = get_current_local_time()
+        today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_local_start = today_local_start + timedelta(days=1)
+        range_start_utc = local_to_utc(today_local_start)
+        range_end_utc = local_to_utc(tomorrow_local_start)
+        query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
+    elif time_scope == 'seven_days':
+        # 近7天：今天 00:00 起未来7天（含今天）
+        current_local = get_current_local_time()
+        today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        seven_days_later_local_start = today_local_start + timedelta(days=7)
+        range_start_utc = local_to_utc(today_local_start)
+        range_end_utc = local_to_utc(seven_days_later_local_start)
         query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
 
     # 排序：按通告日（本地GMT+8）升序、同日按机师昵称字典序
@@ -240,9 +227,7 @@ def list_announcements():
     return render_template('announcements/list.html',
                            announcements=announcements,
                            owner_filter=owner_filter,
-                           rank_filter=rank_filter,
                            x_filter=x_filter,
-                           y_filter=y_filter,
                            time_scope=time_scope,
                            **filter_choices)
 

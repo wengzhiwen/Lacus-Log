@@ -17,13 +17,13 @@
                 {% if value and owner_filter == value %}{% set _ = selected_items.append(display) %}{% endif %}
             {% endfor %}
         {% endif %}
-        {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
+        {# 移除阶级筛选显示 #}
         {% if x_filter %}{% set _ = selected_items.append('基地:' + x_filter) %}{% endif %}
-        {% if y_filter %}{% set _ = selected_items.append('场地:' + y_filter) %}{% endif %}
+        {# 移除场地筛选显示 #}
         {% if time_scope %}
             {% if time_scope == 'two_days' %}{% set _ = selected_items.append('这两天') %}
-            {% elif time_scope == 'now' %}{% set _ = selected_items.append('现在开始') %}
-            {% elif time_scope == 'all' %}{% set _ = selected_items.append('全部') %}
+            {% elif time_scope == 'today' %}{% set _ = selected_items.append('今天') %}
+            {% elif time_scope == 'seven_days' %}{% set _ = selected_items.append('近7天') %}
             {% endif %}
         {% endif %}
         {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
@@ -35,7 +35,7 @@
         
         <form class="filter-form is-collapsed" id="filter-form" method="GET">
             <div class="filter-group">
-                <label class="filter-label">所属筛选</label>
+                <label class="filter-label">直属运营</label>
                 <select class="filter-select" name="owner" onchange="this.form.submit()">
                     {% for value, label in owner_choices %}
                     <option value="{{ value }}" {% if owner_filter == value %}selected{% endif %}>{{ label }}</option>
@@ -44,16 +44,7 @@
             </div>
 
             <div class="filter-group">
-                <label class="filter-label">阶级筛选</label>
-                <select class="filter-select" name="rank" onchange="this.form.submit()">
-                    {% for value, label in rank_choices %}
-                    <option value="{{ value }}" {% if rank_filter == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="filter-group">
-                <label class="filter-label">X坐标筛选</label>
+                <label class="filter-label">基地</label>
                 <select class="filter-select" name="x" onchange="this.form.submit()">
                     {% for value, label in x_choices %}
                     <option value="{{ value }}" {% if x_filter == value %}selected{% endif %}>{{ label }}</option>
@@ -62,19 +53,10 @@
             </div>
 
             <div class="filter-group">
-                <label class="filter-label">Y坐标筛选</label>
-                <select class="filter-select" name="y" onchange="this.form.submit()">
-                    {% for value, label in y_choices %}
-                    <option value="{{ value }}" {% if y_filter == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="filter-group">
                 <label class="filter-label">时间</label>
                 <select class="filter-select" name="time" onchange="this.form.submit()">
                     {% for value, label in time_choices %}
-                    <option value="{{ value }}" {% if (time_scope or 'now') == value %}selected{% endif %}>{{ label }}</option>
+                    <option value="{{ value }}" {% if (time_scope or 'two_days') == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
