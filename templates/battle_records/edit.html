@@ -80,6 +80,12 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="duration_hours">播时（小时）：</label>
+                        <input type="number" id="duration_hours" step="0.1" min="0" placeholder="自动计算" inputmode="decimal">
+                        <small class="form-help">仅用于便捷计算结束时间，不会提交</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="end_time" class="required">结束时间：</label>
                         <input type="datetime-local" name="end_time" id="end_time" required
                                value="{{ battle_record.end_time|local_datetime_for_input }}">
@@ -440,6 +446,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializePage();
     updateCharacterCount();
     initializeTimeButtons();
+    initializeDurationHelper();
     
     // 监听备注字符计数
     document.getElementById('notes').addEventListener('input', updateCharacterCount);
@@ -651,6 +658,8 @@ function initializeTimeButtons() {
                 const hours = String(currentTime.getHours()).padStart(2, '0');
                 const mins = String(currentTime.getMinutes()).padStart(2, '0');
                 targetInput.value = `${year}-${month}-${day}T${hours}:${mins}`;
+                // 触发 input 事件以便播时联动计算
+                targetInput.dispatchEvent(new Event('input', { bubbles: true }));
                 
                 // 手动触发验证
                 validateNotesRequired();
@@ -664,6 +673,72 @@ function initializeTimeButtons() {
             }
         });
     });
+}
+
+// 播时便捷输入：与开始/结束时间联动
+function initializeDurationHelper() {
+    const startInput = document.getElementById('start_time');
+    const endInput = document.getElementById('end_time');
+    const durationInput = document.getElementById('duration_hours');
+    if (!startInput || !endInput || !durationInput) return;
+
+    // 工具函数：解析 input 值为 Date（本地时区）
+    function parseLocalDate(val) {
+        if (!val) return null;
+        // Safari 兼容：'YYYY-MM-DDTHH:mm' 直接 new Date() 可按本地解析
+        try { return new Date(val); } catch (e) { return null; }
+    }
+
+    function formatLocalInput(dt) {
+        if (!dt) return '';
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        const H = String(dt.getHours()).padStart(2, '0');
+        const M = String(dt.getMinutes()).padStart(2, '0');
+        return `${y}-${m}-${d}T${H}:${M}`;
+    }
+
+    function roundTo1Decimal(hours) {
+        return Math.round(hours * 10) / 10;
+    }
+
+    function recomputeDurationFromTimes() {
+        const s = parseLocalDate(startInput.value);
+        const e = parseLocalDate(endInput.value);
+        if (!s || !e) { durationInput.value = ''; return; }
+        const ms = e - s;
+        if (isNaN(ms)) { durationInput.value = ''; return; }
+        const hours = ms / (1000 * 60 * 60);
+        durationInput.value = roundTo1Decimal(hours).toFixed(1);
+    }
+
+    function applyDurationToEndTime() {
+        const s = parseLocalDate(startInput.value);
+        if (!s) return;
+        let hours = parseFloat(durationInput.value);
+        if (isNaN(hours) || hours < 0) return;
+        const minsTotal = Math.floor(hours * 60); // 精确到分，秒舍弃
+        const newEnd = new Date(s.getTime());
+        newEnd.setMinutes(newEnd.getMinutes() + minsTotal);
+        endInput.value = formatLocalInput(newEnd);
+        // 与现有校验联动
+        validateNotesRequired();
+        updateSubmitButtonState();
+    }
+
+    // 当开始/结束时间变化（含快捷按钮修改）时，自动计算播时
+    ['input', 'change'].forEach(evt => {
+        startInput.addEventListener(evt, recomputeDurationFromTimes);
+        endInput.addEventListener(evt, recomputeDurationFromTimes);
+    });
+
+    // 当用户修改播时时，联动更新结束时间
+    durationInput.addEventListener('input', applyDurationToEndTime);
+    durationInput.addEventListener('change', applyDurationToEndTime);
+
+    // 页面初次加载，若开始和结束时间都有值，自动计算一次
+    recomputeDurationFromTimes();
 }
 
 // 验证备注必填条件
