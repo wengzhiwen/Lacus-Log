@@ -3,6 +3,12 @@
 
 {% block content %}
 <div class="export-table-container">
+  <div class="back-nav no-print" style="margin-bottom: 10px;">
+    <a class="btn btn-secondary" href="{{ url_for('announcement.export_page') }}">
+      <span>←</span>
+      返回
+    </a>
+  </div>
   <div class="table-header">
     <h1 class="table-title">{{ pilot.nickname }} 通告预定表（{{ month }}月）</h1>
     <div class="pilot-info">
