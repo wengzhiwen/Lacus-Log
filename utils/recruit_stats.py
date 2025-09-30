@@ -41,23 +41,28 @@ def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recru
     )
     interviews = Recruit.objects.filter(interviews_query).count()
 
-    # 试播：当天发生的开播决策数量（新六步制 + 历史兼容）
-    # 新六步制：使用 broadcast_decision_time
-    # 历史兼容：使用 final_decision_time
+    # 试播：当天发生的试播决策数量（新六步制 + 历史兼容）
+    # 新六步制：使用 training_decision_time
+    # 历史兼容：使用 training_decision_time_old
     trials_query = Q(**base_query) & (
-        Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
-        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc)
+        Q(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc)
+        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
     )
     trials = Recruit.objects.filter(trials_query).count()
 
     # 新开播：当天在开播决策中决定招募的数量（不招募不算）
     # 新六步制：使用 broadcast_decision_time 和 broadcast_decision
     # 历史兼容：使用 final_decision_time 和 final_decision
+    # 兼容历史旧枚举值（正式机师/实习机师）
     new_recruits_query = Q(**base_query) & (
         Q(broadcast_decision_time__gte=start_utc,
           broadcast_decision_time__lt=end_utc,
-          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
-        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
+          broadcast_decision__in=[
+              BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD
+          ])
+        | Q(final_decision_time__gte=start_utc,
+            final_decision_time__lt=end_utc,
+            final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
     )
     new_recruits = Recruit.objects.filter(new_recruits_query).count()
 
@@ -189,19 +194,23 @@ def get_recruit_records_for_detail(report_date: datetime, range_param: str, metr
         )
         recruits = Recruit.objects.filter(interviews_query).order_by('-interview_decision_time', '-training_decision_time_old')
     elif metric == 'trials':
-        # 试播：按开播决策时间筛选
+        # 试播：按试播决策时间筛选
         trials_query = Q(**base_query) & (
-            Q(broadcast_decision_time__gte=start_utc, broadcast_decision_time__lt=end_utc)
-            | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc)
+            Q(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc)
+            | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
         )
-        recruits = Recruit.objects.filter(trials_query).order_by('-broadcast_decision_time', '-final_decision_time')
+        recruits = Recruit.objects.filter(trials_query).order_by('-training_decision_time', '-training_decision_time_old')
     elif metric == 'new_recruits':
-        # 新开播：按开播决策时间筛选，且决策为招募
+        # 新开播：按开播决策时间筛选，且决策为招募（兼容历史旧枚举值）
         new_recruits_query = Q(**base_query) & (
             Q(broadcast_decision_time__gte=start_utc,
               broadcast_decision_time__lt=end_utc,
-              broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN])
-            | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
+              broadcast_decision__in=[
+                  BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD
+              ])
+            | Q(final_decision_time__gte=start_utc,
+                final_decision_time__lt=end_utc,
+                final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
         )
         recruits = Recruit.objects.filter(new_recruits_query).order_by('-broadcast_decision_time', '-final_decision_time')
     else:

@@ -33,7 +33,7 @@
                   {% elif metric == 'interviews' %}
                     <div class="start-time">面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
                   {% elif metric == 'trials' %}
-                    <div class="start-time">开播决策：{{ recruit.get_effective_broadcast_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
+                    <div class="start-time">试播决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
                   {% elif metric == 'new_recruits' %}
                     <div class="start-time">开播决策：{{ recruit.get_effective_broadcast_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
                   {% endif %}
