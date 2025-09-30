@@ -10,7 +10,12 @@ from models.announcement import Announcement
 from models.battle_record import BattleRecord
 from models.pilot import Pilot, Rank, Status
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.timezone_helper import (
+    get_current_local_time,
+    get_current_utc_time,
+    local_to_utc,
+    utc_to_local,
+)
 
 logger = get_logger('main')
 
@@ -115,7 +120,14 @@ def home():
     # 计算仪表板数据
     dashboard_data = _calculate_dashboard_data()
 
-    return render_template('index.html', dashboard_data=dashboard_data)
+    # 节日图片仪表显示时间窗口（GMT+8）：
+    # 2025-10-01 00:00 至 2025-10-05 23:59 之间显示
+    now_local = get_current_local_time()
+    start_local = now_local.replace(year=2025, month=10, day=1, hour=0, minute=0, second=0, microsecond=0)
+    end_local = now_local.replace(year=2025, month=10, day=5, hour=23, minute=59, second=59, microsecond=0)
+    show_featured_image = start_local <= now_local <= end_local
+
+    return render_template('index.html', dashboard_data=dashboard_data, show_featured_image=show_featured_image)
 
 
 @main_bp.route('/change-password', methods=['GET', 'POST'])

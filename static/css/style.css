@@ -160,6 +160,58 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   padding: 0;
 }
 
+/* 图片仪表：等比缩放、不变形，圆角与卡片统一 */
+.image-gauge {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  position: relative; /* 供流光覆盖层定位 */
+}
+
+.image-gauge-img {
+  display: block;
+  width: 100%;
+  height: auto; /* 关键：保持比例 */
+  object-fit: contain; /* 防止裁剪，确保不变形 */
+}
+
+/* 轻微流光：节日氛围（不过度） */
+.image-gauge::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 50%;
+  height: 100%;
+  pointer-events: none;
+  background: linear-gradient(120deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(255,255,255,0) 100%
+  );
+  transform: skewX(-18deg);
+  opacity: 0;
+  animation: shimmer-sweep 6s ease-in-out infinite;
+}
+
+@keyframes shimmer-sweep {
+  0% { left: -60%; opacity: 0; }
+  10% { opacity: 0.5; }
+  50% { left: 110%; opacity: 0.18; }
+  100% { left: 110%; opacity: 0; }
+}
+
+/* 轻柔金色光晕：极低强度，避免夸张 */
+.image-gauge {
+  box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.0);
+  animation: soft-glow 10s ease-in-out infinite;
+}
+
+@keyframes soft-glow {
+  0%, 100% { box-shadow: 0 0 6px 0 rgba(255, 215, 0, 0.06); }
+  50% { box-shadow: 0 0 12px 0 rgba(255, 215, 0, 0.10); }
+}
+
 .main-data {
   text-align: center;
   margin-bottom: 20px;

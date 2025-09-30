@@ -4,6 +4,19 @@
 <section class="dashboard">
   <h1 class="title">仪表盘</h1>
   <div class="cards">
+    {% if show_featured_image %}
+    <div class="card" id="featuredImageCard">
+      <div class="card-header">
+        <div class="card-title">请所有运营同学尽量欢度国庆，中秋佳节陪伴主播</div>
+        <div class="card-icon">🌕</div>
+      </div>
+      <div class="card-body">
+        <div class="image-gauge">
+          <img src="{{ url_for('static', filename='1001.jpeg') }}" alt="featured" class="image-gauge-img" />
+        </div>
+      </div>
+    </div>
+    {% endif %}
     <div class="card" id="recruitCard" style="cursor: pointer;">
       <div class="card-header">
         <div class="card-title">招募统计</div>
