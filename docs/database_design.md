@@ -83,7 +83,7 @@
   - `y_coord` 索引
   - `availability` 索引
   - `x_coord + y_coord` 复合索引
-  - `x_coord + y_coord + z_coord` 复合降序索引
+  - `x_coord + y_coord + z_coord` 复合降序索引（`-x_coord/-y_coord/-z_coord`）
 
 ### announcements
 - 字段：
@@ -108,6 +108,9 @@
   - `parent_announcement` 索引
   - `created_by` 索引
   - `start_time` 降序索引
+  - `start_time + duration_hours` 复合索引（提升冲突检查效率）
+  - `pilot + start_time + duration_hours` 复合索引
+  - `battle_area + start_time + duration_hours` 复合索引
 
 ### announcement_change_logs
 - 字段：
@@ -120,6 +123,72 @@
   - `ip_address` 操作IP地址
 - 索引：
   - `announcement_id + change_time` 复合索引（降序）
+  - `user_id` 索引
+  - `change_time` 索引
+
+### battle_records
+- 字段：
+  - `pilot` 关联主播（必填）
+  - `related_announcement` 可选的关联通告
+  - `start_time` 开始时间（UTC）
+  - `end_time` 结束时间（UTC）
+  - `revenue_amount` 流水金额（Decimal，默认0）
+  - `base_salary` 底薪金额（Decimal，默认0）
+  - `x_coord` / `y_coord` / `z_coord` 开播地点快照（线下必填）
+  - `work_mode` 开播方式（线上/线下）
+  - `owner_snapshot` 直属运营快照（ReferenceField User）
+  - `registered_by` 登记人（ReferenceField User）
+  - `notes` 备注
+  - `created_at` / `updated_at`
+- 索引：
+  - `start_time` 索引（时间范围查询）
+  - `start_time + pilot` 复合索引
+  - `start_time + owner_snapshot` 复合索引
+  - `pilot + -start_time` 复合索引（主播业绩查询）
+  - `-start_time + -revenue_amount` 复合索引（列表排序）
+  - `owner_snapshot` 索引
+  - `registered_by` 索引
+  - `related_announcement` 索引
+  - `start_time + pilot + revenue_amount` 复合索引（按月聚合）
+
+### battle_record_change_logs
+- 字段：
+  - `battle_record_id` 关联开播记录ID
+  - `user_id` 操作用户ID
+  - `field_name` 变更字段
+  - `old_value` / `new_value`
+  - `change_time`
+  - `ip_address`
+- 索引：
+  - `battle_record_id + change_time` 复合索引（降序）
+  - `user_id` 索引
+  - `change_time` 索引
+
+### pilot_commissions
+- 字段：
+  - `pilot_id` 关联主播
+  - `adjustment_date` 调整生效日期（UTC）
+  - `commission_rate` 分成比例（0-50）
+  - `remark` 备注
+  - `is_active` 是否有效（软删除标记）
+  - `created_at` / `updated_at`
+- 索引：
+  - `pilot_id + adjustment_date` 复合索引
+  - `pilot_id + is_active` 复合索引（查询当前有效记录）
+  - `adjustment_date` 索引
+  - `is_active` 索引
+  - `-created_at` 索引
+
+### pilot_commission_change_logs
+- 字段：
+  - `commission_id` 关联分成调整记录
+  - `user_id` 操作用户ID
+  - `field_name` 变更字段
+  - `old_value` / `new_value`
+  - `change_time`
+  - `ip_address`
+- 索引：
+  - `commission_id + change_time` 复合索引（降序）
   - `user_id` 索引
   - `change_time` 索引
 
