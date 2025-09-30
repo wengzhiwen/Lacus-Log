@@ -156,6 +156,38 @@ document.addEventListener('DOMContentLoaded', function() {
       window.location.href = '{{ url_for('report.daily_report') }}';
     });
   }
+
+  // 仪表盘入场动画：每次页面加载完成后播放一次
+  try {
+    const cardsContainer = document.querySelector('.dashboard .cards');
+    const cards = document.querySelectorAll('.dashboard .cards .card');
+    if (cardsContainer && cards && cards.length > 0) {
+      // 先设置初始入场状态
+      cards.forEach(function(card) {
+        card.classList.add('flip-enter');
+      });
+
+      // 让浏览器渲染一次再逐个触发动画，形成自上而下的翻卡效果
+      requestAnimationFrame(function() {
+        const baseDelay = 200; // 再放慢节奏
+        cards.forEach(function(card, idx) {
+          setTimeout(function() {
+            // 切换到入场动画
+            card.classList.remove('flip-enter');
+            card.classList.add('flip-in');
+
+            // 动画结束后清理标记类，避免影响悬浮态等样式
+            card.addEventListener('animationend', function handler() {
+              card.classList.remove('flip-in');
+              card.removeEventListener('animationend', handler);
+            });
+          }, idx * baseDelay);
+        });
+      });
+    }
+  } catch (e) {
+    // 保守降级：不影响页面其它功能
+  }
 });
 </script>
 {% endblock %}

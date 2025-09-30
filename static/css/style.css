@@ -137,6 +137,28 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   transform: translateY(-2px);
 }
 
+/* 仪表盘入场翻转动画（沿Y轴，从左向右翻开） */
+.dashboard .cards { 
+  perspective: 1000px; /* 提升3D翻转质感 */
+}
+
+.card.flip-enter {
+  transform: rotateY(90deg);
+  opacity: 0;
+  transform-origin: left;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+@keyframes card-flip-in {
+  from { transform: rotateY(90deg); opacity: 0; }
+  to { transform: rotateY(0); opacity: 1; }
+}
+
+.card.flip-in {
+  animation: card-flip-in 600ms ease-out forwards;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
