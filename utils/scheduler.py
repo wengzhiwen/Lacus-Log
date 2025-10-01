@@ -46,7 +46,11 @@ def init_scheduled_jobs(flask_app) -> None:
 
     recruit_daily_trigger = CronTrigger(hour=16, minute=5, timezone='UTC')
 
-    daily_report_trigger = CronTrigger(hour=16, minute=2, timezone='UTC')
+    # 开播邮件日报：改为每日 GMT+8 12:00 触发（UTC 04:00）
+    daily_report_trigger = CronTrigger(hour=4, minute=0, timezone='UTC')
+
+    # 开播邮件月报：每日 GMT+8 12:02 触发（UTC 04:02），发送“前一自然日所在月”的月报
+    monthly_mail_report_trigger = CronTrigger(hour=4, minute=2, timezone='UTC')
 
     def _next_fire_utc(trigger) -> datetime:
         now_utc = get_current_utc_time()
@@ -87,9 +91,20 @@ def init_scheduled_jobs(flask_app) -> None:
             logger.info('跳过执行：daily_report（计划令牌不存在）')
             return
         with flask_app.app_context():
-            result = run_daily_report_job(triggered_by='scheduler@daily-00:02+08')
+            result = run_daily_report_job(triggered_by='scheduler@daily-12:00+08')
             logger.info('定时任务 run_daily_report_job 完成：%s', result)
         plan_fire('daily_report', _next_fire_utc(daily_report_trigger))
+
+    def run_monthly_mail_report_wrapper():
+        from routes.report_mail import run_monthly_mail_report_job  # type: ignore  # pylint: disable=import-error,no-name-in-module
+        fire_dt_utc = get_current_utc_time().replace(second=0, microsecond=0)
+        if not consume_fire('daily_monthly_mail_report', fire_dt_utc):
+            logger.info('跳过执行：daily_monthly_mail_report（计划令牌不存在）')
+            return
+        with flask_app.app_context():
+            result = run_monthly_mail_report_job(triggered_by='scheduler@daily-12:02+08')
+            logger.info('定时任务 run_monthly_mail_report_job 完成：%s', result)
+        plan_fire('daily_monthly_mail_report', _next_fire_utc(monthly_mail_report_trigger))
 
     sched.add_job(run_unstarted_wrapper, unstarted_trigger, id='daily_unstarted_report', replace_existing=True, max_instances=1)
     try:
@@ -108,6 +123,13 @@ def init_scheduled_jobs(flask_app) -> None:
         plan_fire('daily_report', _next_fire_utc(daily_report_trigger))
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('写入开播日报下一次计划失败：%s', exc)
+
+    # 新增：开播邮件月报（每日发送上一自然日所在月的月报）
+    sched.add_job(run_monthly_mail_report_wrapper, monthly_mail_report_trigger, id='daily_monthly_mail_report', replace_existing=True, max_instances=1)
+    try:
+        plan_fire('daily_monthly_mail_report', _next_fire_utc(monthly_mail_report_trigger))
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('写入开播邮件月报下一次计划失败：%s', exc)
 
     if not sched.running:
         sched.start(paused=False)

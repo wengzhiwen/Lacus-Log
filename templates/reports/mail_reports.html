@@ -57,11 +57,30 @@
   </div>
 </div>
 
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">开播月报（邮件）</h2>
+    <div class="card-icon">📅</div>
+  </div>
+  <div class="card-body">
+    {% if next_times and next_times.monthly_mail_report %}
+    <div class="text-muted" style="margin-bottom:8px;">下次触发（GMT+8）：{{ next_times.monthly_mail_report }}</div>
+    {% endif %}
+    <div class="form-group">
+      <label for="monthlyReportMonth">报表月份：</label>
+      <input type="month" id="monthlyReportMonth" class="form-control" style="margin-bottom: 10px;">
+      <small class="text-muted">留空则发送“前一自然日所在月”的月报</small>
+    </div>
+    <button id="btnMonthlyMailReport" class="btn btn-primary" style="width:100%" type="button" aria-label="触发开播月报邮件发送">开始发送</button>
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const btnUnstarted = document.getElementById('btnUnstarted');
   const btnRecruitDaily = document.getElementById('btnRecruitDaily');
   const btnDailyReport = document.getElementById('btnDailyReport');
+  const btnMonthlyMailReport = document.getElementById('btnMonthlyMailReport');
   const result = document.getElementById('result');
   const csrf = document.getElementById('csrfToken')?.value || '';
 
@@ -154,6 +173,37 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  async function postMonthlyMailReport() {
+    const reportMonth = document.getElementById('monthlyReportMonth').value;
+    result.textContent = '开播月报（邮件）已开始运算...';
+    try {
+      const resp = await fetch("{{ url_for('report_mail.trigger_monthly_mail_report') }}", {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrf
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          report_month: reportMonth || null
+        })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        if (data.sent) {
+          result.textContent = `开播月报（邮件）已触发发送，收件人 ${data.count} 人。`;
+        } else {
+          result.textContent = `开播月报（邮件）发送失败（或未配置收件人）。`;
+        }
+      } else {
+        result.textContent = `开播月报（邮件）触发失败：${data && data.error ? data.error : '未知错误'}`;
+      }
+    } catch (e) {
+      result.textContent = '网络异常或服务器错误。';
+    }
+  }
+
   if (btnUnstarted) {
     btnUnstarted.addEventListener('click', postUnstarted);
   }
@@ -164,6 +214,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (btnDailyReport) {
     btnDailyReport.addEventListener('click', postDailyReport);
+  }
+
+  if (btnMonthlyMailReport) {
+    btnMonthlyMailReport.addEventListener('click', postMonthlyMailReport);
   }
 });
 </script>

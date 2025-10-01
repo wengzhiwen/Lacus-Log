@@ -265,6 +265,103 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
 
 
 
+def _build_monthly_mail_markdown(month_summary, details):
+    """将开播月报数据渲染为Markdown格式（用于邮件）。
+
+    采用精简列，便于邮件阅读。
+    """
+    month_table = """| 指标 | 数值 |
+| --- | ---: |
+| 总主播数量 | {pilot_count} |
+| 累计流水 | ¥{revenue_sum:,.2f} |
+| 累计底薪支出 | ¥{basepay_sum:,.2f} |
+| 累计主播分成 | ¥{pilot_share_sum:,.2f} |
+| 累计公司分成 | ¥{company_share_sum:,.2f} |
+| 运营利润估算 | ¥{operating_profit:,.2f} |""".format(**month_summary)
+
+    if details:
+        # 精简明细列：主播 | 直属运营 | 记录数 | 月均播时 | 月累计流水 | 月累计公司分成 | 月累计返点 | 月累计底薪 | 月累计毛利
+        detail_table = """| 主播 | 直属运营 | 记录数 | 月均播时 | 月累计流水 | 月累计公司分成 | 月累计返点 | 月累计底薪 | 月累计毛利 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"""
+
+        for d in details:
+            row = (f"| {d['pilot_display']} | {d['owner']} | {d['records_count']} | {d['avg_duration']:.1f}小时 | "
+                   f"¥{d['total_revenue']:,.2f} | ¥{d['total_company_share']:,.2f} | "
+                   f"¥{d['rebate_amount']:,.2f} | ¥{d['total_base_salary']:,.2f} | "
+                   f"¥{d['total_profit']:,.2f} |")
+            detail_table += "\n" + row
+    else:
+        detail_table = "暂无月度开播记录"
+
+    return f"""
+{month_table}
+
+
+{detail_table}
+
+"""
+
+
+def run_monthly_mail_report_job(report_month: str = None, triggered_by: str = 'scheduler') -> dict:
+    """执行开播邮件月报发送任务。
+
+    - 默认发送“前一自然日所在月”的月报
+    - 邮件内容参考开播月报并做邮件阅读优化
+    """
+    logger.info('触发开播邮件月报发送，来源：%s，报表月份：%s', triggered_by or '未知', report_month or '昨天所在月')
+
+    if not report_month:
+        now_utc = get_current_utc_time()
+        yesterday_local = utc_to_local(now_utc) - timedelta(days=1)
+        year = yesterday_local.year
+        month = yesterday_local.month
+        month_str = yesterday_local.strftime('%Y-%m')
+    else:
+        try:
+            dt = datetime.strptime(report_month, '%Y-%m')
+            year, month = dt.year, dt.month
+            month_str = report_month
+        except ValueError:
+            logger.error('月份参数格式错误：%s', report_month)
+            return {'sent': False, 'count': 0}
+
+    from routes.report import _calculate_monthly_summary, _calculate_monthly_details
+
+    month_summary = _calculate_monthly_summary(year, month)
+    details = _calculate_monthly_details(year, month)
+
+    md_content = _build_monthly_mail_markdown(month_summary, details)
+
+    full_content = f"""# 开播月报
+
+**报表月份：** {month_str}
+
+{md_content}
+
+---
+*本报表由 Lacus-Log 系统自动生成*
+"""
+
+    recipients = []
+    recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 管理员
+    recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 运营
+
+    if not recipients:
+        logger.error('收件人为空，未找到任何运营或管理员的邮箱')
+        return {'sent': False, 'count': 0}
+
+    recipients = list(set(recipients))
+
+    subject = f"[Lacus-Log] 开播月报 - {month_str}"
+
+    ok = send_email_md(recipients, subject, full_content)
+    if ok:
+        logger.info('开播邮件月报已发送，收件人：%s', ', '.join(recipients))
+        return {'sent': True, 'count': len(recipients)}
+
+    logger.error('开播邮件月报发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
+    return {'sent': False, 'count': len(recipients)}
+
 def _build_unstarted_markdown(items: List[dict]) -> str:
     if not items:
         return ''
@@ -307,13 +404,26 @@ def mail_reports_page():
             fire_dt_utc = datetime.strptime(daily_plan.fire_minute, '%Y%m%d%H%M')
             daily_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
+        monthly_mail_plan = (JobPlan.objects(job_code='daily_monthly_mail_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
+            JobPlan.objects(job_code='daily_monthly_mail_report').order_by('-fire_minute').first())
+        monthly_mail_next_local = None
+        if monthly_mail_plan:
+            fire_dt_utc = datetime.strptime(monthly_mail_plan.fire_minute, '%Y%m%d%H%M')
+            monthly_mail_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
+
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('读取任务下一次触发时间失败：%s', exc)
         unstarted_next_local = None
         recruit_next_local = None
         daily_next_local = None
+        monthly_mail_next_local = None
 
-    next_times = {'unstarted': unstarted_next_local, 'recruit_daily': recruit_next_local, 'daily_report': daily_next_local}
+    next_times = {
+        'unstarted': unstarted_next_local,
+        'recruit_daily': recruit_next_local,
+        'daily_report': daily_next_local,
+        'monthly_mail_report': monthly_mail_next_local
+    }
     return render_template('reports/mail_reports.html', next_times=next_times)
 
 
@@ -437,5 +547,21 @@ def trigger_daily_report():
     report_date = request.json.get('report_date') if request.is_json else None
 
     result = run_daily_report_job(report_date=report_date, triggered_by=username)
+    status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
+    return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
+
+
+@report_mail_bp.route('/mail/monthly-report', methods=['POST'])
+@roles_required('gicho')
+def trigger_monthly_mail_report():
+    """触发开播月报（邮件）发送。
+
+    请求JSON：{"report_month": "YYYY-MM"}，留空则按“前一自然日所在月”。
+    """
+    username = getattr(current_user, 'username', '未知')
+
+    report_month = request.json.get('report_month') if request.is_json else None
+
+    result = run_monthly_mail_report_job(report_month=report_month, triggered_by=username)
     status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
     return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
