@@ -2,12 +2,10 @@
 {% block title %}开播地点管理 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="area-management">
-  <!-- 页面头部 -->
   <div class="page-header">
     <h1 class="page-title">开播地点管理</h1>
   </div>
 
-  <!-- 筛选器（默认折叠） -->
   <div class="filter-bar">
     {% set selected_items = [] %}
     {% if x_filter %}{% set _ = selected_items.append(x_filter) %}{% endif %}
@@ -53,7 +51,6 @@
     </form>
   </div>
 
-  <!-- 区域列表 -->
   <div class="area-list">
     {% if areas and areas|length > 0 %}
       <div class="area-cards">
@@ -91,7 +88,6 @@
   </div>
 </section>
 
-<!-- 底部footbar：新建开播地点按钮 -->
 <div class="footbar">
   <div class="inner">
     <a class="btn btn-primary" href="{{ url_for('battle_area.new_area') }}">
@@ -102,7 +98,7 @@
 </div>
 
 <style>
-/* 卡片列表样式（复用机师列表风格） */
+
 .area-cards { display: block; }
 .area-card {
   display: block;
@@ -127,7 +123,7 @@
 .availability-可用 { color: var(--green); }
 .availability-禁用 { color: var(--error); }
 
-/* 筛选器折叠样式（与机师一致） */
+
 .filter-toggle {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   background: var(--brand); color: #fff; border: none; border-radius: 8px;
@@ -136,7 +132,7 @@
 .filter-form.is-collapsed { display: none; }
 .filter-form { margin-bottom: 12px; }
 
-/* 底部footbar（固定吸附，与机师一致） */
+
 .footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
 .footbar .inner { display: flex; justify-content: center; }
 .container { padding-bottom: 88px; }

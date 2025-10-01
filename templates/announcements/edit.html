@@ -24,7 +24,6 @@
         <form method="POST" id="announcementForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="edit_scope" value="{{ request.args.get('edit_scope', 'this_only') }}"/>
-            <!-- 基础信息 -->
             <div class="form-section">
                 <h3>基础信息</h3>
                 
@@ -35,7 +34,6 @@
                             {{ announcement.pilot.nickname }}{% if announcement.pilot.real_name %} [{{ announcement.pilot.real_name }}]{% endif %}
                             {% if announcement.pilot.owner %} - {{ announcement.pilot.owner.nickname or announcement.pilot.owner.username }}{% else %} - 无所属{% endif %}
                         </div>
-                        <!-- 隐藏字段用于后端处理 -->
                         <input type="hidden" name="pilot" value="{{ announcement.pilot.id }}">
                     </div>
                 </div>
@@ -63,13 +61,11 @@
                         <select name="z_coord" id="z_coord" required>
                             <option value="">请选择坐席</option>
                         </select>
-                        <!-- 隐藏字段用于后端验证 -->
                         <input type="hidden" name="battle_area" id="battle_area" value="{{ announcement.battle_area.id if announcement.battle_area else '' }}">
                     </div>
                 </div>
             </div>
 
-            <!-- 时间信息 -->
             <div class="form-section">
                 <h3>时间信息</h3>
                 
@@ -126,7 +122,6 @@
             </div>
 
             {% if announcement.is_in_recurrence_group %}
-            <!-- 循环事件提示 -->
             <div class="form-section">
                 <div class="repeat-notice">
                     <h4>⚠️ 循环事件编辑说明</h4>
@@ -142,11 +137,9 @@
             </div>
             {% endif %}
 
-            <!-- 表单操作 -->
             <div class="form-actions">
                 <button type="button" id="check_btn" class="btn btn-secondary">检查冲突</button>
                 
-                <!-- 冲突检查结果 -->
                 <div id="conflict_results" class="conflict-section" style="display: none;">
                     <div id="conflict_content"></div>
                 </div>
@@ -491,13 +484,12 @@
 </style>
 
 <script>
-// 初始化坐标选择
 const currentX = '{{ announcement.x_coord }}';
 const currentY = '{{ announcement.y_coord }}';
 const currentBattleAreaId = '{{ announcement.battle_area.id }}';
 const currentPilotId = '{{ announcement.pilot.id }}';
+const EDIT_SCOPE = '{{ request.args.get("edit_scope", "this_only") }}';
 
-// 坐标联动选择
 document.getElementById('x_coord').addEventListener('change', function() {
     const x = this.value;
     const ySelect = document.getElementById('y_coord');
@@ -523,7 +515,6 @@ document.getElementById('x_coord').addEventListener('change', function() {
                         ySelect.appendChild(option);
                     });
                     
-                    // 如果选中了场地，自动加载坐席
                     if (ySelect.value) {
                         ySelect.dispatchEvent(new Event('change'));
                     }
@@ -561,64 +552,56 @@ document.getElementById('y_coord').addEventListener('change', function() {
     }
 });
 
-// 当坐席选择改变时，更新隐藏的battle_area字段
 document.getElementById('z_coord').addEventListener('change', function() {
     const battleAreaInput = document.getElementById('battle_area');
     battleAreaInput.value = this.value;
 });
 
-// 页面加载时初始化坐标选择
 window.addEventListener('load', function() {
     if (currentX) {
         document.getElementById('x_coord').dispatchEvent(new Event('change'));
     }
 });
 
-// 主播字段已改为只读，无需筛选功能
 
-// 冲突检查（与新建页保持一致的展示逻辑）
 document.getElementById('check_btn').addEventListener('click', function() {
     const form = document.getElementById('announcementForm');
     const formData = new FormData(form);
 
-    // 验证必填字段
     const pilot = formData.get('pilot');
     const battleArea = formData.get('battle_area');
     const duration = formData.get('duration_hours');
 
-    // 处理时间输入（根据编辑范围不同）
     let startTime;
-    {% set edit_scope = request.args.get('edit_scope', 'this_only') %}
-    {% if edit_scope == 'future_all' %}
-    const startDate = formData.get('start_date');
-    const startHour = formData.get('start_hour');
-    const startMinute = formData.get('start_minute');
-    if (!startDate || !startHour || !startMinute) {
-        alert('请填写所有必填字段');
-        return;
+    if (EDIT_SCOPE === 'future_all') {
+        const startDate = formData.get('start_date');
+        const startHour = formData.get('start_hour');
+        const startMinute = formData.get('start_minute');
+        if (!startDate || !startHour || !startMinute) {
+            alert('请填写所有必填字段');
+            return;
+        }
+        startTime = startDate + 'T' + startHour + ':' + startMinute;
+    } else {
+        startTime = formData.get('start_time');
+        if (!startTime) {
+            alert('请填写所有必填字段');
+            return;
+        }
     }
-    startTime = startDate + 'T' + startHour + ':' + startMinute;
-    {% else %}
-    startTime = formData.get('start_time');
-    if (!startTime) {
-        alert('请填写所有必填字段');
-        return;
-    }
-    {% endif %}
 
     if (!pilot || !battleArea || !duration) {
         alert('请填写所有必填字段');
         return;
     }
 
-    // 发送冲突检查请求
     const checkData = {
         pilot_id: pilot,
         battle_area_id: battleArea,
         start_time: startTime,
         duration_hours: parseFloat(duration),
         exclude_id: '{{ announcement.id }}',
-        edit_scope: '{{ request.args.get("edit_scope", "this_only") }}'
+        edit_scope: EDIT_SCOPE
     };
 
     fetch('/announcements/check-conflicts', {
@@ -651,7 +634,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
                 contentDiv.innerHTML = html;
                 document.getElementById('submit_btn').disabled = true;
             } else {
-                // 无冲突时显示所有计划实例
                 let html = '<div class="no-conflicts">✓ 检查通过，无冲突</div>';
                 html += '<h3>计划详情</h3>';
 
@@ -690,7 +672,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
     });
 });
 
-// 表单提交前再次检查
 document.getElementById('announcementForm').addEventListener('submit', function(e) {
     const submitBtn = document.getElementById('submit_btn');
     if (submitBtn.disabled) {
@@ -699,27 +680,24 @@ document.getElementById('announcementForm').addEventListener('submit', function(
         return;
     }
 
-    // 编辑未来所有循环时的额外验证
-    {% set edit_scope = request.args.get('edit_scope', 'this_only') %}
-    {% if edit_scope == 'future_all' %}
-    const startDateInput = document.getElementById('start_date');
-    const startHourInput = document.getElementById('start_hour');
-    const startMinuteInput = document.getElementById('start_minute');
-    
-    if (!startDateInput.value || !startHourInput.value || !startMinuteInput.value) {
-        e.preventDefault();
-        alert('请填写完整的日期和时间信息');
-        return;
+    if (EDIT_SCOPE === 'future_all') {
+        const startDateInput = document.getElementById('start_date');
+        const startHourInput = document.getElementById('start_hour');
+        const startMinuteInput = document.getElementById('start_minute');
+        
+        if (!startDateInput.value || !startHourInput.value || !startMinuteInput.value) {
+            e.preventDefault();
+            alert('请填写完整的日期和时间信息');
+            return;
+        }
+        
+        const originalDate = '{{ announcement.start_time | local_date_for_input }}';
+        if (startDateInput.value !== originalDate) {
+            e.preventDefault();
+            alert('编辑未来所有循环时，日期不可修改');
+            return;
+        }
     }
-    
-    // 确保日期部分没有被修改（通过比较原始值）
-    const originalDate = '{{ announcement.start_time | local_date_for_input }}';
-    if (startDateInput.value !== originalDate) {
-        e.preventDefault();
-        alert('编辑未来所有循环时，日期不可修改');
-        return;
-    }
-    {% endif %}
 });
 </script>
 {% endblock %}

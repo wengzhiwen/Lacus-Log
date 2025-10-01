@@ -4,7 +4,6 @@
 
 {% block content %}
 <section class="commission-management">
-  <!-- 页面头部 -->
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">主播分成管理 - {{ pilot.nickname }}</h1>
@@ -15,7 +14,6 @@
     </div>
   </div>
 
-  <!-- 当前分成信息卡片 -->
   <div class="commission-info-card">
     <div class="card-header">
       <h3 class="card-title">当前分成信息</h3>
@@ -59,7 +57,6 @@
     </div>
   </div>
 
-  <!-- 操作区域 -->
   <div class="action-section">
     <div class="action-header">
       <h3 class="section-title">分成调整记录</h3>
@@ -70,7 +67,6 @@
     </div>
   </div>
 
-  <!-- 调整记录列表 -->
   <div class="records-section">
     {% if commissions %}
       <div class="records-list">
@@ -125,7 +121,6 @@
   </div>
 </section>
 
-<!-- 变更记录模态框 -->
 <div id="changesModal" class="modal" style="display: none;">
   <div class="modal-content">
     <div class="modal-header">
@@ -144,7 +139,7 @@
 </div>
 
 <style>
-/* 分成管理页面样式 */
+
 .commission-management {
   max-width: 800px;
   margin: 0 auto;
@@ -387,7 +382,7 @@
   color: #666666;
 }
 
-/* 模态框样式 */
+
 .modal {
   position: fixed;
   top: 0;
@@ -457,7 +452,7 @@
   padding: 20px;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
@@ -497,7 +492,6 @@
 function showChanges(commissionId) {
   document.getElementById('changesModal').style.display = 'flex';
   
-  // 加载变更记录
   fetch("{{ url_for('pilot.pilot_commission_changes', pilot_id=pilot.id, commission_id='PLACEHOLDER') }}".replace('PLACEHOLDER', commissionId))
     .then(response => response.json())
     .then(data => {
@@ -540,7 +534,6 @@ function hideChangesModal() {
   document.getElementById('changesModal').style.display = 'none';
 }
 
-// 点击模态框外部关闭
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('modal')) {
     e.target.style.display = 'none';

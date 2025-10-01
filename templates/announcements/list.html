@@ -4,12 +4,10 @@
 
 {% block content %}
 <section class="announcement-management">
-    <!-- 页面头部 -->
     <div class="page-header">
         <h1 class="page-title">通告管理</h1>
     </div>
 
-    <!-- 筛选器（默认折叠） -->
     <div class="filter-bar">
         {% set selected_items = [] %}
         {% if owner_filter %}
@@ -17,9 +15,7 @@
                 {% if value and owner_filter == value %}{% set _ = selected_items.append(display) %}{% endif %}
             {% endfor %}
         {% endif %}
-        {# 移除阶级筛选显示 #}
         {% if x_filter %}{% set _ = selected_items.append('基地:' + x_filter) %}{% endif %}
-        {# 移除场地筛选显示 #}
         {% if time_scope %}
             {% if time_scope == 'two_days' %}{% set _ = selected_items.append('这两天') %}
             {% elif time_scope == 'today' %}{% set _ = selected_items.append('今天') %}
@@ -63,7 +59,6 @@
         </form>
     </div>
 
-    <!-- 搜索框（与机师管理一致的UI） -->
     <div class="search-bar">
         <div class="search-input-group">
             <input type="text" id="announcement-pilot-search" class="search-input" placeholder="搜索主播昵称或真实姓名..." />
@@ -73,10 +68,8 @@
         </div>
     </div>
 
-    <!-- 通告列表 -->
     <div class="announcement-list">
         {% if announcements %}
-            <!-- 通告卡片列表 -->
             <div class="announcement-cards">
                 {% for announcement in announcements %}
                 <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}" class="announcement-card">
@@ -136,7 +129,6 @@
     </div>
 </section>
 
-<!-- 底部footbar：新建通告按钮 + 通告清理按钮 -->
 <div class="footbar">
     <div class="inner">
         <a class="btn btn-primary" href="{{ url_for('announcement.new_announcement') }}">
@@ -150,9 +142,9 @@
 </div>
 
 <style>
-/* 通告管理页面样式 - 符合基础-UI风格规范 */
 
-/* 筛选器折叠样式 */
+
+
 .filter-toggle {
     width: 100%;
     display: flex;
@@ -168,7 +160,7 @@
     cursor: pointer;
 }
 
-/* 搜索框样式（复用机师管理样式） */
+
 .search-bar {
     margin-bottom: 16px;
 }
@@ -247,7 +239,7 @@
     gap: 10px;
 }
 
-/* 通告卡片样式 */
+
 .announcement-cards {
     display: block;
 }
@@ -413,7 +405,7 @@
     color: var(--text);
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
     .filter-form {
         grid-template-columns: repeat(2, 1fr);
@@ -449,7 +441,7 @@
 </style>
 
 <style>
-/* 底部footbar（固定吸附） */
+
 .footbar {
     position: fixed;
     bottom: 0;
@@ -494,7 +486,6 @@ document.addEventListener('DOMContentLoaded', function () {
     initAnnouncementSearch();
 });
 
-// 纯前端搜索：按机师昵称与真实姓名过滤通告卡片
 let allAnnouncements = [];
 
 function performAnnouncementSearch() {
@@ -543,7 +534,6 @@ function updateAnnouncementEmptyState(hasResults) {
 }
 
 function initAnnouncementSearch() {
-    // 收集所有通告卡片中的机师昵称与真实姓名
     const cards = document.querySelectorAll('.announcement-card');
     allAnnouncements = Array.from(cards).map(card => {
         const nicknameEl = card.querySelector('.pilot-name');

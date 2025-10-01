@@ -13,7 +13,6 @@
 
   <h1 class="title">预约开播</h1>
 
-  <!-- 机师信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -42,7 +41,6 @@
     </div>
   </div>
 
-  <!-- 预约开播表单 -->
   <form method="POST" action="{{ url_for('recruit.schedule_broadcast', recruit_id=recruit.id) }}" class="recruit-form" id="schedule-broadcast-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
@@ -82,7 +80,6 @@
   </form>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
   <button type="submit" form="schedule-broadcast-form" class="btn btn-primary">确认预约</button>

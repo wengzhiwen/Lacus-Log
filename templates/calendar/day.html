@@ -18,7 +18,6 @@
   </div>
 
   <div class="day-calendar">
-    <!-- 时间标题行 -->
     <div class="time-header-row">
       <div class="area-header">开播地点</div>
       <div class="time-header-scroll">
@@ -51,9 +50,7 @@
       </div>
     </div>
     
-    <!-- 数据行容器 -->
     <div id="dataRows" class="data-rows">
-      <!-- 动态生成数据行 -->
     </div>
   </div>
 
@@ -65,7 +62,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // 从URL参数获取日期，或使用当前日期
   const urlParams = new URLSearchParams(window.location.search);
   let currentDateStr = urlParams.get('date') || new Date().toISOString().split('T')[0];
   let currentDate = new Date(currentDateStr + 'T00:00:00');
@@ -120,16 +116,13 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    // 按区域排序
     const sortedAreas = Object.keys(data.area_timelines).sort((a, b) => {
       const [x1, y1, z1] = a.split('-');
       const [x2, y2, z2] = b.split('-');
       
-      // 按基地, 场地, 坐席排序
       if (x1 !== x2) return x1.localeCompare(x2);
       if (y1 !== y2) return y1.localeCompare(y2);
       
-      // 坐席数值排序
       const z1Num = parseFloat(z1);
       const z2Num = parseFloat(z2);
       
@@ -140,28 +133,23 @@ document.addEventListener('DOMContentLoaded', function() {
       return z1.localeCompare(z2);
     });
     
-    // 为每个有计划的区域创建一行
     sortedAreas.forEach(areaKey => {
       const timeline = data.area_timelines[areaKey];
       
-      // 创建行容器
       const rowEl = document.createElement('div');
       rowEl.className = 'data-row';
       
-      // 左侧固定区域标签
       const areaLabelEl = document.createElement('div');
       areaLabelEl.className = 'area-cell';
       areaLabelEl.textContent = timeline.area_display;
       rowEl.appendChild(areaLabelEl);
       
-      // 右侧可滚动的时间内容
       const contentScrollEl = document.createElement('div');
       contentScrollEl.className = 'content-scroll';
       
       const timelineEl = document.createElement('div');
       timelineEl.className = 'timeline-grid';
       
-      // 为该区域的每个通告计划创建元素
       timeline.slots.forEach(slotData => {
         const slotEl = document.createElement('div');
         slotEl.className = 'time-slot-item occupied';
@@ -170,9 +158,8 @@ document.addEventListener('DOMContentLoaded', function() {
           slotEl.classList.add('own-slot');
         }
         
-        // 设置grid位置和跨度
-        slotEl.style.gridColumnStart = slotData.start_hour + 1; // CSS grid从1开始
-        slotEl.style.gridColumnEnd = slotData.end_hour + 2; // 结束位置+1
+        slotEl.style.gridColumnStart = slotData.start_hour + 1;
+        slotEl.style.gridColumnEnd = slotData.end_hour + 2;
         
         slotEl.innerHTML = `
           <div class="slot-content" data-announcement-id="${slotData.id}">
@@ -181,7 +168,6 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         `;
         
-        // 点击跳转到详情页
         slotEl.addEventListener('click', function() {
           const currentDate = new URLSearchParams(window.location.search).get('date') || formatDate(new Date());
           window.location.href = `{{ url_for('announcement.announcement_detail', announcement_id='PLACEHOLDER') }}?from=calendar&date=${currentDate}`.replace('PLACEHOLDER', slotData.id);
@@ -195,7 +181,6 @@ document.addEventListener('DOMContentLoaded', function() {
       dataRowsEl.appendChild(rowEl);
     });
     
-    // 设置滚动同步
     setupScrollSync();
   }
 
@@ -203,7 +188,6 @@ document.addEventListener('DOMContentLoaded', function() {
     currentDate.setDate(currentDate.getDate() + offset);
     currentDateStr = formatDate(currentDate);
     
-    // 更新URL参数
     const url = new URL(window.location);
     url.searchParams.set('date', currentDateStr);
     window.history.replaceState({}, '', url);
@@ -212,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDayData();
   }
 
-  // 事件监听
   document.getElementById('prevDay').addEventListener('click', function() {
     navigateDay(-1);
   });
@@ -221,7 +204,6 @@ document.addEventListener('DOMContentLoaded', function() {
     navigateDay(1);
   });
 
-  // 设置滚动同步
   function setupScrollSync() {
     const timeHeaderScroll = document.querySelector('.time-header-scroll');
     const contentScrolls = document.querySelectorAll('.content-scroll');
@@ -230,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let isScrolling = false;
     
-    // 时间标题滚动时同步所有内容行
     timeHeaderScroll.addEventListener('scroll', function() {
       if (isScrolling) return;
       isScrolling = true;
@@ -241,7 +222,6 @@ document.addEventListener('DOMContentLoaded', function() {
       setTimeout(() => { isScrolling = false; }, 10);
     });
     
-    // 任一内容行滚动时同步时间标题和其他内容行
     contentScrolls.forEach(contentScroll => {
       contentScroll.addEventListener('scroll', function() {
         if (isScrolling) return;
@@ -258,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // 初始化
   updateDayTitle();
   loadDayData();
 });

@@ -13,7 +13,6 @@
 
   <h1 class="title">开播决策</h1>
 
-  <!-- 机师信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -42,7 +41,6 @@
     </div>
   </div>
 
-  <!-- 开播决策表单 -->
   <form method="POST" action="{{ url_for('recruit.broadcast_decision', recruit_id=recruit.id) }}" class="recruit-form" id="broadcast-decision-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
@@ -70,7 +68,6 @@
       </div>
     </div>
 
-    <!-- 主播分配信息（当选择正式主播或实习主播时显示） -->
     <div class="form-section" id="pilot-assignment-info" style="display: none;">
       <h3 class="section-title">主播分配信息</h3>
       <div class="info-notice">
@@ -120,7 +117,6 @@
   </form>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
   <button type="submit" form="broadcast-decision-form" class="btn btn-primary">确认决策</button>
@@ -133,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const ownerSelect = document.getElementById('owner');
     const platformSelect = document.getElementById('platform');
     
-    // 监听开播决策变化
     broadcastDecision.addEventListener('change', function() {
         if (this.value === '正式主播' || this.value === '实习主播') {
             pilotAssignmentInfo.style.display = 'block';
@@ -146,7 +141,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 表单提交
     const form = document.getElementById('broadcast-decision-form');
     form.addEventListener('submit', function(e) {
         const decision = broadcastDecision.value;

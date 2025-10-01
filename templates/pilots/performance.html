@@ -5,7 +5,6 @@
 {% block content %}
 <div class="page-header">
   <div class="header-content">
-    <!-- 返回按钮 -->
     <div class="back-nav">
       {% set from_param = request.args.get('from') %}
       {% if from_param == 'daily_report' %}
@@ -43,7 +42,6 @@
   </div>
 </div>
 
-<!-- 主播基本信息（压缩高度） -->
 <div class="pilot-header">
   <div class="pilot-basic-info">
     <div class="pilot-name">
@@ -64,9 +62,7 @@
   </div>
 </div>
 
-<!-- 统计卡片区域 -->
 <div class="stats-section">
-  <!-- 本月统计 -->
   <div class="summary-section">
     <h2 class="section-title">本月统计（全月 / 月初至报表日）</h2>
     <div class="summary-cards">
@@ -105,7 +101,6 @@
     </div>
   </div>
 
-  <!-- 统计说明提示 -->
   <div class="stats-notice">
     <div class="notice-content">
       <div class="notice-icon">ℹ️</div>
@@ -115,7 +110,6 @@
     </div>
   </div>
 
-  <!-- 近7日统计 -->
   <div class="summary-section">
     <h2 class="section-title">近7日统计</h2>
     <div class="summary-cards">
@@ -150,7 +144,6 @@
     </div>
   </div>
 
-  <!-- 近3日统计 -->
   <div class="summary-section">
     <h2 class="section-title">近3日统计</h2>
     <div class="summary-cards">
@@ -186,7 +179,6 @@
   </div>
 </div>
 
-<!-- 最近开播记录 -->
 <div class="summary-section">
   <h2 class="section-title">最近开播记录</h2>
   {% if recent_records %}
@@ -224,7 +216,7 @@
 </div>
 
 <style>
-/* 页面头部样式 */
+
 .page-header {
   margin-bottom: 20px;
 }
@@ -235,7 +227,7 @@
   gap: 16px;
 }
 
-/* 返回按钮样式 */
+
 .back-nav {
   flex-shrink: 0;
 }
@@ -265,13 +257,13 @@
   font-weight: bold;
 }
 
-/* 页面标题样式 */
+
 .page-title {
   margin: 0;
   flex: 1;
 }
 
-/* 主播基本信息样式（压缩高度） */
+
 .pilot-header {
   background: #fff;
   border-radius: 8px;
@@ -321,12 +313,12 @@
   content: " ";
 }
 
-/* 统计卡片样式（与开播日报保持一致） */
+
 .stats-section {
   margin-bottom: 30px;
 }
 
-/* 统计说明提示样式 */
+
 .stats-notice {
   background: #e3f2fd;
   border: 1px solid #bbdefb;
@@ -411,7 +403,7 @@
   margin-top: 4px;
 }
 
-/* 开播记录卡片样式 */
+
 .record-cards {
   padding: 0;
 }
@@ -533,7 +525,7 @@
   margin-bottom: 8px;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;

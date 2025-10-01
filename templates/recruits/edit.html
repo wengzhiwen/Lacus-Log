@@ -11,7 +11,6 @@
 
   <h1 class="title">编辑招募</h1>
 
-  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -40,7 +39,6 @@
     </div>
   </div>
 
-  <!-- 招募表单 -->
   <form method="POST" action="{{ url_for('recruit.update_recruit', recruit_id=recruit.id) }}" class="recruit-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
@@ -97,10 +95,8 @@
         </div>
       </div>
 
-      {# 按状态逐步开放可编辑字段 #}
       {% set effective_status = recruit.get_effective_status().value %}
 
-      {# 待试播及之后：允许编辑预约试播时间 #}
       {% if effective_status in ['待试播', '待预约开播', '待开播'] %}
       <div class="form-row">
         <div class="form-group">
@@ -114,7 +110,6 @@
       </div>
       {% endif %}
 
-      {# 待开播：允许编辑预约开播时间 #}
       {% if effective_status in ['待开播'] %}
       <div class="form-row">
         <div class="form-group">
@@ -151,7 +146,6 @@
   </form>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
   {% if recruit.get_effective_status().value == '已结束' %}
@@ -364,7 +358,6 @@
 </style>
 
 <script>
-// 设置表单的id属性以便footbar按钮可以提交
 document.querySelector('.recruit-form').setAttribute('id', 'recruit_form');
 </script>
 {% endblock %}

@@ -2,7 +2,6 @@
 {% block title %}用户管理 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="user-management">
-  <!-- 页面头部 -->
   <div class="page-header">
     <h1 class="page-title">用户管理</h1>
     <a class="btn btn-primary" href="{{ url_for('admin.users_new') }}">
@@ -11,7 +10,6 @@
     </a>
   </div>
 
-  <!-- 筛选器 -->
   <div class="filter-bar">
     <form class="filter-form" method="get">
       <div class="filter-group">
@@ -25,10 +23,8 @@
     </form>
   </div>
 
-  <!-- 用户列表 -->
   <div class="user-list">
     {% if users %}
-      <!-- 用户卡片列表 -->
       <div class="user-cards">
         {% for u in users %}
         <a href="{{ url_for('admin.users_detail', user_id=(u.id|string)) }}" class="user-card">

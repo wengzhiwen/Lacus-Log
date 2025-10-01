@@ -11,12 +11,10 @@
   </div>
 
 <section class="battle-record-detail">
-  <!-- 页面头部 -->
   <div class="page-header">
     <h1 class="page-title">开播记录详情</h1>
   </div>
 
-  <!-- 开播记录信息 -->
   <div class="detail-card">
     <div class="card-section">
       <h3 class="section-title">基本信息</h3>
@@ -141,7 +139,6 @@
   </div>
 </section>
 
-<!-- 底部footbar：操作按钮 -->
 <div class="footbar">
   <div class="inner">
     <a class="btn btn-secondary" href="{{ url_for('battle_record.edit_battle_record', record_id=battle_record.id|string) }}">
@@ -159,7 +156,6 @@
   </div>
 </div>
 
-<!-- 变更记录弹窗 -->
 <div id="changeLogModal" class="modal" style="display: none;">
   <div class="modal-content">
     <div class="modal-header">
@@ -172,7 +168,6 @@
   </div>
 </div>
 
-<!-- 删除确认弹窗 -->
 <div id="deleteModal" class="modal" style="display: none;">
   <div class="modal-content">
     <div class="modal-header">
@@ -192,7 +187,7 @@
 </div>
 
 <style>
-/* 详情卡片样式 */
+
 .detail-card {
   background: #fff;
   border-radius: 8px;
@@ -298,7 +293,7 @@
   border: 1px solid var(--table-header);
 }
 
-/* 底部footbar */
+
 .footbar {
   position: fixed;
   bottom: 0;
@@ -321,7 +316,7 @@
   padding-bottom: 88px;
 }
 
-/* 弹窗样式 */
+
 .modal {
   position: fixed;
   top: 0;
@@ -415,13 +410,13 @@
   padding: 20px;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .detail-grid {
     grid-template-columns: 1fr;
   }
 
-  /* 面包屑导航样式 */
+  
   .header {
     margin-bottom: 30px;
     padding-bottom: 15px;
@@ -509,7 +504,6 @@ function hideDeleteModal() {
   document.getElementById('deleteModal').style.display = 'none';
 }
 
-// 点击模态框背景关闭
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('modal')) {
     e.target.style.display = 'none';

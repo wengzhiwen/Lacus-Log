@@ -28,7 +28,6 @@
       <div class="weekday">日</div>
     </div>
     <div id="calendarGrid" class="calendar-grid">
-      <!-- 动态生成日期格子 -->
     </div>
   </div>
 
@@ -48,7 +47,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const calendarGridEl = document.getElementById('calendarGrid');
   const loadingEl = document.getElementById('loading');
   
-  // 月份名称
   const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', 
                      '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
@@ -80,18 +78,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const firstDay = new Date(currentYear, currentMonth - 1, 1);
     const lastDay = new Date(currentYear, currentMonth, 0);
     const daysInMonth = lastDay.getDate();
-    const startWeekday = firstDay.getDay() === 0 ? 7 : firstDay.getDay(); // 转换为周一=1的格式
+    const startWeekday = firstDay.getDay() === 0 ? 7 : firstDay.getDay();
 
     calendarGridEl.innerHTML = '';
 
-    // 添加上个月的空白天数
     for (let i = 1; i < startWeekday; i++) {
       const emptyDay = document.createElement('div');
       emptyDay.className = 'calendar-day empty';
       calendarGridEl.appendChild(emptyDay);
     }
 
-    // 添加本月的日期
     const today = new Date();
     const todayStr = today.getFullYear() === currentYear && 
                     today.getMonth() + 1 === currentMonth ? 
@@ -113,7 +109,6 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="day-count">${count > 0 ? count + '通告' : ''}</div>
       `;
 
-      // 点击跳转到日视图
       dayEl.addEventListener('click', function() {
         window.location.href = `{{ url_for('calendar.day_view') }}?date=${dateStr}`;
       });
@@ -122,7 +117,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // 事件监听
   document.getElementById('prevMonth').addEventListener('click', function() {
     currentMonth--;
     if (currentMonth < 1) {
@@ -143,7 +137,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadMonthData();
   });
 
-  // 初始化
   updateMonthTitle();
   loadMonthData();
 });

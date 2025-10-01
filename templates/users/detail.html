@@ -2,14 +2,12 @@
 {% block title %}用户详情 - {{ user.username }} - Lacus-Log{% endblock %}
 {% block content %}
 <section class="user-detail">
-  <!-- 返回按钮 -->
   <div class="back-nav">
     <a href="{{ url_for('admin.users_list') }}" class="btn btn-secondary">
       ← 返回用户列表
     </a>
   </div>
 
-  <!-- 用户信息卡片 -->
   <div class="user-info-card">
     <div class="card-header">
       <div class="user-avatar">
@@ -67,7 +65,6 @@
     </div>
   </div>
 
-  <!-- 操作按钮 -->
   <div class="action-section">
     <h2 class="section-title">用户操作</h2>
     <div class="action-buttons">
@@ -88,7 +85,6 @@
     </div>
   </div>
 
-  <!-- 登录历史 -->
   {% if user.last_login_at %}
   <div class="login-history">
     <h2 class="section-title">登录信息</h2>

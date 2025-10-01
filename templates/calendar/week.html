@@ -19,7 +19,6 @@
 
   <div class="week-calendar">
     <div id="weekGrid" class="week-grid">
-      <!-- 动态生成周视图 -->
     </div>
   </div>
 
@@ -40,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function getWeekStart(date) {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = d.getDate() - (day === 0 ? 6 : day - 1); // 周一为一周的开始
+    const diff = d.getDate() - (day === 0 ? 6 : day - 1);
     return new Date(d.setDate(diff));
   }
 
@@ -85,7 +84,6 @@ document.addEventListener('DOMContentLoaded', function() {
   function renderWeek(data) {
     weekGridEl.innerHTML = '';
 
-    // 按日期顺序遍历一周
     const weekStart = new Date(data.week_start);
     for (let i = 0; i < 7; i++) {
       const currentDay = new Date(weekStart);
@@ -120,7 +118,6 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       `;
 
-      // 点击跳转到日视图
       dayEl.addEventListener('click', function() {
         window.location.href = `{{ url_for('calendar.day_view') }}?date=${dateKey}`;
       });
@@ -129,7 +126,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // 事件监听
   document.getElementById('prevWeek').addEventListener('click', function() {
     currentDate.setDate(currentDate.getDate() - 7);
     const weekStart = getWeekStart(currentDate);
@@ -144,7 +140,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadWeekData();
   });
 
-  // 初始化
   const weekStart = getWeekStart(currentDate);
   updateWeekTitle(weekStart);
   loadWeekData();

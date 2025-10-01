@@ -2,12 +2,10 @@
 {% block title %}主播招募 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="recruits-list">
-  <!-- 页面头部对齐开播记录样式 -->
   <div class="page-header">
     <h1 class="page-title">主播招募</h1>
   </div>
 
-  <!-- 筛选器（默认折叠，样式对齐作战记录） -->
   <div class="filter-bar">
     {% set selected_items = [] %}
     {% if current_status %}{% set _ = selected_items.append('状态:' + current_status) %}{% endif %}
@@ -32,7 +30,6 @@
     </form>
   </div>
 
-  <!-- 快速跳转按钮组 -->
   <div class="quick-nav" id="quick-nav">
     {% if grouped_recruits.pending_interview %}
     <button class="quick-nav-btn" onclick="scrollToGroup('pending-interview')">待面试</button>
@@ -57,7 +54,6 @@
     {% endif %}
   </div>
 
-  <!-- 招募列表（分组显示） -->
   <div class="recruit-groups">
     {% if grouped_recruits.pending_interview %}
     <div class="recruit-group" id="pending-interview">
@@ -277,7 +273,6 @@
     {% endif %}
   </div>
 
-  <!-- 空状态 -->
   {% if not grouped_recruits.pending_interview and not grouped_recruits.pending_training_schedule and not grouped_recruits.pending_training and not grouped_recruits.pending_broadcast_schedule and not grouped_recruits.pending_broadcast and not grouped_recruits.overdue and not grouped_recruits.ended %}
       <div class="empty-state">
         <div class="empty-icon">📋</div>
@@ -299,14 +294,13 @@
       </div>
     {% endif %}
 
-  <!-- 浮动回到顶部按钮 -->
   <button class="floating-back-to-top" id="floating-back-to-top" onclick="scrollToTop()" style="display: none;">
     ↑
   </button>
 </section>
 
 <style>
-/* 过滤条与按钮（对齐作战记录） */
+
 .filter-toggle {
   width: 100%;
   display: flex;
@@ -329,7 +323,7 @@
 .filter-label { font-size: 14px; color: var(--text); display: block; margin-bottom: 4px; }
 .filter-select { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--table-header); background: #fff; }
 
-/* 快速跳转按钮组 */
+
 .quick-nav {
   display: flex;
   flex-wrap: wrap;
@@ -358,7 +352,7 @@
   border-color: var(--brand);
 }
 
-/* 分组标题 */
+
 .recruit-groups {
   margin-bottom: 20px;
 }
@@ -376,7 +370,7 @@
   border-bottom: 2px solid var(--brand);
 }
 
-/* 卡片列表（对齐作战记录） */
+
 .record-cards { display: block; }
 .record-card {
   display: block;
@@ -425,7 +419,7 @@
 .record-card .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 12px; }
 .record-card:hover .card-arrow { color: var(--brand); }
 
-/* 浮动回到顶部按钮 */
+
 .floating-back-to-top {
   position: fixed;
   bottom: 20px;
@@ -456,7 +450,7 @@
 .empty-description { color: var(--muted); line-height: 1.5; margin-bottom: 24px; }
 .empty-actions { display: flex; justify-content: center; gap: 12px; }
 
-/* 移动端适配（对齐作战记录） */
+
 @media (max-width: 768px) {
   .filter-form {
     display: grid;
@@ -518,7 +512,6 @@ document.addEventListener('DOMContentLoaded', function () {
   const floatingBtn = document.getElementById('floating-back-to-top');
   const quickNav = document.getElementById('quick-nav');
 
-  // 初始化筛选器状态
   if (!hasQuery) {
     if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
     icon.textContent = '▼';
@@ -527,13 +520,11 @@ document.addEventListener('DOMContentLoaded', function () {
     icon.textContent = '▲';
   }
 
-  // 监听滚动事件，控制浮动按钮显示
   function handleScroll() {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const quickNavRect = quickNav.getBoundingClientRect();
     const quickNavBottom = quickNavRect.bottom + scrollTop;
     
-    // 当快速跳转按钮不可见时显示浮动按钮
     if (scrollTop > quickNavBottom) {
       floatingBtn.style.display = 'block';
     } else {
@@ -541,10 +532,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  // 添加滚动监听器
   window.addEventListener('scroll', handleScroll);
   
-  // 初始化时检查一次
   handleScroll();
 });
 </script>

@@ -4,7 +4,6 @@
 
 {% block content %}
 <section class="commission-form">
-  <!-- 页面头部 -->
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">新增分成调整记录 - {{ pilot.nickname }}</h1>
@@ -15,7 +14,6 @@
     </div>
   </div>
 
-  <!-- 表单卡片 -->
   <div class="form-card">
     <div class="card-header">
       <h3 class="card-title">调整记录信息</h3>
@@ -48,7 +46,6 @@
           <div class="form-help">可选，用于记录调整原因或相关说明</div>
         </div>
 
-        <!-- 分成计算预览 -->
         <div class="preview-section">
           <h4 class="preview-title">分成计算预览</h4>
           <div class="preview-card">
@@ -84,7 +81,7 @@
 </section>
 
 <style>
-/* 新增分成调整记录页面样式 */
+
 .commission-form {
   max-width: 600px;
   margin: 0 auto;
@@ -274,7 +271,7 @@
   border-top: 1px solid #A9A9A9;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
@@ -298,7 +295,6 @@
 </style>
 
 <script>
-// 实时计算分成预览
 function updatePreview() {
   const rate = parseFloat(document.getElementById('commission_rate').value);
   if (isNaN(rate) || rate < 0 || rate > 50) {
@@ -309,29 +305,23 @@ function updatePreview() {
     return;
   }
 
-  // 计算分成分配
   const BASE_RATE = 50.0;
   const COMPANY_RATE = 42.0;
   const pilotIncome = (rate / BASE_RATE) * COMPANY_RATE;
   const companyIncome = COMPANY_RATE - pilotIncome;
 
-  // 更新显示
   document.getElementById('previewRate').textContent = rate + '%';
   document.getElementById('previewPilotIncome').textContent = pilotIncome.toFixed(1) + '%';
   document.getElementById('previewCompanyIncome').textContent = companyIncome.toFixed(1) + '%';
   document.getElementById('previewFormula').textContent = `计算公式：(${rate}%/50%) * 42% = ${pilotIncome.toFixed(1)}%`;
 }
 
-// 绑定事件
 document.getElementById('commission_rate').addEventListener('input', updatePreview);
 
-// 初始化
 document.addEventListener('DOMContentLoaded', function() {
-  // 初始计算
   updatePreview();
 });
 
-// 表单验证
 document.getElementById('commissionForm').addEventListener('submit', function(e) {
   const adjustmentDate = document.getElementById('adjustment_date').value;
   const commissionRate = document.getElementById('commission_rate').value;

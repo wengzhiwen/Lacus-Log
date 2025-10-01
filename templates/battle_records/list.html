@@ -2,12 +2,10 @@
 {% block title %}开播记录 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="battle-record-management">
-  <!-- 页面头部 -->
   <div class="page-header">
     <h1 class="page-title">开播记录</h1>
   </div>
 
-  <!-- 筛选器（默认折叠） -->
   <div class="filter-bar">
     {% set selected_items = [] %}
     {% if current_filters.owner and current_filters.owner != 'all' %}
@@ -19,7 +17,6 @@
         {% endfor %}
       {% endif %}
     {% endif %}
-    {# 已移除：主播分类与主播筛选 #}
     {% if current_filters.x %}{% set _ = selected_items.append('基地:' + current_filters.x) %}{% endif %}
     {% if current_filters.time %}
       {% if current_filters.time == 'today' %}{% set _ = selected_items.append('今天') %}
@@ -66,7 +63,6 @@
     </form>
   </div>
 
-  <!-- 搜索框（模仿通告列表的前端搜索） -->
   <div class="search-bar">
     <div class="search-input-group">
       <input type="text" id="battle-record-pilot-search" class="search-input" placeholder="搜索主播昵称或真实姓名..." />
@@ -76,10 +72,8 @@
     </div>
   </div>
 
-  <!-- 开播记录列表 -->
   <div class="battle-record-list">
     {% if battle_records %}
-      <!-- 开播记录卡片列表 -->
       <div class="record-cards">
         {% for record in battle_records %}
         <a href="{{ url_for('battle_record.detail_battle_record', record_id=record.id|string) }}" class="record-card">
@@ -92,7 +86,6 @@
               {% set age_str = '(' ~ record.pilot.age ~ ')' if record.pilot.age else '' %}
               {% set gender_icon = '♂' if record.pilot.gender.value == 0 else ('♀' if record.pilot.gender.value == 1 else '?') %}
               <div class="pilot-name">{{ record.pilot.nickname }}{{ age_str }}[{{ record.pilot.status.value }}]{{ gender_icon }}</div>
-              {# 隐藏真实姓名用于前端搜索匹配 #}
               {% if record.pilot.real_name %}
               <span class="real-name" style="display:none;">{{ record.pilot.real_name }}</span>
               {% endif %}
@@ -112,7 +105,6 @@
         {% endfor %}
       </div>
 
-      <!-- 加载更多 -->
       {% if has_more %}
       <div class="load-more">
         <a href="{{ url_for('battle_record.list_battle_records', page=(current_page + 1), **current_filters) }}" class="btn btn-secondary">加载更多</a>
@@ -128,7 +120,6 @@
   </div>
 </section>
 
-<!-- 底部footbar：登记开播记录按钮 -->
 <div class="footbar">
   <div class="inner">
     <a class="btn btn-primary" href="{{ url_for('battle_record.new_battle_record') }}">
@@ -139,12 +130,12 @@
 </div>
 
 <style>
-/* 作战记录卡片样式 */
+
 .record-cards {
   display: block;
 }
 
-/* 筛选器折叠样式 */
+
 .filter-toggle {
   width: 100%;
   display: flex;
@@ -162,7 +153,7 @@
 .filter-form.is-collapsed { display: none; }
 .filter-form { margin-bottom: 12px; }
 
-/* 搜索框样式（与通告列表一致） */
+
 .search-bar { margin-bottom: 16px; }
 .search-input-group {
   display: flex;
@@ -215,7 +206,7 @@
 .record-card .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start; /* 右侧信息置于右上角 */
+  align-items: flex-start; 
   margin-bottom: 8px;
 }
 
@@ -240,7 +231,7 @@
   text-align: right;
   display: flex;
   flex-direction: column;
-  align-items: flex-end; /* 右对齐到角落 */
+  align-items: flex-end; 
 }
 
 .pilot-name {
@@ -291,7 +282,7 @@
   margin: 20px 0;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .filter-form {
     display: grid;
@@ -299,7 +290,7 @@
     gap: 12px;
   }
   
-  /* 保持头部横向排列，右侧信息固定在右上角 */
+  
   .record-card .card-header {
     flex-direction: row;
     align-items: flex-start;
@@ -314,7 +305,7 @@
 </style>
 
 <style>
-/* 底部footbar（固定吸附） */
+
 .footbar {
   position: fixed;
   bottom: 0;
@@ -338,7 +329,6 @@ function toggleFilters() {
   icon.textContent = collapsed ? '▼' : '▲';
 }
 
-// 更新主播筛选器
 function updatePilotFilter() {
   const ownerSelect = document.querySelector('select[name="owner"]');
   const rankSelect = document.querySelector('select[name="rank"]');
@@ -380,7 +370,6 @@ document.addEventListener('DOMContentLoaded', function () {
   initBattleRecordSearch();
 });
 
-// 纯前端搜索：按主播昵称与真实姓名过滤开播记录卡片
 let allBattleRecords = [];
 
 function performBattleRecordSearch() {
@@ -429,7 +418,6 @@ function updateBattleRecordEmptyState(hasResults) {
 }
 
 function initBattleRecordSearch() {
-  // 收集所有卡片中的昵称与真实姓名
   const cards = document.querySelectorAll('.record-card');
   allBattleRecords = Array.from(cards).map(card => {
     const nicknameEl = card.querySelector('.pilot-name');

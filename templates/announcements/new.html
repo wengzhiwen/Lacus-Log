@@ -15,11 +15,9 @@
     <div class="form-container">
         <form method="POST" id="announcementForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <!-- 基础信息 -->
             <div class="form-section">
                 <h3>基础信息</h3>
                 
-                <!-- 主播本地搜索（替代直属运营/主播分类筛选） -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
@@ -64,7 +62,6 @@
                 </div>
             </div>
 
-            <!-- 时间信息 -->
             <div class="form-section">
                 <h3>时间信息</h3>
                 
@@ -89,7 +86,6 @@
                 </div>
             </div>
 
-            <!-- 循环规则 -->
             <div class="form-section">
                 <h3>循环规则</h3>
                 
@@ -105,7 +101,6 @@
                     </div>
                 </div>
 
-                <!-- 每日循环选项 -->
                 <div id="daily_options" class="recurrence-options" style="display: none;">
                     <div class="form-row">
                         <div class="form-group">
@@ -119,7 +114,6 @@
                     </div>
                 </div>
 
-                <!-- 每周循环选项 -->
                 <div id="weekly_options" class="recurrence-options" style="display: none;">
                     <div class="form-row">
                         <div class="form-group">
@@ -146,7 +140,6 @@
                     </div>
                 </div>
 
-                <!-- 自定义循环选项 -->
                 <div id="custom_options" class="recurrence-options" style="display: none;">
                     <div class="form-row">
                         <div class="form-group full-width">
@@ -156,7 +149,6 @@
                     </div>
                 </div>
 
-                <!-- 循环结束日期 -->
                 <div id="recurrence_end_section" class="form-row" style="display: none;">
                     <div class="form-group">
                         <label for="recurrence_end_date">循环结束日期：</label>
@@ -167,11 +159,9 @@
                 </div>
             </div>
 
-            <!-- 表单操作 -->
             <div class="form-actions">
                 <button type="button" id="check_btn" class="btn btn-secondary">检查冲突</button>
                 
-                <!-- 冲突检查结果 -->
                 <div id="conflict_results" class="conflict-section" style="display: none;">
                     <div id="conflict_content"></div>
                 </div>
@@ -471,10 +461,8 @@
 </style>
 
 <script>
-// 恢复流程标记，避免初始化覆盖用户选择
 window.isRestoring = false;
 window._formRestoreData = null;
-// 坐标联动选择
 document.getElementById('x_coord').addEventListener('change', function() {
     const x = this.value;
     const ySelect = document.getElementById('y_coord');
@@ -496,7 +484,6 @@ document.getElementById('x_coord').addEventListener('change', function() {
                         option.textContent = y;
                         ySelect.appendChild(option);
                     });
-                    // 恢复Y
                     if (window.isRestoring && window._formRestoreData && window._formRestoreData.y_coord) {
                         ySelect.value = window._formRestoreData.y_coord;
                         ySelect.dispatchEvent(new Event('change'));
@@ -526,7 +513,6 @@ document.getElementById('y_coord').addEventListener('change', function() {
                         option.textContent = area.z_coord;
                         zSelect.appendChild(option);
                     });
-                    // 恢复Z（battle_area）
                     if (window.isRestoring && window._formRestoreData && window._formRestoreData.battle_area) {
                         zSelect.value = window._formRestoreData.battle_area;
                     }
@@ -536,7 +522,6 @@ document.getElementById('y_coord').addEventListener('change', function() {
     }
 });
 
-// 重复类型选择
 document.getElementById('recurrence_type').addEventListener('change', function() {
     const type = this.value;
     const dailyOptions = document.getElementById('daily_options');
@@ -544,13 +529,11 @@ document.getElementById('recurrence_type').addEventListener('change', function()
     const customOptions = document.getElementById('custom_options');
     const endSection = document.getElementById('recurrence_end_section');
     
-    // 隐藏所有选项
     dailyOptions.style.display = 'none';
     weeklyOptions.style.display = 'none';
     customOptions.style.display = 'none';
     endSection.style.display = 'none';
     
-    // 显示对应选项
     if (type === 'DAILY') {
         dailyOptions.style.display = 'block';
         endSection.style.display = 'block';
@@ -562,12 +545,10 @@ document.getElementById('recurrence_type').addEventListener('change', function()
     }
 });
 
-// 冲突检查
 document.getElementById('check_btn').addEventListener('click', function() {
     const form = document.getElementById('announcementForm');
     const formData = new FormData(form);
     
-    // 验证必填字段
     const pilot = formData.get('pilot');
     const battleArea = document.getElementById('battle_area').value;
     const startTime = formData.get('start_time');
@@ -578,7 +559,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
         return;
     }
     
-    // 收集重复规则数据
     const recurrenceType = document.getElementById('recurrence_type').value;
     const recurrencePattern = {};
     
@@ -603,7 +583,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
         }
     }
     
-    // 发送冲突检查请求
     const checkData = {
         pilot_id: pilot,
         battle_area_id: battleArea,
@@ -613,7 +592,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
         recurrence_pattern: recurrencePattern
     };
     
-    // 添加重复结束日期
     const recurrenceEndDate = document.getElementById('recurrence_end_date').value;
     if (recurrenceEndDate) {
         checkData.recurrence_end_date = recurrenceEndDate;
@@ -649,7 +627,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
                 contentDiv.innerHTML = html;
                 document.getElementById('submit_btn').disabled = true;
             } else {
-                // 无冲突时显示所有计划实例
                 let html = '<div class="no-conflicts">✓ 检查通过，无冲突</div>';
                 html += '<h3>计划详情</h3>';
                 
@@ -657,13 +634,11 @@ document.getElementById('check_btn').addEventListener('click', function() {
                     html += '<div class="plan-content">';
                     
                     if (data.planned_instances.length === 1) {
-                        // 单个事件
                         const instance = data.planned_instances[0];
                         html += `${instance.pilot_name}<br>`;
                         html += `${instance.start_time} 起 ${instance.duration}<br>`;
                         html += `${instance.coords}`;
                     } else {
-                        // 多个重复事件
                         html += `<div class="plan-summary">共 ${data.planned_instances.length} 个事件：</div>`;
                         data.planned_instances.forEach((instance, index) => {
                             html += `<div class="plan-instance">`;
@@ -676,7 +651,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
                     
                     html += '</div>';
                 } else {
-                    // fallback到原来的逻辑
                     const pilotSelect = document.getElementById('pilot');
                     const pilotName = pilotSelect.options[pilotSelect.selectedIndex].text;
                     const startTime = new Date(formData.get('start_time'));
@@ -710,7 +684,6 @@ document.getElementById('check_btn').addEventListener('click', function() {
     });
 });
 
-// 表单提交前再次检查
 document.getElementById('announcementForm').addEventListener('submit', function(e) {
     const submitBtn = document.getElementById('submit_btn');
     if (submitBtn.disabled) {
@@ -719,7 +692,6 @@ document.getElementById('announcementForm').addEventListener('submit', function(
     }
 });
 
-// 主播本地搜索 + 列表加载
 function loadAllPilots(callback) {
     const pilotSelect = document.getElementById('pilot');
     pilotSelect.innerHTML = '<option value="">请选择主播</option>';
@@ -768,7 +740,6 @@ function initPilotLocalSearch() {
     input.addEventListener('input', applyFilter);
 }
 
-// 构建主播显示文本：昵称(年龄)真实姓名[主播分类]性别icon
 function buildPilotDisplay(p) {
     const nickname = p.nickname || '';
     const agePart = p.age ? `(${p.age})` : '';
@@ -781,9 +752,7 @@ function buildPilotDisplay(p) {
     return `${nameWithReal}${rankPart}${genderIcon}`;
 }
 
-// 设置默认开始时间（当前时间+1小时）
 window.addEventListener('load', function() {
-    // 恢复表单数据（如果有的话）
     const formData = {
         pilot: '{{ form.pilot if form else "" }}',
         x_coord: '{{ form.x_coord if form else "" }}',
@@ -801,7 +770,6 @@ window.addEventListener('load', function() {
     window.isRestoring = true;
     window._formRestoreData = formData;
     
-    // 恢复星期几的选择
     {% if form and form.getlist('days_of_week') %}
     const selectedDays = {{ form.getlist('days_of_week') | tojson }};
     formData.days_of_week = selectedDays;
@@ -820,20 +788,16 @@ window.addEventListener('load', function() {
         startTimeInput.value = formData.start_time;
     }
     
-    // 恢复时长选择
     if (formData.duration_hours) {
         const durationSelect = document.getElementById('duration_hours');
         durationSelect.value = formData.duration_hours;
     }
     
-    // 恢复重复类型
     if (formData.recurrence_type) {
         const recurrenceSelect = document.getElementById('recurrence_type');
         recurrenceSelect.value = formData.recurrence_type;
-        // 触发change事件来显示对应的选项
         recurrenceSelect.dispatchEvent(new Event('change'));
         
-        // 恢复重复选项
         setTimeout(function() {
             if (formData.recurrence_type === 'DAILY' && formData.daily_interval) {
                 document.getElementById('daily_interval').value = formData.daily_interval;
@@ -853,14 +817,12 @@ window.addEventListener('load', function() {
                 document.getElementById('custom_dates').value = formData.custom_dates;
             }
             
-            // 恢复重复结束日期
             if (formData.recurrence_end_date) {
                 document.getElementById('recurrence_end_date').value = formData.recurrence_end_date;
             }
         }, 100);
     }
     
-    // 加载主播列表（本地搜索），并在加载完成后恢复主播选择
     loadAllPilots(function() {
         if (formData.pilot) {
             const pilotSelect = document.getElementById('pilot');
@@ -869,21 +831,18 @@ window.addEventListener('load', function() {
     });
     initPilotLocalSearch();
     
-    // 恢复坐标选择（触发X->Y->Z的联动链）
     setTimeout(function() {
         if (formData.x_coord) {
             const xSelect = document.getElementById('x_coord');
             xSelect.value = formData.x_coord;
             xSelect.dispatchEvent(new Event('change'));
             
-            // 等待场地加载后恢复场地选择
             setTimeout(function() {
                 if (formData.y_coord) {
                     const ySelect = document.getElementById('y_coord');
                     ySelect.value = formData.y_coord;
                     ySelect.dispatchEvent(new Event('change'));
                     
-                    // 等待坐席加载后恢复battle_area选择
                     setTimeout(function() {
                         if (formData.battle_area) {
                             const battleAreaSelect = document.getElementById('battle_area');
@@ -893,13 +852,11 @@ window.addEventListener('load', function() {
                 }
             }, 500);
         } else {
-            // 如果没有表单数据，使用默认值
             const xSelect = document.getElementById('x_coord');
             if (xSelect.value) {
                 xSelect.dispatchEvent(new Event('change'));
             }
         }
-        // 延迟关闭恢复标记，给异步选项填充时间
         setTimeout(function(){ window.isRestoring = false; }, 800);
     }, 100);
 });

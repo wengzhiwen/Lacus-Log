@@ -29,7 +29,6 @@
     {% endif %}
   </div>
 
-  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-main-info">
@@ -53,9 +52,7 @@
     </div>
   </div>
 
-  <!-- 招募信息 -->
   <div class="recruit-info-card">
-    <!-- 基本信息 -->
     <div class="info-section">
       <h3 class="section-title">基本信息</h3>
       <div class="info-grid">
@@ -88,7 +85,6 @@
       </div>
     </div>
 
-    <!-- 面试阶段 -->
     {% set effective_interview_decision = recruit.get_effective_interview_decision() %}
     {% if effective_interview_decision %}
     <div class="info-section">
@@ -116,7 +112,6 @@
     </div>
     {% endif %}
 
-    <!-- 试播预约阶段 -->
     {% set effective_scheduled_training_time = recruit.get_effective_scheduled_training_time() %}
     {% if effective_scheduled_training_time %}
     <div class="info-section">
@@ -144,7 +139,6 @@
     </div>
     {% endif %}
 
-    <!-- 试播阶段 -->
     {% set effective_training_decision = recruit.get_effective_training_decision() %}
     {% if effective_training_decision %}
     <div class="info-section">
@@ -172,7 +166,6 @@
     </div>
     {% endif %}
 
-    <!-- 开播预约阶段 -->
     {% set effective_scheduled_broadcast_time = recruit.get_effective_scheduled_broadcast_time() %}
     {% if effective_scheduled_broadcast_time %}
     <div class="info-section">
@@ -200,7 +193,6 @@
     </div>
     {% endif %}
 
-    <!-- 开播阶段 -->
     {% set effective_broadcast_decision = recruit.get_effective_broadcast_decision() %}
     {% if effective_broadcast_decision %}
     <div class="info-section">
@@ -228,7 +220,6 @@
     </div>
     {% endif %}
 
-    <!-- 历史数据（兼容性） -->
     {% if recruit.training_decision_old or recruit.training_time or recruit.final_decision %}
     <div class="info-section">
       <h3 class="section-title">历史数据</h3>
@@ -255,7 +246,6 @@
     </div>
     {% endif %}
 
-    <!-- 系统信息 -->
     <div class="info-section">
       <h3 class="section-title">系统信息</h3>
       <div class="info-grid">
@@ -272,7 +262,6 @@
   </div>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.edit_recruit', recruit_id=recruit.id) }}">编辑</a>
   
@@ -289,7 +278,6 @@
   <a class="btn btn-primary" href="{{ url_for('recruit.broadcast_decision_page', recruit_id=recruit.id) }}">开播决策</a>
   {% endif %}
   
-  <!-- 历史兼容按钮 -->
   {% if recruit.status.value == '已启动' %}
   <a class="btn btn-primary" href="{{ url_for('recruit.training_recruit_page', recruit_id=recruit.id) }}">试播招募</a>
   {% endif %}
@@ -298,7 +286,6 @@
 </div>
 
 
-<!-- 变更记录模态框 -->
 <div id="changesModal" class="modal" style="display: none;">
   <div class="modal-content">
     <div class="modal-header">
@@ -465,8 +452,8 @@
 .status-待预约开播 { color: var(--hud-green); font-weight: 600; }
 .status-待开播 { color: var(--hud-green); font-weight: 600; }
 .status-已结束 { color: var(--muted); }
-.status-已启动 { color: var(--hud-green); font-weight: 600; }  /* 历史兼容 */
-.status-训练征召中 { color: var(--hud-green); font-weight: 600; }  /* 历史兼容 */
+.status-已启动 { color: var(--hud-green); font-weight: 600; }  
+.status-训练征召中 { color: var(--hud-green); font-weight: 600; }  
 
 .modal {
   position: fixed;
@@ -595,7 +582,6 @@ function hideChangesModal() {
   document.getElementById('changesModal').style.display = 'none';
 }
 
-// 点击模态框背景关闭
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('modal')) {
     e.target.style.display = 'none';

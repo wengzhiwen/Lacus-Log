@@ -20,7 +20,6 @@
             <input type="hidden" name="related_announcement" value="{{ default_data.related_announcement.id }}"/>
             {% endif %}
             
-            <!-- 基础信息 -->
             <div class="form-section">
                 <h3>基础信息</h3>
                 
@@ -33,7 +32,6 @@
                 {% endif %}
                 
                 {% if related_announcement %}
-                <!-- 从通告进入：主播与所属只读展示，并提交隐藏字段 -->
                 <div class="form-row">
                     <div class="form-group">
                         <label>主播</label>
@@ -54,7 +52,6 @@
                     </div>
                 </div>
                 {% else %}
-                <!-- 普通入口：仅展示“昵称/真实姓名”搜索 + 主播选择（纯前端过滤） -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
@@ -99,7 +96,6 @@
                 {% endif %}
             </div>
 
-            <!-- 时间信息 -->
             <div class="form-section">
                 <h3>时间信息</h3>
                 
@@ -136,7 +132,6 @@
                 </div>
             </div>
 
-            <!-- 开播地点 -->
             <div class="form-section">
                 <h3>开播地点</h3>
 
@@ -175,7 +170,6 @@
                 </div>
             </div>
 
-            <!-- 收益信息 -->
             <div class="form-section">
                 <h3>收益信息</h3>
                 
@@ -196,7 +190,6 @@
                 </div>
             </div>
 
-            <!-- 备注信息 -->
             <div class="form-section">
                 <h3>备注信息</h3>
                 
@@ -225,7 +218,7 @@
 </div>
 
 <style>
-/* 信息横幅样式 */
+
 .info-banner {
     background: var(--bg-light);
     border: 1px solid var(--brand);
@@ -236,9 +229,9 @@
     color: var(--text);
 }
 
-/* （移除误植的脚本，真实脚本见下方 <script> 块） */
 
-/* 只读值样式 */
+
+
 .readonly-value {
     font-size: 14px;
     color: var(--text);
@@ -257,7 +250,7 @@
     color: var(--brand-dark);
 }
 
-/* 字符计数器 */
+
 .char-count {
     font-size: 12px;
     color: var(--muted);
@@ -265,7 +258,7 @@
     margin-top: 4px;
 }
 
-/* 验证消息样式 */
+
 .validation-message {
     font-size: 12px;
     color: var(--error);
@@ -276,7 +269,7 @@
     border-radius: 4px;
 }
 
-/* 表单样式继承自基础样式 */
+
 .form-container {
     max-width: 800px;
     margin: 0 auto;
@@ -366,7 +359,7 @@
     border-top: 1px solid var(--table-header);
 }
 
-/* 时间快捷按钮样式 */
+
 .time-quick-buttons {
     display: flex;
     gap: 12px;
@@ -415,7 +408,7 @@
     100% { transform: scale(1); }
 }
 
-/* 按钮禁用状态 */
+
 .btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -432,7 +425,7 @@
     border-color: #6c757d !important;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
     .form-row {
         grid-template-columns: 1fr;
@@ -465,7 +458,6 @@ let defaultData = {
     work_mode: '{{ default_data.work_mode.value if default_data.work_mode else "" }}'
 };
 
-// 初始化页面
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[BR] DOMContentLoaded: initialize page');
     initializePage();
@@ -473,10 +465,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeTimeButtons();
     initializeDurationHelper();
     
-    // 监听备注字符计数
     document.getElementById('notes').addEventListener('input', updateCharacterCount);
     
-    // 监听字段变更实时验证备注
     const fieldsToWatch = ['start_time', 'end_time', 'revenue_amount', 'base_salary', 'related_announcement', 'notes'];
     fieldsToWatch.forEach(fieldName => {
         const field = document.getElementById(fieldName);
@@ -492,17 +482,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 监听表单提交事件
     document.getElementById('battleRecordForm').addEventListener('submit', function(e) {
         if (!validateFormSubmission()) {
             e.preventDefault();
         }
     });
     
-    // 初始化按钮状态
     updateSubmitButtonState();
     
-    // 监听主播变更，更新参战形式（仅当存在下拉时）
     const pilotEl = document.getElementById('pilot');
     if (pilotEl) pilotEl.addEventListener('change', function() {
         const pilotId = this.value;
@@ -512,7 +499,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     if (data.success && data.pilots.length > 0) {
                         const pilot = data.pilots[0];
-                        // 如果没有预填数据，则从主播复制参战形式
                         if (!defaultData.work_mode) {
                             document.getElementById('work_mode').value = pilot.work_mode || '';
                         }
@@ -520,7 +506,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .catch(error => console.error('获取主播信息失败:', error));
 
-            // 获取关联通告（昨天/今天/明天）
             fetch(`{{ url_for('battle_record.api_related_announcements') }}?pilot_id=${pilotId}`)
                 .then(resp => resp.json())
                 .then(data => {
@@ -539,14 +524,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 .catch(err => console.error('获取关联通告失败:', err));
         }
     });
-    // 参战形式联动
     const wmSelect = document.getElementById('work_mode');
     if (wmSelect) {
         wmSelect.addEventListener('change', handleWorkModeChange);
         handleWorkModeChange();
     }
 
-    // 关联通告联动预填
     const relatedSelect = document.getElementById('related_announcement');
     if (relatedSelect) {
         relatedSelect.addEventListener('change', function () {
@@ -562,33 +545,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!data.success) return;
                     const a = data.announcement;
 
-                    // 时间
                     const startInput = document.getElementById('start_time');
                     const endInput = document.getElementById('end_time');
                     if (startInput && a.start_time) startInput.value = a.start_time.slice(0,16);
                     if (endInput && a.end_time) endInput.value = a.end_time.slice(0,16);
 
-                    // 参战形式固定线下
                     const wmSel = document.getElementById('work_mode');
                     if (wmSel) {
                         wmSel.value = '线下';
                         handleWorkModeChange();
                     }
 
-                    // 坐标快照
                     defaultData.x_coord = a.x_coord || '';
                     defaultData.y_coord = a.y_coord || '';
                     defaultData.z_coord = a.z_coord || '';
                     console.log('[BR] set default coords:', defaultData);
                     initializeBattleAreaSelects();
 
-                    // 设置底薪默认值150元
                     const baseSalaryInput = document.getElementById('base_salary');
                     if (baseSalaryInput) {
                         baseSalaryInput.value = '150';
                     }
                     
-                    // 预填数据后触发验证
                     validateNotesRequired();
                     updateSubmitButtonState();
                 })
@@ -598,7 +576,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializePage() {
-    // 普通入口加载所有主播并初始化本地搜索
     if (document.getElementById('pilot') && !document.getElementById('pilot').hasAttribute('data-prefilled')) {
         loadAllPilots();
         initPilotLocalSearch();
@@ -606,7 +583,6 @@ function initializePage() {
     loadBattleAreaData();
 }
 
-// 加载全部主播用于本地筛选
 function loadAllPilots() {
     fetch(`{{ url_for('battle_record.api_pilots_filtered') }}`)
         .then(response => response.json())
@@ -614,13 +590,11 @@ function loadAllPilots() {
             const pilotSelect = document.getElementById('pilot');
             pilotSelect.innerHTML = '<option value="">请选择主播</option>';
             if (data.success) {
-                // 缓存到 window 便于本地筛选
                 window.__allPilots = data.pilots || [];
                 window.__allPilots.forEach(pilot => {
                     const option = document.createElement('option');
                     option.value = pilot.id;
                     option.textContent = buildPilotDisplay(pilot);
-                    // 附加数据用于本地筛选
                     option.setAttribute('data-nickname', pilot.nickname || '');
                     option.setAttribute('data-real-name', pilot.real_name || '');
                     if (pilot.id === defaultData.pilot) {
@@ -633,7 +607,6 @@ function loadAllPilots() {
         .catch(error => console.error('加载主播列表失败:', error));
 }
 
-// 初始化“昵称/真实姓名”本地筛选
 function initPilotLocalSearch() {
     const input = document.getElementById('pilot_search');
     const pilotSelect = document.getElementById('pilot');
@@ -641,7 +614,6 @@ function initPilotLocalSearch() {
 
     function applyFilter() {
         const keyword = (input.value || '').trim().toLowerCase();
-        // 重建选项
         pilotSelect.innerHTML = '<option value="">请选择主播</option>';
         const source = (window.__allPilots || []);
         const filtered = keyword
@@ -660,7 +632,6 @@ function initPilotLocalSearch() {
     input.addEventListener('input', applyFilter);
 }
 
-// 构建主播显示文本：昵称(年龄)真实姓名[主播分类]性别icon
 function buildPilotDisplay(p) {
     const nickname = p.nickname || '';
     const agePart = p.age ? `(${p.age})` : '';
@@ -691,7 +662,6 @@ function initializeBattleAreaSelects() {
     const zSelect = document.getElementById('z_coord');
     console.log('[BR] initializeBattleAreaSelects with defaultData:', defaultData);
     
-    // 填充基地
     xSelect.innerHTML = '<option value="">请选择基地</option>';
     Object.keys(battleAreaData).sort().forEach(x => {
         const option = document.createElement('option');
@@ -703,18 +673,15 @@ function initializeBattleAreaSelects() {
         xSelect.appendChild(option);
     });
     
-    // 监听基地变化
     xSelect.addEventListener('change', function() {
         updateYCoords(this.value);
     });
     
-    // 监听场地变化
     ySelect.addEventListener('change', function() {
         const xCoord = xSelect.value;
         updateZCoords(xCoord, this.value);
     });
     
-    // 如果有默认基地，触发联动
     if (defaultData.x_coord) {
         updateYCoords(defaultData.x_coord);
     }
@@ -741,7 +708,6 @@ function updateYCoords(xCoord) {
             ySelect.appendChild(option);
         });
         
-        // 如果有默认场地，触发联动
         if (defaultData.y_coord) {
             updateZCoords(xCoord, defaultData.y_coord);
         }
@@ -786,7 +752,6 @@ function updateCharacterCount() {
     }
 }
 
-// 初始化时间快捷按钮
 function initializeTimeButtons() {
     const timeButtons = document.querySelectorAll('.time-btn');
     timeButtons.forEach(button => {
@@ -796,25 +761,19 @@ function initializeTimeButtons() {
             const targetInput = document.getElementById(targetId);
             
             if (targetInput && targetInput.value) {
-                // 解析当前时间
                 const currentTime = new Date(targetInput.value);
-                // 添加分钟
                 currentTime.setMinutes(currentTime.getMinutes() + minutes);
-                // 更新输入框值（使用本地时间格式）
                 const year = currentTime.getFullYear();
                 const month = String(currentTime.getMonth() + 1).padStart(2, '0');
                 const day = String(currentTime.getDate()).padStart(2, '0');
                 const hours = String(currentTime.getHours()).padStart(2, '0');
                 const mins = String(currentTime.getMinutes()).padStart(2, '0');
                 targetInput.value = `${year}-${month}-${day}T${hours}:${mins}`;
-                // 触发 input 事件以便播时联动计算
                 targetInput.dispatchEvent(new Event('input', { bubbles: true }));
                 
-                // 手动触发验证
                 validateNotesRequired();
                 updateSubmitButtonState();
                 
-                // 添加点击效果
                 this.classList.add('clicked');
                 setTimeout(() => {
                     this.classList.remove('clicked');
@@ -824,7 +783,6 @@ function initializeTimeButtons() {
     });
 }
 
-// 播时便捷输入：与开始/结束时间联动
 function initializeDurationHelper() {
     const startInput = document.getElementById('start_time');
     const endInput = document.getElementById('end_time');
@@ -865,7 +823,7 @@ function initializeDurationHelper() {
         if (!s) return;
         let hours = parseFloat(durationInput.value);
         if (isNaN(hours) || hours < 0) return;
-        const minsTotal = Math.floor(hours * 60); // 精确到分，秒舍弃
+        const minsTotal = Math.floor(hours * 60);
         const newEnd = new Date(s.getTime());
         newEnd.setMinutes(newEnd.getMinutes() + minsTotal);
         endInput.value = formatLocalInput(newEnd);
@@ -884,7 +842,6 @@ function initializeDurationHelper() {
     recomputeDurationFromTimes();
 }
 
-// 开播方式影响开播地点可编辑性
 function handleWorkModeChange() {
     const wmEl = document.getElementById('work_mode');
     const wm = wmEl ? wmEl.value : '';
@@ -913,7 +870,6 @@ function handleWorkModeChange() {
     }
 }
 
-// 验证备注必填条件
 function validateNotesRequired() {
     const notes = document.getElementById('notes');
     const startTimeField = document.getElementById('start_time');
@@ -923,7 +879,7 @@ function validateNotesRequired() {
     const relatedAnnouncementField = document.getElementById('related_announcement');
     const validationMessage = document.getElementById('notes-validation-message');
     
-    if (!notes || !validationMessage) return false; // 返回验证状态
+    if (!notes || !validationMessage) return false;
     
     const notesValue = notes.value.trim();
     const startTime = startTimeField ? startTimeField.value : '';
@@ -932,19 +888,17 @@ function validateNotesRequired() {
     const baseSalary = parseFloat(baseSalaryField ? baseSalaryField.value : 0) || 0;
     const relatedAnnouncementId = relatedAnnouncementField ? relatedAnnouncementField.value : '';
     
-    // 如果已有备注，清除验证消息
     if (notesValue) {
         validationMessage.style.display = 'none';
-        return false; // 验证通过
+        return false;
     }
     
     const reasons = [];
     
-    // 计算开播时长
     if (startTime && endTime) {
         const start = new Date(startTime);
         const end = new Date(endTime);
-        const duration = (end - start) / (1000 * 60 * 60); // 转换为小时
+        const duration = (end - start) / (1000 * 60 * 60);
         
         if (duration < 6.0) {
             reasons.push("开播时长小于6.0小时");
@@ -953,35 +907,29 @@ function validateNotesRequired() {
         }
     }
     
-    // 底薪不等于0也不等于150
     if (baseSalary !== 0 && baseSalary !== 150) {
         reasons.push("底薪不等于0也不等于150");
     }
     
-    // 流水不等于0且小于100
     if (revenue !== 0 && revenue < 100) {
         reasons.push("流水不等于0且小于100");
     }
     
-    // 流水大于等于5000
     if (revenue >= 5000) {
         reasons.push("流水大于等于5000");
     }
     
-    // 关联通告时间差验证（这个在前端比较复杂，暂时跳过）
     
-    // 显示验证消息
     if (reasons.length > 0) {
         validationMessage.textContent = "因为" + reasons.join("或") + "原因，必须填写备注";
         validationMessage.style.display = 'block';
-        return true; // 验证失败
+        return true;
     } else {
         validationMessage.style.display = 'none';
-        return false; // 验证通过
+        return false;
     }
 }
 
-// 更新提交按钮状态
 function updateSubmitButtonState() {
     const submitBtn = document.getElementById('submit-btn');
     const notesValidationFailed = validateNotesRequired();
@@ -997,7 +945,6 @@ function updateSubmitButtonState() {
     }
 }
 
-// 表单提交验证
 function validateFormSubmission() {
     const notesValidationFailed = validateNotesRequired();
     

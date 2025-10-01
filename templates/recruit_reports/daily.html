@@ -8,7 +8,6 @@
   <p class="text-muted">{{ pagination.date }}</p>
 </div>
 
-<!-- 日期导航 -->
 <div class="date-navigation">
   <div class="date-controls">
     <a href="{{ url_for('report.recruit_daily_report', date=pagination.prev_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">← 前一日</a>
@@ -16,7 +15,6 @@
     <a href="{{ url_for('report.recruit_daily_report', date=pagination.next_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">后一日 →</a>
   </div>
   
-  <!-- 招募负责人筛选器 -->
   <div class="recruiter-filter">
     <label for="recruiterSelector" class="filter-label">招募负责人：</label>
     <select id="recruiterSelector" class="recruiter-select">
@@ -30,7 +28,6 @@
   </div>
 </div>
 
-<!-- 招募统计表格 -->
 <div class="statistics-section">
   <h2 class="section-title">招募统计</h2>
   <div class="table-container">
@@ -95,7 +92,6 @@
   </div>
 </div>
 
-<!-- 指标说明 -->
 <div class="explanation-section">
   <h2 class="section-title">指标说明</h2>
   <div class="explanation-cards">
@@ -131,7 +127,7 @@
 </div>
 
 <style>
-/* 日期导航样式 */
+
 .date-navigation {
   display: flex;
   justify-content: space-between;
@@ -155,7 +151,7 @@
   font-size: 14px;
 }
 
-/* 招募负责人筛选器样式 */
+
 .recruiter-filter {
   display: flex;
   align-items: center;
@@ -177,7 +173,7 @@
   min-width: 120px;
 }
 
-/* 统计表格样式 */
+
 .statistics-section {
   margin: 24px 0;
 }
@@ -252,7 +248,7 @@
   margin-top: 2px;
 }
 
-/* 指标说明样式 */
+
 .explanation-section {
   margin: 24px 0;
 }
@@ -298,7 +294,7 @@
   line-height: 1.4;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .date-navigation {
     flex-direction: column;
@@ -342,7 +338,7 @@
   }
 }
 
-/* 可点击单元格样式 */
+
 .stat-value.clickable {
   cursor: pointer;
   transition: background-color 0.2s ease;
@@ -358,7 +354,6 @@
 </style>
 
 <script>
-// 日期选择器事件
 document.getElementById('dateSelector').addEventListener('change', function() {
   const selectedDate = this.value;
   const selectedRecruiter = document.getElementById('recruiterSelector').value;
@@ -367,14 +362,12 @@ document.getElementById('dateSelector').addEventListener('change', function() {
   }
 });
 
-// 招募负责人筛选器事件
 document.getElementById('recruiterSelector').addEventListener('change', function() {
   const selectedRecruiter = this.value;
   const currentDate = '{{ pagination.date }}';
   window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + currentDate + '&recruiter=' + selectedRecruiter;
 });
 
-// 跳转到详情页面
 function goToDetail(range, metric) {
   const currentDate = '{{ pagination.date }}';
   const selectedRecruiter = document.getElementById('recruiterSelector').value;

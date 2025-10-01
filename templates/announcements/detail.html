@@ -18,7 +18,6 @@
     {% endif %}
   </div>
 
-  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-main-info">
@@ -42,9 +41,7 @@
     </div>
   </div>
 
-  <!-- 通告信息 -->
   <div class="announcement-info-card">
-    <!-- 基础信息 -->
     <div class="info-section">
       <h3 class="section-title">基础信息</h3>
       <div class="info-grid">
@@ -59,7 +56,6 @@
       </div>
     </div>
 
-    <!-- 时间信息 -->
     <div class="info-section">
       <h3 class="section-title">时间信息</h3>
       <div class="info-grid">
@@ -82,7 +78,6 @@
       </div>
     </div>
 
-    <!-- 循环信息 -->
     {% if announcement.recurrence_type.value != '无重复' or related_announcements %}
     <div class="info-section">
       <h3 class="section-title">循环信息</h3>
@@ -116,7 +111,6 @@
     </div>
     {% endif %}
 
-    <!-- 系统信息 -->
     <div class="info-section">
       <h3 class="section-title">系统信息</h3>
       <div class="info-grid">
@@ -137,7 +131,6 @@
   </div>
 </section>
 
-<!-- 底部操作栏 -->
 <div class="footbar">
     <div class="inner">
         {% if announcement.is_in_recurrence_group %}
@@ -156,7 +149,6 @@
     </div>
 </div>
 
-<!-- 编辑选项模态框（循环组通告） -->
 {% if announcement.is_in_recurrence_group %}
 <div id="editModal" class="modal">
     <div class="modal-content">
@@ -183,7 +175,6 @@
 </div>
 {% endif %}
 
-<!-- 删除确认模态框 -->
 <div id="deleteModal" class="modal">
     <div class="modal-content">
         <h4>确认删除</h4>
@@ -233,7 +224,6 @@
     </div>
 </div>
 
-<!-- 变更记录模态框 -->
 <div id="changesModal" class="modal">
     <div class="modal-content">
         <h4>变更记录</h4>
@@ -451,7 +441,7 @@
   font-size: 11px;
 }
 
-/* 底部操作栏样式 */
+
 .footbar {
   position: fixed;
   bottom: 0;
@@ -472,7 +462,7 @@
   margin: 0 auto;
 }
 
-/* 让footbar按钮内容水平居中（移动端全宽时也居中） */
+
 .footbar .btn {
   display: flex;
   justify-content: center;
@@ -670,7 +660,7 @@
   width: 100%;
 }
 
-/* 本页按钮样式微调 */
+
 .btn-hud {
   background: var(--hud-green);
   color: #fff;
@@ -715,7 +705,7 @@
     flex-direction: column;
   }
   
-  /* 移动端footbar样式 */
+  
   .footbar .inner {
     flex-direction: row;
     gap: 8px;
@@ -791,7 +781,6 @@ function hideChangesModal() {
     document.getElementById('changesModal').style.display = 'none';
 }
 
-// 点击模态框外部关闭
 window.onclick = function(event) {
     const editModal = document.getElementById('editModal');
     const deleteModal = document.getElementById('deleteModal');

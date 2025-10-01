@@ -27,7 +27,6 @@
     </div>
   </div>
 
-  <!-- 场地信息 -->
   {% if venue_info %}
   <div class="venue-info">
     <div class="venue-row">
@@ -84,7 +83,7 @@
 </div>
 
 <style>
-/* 屏幕显示样式 */
+
 .export-table-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -266,7 +265,7 @@
   opacity: 0.9;
 }
 
-/* 打印样式 */
+
 @media print {
   @page {
     size: A4;
@@ -277,7 +276,7 @@
     display: none !important;
   }
   
-  /* 隐藏页面基础元素 */
+  
   header.topbar {
     display: none !important;
   }
@@ -368,7 +367,7 @@
     font-size: 8px;
   }
   
-  /* 避免表格跨页断裂 */
+  
   .schedule-table {
     page-break-inside: avoid;
   }
@@ -377,14 +376,14 @@
     break-inside: avoid;
   }
   
-  /* 确保内容在一页内 */
+  
   .export-table-container {
     height: auto;
     max-height: 95vh;
   }
 }
 
-/* 移动设备样式 */
+
 @media (max-width: 768px) {
   .pilot-info {
     flex-direction: column;

@@ -11,7 +11,6 @@
 
   <h1 class="title">启动招募</h1>
 
-  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -40,7 +39,6 @@
     </div>
   </div>
 
-  <!-- 招募表单 -->
   <form method="POST" action="{{ url_for('recruit.create_recruit', pilot_id=pilot.id) }}" class="recruit-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
@@ -96,7 +94,6 @@
   </form>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}">返回</a>
   <button type="submit" form="recruit_form" class="btn btn-primary">创建招募</button>
@@ -281,7 +278,6 @@
 </style>
 
 <script>
-// 设置表单的id属性以便footbar按钮可以提交
 document.querySelector('.recruit-form').setAttribute('id', 'recruit_form');
 </script>
 {% endblock %}

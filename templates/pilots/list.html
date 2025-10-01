@@ -2,12 +2,10 @@
 {% block title %}主播管理 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="pilot-management">
-  <!-- 页面头部 -->
   <div class="page-header">
     <h1 class="page-title">主播管理</h1>
   </div>
 
-  <!-- 筛选器（默认折叠） -->
   <div class="filter-bar">
     {% set selected_items = [] %}
     {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
@@ -80,7 +78,6 @@
     </form>
   </div>
 
-  <!-- 搜索框 -->
   <div class="search-bar">
     <div class="search-input-group">
       <input type="text" id="pilot-search" class="search-input" placeholder="搜索主播昵称或真实姓名..." />
@@ -90,10 +87,8 @@
     </div>
   </div>
 
-  <!-- 机师列表 -->
   <div class="pilot-list">
     {% if pilots %}
-      <!-- 机师卡片列表 -->
       <div class="pilot-cards">
         {% for pilot in pilots %}
         <a href="{{ url_for('pilot.pilot_detail', pilot_id=(pilot.id|string)) }}" class="pilot-card">
@@ -133,7 +128,6 @@
   </div>
 </section>
 
-<!-- 底部footbar：新主播按钮和导出按钮 -->
 <div class="footbar">
   <div class="inner">
     <a class="btn btn-primary" href="{{ url_for('pilot.new_pilot') }}">
@@ -148,12 +142,12 @@
 </div>
 
 <style>
-/* 机师卡片样式 */
+
 .pilot-cards {
   display: block;
 }
 
-/* 筛选器折叠样式 */
+
 .filter-toggle {
   width: 100%;
   display: flex;
@@ -168,7 +162,7 @@
   font-size: 14px;
 }
 
-/* 搜索框样式 */
+
 .search-bar {
   margin-bottom: 16px;
 }
@@ -274,24 +268,24 @@
 .pilot-card .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 8px; }
 .badges { display: flex; gap: 10px; font-size: 12px; }
 
-/* 阶级徽章样式 */
+
 .rank-候补机师 { color: var(--muted); }
 .rank-训练机师 { color: #FFA500; }
 .rank-实习机师 { color: var(--green); }
 .rank-正式机师 { color: var(--brand); }
-/* 新用语样式 */
+
 .rank-候选人 { color: var(--muted); }
 .rank-试播主播 { color: #FFA500; }
 .rank-实习主播 { color: var(--green); }
 .rank-正式主播 { color: var(--brand); }
 
-/* 状态徽章样式 */
+
 .status-未征召 { color: var(--muted); }
 .status-不征召 { color: var(--error); }
 .status-已征召 { color: var(--warn); }
 .status-已签约 { color: var(--hud-green); }
 .status-已阵亡 { color: var(--error); }
-/* 新用语样式 */
+
 .status-未招募 { color: var(--muted); }
 .status-不招募 { color: var(--error); }
 .status-已招募 { color: var(--warn); }
@@ -301,7 +295,7 @@
   color: var(--brand);
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .filter-form {
     display: grid;
@@ -314,7 +308,7 @@
 }
 </style>
 <style>
-/* 底部footbar（固定吸附） */
+
 .footbar {
   position: fixed;
   bottom: 0;
@@ -330,7 +324,6 @@
 .container { padding-bottom: 88px; }
 </style>
 <script>
-// 存储所有机师数据用于搜索
 let allPilots = [];
 
 function toggleFilters() {
@@ -340,18 +333,15 @@ function toggleFilters() {
   icon.textContent = collapsed ? '▼' : '▲';
 }
 
-// 搜索功能
 function performSearch() {
   const searchInput = document.getElementById('pilot-search');
   const searchTerm = searchInput.value.trim().toLowerCase();
   
   if (!searchTerm) {
-    // 如果搜索框为空，显示所有机师
     showAllPilots();
     return;
   }
   
-  // 过滤机师
   const filteredPilots = allPilots.filter(pilot => {
     const nickname = (pilot.nickname || '').toLowerCase();
     const realName = (pilot.realName || '').toLowerCase();
@@ -359,22 +349,18 @@ function performSearch() {
     return nickname.includes(searchTerm) || realName.includes(searchTerm);
   });
   
-  // 显示过滤后的机师
   showFilteredPilots(filteredPilots);
 }
 
-// 显示所有机师
 function showAllPilots() {
   const pilotCards = document.querySelectorAll('.pilot-card');
   pilotCards.forEach(card => {
     card.style.display = 'block';
   });
   
-  // 更新空状态显示
   updateEmptyState(pilotCards.length > 0);
 }
 
-// 显示过滤后的机师
 function showFilteredPilots(filteredPilots) {
   const pilotCards = document.querySelectorAll('.pilot-card');
   const pilotIds = filteredPilots.map(pilot => pilot.id);
@@ -388,11 +374,9 @@ function showFilteredPilots(filteredPilots) {
     }
   });
   
-  // 更新空状态显示
   updateEmptyState(filteredPilots.length > 0);
 }
 
-// 更新空状态显示
 function updateEmptyState(hasResults) {
   const emptyState = document.querySelector('.empty-state');
   if (emptyState) {
@@ -400,11 +384,9 @@ function updateEmptyState(hasResults) {
   }
 }
 
-// 初始化搜索功能
 function initSearch() {
   const searchInput = document.getElementById('pilot-search');
   
-  // 收集所有机师数据
   const pilotCards = document.querySelectorAll('.pilot-card');
   allPilots = Array.from(pilotCards).map(card => {
     const pilotNameElement = card.querySelector('.pilot-name');
@@ -418,19 +400,15 @@ function initSearch() {
     };
   });
   
-  // 绑定搜索事件
   searchInput.addEventListener('input', function() {
-    // 实时搜索
     performSearch();
   });
   
-  // 绑定键盘事件
   searchInput.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
       performSearch();
     } else if (event.key === 'Backspace' || event.key === 'Delete') {
-      // 退格键和删除键触发搜索
       setTimeout(() => performSearch(), 10);
     }
   });
@@ -448,7 +426,6 @@ document.addEventListener('DOMContentLoaded', function () {
     icon.textContent = '▲';
   }
   
-  // 初始化搜索功能
   initSearch();
 });
 </script>

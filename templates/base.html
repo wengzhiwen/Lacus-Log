@@ -59,7 +59,6 @@
   </main>
 
   <script>
-    // 移动端菜单切换
     document.addEventListener('DOMContentLoaded', function() {
       const menuToggle = document.getElementById('menuToggle');
       const topNav = document.getElementById('topNav');
@@ -70,7 +69,6 @@
           menuToggle.classList.toggle('active');
         });
         
-        // 点击菜单外部关闭菜单
         document.addEventListener('click', function(event) {
           if (!menuToggle.contains(event.target) && !topNav.contains(event.target)) {
             topNav.classList.remove('active');
@@ -81,8 +79,6 @@
     });
   </script>
   <script>
-    // 全站禁用回车键触发表单提交（必须点击提交按钮）
-    // 允许 textarea 与可编辑区域正常换行
     (function() {
       function shouldBlockEnter(event) {
         if (!event) return false;

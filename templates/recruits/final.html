@@ -11,7 +11,6 @@
 
   <h1 class="title">结束征召</h1>
 
-  <!-- 机师信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -44,7 +43,6 @@
     </div>
   </div>
 
-  <!-- 结束征召表单 -->
   <form method="POST" action="#" class="final-form" id="final_form" onsubmit="return false;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
@@ -72,7 +70,6 @@
       </div>
     </div>
 
-    <!-- 机师分配信息 -->
     <div class="form-section" id="assignment_section" style="display: none;">
       <h3 class="section-title">机师分配信息</h3>
       
@@ -99,7 +96,6 @@
       </div>
     </div>
 
-    <!-- 其他信息 -->
     <div class="form-section">
       <h3 class="section-title">其他信息</h3>
       
@@ -163,7 +159,6 @@
   </form>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
   <button type="submit" form="final_form" class="btn btn-primary">确认决策</button>
@@ -449,7 +444,6 @@ function toggleAssignmentFields() {
     internInfo.style.display = 'none';
     notRecruitInfo.style.display = 'none';
     
-    // 设置必填
     document.getElementById('owner').setAttribute('required', '');
     document.getElementById('platform').setAttribute('required', '');
   } else if (decision === '实习机师') {
@@ -458,7 +452,6 @@ function toggleAssignmentFields() {
     internInfo.style.display = 'flex';
     notRecruitInfo.style.display = 'none';
     
-    // 设置必填
     document.getElementById('owner').setAttribute('required', '');
     document.getElementById('platform').setAttribute('required', '');
   } else if (decision === '不征召') {
@@ -467,7 +460,6 @@ function toggleAssignmentFields() {
     internInfo.style.display = 'none';
     notRecruitInfo.style.display = 'flex';
     
-    // 移除必填
     document.getElementById('owner').removeAttribute('required');
     document.getElementById('platform').removeAttribute('required');
   } else {
@@ -476,13 +468,11 @@ function toggleAssignmentFields() {
     internInfo.style.display = 'none';
     notRecruitInfo.style.display = 'none';
     
-    // 移除必填
     document.getElementById('owner').removeAttribute('required');
     document.getElementById('platform').removeAttribute('required');
   }
 }
 
-// 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
   toggleAssignmentFields();
 });

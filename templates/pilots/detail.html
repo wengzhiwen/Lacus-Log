@@ -52,7 +52,6 @@
       </div>
     </div>
 
-    <!-- 基础信息 -->
     <div class="info-section">
       <h3 class="section-title">基础信息</h3>
       <div class="info-grid">
@@ -82,7 +81,6 @@
       </div>
     </div>
 
-    <!-- 业务信息 -->
     <div class="info-section">
       <h3 class="section-title">业务信息</h3>
       <div class="info-grid">
@@ -109,7 +107,6 @@
       </div>
     </div>
 
-    <!-- 分成信息 -->
     <div class="info-section">
       <h3 class="section-title">分成信息</h3>
       <div class="commission-card">
@@ -143,7 +140,6 @@
       </div>
     </div>
 
-    <!-- 系统信息 -->
     <div class="info-section">
       <h3 class="section-title">系统信息</h3>
       <div class="info-grid">
@@ -159,7 +155,6 @@
     </div>
   </div>
 
-  <!-- 操作按钮 -->
   <div class="action-section">
     <h3 class="section-title">操作</h3>
     <div class="action-buttons">
@@ -189,7 +184,6 @@
   </div>
 </section>
 
-<!-- 变更记录模态框 -->
 <div id="changesModal" class="modal" style="display: none;">
   <div class="modal-content">
     <div class="modal-header">
@@ -204,7 +198,7 @@
 </div>
 
 <style>
-/* 分成信息卡片样式 */
+
 .commission-card {
   background: #fff;
   border-radius: 8px;
@@ -290,7 +284,7 @@
   color: #666666;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .commission-header {
     flex-direction: column;
@@ -302,7 +296,7 @@
   }
 }
 
-/* 主播详情页面样式 */
+
 .pilot-detail {
   max-width: 800px;
   margin: 0 auto;
@@ -367,13 +361,13 @@
   font-weight: 500;
 }
 
-/* 主播分类徽章样式 */
+
 .rank-候选人 { background: var(--table-header); color: var(--muted); }
 .rank-试播主播 { background: #FFF3CD; color: #856404; }
 .rank-实习主播 { background: #D4EDDA; color: #155724; }
 .rank-正式主播 { background: var(--brand); color: #fff; }
 
-/* 状态徽章样式 */
+
 .status-未招募 { background: var(--table-header); color: var(--muted); }
 .status-不招募 { background: #F8D7DA; color: #721C24; }
 .status-已招募 { background: #FFF3CD; color: #856404; }
@@ -430,7 +424,7 @@
   flex-wrap: wrap;
 }
 
-/* 模态框样式 */
+
 .modal {
   position: fixed;
   top: 0;
@@ -538,7 +532,7 @@
   color: var(--hud-green);
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .pilot-info-card .card-header {
     flex-direction: column;
@@ -622,7 +616,6 @@ function hideChanges() {
   modal.style.display = 'none';
 }
 
-// 点击模态框外部关闭
 document.getElementById('changesModal').addEventListener('click', function(e) {
   if (e.target === this) {
     hideChanges();

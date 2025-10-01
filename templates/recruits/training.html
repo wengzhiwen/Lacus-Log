@@ -11,7 +11,6 @@
 
   <h1 class="title">试播招募</h1>
 
-  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -40,7 +39,6 @@
     </div>
   </div>
 
-  <!-- 试播招募表单 -->
   <form method="POST" action="{{ url_for('recruit.training_recruit', recruit_id=recruit.id) }}" class="training-form" id="training_form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
@@ -68,7 +66,6 @@
       </div>
     </div>
 
-    <!-- 试播时间 -->
     <div class="form-section" id="training_time_section" style="display: none;">
       <h3 class="section-title">试播安排</h3>
       
@@ -82,7 +79,6 @@
       </div>
     </div>
 
-    <!-- 主播基本信息 -->
     <div class="form-section" id="pilot_info_section" style="display: none;">
       <h3 class="section-title">主播基本信息</h3>
       
@@ -115,7 +111,6 @@
       </div>
     </div>
 
-    <!-- 其他信息 -->
     <div class="form-section">
       <h3 class="section-title">其他信息</h3>
       
@@ -163,7 +158,6 @@
   </form>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
   <button type="submit" form="training_form" class="btn btn-primary">确认决策</button>
@@ -449,7 +443,6 @@ function toggleTrainingFields() {
     recruitInfo.style.display = 'flex';
     notRecruitInfo.style.display = 'none';
     
-    // 设置必填
     document.getElementById('training_time').setAttribute('required', '');
     document.getElementById('real_name').setAttribute('required', '');
     document.getElementById('birth_year').setAttribute('required', '');
@@ -460,7 +453,6 @@ function toggleTrainingFields() {
     recruitInfo.style.display = 'none';
     notRecruitInfo.style.display = 'flex';
     
-    // 移除必填
     document.getElementById('training_time').removeAttribute('required');
     document.getElementById('real_name').removeAttribute('required');
     document.getElementById('birth_year').removeAttribute('required');
@@ -471,7 +463,6 @@ function toggleTrainingFields() {
     recruitInfo.style.display = 'none';
     notRecruitInfo.style.display = 'none';
     
-    // 移除必填
     document.getElementById('training_time').removeAttribute('required');
     document.getElementById('real_name').removeAttribute('required');
     document.getElementById('birth_year').removeAttribute('required');
@@ -479,7 +470,6 @@ function toggleTrainingFields() {
   }
 }
 
-// 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
   toggleTrainingFields();
 });

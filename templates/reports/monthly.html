@@ -7,7 +7,6 @@
   <h1 class="page-title">📒 开播月报</h1>
 </div>
 
-<!-- 月份导航 -->
 <div class="date-navigation">
   <div class="date-controls">
     <a href="{{ url_for('report.monthly_report', month=pagination.prev_month) }}" class="btn btn-secondary btn-sm">← 上个月</a>
@@ -19,7 +18,6 @@
   </div>
 </div>
 
-<!-- 月度汇总数据 -->
 <div class="summary-section">
   <h2 class="section-title">{{ report_month.strftime('%Y年%m月') }} 月度汇总</h2>
   <div class="summary-cards">
@@ -57,7 +55,6 @@
   </div>
 </div>
 
-<!-- 月报明细 -->
 <div class="details-section">
   <h2 class="section-title">月报明细</h2>
   {% if details %}
@@ -113,7 +110,7 @@
 </div>
 
 <style>
-/* 月份导航样式 */
+
 .date-navigation {
   display: flex;
   justify-content: space-between;
@@ -142,7 +139,7 @@
   gap: 8px;
 }
 
-/* 汇总卡片样式 */
+
 .summary-section {
   margin: 24px 0;
 }
@@ -192,7 +189,7 @@
   margin-top: 4px;
 }
 
-/* 明细表格样式 */
+
 .details-section {
   margin: 24px 0;
 }
@@ -230,7 +227,7 @@
 .report-table td.fixed-col {
   position: sticky;
   left: 0;
-  background: #fff; /* 不透明底色，避免被遮挡时透出 */
+  background: #fff; 
   background-clip: padding-box;
   min-width: 120px;
   max-width: 120px;
@@ -239,11 +236,11 @@
   white-space: nowrap;
 }
 
-/* 提升层叠顺序，确保首列在横向滚动时不被内容遮挡 */
+
 .report-table td.fixed-col { z-index: 4; }
 .report-table th.fixed-col { z-index: 5; }
 
-/* 分隔视觉，横向滚动时更清晰 */
+
 .report-table td.fixed-col { box-shadow: 2px 0 0 #eee; }
 .report-table th.fixed-col { box-shadow: 2px 0 0 #ddd; }
 
@@ -257,7 +254,7 @@
   color: var(--muted);
 }
 
-/* 主播链接样式 */
+
 .pilot-link {
   color: var(--brand);
   text-decoration: none;
@@ -269,13 +266,13 @@
   text-decoration: underline;
 }
 
-/* 负数样式 */
+
 .negative-value {
   color: #dc3545 !important;
   font-weight: 600;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .date-navigation {
     flex-direction: column;
@@ -307,7 +304,6 @@
 </style>
 
 <script>
-// 月份选择器事件
 document.getElementById('monthSelector').addEventListener('change', function() {
   const selectedMonth = this.value;
   if (selectedMonth) {

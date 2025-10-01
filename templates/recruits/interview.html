@@ -13,7 +13,6 @@
 
   <h1 class="title">面试决策</h1>
 
-  <!-- 主播信息卡片 -->
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-avatar">
@@ -42,7 +41,6 @@
     </div>
   </div>
 
-  <!-- 面试决策表单 -->
   <form method="POST" action="{{ url_for('recruit.interview_decision', recruit_id=recruit.id) }}" class="recruit-form" id="interview-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 
@@ -67,7 +65,6 @@
       </div>
     </div>
 
-    <!-- 主播基本信息（当选择预约试播时显示） -->
     <div class="form-section" id="pilot-basic-info" style="display: none;">
       <h3 class="section-title">主播基本信息</h3>
       <div class="info-notice">
@@ -109,7 +106,6 @@
   </form>
 </section>
 
-<!-- 底部操作按钮 -->
 <div class="footbar">
   <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
   <button type="submit" form="interview-form" class="btn btn-primary">确认决策</button>
@@ -122,7 +118,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const realNameInput = document.getElementById('real_name');
     const birthYearInput = document.getElementById('birth_year');
     
-    // 监听面试决策变化
     interviewDecision.addEventListener('change', function() {
         if (this.value === '预约试播') {
             pilotBasicInfo.style.display = 'block';
@@ -135,7 +130,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 表单提交
     const form = document.getElementById('interview-form');
     form.addEventListener('submit', function(e) {
         const decision = interviewDecision.value;

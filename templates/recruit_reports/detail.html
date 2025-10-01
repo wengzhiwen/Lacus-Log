@@ -12,12 +12,10 @@
       <h1 class="page-title">{{ page_title }}</h1>
     </div>
     <div class="header-right">
-      <!-- 预留空间，保持布局平衡 -->
     </div>
   </div>
 </div>
 
-<!-- 招募记录列表 -->
 <div class="recruits-section">
   {% if recruits %}
     <div class="recruit-groups">
@@ -66,7 +64,7 @@
 </div>
 
 <style>
-/* 页面头部样式 */
+
 .page-header {
   margin-bottom: 24px;
 }
@@ -88,7 +86,7 @@
 
 .header-right {
   flex: 0 0 auto;
-  width: 100px; /* 与左侧按钮宽度保持一致 */
+  width: 100px; 
 }
 
 .page-title {
@@ -98,7 +96,7 @@
   color: var(--text);
 }
 
-/* 招募记录列表样式（与招募列表保持一致） */
+
 .recruits-section {
   margin-top: 24px;
 }
@@ -120,7 +118,7 @@
   border-bottom: 2px solid var(--brand);
 }
 
-/* 卡片列表（对齐招募列表） */
+
 .record-cards { 
   display: block; 
 }
@@ -200,7 +198,7 @@
   font-weight: 500; 
 }
 
-/* 状态样式（与招募列表保持一致） */
+
 .status-待面试 { background: #e3f2fd; color: #1565c0; }
 .status-待预约试播 { background: #f3e5f5; color: #7b1fa2; }
 .status-待试播 { background: #fff3e0; color: #ef6c00; }
@@ -226,7 +224,7 @@
   color: var(--brand); 
 }
 
-/* 空状态样式 */
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;
@@ -250,7 +248,7 @@
   margin-bottom: 24px;
 }
 
-/* 移动端适配（与招募列表保持一致） */
+
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
@@ -282,10 +280,8 @@
 </style>
 
 <script>
-// 跳转到招募详情页面
 function goToRecruitDetail(recruitId) {
   const detailUrl = '{{ url_for("recruit.detail_recruit", recruit_id="PLACEHOLDER") }}'.replace('PLACEHOLDER', recruitId);
-  // 添加来源参数，用于返回按钮逻辑
   const urlWithParams = detailUrl + '?from=recruit_report_detail&report_date={{ report_date }}&report_range={{ range_param }}&report_metric={{ metric }}&report_recruiter={{ recruiter_id }}';
   window.location.href = urlWithParams;
 }

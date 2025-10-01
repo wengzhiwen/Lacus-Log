@@ -4,7 +4,6 @@
 
 {% block content %}
 <section class="commission-form">
-  <!-- 页面头部 -->
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">编辑分成调整记录 - {{ pilot.nickname }}</h1>
@@ -15,7 +14,6 @@
     </div>
   </div>
 
-  <!-- 表单卡片 -->
   <div class="form-card">
     <div class="card-header">
       <h3 class="card-title">调整记录信息</h3>
@@ -23,7 +21,6 @@
     <div class="form-content">
       <form method="POST" id="commissionForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-        <!-- 只读字段 -->
         <div class="form-group">
           <label for="adjustment_date" class="form-label">调整日</label>
           <input type="text" class="form-input readonly" id="adjustment_date" 
@@ -42,7 +39,6 @@
           <div class="form-help">分成比例范围：0-50%，表示主播在总流水中的分成比例</div>
         </div>
 
-        <!-- 可编辑字段 -->
         <div class="form-group">
           <label for="remark" class="form-label">备注</label>
           <textarea class="form-textarea" id="remark" name="remark" rows="3" 
@@ -50,7 +46,6 @@
           <div class="form-help">可以修改备注信息</div>
         </div>
 
-        <!-- 状态切换 -->
         <div class="form-group">
           <label class="form-label">记录状态</label>
           <div class="status-toggle">
@@ -72,7 +67,6 @@
           </div>
         </div>
 
-        <!-- 当前分成计算 -->
         <div class="preview-section">
           <h4 class="preview-title">当前分成计算</h4>
           <div class="preview-card">
@@ -92,7 +86,6 @@
           <div class="preview-formula">计算公式：({{ commission.commission_rate }}%/50%) * 42% = {{ "%.1f"|format((commission.commission_rate / 50.0) * 42.0) }}%</div>
         </div>
 
-        <!-- 记录信息 -->
         <div class="record-info">
           <h4 class="info-title">记录信息</h4>
           <div class="info-grid">
@@ -133,7 +126,7 @@
 </section>
 
 <style>
-/* 编辑分成调整记录页面样式 */
+
 .commission-form {
   max-width: 600px;
   margin: 0 auto;
@@ -257,7 +250,7 @@
   color: #666666;
 }
 
-/* 状态切换开关样式 */
+
 .status-toggle {
   display: flex;
   align-items: center;
@@ -431,7 +424,7 @@ input:checked + .toggle-slider:before {
   border-top: 1px solid #A9A9A9;
 }
 
-/* 移动端适配 */
+
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
@@ -461,28 +454,22 @@ input:checked + .toggle-slider:before {
 </style>
 
 <script>
-// 实时更新分成计算预览
 function updatePreview() {
   const commissionRate = parseFloat(document.getElementById('commission_rate').value) || 0;
   
-  // 计算主播收入和公司收入
   const pilotIncome = (commissionRate / 50.0) * 42.0;
   const companyIncome = 42.0 - pilotIncome;
   
-  // 更新预览显示
   document.querySelector('.preview-item:nth-child(1) .preview-value').textContent = commissionRate + '%';
   document.querySelector('.preview-item:nth-child(2) .preview-value').textContent = pilotIncome.toFixed(1) + '%';
   document.querySelector('.preview-item:nth-child(3) .preview-value').textContent = companyIncome.toFixed(1) + '%';
   
-  // 更新计算公式
   document.querySelector('.preview-formula').textContent = 
     `计算公式：(${commissionRate}%/50%) * 42% = ${pilotIncome.toFixed(1)}%`;
 }
 
-// 绑定输入事件
 document.getElementById('commission_rate').addEventListener('input', updatePreview);
 
-// 状态切换事件
 document.getElementById('is_active').addEventListener('change', function() {
   const statusLabel = document.getElementById('status-label');
   const helpText = this.parentElement.parentElement.querySelector('.form-help');
@@ -496,7 +483,6 @@ document.getElementById('is_active').addEventListener('change', function() {
   }
 });
 
-// 页面加载时初始化预览
 document.addEventListener('DOMContentLoaded', updatePreview);
 </script>
 {% endblock %}

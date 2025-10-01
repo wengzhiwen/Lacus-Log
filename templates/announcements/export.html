@@ -161,12 +161,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const yearSelect = document.getElementById('year');
     const monthSelect = document.getElementById('month');
 
-    // 设置年月选项
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
 
-    // 填充年份选项
     for (let year = currentYear - 1; year <= currentYear + 1; year++) {
         const option = document.createElement('option');
         option.value = year;
@@ -175,7 +173,6 @@ document.addEventListener('DOMContentLoaded', function() {
         yearSelect.appendChild(option);
     }
 
-    // 填充月份选项
     for (let month = 1; month <= 12; month++) {
         const option = document.createElement('option');
         option.value = month;
@@ -184,7 +181,6 @@ document.addEventListener('DOMContentLoaded', function() {
         monthSelect.appendChild(option);
     }
 
-    // 加载主播并初始化本地搜索
     function buildPilotDisplay(p) {
         const nickname = p.nickname || '';
         const agePart = p.age ? `(${p.age})` : '';
