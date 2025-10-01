@@ -577,6 +577,35 @@ def get_local_month_from_string(month_str):
         return None
 
 
+def get_week_start_tuesday(local_date: datetime) -> datetime:
+    """获取包含给定本地日期的“周二开始”的周起始（周二 00:00:00）。
+
+    规则：周定义为周二至次周一，共7天。
+    """
+    # Python weekday(): Monday=0 ... Sunday=6
+    # 我们要找最近的周二（weekday=1），不晚于当前local_date的那一天
+    target_weekday = 1  # Tuesday
+    delta_days = (local_date.weekday() - target_weekday) % 7
+    week_start = local_date - timedelta(days=delta_days)
+    return week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def get_default_week_start_for_now_prev_week() -> datetime:
+    """默认选择：当前日期的前一周的周二起始（本地时间）。"""
+    now_utc = get_current_utc_time()
+    today_local = utc_to_local(now_utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    prev_week_date = today_local - timedelta(days=7)
+    return get_week_start_tuesday(prev_week_date)
+
+
+def get_local_date_from_string_safe(date_str):
+    """解析 YYYY-MM-DD 为本地日期对象（安全封装）。"""
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d') if date_str else None
+    except ValueError:
+        return None
+
+
 def get_battle_records_for_month(year, month, owner_id=None, mode: str = 'all'):
     """获取指定月份开播记录。"""
     month_start = datetime(year, month, 1, 0, 0, 0, 0)
@@ -958,4 +987,200 @@ def export_monthly_csv():
 
     response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
 
+    return response
+
+
+# —— 开播周报 ——
+
+@cached_monthly_report()
+def _calculate_weekly_summary(week_start_local: datetime, owner_id: str = None, mode: str = 'all'):
+    """计算周度汇总（周二至次周一，不计返点）。"""
+    week_end_local = week_start_local + timedelta(days=7) - timedelta(microseconds=1)
+    week_records = get_battle_records_for_date_range(week_start_local, week_end_local + timedelta(microseconds=1), owner_id, mode)
+
+    pilot_ids = set()
+    total_revenue = Decimal('0')
+    total_base_salary = Decimal('0')
+    total_pilot_share = Decimal('0')
+    total_company_share = Decimal('0')
+
+    for record in week_records:
+        pilot_ids.add(str(record.pilot.id))
+        total_revenue += record.revenue_amount
+        total_base_salary += record.base_salary
+        record_date = utc_to_local(record.start_time).date()
+        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
+        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+        total_pilot_share += commission_amounts['pilot_amount']
+        total_company_share += commission_amounts['company_amount']
+
+    profit_7d = total_company_share - total_base_salary
+
+    conversion_rate = None
+    if total_base_salary > 0:
+        conversion_rate = int((total_revenue / total_base_salary) * 100)
+
+    return {
+        'pilot_count': len(pilot_ids),
+        'revenue_sum': total_revenue,
+        'basepay_sum': total_base_salary,
+        'pilot_share_sum': total_pilot_share,
+        'company_share_sum': total_company_share,
+        'profit_7d': profit_7d,
+        'conversion_rate': conversion_rate
+    }
+
+
+@cached_monthly_report()
+def _calculate_weekly_details(week_start_local: datetime, owner_id: str = None, mode: str = 'all'):
+    """计算周度明细（按主播聚合，不计返点）。"""
+    week_end_local = week_start_local + timedelta(days=7) - timedelta(microseconds=1)
+    week_records = get_battle_records_for_date_range(week_start_local, week_end_local + timedelta(microseconds=1), owner_id, mode)
+
+    pilot_stats = {}
+    for record in week_records:
+        pilot_id = str(record.pilot.id)
+        if pilot_id not in pilot_stats:
+            pilot_stats[pilot_id] = {
+                'pilot': record.pilot,
+                'records_count': 0,
+                'total_duration': 0.0,
+                'total_revenue': Decimal('0'),
+                'total_base_salary': Decimal('0')
+            }
+        pilot_stats[pilot_id]['records_count'] += 1
+        if record.duration_hours:
+            pilot_stats[pilot_id]['total_duration'] += record.duration_hours
+        pilot_stats[pilot_id]['total_revenue'] += record.revenue_amount
+        pilot_stats[pilot_id]['total_base_salary'] += record.base_salary
+
+    details = []
+    for pilot_id, stats in pilot_stats.items():
+        pilot = stats['pilot']
+        pilot_display = f"{pilot.nickname}"
+        if pilot.real_name:
+            pilot_display += f"（{pilot.real_name}）"
+        gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
+        current_year = datetime.now().year
+        age = current_year - pilot.birth_year if pilot.birth_year else "未知"
+        gender_age = f"{age}-{gender_icon}"
+        owner = pilot.owner.nickname if pilot.owner else "未知"
+        rank = pilot.rank.value
+
+        records_count = stats['records_count']
+        avg_duration = stats['total_duration'] / records_count if records_count > 0 else 0
+
+        # 分成（逐条按日比例计算并累加）
+        total_pilot_share = Decimal('0')
+        total_company_share = Decimal('0')
+        for record in week_records:
+            if str(record.pilot.id) != pilot_id:
+                continue
+            record_date = utc_to_local(record.start_time).date()
+            commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
+            commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
+            total_pilot_share += commission_amounts['pilot_amount']
+            total_company_share += commission_amounts['company_amount']
+
+        total_profit = total_company_share - stats['total_base_salary']
+
+        detail = {
+            'pilot_id': pilot_id,
+            'pilot_display': pilot_display,
+            'gender_age': gender_age,
+            'owner': owner,
+            'rank': rank,
+            'records_count': records_count,
+            'avg_duration': round(avg_duration, 1),
+            'total_revenue': stats['total_revenue'],
+            'total_pilot_share': total_pilot_share,
+            'total_company_share': total_company_share,
+            'total_base_salary': stats['total_base_salary'],
+            'total_profit': total_profit
+        }
+        details.append(detail)
+
+    details.sort(key=lambda x: x['total_profit'])
+    return details
+
+
+@report_bp.route('/weekly')
+@roles_accepted('gicho', 'kancho')
+def weekly_report():
+    """开播周报页面（周二-次周一，默认当前日期的前一周）。"""
+    week_start_str = request.args.get('week_start')
+    if week_start_str:
+        week_start_local = get_local_date_from_string_safe(week_start_str)
+        if not week_start_local:
+            logger.error('无效的周起始参数：%s', week_start_str)
+            return '无效的周起始格式', 400
+        week_start_local = get_week_start_tuesday(week_start_local)
+    else:
+        week_start_local = get_default_week_start_for_now_prev_week()
+
+    owner_id = request.args.get('owner', 'all') or 'all'
+    mode = request.args.get('mode', 'all') or 'all'
+    if mode not in ['all', 'online', 'offline']:
+        mode = 'all'
+
+    logger.info('生成开播周报，起始周二：%s，直属运营：%s，开播方式：%s', week_start_local.strftime('%Y-%m-%d'), owner_id, mode)
+
+    week_summary = _calculate_weekly_summary(week_start_local, owner_id, mode)
+    details = _calculate_weekly_details(week_start_local, owner_id, mode)
+
+    owners = _get_recruit_users()
+
+    pagination = {
+        'week_start': week_start_local.strftime('%Y-%m-%d'),
+        'prev_week_start': (week_start_local - timedelta(days=7)).strftime('%Y-%m-%d'),
+        'next_week_start': (week_start_local + timedelta(days=7)).strftime('%Y-%m-%d')
+    }
+
+    return render_template('reports/weekly.html', week_summary=week_summary, details=details, pagination=pagination, owners=owners, selected_owner=owner_id, selected_mode=mode)
+
+
+@report_bp.route('/weekly/export.csv')
+@roles_accepted('gicho', 'kancho')
+def export_weekly_csv():
+    """导出开播周报CSV（不含返点列）。"""
+    week_start_str = request.args.get('week_start')
+    if week_start_str:
+        week_start_local = get_local_date_from_string_safe(week_start_str)
+        if not week_start_local:
+            logger.error('无效的周起始参数：%s', week_start_str)
+            return '无效的周起始格式', 400
+        week_start_local = get_week_start_tuesday(week_start_local)
+    else:
+        week_start_local = get_default_week_start_for_now_prev_week()
+
+    owner_id = request.args.get('owner', 'all') or 'all'
+    mode = request.args.get('mode', 'all') or 'all'
+    if mode not in ['all', 'online', 'offline']:
+        mode = 'all'
+
+    logger.info('导出开播周报CSV，起始周二：%s，直属运营：%s，开播方式：%s', week_start_local.strftime('%Y-%m-%d'), owner_id, mode)
+
+    details = _calculate_weekly_details(week_start_local, owner_id, mode)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    output.write('\ufeff')
+
+    headers = ['主播', '性别年龄', '直属运营', '主播分类', '周累计开播记录数', '周均播时(小时)', '周累计流水(元)', '周累计主播分成(元)', '周累计公司分成(元)', '周累计底薪(元)', '周累计毛利(元)']
+    writer.writerow(headers)
+
+    for detail in details:
+        row = [
+            detail['pilot_display'], detail['gender_age'], detail['owner'], detail['rank'], detail['records_count'], f"{detail['avg_duration']:.1f}", f"{detail['total_revenue']:.2f}",
+            f"{detail['total_pilot_share']:.2f}", f"{detail['total_company_share']:.2f}", f"{detail['total_base_salary']:.2f}", f"{detail['total_profit']:.2f}"
+        ]
+        writer.writerow(row)
+
+    csv_content = output.getvalue()
+    output.close()
+
+    filename = f"开播周报_{week_start_local.strftime('%Y%m%d')}.csv"
+    encoded_filename = quote(filename.encode('utf-8'))
+
+    response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}"})
     return response
