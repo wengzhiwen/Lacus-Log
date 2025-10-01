@@ -20,7 +20,7 @@
 
 <div class="summary-section">
   <h2 class="section-title">{{ report_month.strftime('%Y年%m月') }} 月度汇总</h2>
-  <div class="summary-cards">
+  <div class="summary-cards blast-intro" data-animate-group="month">
     <div class="summary-card">
       <div class="card-label">总主播数量</div>
       <div class="card-value">{{ month_summary.pilot_count }}</div>
@@ -156,6 +156,39 @@
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 20px;
+}
+
+/* —— 月报“炸裂”入场动画（区别于日报） —— */
+.blast-intro {
+  perspective: 800px;
+  perspective-origin: 50% 35%;
+}
+
+.blast-intro .summary-card {
+  transform: translateY(40px) translateZ(-120px) rotateZ(-8deg) rotateX(8deg) scale(0.6);
+  opacity: 0;
+  filter: blur(8px) saturate(0.9);
+  will-change: transform, opacity, filter, box-shadow;
+}
+
+.blast-intro.play .summary-card {
+  animation: blastIn 900ms cubic-bezier(0.2, 0.8, 0.2, 1.1) forwards;
+}
+
+.blast-intro.play .summary-card:nth-child(1) { animation-delay: 0ms; }
+.blast-intro.play .summary-card:nth-child(2) { animation-delay: 80ms; }
+.blast-intro.play .summary-card:nth-child(3) { animation-delay: 160ms; }
+.blast-intro.play .summary-card:nth-child(4) { animation-delay: 240ms; }
+.blast-intro.play .summary-card:nth-child(5) { animation-delay: 320ms; }
+.blast-intro.play .summary-card:nth-child(6) { animation-delay: 400ms; }
+.blast-intro.play .summary-card:nth-child(7) { animation-delay: 480ms; }
+.blast-intro.play .summary-card:nth-child(8) { animation-delay: 560ms; }
+
+@keyframes blastIn {
+  0%   { transform: translateY(40px) translateZ(-120px) rotateZ(-8deg) rotateX(8deg) scale(0.6); opacity: 0; filter: blur(8px) saturate(0.9); box-shadow: 0 0 0 rgba(0,0,0,0); }
+  55%  { transform: translateY(-6px) translateZ(30px) rotateZ(3deg) rotateX(-2deg) scale(1.08); opacity: 1; filter: blur(1.5px) saturate(1.05); box-shadow: 0 22px 40px rgba(0,0,0,0.18); }
+  75%  { transform: translateY(3px) translateZ(10px) rotateZ(-1deg) rotateX(1deg) scale(0.995); opacity: 1; filter: blur(0.5px) saturate(1.0); box-shadow: 0 14px 28px rgba(0,0,0,0.14); }
+  100% { transform: translateY(0) translateZ(0) rotateZ(0) rotateX(0) scale(1); opacity: 1; filter: blur(0) saturate(1.0); box-shadow: 0 8px 18px rgba(0,0,0,0.10); }
 }
 
 .summary-card {
@@ -309,6 +342,14 @@ document.getElementById('monthSelector').addEventListener('change', function() {
   if (selectedMonth) {
     window.location.href = '{{ url_for("report.monthly_report") }}?month=' + selectedMonth;
   }
+});
+
+// 页面加载后触发“炸裂”入场动画
+window.addEventListener('load', function() {
+  var groups = document.querySelectorAll('.blast-intro');
+  groups.forEach(function(g) {
+    setTimeout(function(){ g.classList.add('play'); }, 50);
+  });
 });
 </script>
 {% endblock %}

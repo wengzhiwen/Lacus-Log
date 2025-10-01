@@ -34,7 +34,7 @@
 
 <div class="summary-section">
   <h2 class="section-title">本月数据（截至{{ pagination.date }}）</h2>
-  <div class="summary-cards">
+  <div class="summary-cards epic-intro" data-animate-group="month">
     <div class="summary-card">
       <div class="card-label">总主播数量</div>
       <div class="card-value">{{ month_summary.pilot_count }}</div>
@@ -66,7 +66,7 @@
       <div class="card-label">累计公司分成</div>
       <div class="card-value">¥{{ "{:,.2f}".format(month_summary.company_share_sum) }}</div>
     </div>
-    <div class="summary-card">
+    <div class="summary-card {% if month_summary.operating_profit < 0 %}danger-outline{% endif %}">
       <div class="card-label">运营利润估算</div>
       <div class="card-value">¥{{ "{:,.2f}".format(month_summary.operating_profit) }}</div>
     </div>
@@ -75,7 +75,7 @@
 
 <div class="summary-section">
   <h2 class="section-title">{{ pagination.date }} 日报汇总</h2>
-  <div class="summary-cards">
+  <div class="summary-cards epic-intro" data-animate-group="day">
     <div class="summary-card">
       <div class="card-label">总主播数量</div>
       <div class="card-value">{{ day_summary.pilot_count }}</div>
@@ -102,6 +102,11 @@
     <div class="summary-card">
       <div class="card-label">累计公司分成</div>
       <div class="card-value">¥{{ "{:,.2f}".format(day_summary.company_share_sum) }}</div>
+    </div>
+    {% set today_profit_no_rebate = (day_summary.company_share_sum or 0) - (day_summary.basepay_sum or 0) %}
+    <div class="summary-card {% if today_profit_no_rebate < 0 %}danger-outline{% endif %}">
+      <div class="card-label">今日盈亏（不计返点）</div>
+      <div class="card-value">¥{{ "{:,.2f}".format(today_profit_no_rebate) }}</div>
     </div>
   </div>
 </div>
@@ -260,6 +265,38 @@
   margin-bottom: 20px;
 }
 
+/* —— 戏剧化“前方飞入”动画 —— */
+.epic-intro {
+  perspective: 1000px;
+  perspective-origin: 50% 40%;
+}
+
+.epic-intro .summary-card {
+  transform: translateZ(240px) translateY(30px) scale(0.85) rotateX(-12deg);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.epic-intro.play .summary-card {
+  animation: epicFlyIn 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.epic-intro.play .summary-card:nth-child(1) { animation-delay: 0ms; }
+.epic-intro.play .summary-card:nth-child(2) { animation-delay: 90ms; }
+.epic-intro.play .summary-card:nth-child(3) { animation-delay: 180ms; }
+.epic-intro.play .summary-card:nth-child(4) { animation-delay: 270ms; }
+.epic-intro.play .summary-card:nth-child(5) { animation-delay: 360ms; }
+.epic-intro.play .summary-card:nth-child(6) { animation-delay: 450ms; }
+.epic-intro.play .summary-card:nth-child(7) { animation-delay: 540ms; }
+.epic-intro.play .summary-card:nth-child(8) { animation-delay: 630ms; }
+
+@keyframes epicFlyIn {
+  0%   { transform: translateZ(240px) translateY(30px) scale(0.85) rotateX(-12deg); opacity: 0; }
+  60%  { transform: translateZ(-20px) translateY(-6px) scale(1.02) rotateX(2deg); opacity: 1; }
+  85%  { transform: translateZ(10px) translateY(0px) scale(0.995) rotateX(0deg); opacity: 1; }
+  100% { transform: translateZ(0) translateY(0) scale(1) rotateX(0); opacity: 1; }
+}
+
 .summary-card {
   background: #fff;
   border: 1px solid var(--gray);
@@ -271,6 +308,11 @@
 
 .summary-card:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* 负数警示边框 */
+.summary-card.danger-outline {
+  border-color: #dc3545;
 }
 
 .card-label {
@@ -437,6 +479,15 @@ document.getElementById('ownerSelector').addEventListener('change', function() {
     url += '&owner=' + selectedOwner;
   }
   window.location.href = url;
+});
+
+// 页面加载后触发史诗入场动画
+window.addEventListener('load', function() {
+  var groups = document.querySelectorAll('.epic-intro');
+  groups.forEach(function(g) {
+    // 使用微小延时保证渲染完成后再加class，避免初始状态闪烁
+    setTimeout(function(){ g.classList.add('play'); }, 50);
+  });
 });
 </script>
 {% endblock %}
