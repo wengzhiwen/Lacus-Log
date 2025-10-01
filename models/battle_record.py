@@ -17,36 +17,27 @@ class BattleRecord(Document):
     所有日期时间在数据库中存储为UTC，界面显示和输入为GMT+8。
     """
 
-    # 关联信息字段
     pilot = ReferenceField(Pilot, required=True)
     related_announcement = ReferenceField(Announcement)  # 关联通告（可选）
 
-    # 时间信息字段
     start_time = DateTimeField(required=True)
     end_time = DateTimeField(required=True)
 
-    # 金额字段（人民币元，两位小数）
     revenue_amount = DecimalField(min_value=0, precision=2, default=Decimal('0.00'))
     base_salary = DecimalField(min_value=0, precision=2, default=Decimal('0.00'))
 
-    # 坐标快照字段（仅线下必填；线上可为空）
     x_coord = StringField(required=False, max_length=50)  # 基地
     y_coord = StringField(required=False, max_length=50)  # 场地
     z_coord = StringField(required=False, max_length=50)  # 坐席
 
-    # 开播方式（可从主播复制，但允许修改）
     work_mode = EnumField(WorkMode, required=True)
 
-    # 直属运营快照（从主播复制，仅显示不可编辑；可为空表示主播无直属运营）
     owner_snapshot = ReferenceField(User, required=False)
 
-    # 登记人（首次登记的操作人，仅显示不可编辑）
     registered_by = ReferenceField(User, required=True)
 
-    # 备注
     notes = StringField(max_length=200)
 
-    # 系统字段
     created_at = DateTimeField(default=get_current_utc_time)
     updated_at = DateTimeField(default=get_current_utc_time)
 
@@ -54,39 +45,30 @@ class BattleRecord(Document):
         'collection':
         'battle_records',
         'indexes': [
-            # 主要查询索引：时间范围查询（开播日报的核心查询）
             {
                 'fields': ['start_time']
             },
-            # 复合索引：时间 + 主播（用于主播相关的时间范围查询）
             {
                 'fields': ['start_time', 'pilot']
             },
-            # 复合索引：时间 + 直属运营快照（用于筛选查询）
             {
                 'fields': ['start_time', 'owner_snapshot']
             },
-            # 复合索引：主播 + 时间（用于主播业绩等查询）
             {
                 'fields': ['pilot', '-start_time']
             },
-            # 排序索引：时间 + 流水（用于列表排序）
             {
                 'fields': ['-start_time', '-revenue_amount']
             },
-            # 单字段索引：直属运营快照
             {
                 'fields': ['owner_snapshot']
             },
-            # 单字段索引：登记人
             {
                 'fields': ['registered_by']
             },
-            # 单字段索引：关联通告
             {
                 'fields': ['related_announcement']
             },
-            # 月度查询优化索引：年月 + 主播（用于月度统计）
             {
                 'fields': ['start_time', 'pilot', 'revenue_amount']
             },
@@ -97,12 +79,10 @@ class BattleRecord(Document):
         """数据验证和业务规则检查"""
         super().clean()
 
-        # 时间验证：结束时间必须大于开始时间
         if self.start_time and self.end_time:
             if self.end_time <= self.start_time:
                 raise ValueError("结束时间必须大于开始时间")
 
-        # 金额验证：保留两位小数
         if self.revenue_amount is not None:
             if self.revenue_amount < 0:
                 raise ValueError("流水金额不能为负数")
@@ -111,12 +91,10 @@ class BattleRecord(Document):
             if self.base_salary < 0:
                 raise ValueError("底薪金额不能为负数")
 
-        # 开播地点坐标：仅线下必填
         if self.work_mode == WorkMode.OFFLINE:
             if not (self.x_coord and self.y_coord and self.z_coord):
                 raise ValueError("线下开播时必须填写基地/场地/坐席")
         else:
-            # 线上：确保为空，避免误保存
             self.x_coord = self.x_coord or ''
             self.y_coord = self.y_coord or ''
             self.z_coord = self.z_coord or ''

@@ -53,7 +53,6 @@ def plan_fire(job_code: str, fire_dt_utc: datetime) -> None:
         fire_dt_utc: 下一次触发UTC时间（必须是tz-aware的UTC时间）
     """
     minute = _to_minute_str(fire_dt_utc)
-    # 使用底层collection执行upsert，避免动态属性的类型检查告警
     coll = JobPlan._get_collection()  # type: ignore[attr-defined]  # noqa: SLF001, E1101
     coll.update_one(
         {'job_code': job_code, 'fire_minute': minute},
@@ -79,7 +78,6 @@ def consume_fire(job_code: str, fire_dt_utc: datetime) -> bool:
         fire_dt_utc: 本次应触发的UTC时间（分钟精度）
     """
     minute = _to_minute_str(fire_dt_utc)
-    # 使用底层collection原子删除
     coll = JobPlan._get_collection()  # type: ignore[attr-defined]  # noqa: SLF001, E1101
     doc = coll.find_one_and_delete({'job_code': job_code, 'fire_minute': minute})
     return doc is not None

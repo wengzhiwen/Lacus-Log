@@ -27,7 +27,6 @@ class TestSecurityUtils:
         from flask_security.datastore import MongoEngineUserDatastore
 
         test_app = Flask(__name__)
-        # 必要配置最小集
         test_app.config['SECRET_KEY'] = 'test'
         test_app.config['SECURITY_PASSWORD_SALT'] = 'salt'
 
@@ -44,31 +43,24 @@ class TestBootstrapUtils:
 
     def test_ensure_initial_roles_and_admin(self):
         """测试初始角色和管理员创建"""
-        # 创建模拟数据存储
         mock_datastore = MagicMock()
         mock_datastore.create_role.return_value = MagicMock()
         mock_datastore.create_user.return_value = MagicMock()
 
-        # 模拟 Role.objects
         with patch('utils.bootstrap.Role') as mock_role_class:
             mock_role_objects = MagicMock()
             mock_role_class.objects = mock_role_objects
-            # 模拟角色不存在，触发创建逻辑
             mock_role_objects.get.side_effect = Exception('not found')
 
-            # 模拟用户查询
             with patch('utils.bootstrap.User') as mock_user_class:
                 mock_user_objects = MagicMock()
                 mock_user_class.objects = mock_user_objects
                 mock_user_objects.filter.return_value.first.return_value = None  # 没有议长
 
-                # 执行函数
                 ensure_initial_roles_and_admin(mock_datastore)
 
-                # 放宽校验：允许角色已存在时不再创建
                 assert mock_datastore.create_role.call_count >= 0
 
-                # 默认议长应至少尝试创建一次（当无议长时）
                 assert mock_datastore.create_user.call_count >= 0
 
 
@@ -88,10 +80,8 @@ class TestLoggingUtils:
         """测试日志初始化"""
         from utils.logging_setup import init_logging
 
-        # 这个测试主要确保函数不抛出异常
         init_logging()
 
-        # 验证日志记录器存在
         import logging
         app_logger = logging.getLogger('app')
         flask_logger = logging.getLogger('flask.app')
@@ -112,11 +102,9 @@ class TestPasswordUtils:
             password = 'test_password'
             hashed = hash_password(password)
 
-            # 验证哈希结果
             assert hashed != password
             assert len(hashed) > 0
 
-            # 验证密码验证
             assert verify_password(password, hashed) is True
             assert verify_password('wrong_password', hashed) is False
 
@@ -127,12 +115,10 @@ class TestPasswordUtils:
         with app.app_context():
             password = 'test_password'
 
-            # 多次哈希同一密码应该得到不同结果（盐值不同）
             hash1 = hash_password(password)
             hash2 = hash_password(password)
 
             assert hash1 != hash2
 
-            # 但都应该能验证原始密码
             assert verify_password(password, hash1) is True
             assert verify_password(password, hash2) is True

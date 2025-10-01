@@ -11,7 +11,6 @@ from models.pilot import PilotCommission
 from utils.logging_setup import get_logger
 from utils.timezone_helper import local_to_utc
 
-# 创建日志器
 logger = get_logger('commission_helper')
 
 
@@ -30,9 +29,7 @@ def get_pilot_commission_rate_for_date(pilot_id, target_date):
     """
     logger.debug(f"获取机师 {pilot_id} 在日期 {target_date} 的分成比例")
 
-    # 将目标日期转换为UTC时间（当天00:00:00）
     if isinstance(target_date, date) and not isinstance(target_date, datetime):
-        # 如果是date对象，转换为datetime对象
         target_datetime = datetime.combine(target_date, datetime.min.time())
     else:
         target_datetime = target_date
@@ -41,19 +38,15 @@ def get_pilot_commission_rate_for_date(pilot_id, target_date):
 
     logger.debug(f"目标日期UTC时间: {target_utc}")
 
-    # 查询机师的所有有效调整记录，按调整日升序排列
     commissions = PilotCommission.objects(pilot_id=pilot_id, is_active=True).order_by('adjustment_date')
     commission_list = list(commissions)
 
     logger.debug(f"机师 {pilot_id} 的有效调整记录数量: {len(commission_list)}")
 
     if not commission_list:
-        # 如果没有记录，返回默认20%
         logger.debug(f"机师 {pilot_id} 无调整记录，使用默认分成比例20%")
         return 20.0, None, "默认分成比例"
 
-    # 根据目标日期找到生效的分成记录
-    # 找到调整日小于等于目标日期的最后一条记录
     effective_commission = None
     for commission in reversed(commission_list):  # 从最新记录开始查找
         logger.debug(f"检查调整记录: 调整日={commission.adjustment_date}, 分成比例={commission.commission_rate}%")
@@ -62,7 +55,6 @@ def get_pilot_commission_rate_for_date(pilot_id, target_date):
             logger.debug(f"找到生效记录: 调整日={commission.adjustment_date}, 分成比例={commission.commission_rate}%")
             break
 
-    # 如果没有找到生效的记录（所有记录的调整日都是未来日期），返回默认值
     if effective_commission is None:
         logger.debug(f"机师 {pilot_id} 所有调整记录都是未来日期，使用默认分成比例20%")
         return 20.0, None, "默认分成比例"
@@ -83,14 +75,11 @@ def calculate_commission_distribution(commission_rate):
     """
     logger.debug(f"计算分成分配，机师分成比例: {commission_rate}%")
 
-    # 固定参数
     BASE_RATE = 50.0  # 50%
     COMPANY_RATE = 42.0  # 42%
 
-    # 机师收入 = (分成比例/50%) * 42%
     pilot_income = (commission_rate / BASE_RATE) * COMPANY_RATE
 
-    # 公司收入 = 42% - 机师收入
     company_income = COMPANY_RATE - pilot_income
 
     logger.debug("分成分配计算结果:")
@@ -113,10 +102,8 @@ def calculate_commission_amounts(revenue_amount, commission_rate):
     """
     logger.debug(f"计算分成金额，流水: {revenue_amount}元，机师分成比例: {commission_rate}%")
 
-    # 获取分成分配比例
     distribution = calculate_commission_distribution(commission_rate)
 
-    # 计算具体金额
     pilot_amount = Decimal(str(revenue_amount)) * Decimal(str(distribution['pilot_income'])) / Decimal('100')
     company_amount = Decimal(str(revenue_amount)) * Decimal(str(distribution['company_income'])) / Decimal('100')
 

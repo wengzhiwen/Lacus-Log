@@ -33,7 +33,6 @@ class TestBattleRecordTimeLogic:
 
         record = create_battle_record(pilot, start_time, end_time)
 
-        # 验证播时计算
         expected_duration = 2.5
         actual_duration = (record.end_time - record.start_time).total_seconds() / 3600
         assert abs(actual_duration - expected_duration) < 0.01
@@ -45,7 +44,6 @@ class TestBattleRecordTimeLogic:
 
         record = create_battle_record(pilot, start_time, end_time)
 
-        # 验证跨天播时计算
         expected_duration = 4.0  # 4小时
         actual_duration = (record.end_time - record.start_time).total_seconds() / 3600
         assert abs(actual_duration - expected_duration) < 0.01
@@ -55,7 +53,6 @@ class TestBattleRecordTimeLogic:
         start_time = datetime(2025, 9, 10, 12, 0)
         end_time = datetime(2025, 9, 10, 10, 0)  # 结束时间早于开始时间
 
-        # 这应该通过业务逻辑验证被拒绝
         import pytest
         with pytest.raises(Exception):
             create_battle_record(pilot, start_time, end_time)
@@ -113,7 +110,6 @@ class TestBattleRecordWorkModeRules:
         start_time = datetime(2025, 9, 10, 10, 0)
         end_time = datetime(2025, 9, 10, 12, 0)
 
-        # 线下模式，提供坐标
         record = create_battle_record(pilot, start_time, end_time, x='X1', y='Y1', z='1', work_mode=WorkMode.OFFLINE)
 
         assert record.work_mode == WorkMode.OFFLINE
@@ -126,7 +122,6 @@ class TestBattleRecordWorkModeRules:
         start_time = datetime(2025, 9, 10, 10, 0)
         end_time = datetime(2025, 9, 10, 12, 0)
 
-        # 线上模式，不提供坐标
         record = create_battle_record(pilot, start_time, end_time, x='', y='', z='', work_mode=WorkMode.ONLINE)
 
         assert record.work_mode == WorkMode.ONLINE
@@ -139,11 +134,9 @@ class TestBattleRecordWorkModeRules:
         start_time = datetime(2025, 9, 10, 10, 0)
         end_time = datetime(2025, 9, 10, 12, 0)
 
-        # 测试线下模式
         offline_record = create_battle_record(pilot, start_time, end_time, work_mode=WorkMode.OFFLINE)
         assert offline_record.work_mode.value == '线下'
 
-        # 测试线上模式
         online_record = create_battle_record(pilot, start_time, end_time, work_mode=WorkMode.ONLINE)
         assert online_record.work_mode.value == '线上'
 
@@ -163,7 +156,6 @@ class TestBattleRecordBusinessRules:
 
         record = create_battle_record(pilot, start_time, end_time)
 
-        # 验证所属快照
         assert record.owner_snapshot is not None
         assert record.owner_snapshot.id == pilot.owner.id
 
@@ -174,7 +166,6 @@ class TestBattleRecordBusinessRules:
 
         record = create_battle_record(pilot, start_time, end_time)
 
-        # 验证登记人
         assert record.registered_by is not None
 
     def test_notes_field(self, pilot):
@@ -203,25 +194,21 @@ class TestBattleRecordIntegration:
         owner = create_user('owner_user')
         pilot = create_pilot('作战机师', owner=owner)
 
-        # 创建
         start_time = datetime(2025, 9, 10, 10, 0)
         end_time = datetime(2025, 9, 10, 12, 0)
         record = create_battle_record(pilot, start_time, end_time, revenue=Decimal('200.00'), base_salary=Decimal('100.00'))
 
-        # 读取
         saved_record = BattleRecord.objects(id=record.id).first()
         assert saved_record is not None
         assert saved_record.pilot.id == pilot.id
         assert saved_record.revenue_amount == Decimal('200.00')
 
-        # 更新
         saved_record.revenue_amount = Decimal('250.00')
         saved_record.save()
 
         updated_record = BattleRecord.objects(id=record.id).first()
         assert updated_record.revenue_amount == Decimal('250.00')
 
-        # 删除
         record_id = record.id
         record.delete()
 

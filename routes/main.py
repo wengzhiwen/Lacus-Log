@@ -26,7 +26,6 @@ def _calculate_dashboard_data():
     """计算仪表板数据"""
     now = get_current_utc_time()
 
-    # 使用GMT+8本地时间进行日期归属，与征召日报保持一致
     current_local = utc_to_local(now)
     today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
     today_local_end = today_local_start + timedelta(days=1)
@@ -34,54 +33,42 @@ def _calculate_dashboard_data():
     yesterday_local_end = today_local_start
     week_local_start = today_local_start - timedelta(days=7)
 
-    # 转换为UTC时间范围进行数据库查询
     today_start_utc = local_to_utc(today_local_start)
     today_end_utc = local_to_utc(today_local_end)
     yesterday_start_utc = local_to_utc(yesterday_local_start)
     yesterday_end_utc = local_to_utc(yesterday_local_end)
     week_start_utc = local_to_utc(week_local_start)
 
-    # 今日作战计划数量（开播起始日为当前日期的作战计划）
     today_count = Announcement.objects(start_time__gte=today_start_utc, start_time__lt=today_end_utc).count()
 
-    # 昨日作战计划数量
     yesterday_count = Announcement.objects(start_time__gte=yesterday_start_utc, start_time__lt=yesterday_end_utc).count()
 
-    # 计算环比（百分比，保留一位小数）
     if yesterday_count > 0:
         change_rate = round(((today_count - yesterday_count) / yesterday_count) * 100, 1)
     else:
         change_rate = 100.0 if today_count > 0 else 0.0
 
-    # 最近7天的日均作战计划数量
     week_count = Announcement.objects(start_time__gte=week_start_utc, start_time__lt=today_end_utc).count()
     week_avg = round(week_count / 7, 1)
 
-    # 作战记录统计（流水金额统计）
-    # 今日流水（所有作战记录中的开始日期为今天的作战记录的流水总和）
     br_today_records = BattleRecord.objects(start_time__gte=today_start_utc, start_time__lt=today_end_utc)
     br_today_revenue = sum(record.revenue_amount for record in br_today_records)
 
-    # 昨日流水
     br_yesterday_records = BattleRecord.objects(start_time__gte=yesterday_start_utc, start_time__lt=yesterday_end_utc)
     br_yesterday_revenue = sum(record.revenue_amount for record in br_yesterday_records)
 
-    # 7日平均流水
     br_week_records = BattleRecord.objects(start_time__gte=week_start_utc, start_time__lt=today_end_utc)
     br_week_revenue = sum(record.revenue_amount for record in br_week_records)
     br_week_avg_revenue = br_week_revenue / 7
 
-    # 机师统计
     serving_status = [Status.RECRUITED, Status.CONTRACTED]
     pilot_serving = Pilot.objects(status__in=serving_status).count()
     pilot_intern_serving = Pilot.objects(rank=Rank.INTERN, status__in=serving_status).count()
     pilot_official_serving = Pilot.objects(rank=Rank.OFFICIAL, status__in=serving_status).count()
 
-    # 候补机师统计
     candidate_not_recruited = Pilot.objects(rank=Rank.CANDIDATE, status=Status.NOT_RECRUITED).count()
     trainee_serving = Pilot.objects(rank=Rank.TRAINEE, status__in=serving_status).count()
 
-    # 征召统计（使用统一的工具函数）
     from utils.recruit_stats import calculate_recruit_today_stats
     today_recruit_stats = calculate_recruit_today_stats()
     recruit_today_appointments = today_recruit_stats['appointments']
@@ -89,22 +76,17 @@ def _calculate_dashboard_data():
     recruit_today_new_recruits = today_recruit_stats['new_recruits']
 
     return {
-        # 作战计划统计（保留现有键名以兼容模板）
         'today_count': today_count,
         'change_rate': change_rate,
         'week_avg': week_avg,
-        # 作战记录统计
         'battle_today_revenue': br_today_revenue,
         'battle_yesterday_revenue': br_yesterday_revenue,
         'battle_week_avg_revenue': br_week_avg_revenue,
-        # 机师统计
         'pilot_serving_count': pilot_serving,
         'pilot_intern_serving_count': pilot_intern_serving,
         'pilot_official_serving_count': pilot_official_serving,
-        # 候补机师统计
         'candidate_not_recruited_count': candidate_not_recruited,
         'trainee_serving_count': trainee_serving,
-        # 征召统计
         'recruit_today_appointments': recruit_today_appointments,
         'recruit_today_interviews': recruit_today_interviews,
         'recruit_today_new_recruits': recruit_today_new_recruits,
@@ -117,11 +99,8 @@ def home():
     """用户首页（移动端优先）。"""
     logger.debug('用户进入首页：%s', getattr(current_user, 'username', 'anonymous'))
 
-    # 计算仪表板数据
     dashboard_data = _calculate_dashboard_data()
 
-    # 节日图片仪表显示时间窗口（GMT+8）：
-    # 2025-10-01 00:00 至 2025-10-05 23:59 之间显示
     now_local = get_current_local_time()
     start_local = now_local.replace(year=2025, month=10, day=1, hour=0, minute=0, second=0, microsecond=0)
     end_local = now_local.replace(year=2025, month=10, day=5, hour=23, minute=59, second=59, microsecond=0)
@@ -139,7 +118,6 @@ def change_password():
         new_password = request.form.get('new_password', '').strip()
         confirm_password = request.form.get('new_password_confirm', '').strip()
 
-        # 验证输入
         if not current_password or not new_password or not confirm_password:
             flash('所有字段都是必填的', 'error')
             return render_template('security/change_password.html')
@@ -152,12 +130,10 @@ def change_password():
             flash('新密码长度至少6个字符', 'error')
             return render_template('security/change_password.html')
 
-        # 验证当前密码
         if not current_user.verify_and_update_password(current_password):
             flash('当前密码错误', 'error')
             return render_template('security/change_password.html')
 
-        # 更新密码
         current_user.password = hash_password(new_password)
         current_user.save()
 

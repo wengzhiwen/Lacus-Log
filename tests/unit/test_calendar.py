@@ -29,12 +29,10 @@ class TestCalendarMonthData:
         return create_battle_area('X1', 'Y1', '1')
 
     def test_month_daily_counts(self, pilot, area):
-        # 构造9月1日、3日、5日各一条通告
         create_announcement(pilot, area, datetime(2025, 9, 1, 10))
         create_announcement(pilot, area, datetime(2025, 9, 3, 14))
         create_announcement(pilot, area, datetime(2025, 9, 5, 20))
 
-        # 模拟API逻辑：查询当月范围并聚合
         first_day = datetime(2025, 9, 1)
         last_day = datetime(2025, 9, 30, 23, 59, 59)
         first_day_utc = local_to_utc(first_day)
@@ -67,12 +65,10 @@ class TestCalendarWeekData:
         return [create_battle_area('X1', 'Y1', str(i)) for i in range(1, 4)]
 
     def test_week_used_areas(self, pilot, areas):
-        # 周一、周三、周五各一条，使用不同区域
         create_announcement(pilot, areas[0], datetime(2025, 9, 8, 10))  # 周一
         create_announcement(pilot, areas[1], datetime(2025, 9, 10, 14))  # 周三
         create_announcement(pilot, areas[2], datetime(2025, 9, 12, 20))  # 周五
 
-        # 模拟API逻辑：按周聚合
         date = datetime(2025, 9, 10)  # 周三
         days_since_monday = date.weekday()
         week_start = date - timedelta(days=days_since_monday)
@@ -114,11 +110,9 @@ class TestCalendarDayData:
         return [create_battle_area('X1', 'Y1', str(i)) for i in range(1, 3)]
 
     def test_day_timeline_by_area(self, pilot, areas):
-        # 同一天不同区域、不同时段
         create_announcement(pilot, areas[0], datetime(2025, 9, 10, 9), duration_hours=2.0)
         create_announcement(pilot, areas[1], datetime(2025, 9, 10, 14), duration_hours=3.0)
 
-        # 模拟API逻辑：按区域分组时间轴
         date = datetime(2025, 9, 10)
         day_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)

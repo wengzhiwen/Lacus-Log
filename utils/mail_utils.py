@@ -20,13 +20,10 @@ from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from utils.logging_setup import get_logger
 
-# 加载环境变量
 load_dotenv()
 
-# 配置日志
 logger = get_logger('mail')
 
-# SMTP 配置信息 - 从环境变量读取
 SMTP_SERVER = os.getenv('SES_SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.getenv('SES_SMTP_PORT', '587'))
 SMTP_USER = os.getenv('SES_SMTP_USER')  # SMTP服务器登录用户名
@@ -64,7 +61,6 @@ def _apply_inline_table_styles(html: str) -> str:
     }
 
     def _merge_style(existing: str, defaults: dict) -> str:
-        # 将已有style分解为键值映射
         style_map = {}
         if existing:
             parts = [p.strip() for p in existing.split(';') if p.strip()]
@@ -73,12 +69,10 @@ def _apply_inline_table_styles(html: str) -> str:
                     k, v = p.split(':', 1)
                     style_map[k.strip().lower()] = v.strip()
 
-        # 仅在不存在时补齐默认项（不覆盖已有，例如 text-align:right 保留）
         for k, v in defaults.items():
             if k not in style_map:
                 style_map[k] = v
 
-        # 重新拼装为 style 字符串，保持稳定顺序
         ordered_keys = list(defaults.keys()) + [k for k in style_map.keys() if k not in defaults]
         return "; ".join(f"{k}: {style_map[k]}" for k in ordered_keys if k in style_map)
 
@@ -105,7 +99,6 @@ def _create_html_template(content: str) -> str:
     """
     send_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # 为表格添加内联样式（若存在表格）
     content = _apply_inline_table_styles(content)
 
     return f"""
@@ -172,7 +165,6 @@ def send_email(recipients: List[str], subject: str, content: str, html_content: 
         发送成功返回True，失败返回False
     """
     try:
-        # 检查配置
         if not SMTP_USER:
             logger.error("SMTP_USER环境变量未配置")
             return False
@@ -181,29 +173,24 @@ def send_email(recipients: List[str], subject: str, content: str, html_content: 
             logger.error("SMTP_PASSWORD环境变量未配置")
             return False
 
-        # 创建邮件对象
         msg = MIMEMultipart('alternative')
         msg['From'] = SENDER_EMAIL
         msg['To'] = ', '.join(recipients)
         msg['Subject'] = subject
 
-        # 创建邮件内容
         text_body = _create_text_template(content)
         text_part = MIMEText(text_body, 'plain', 'utf-8')
         msg.attach(text_part)
 
-        # 如果有HTML内容，也添加HTML部分
         if html_content:
             html_body = _create_html_template(html_content)
             html_part = MIMEText(html_body, 'html', 'utf-8')
             msg.attach(html_part)
         else:
-            # 如果没有提供HTML内容，使用纯文本内容生成HTML
             html_body = _create_html_template(content)
             html_part = MIMEText(html_body, 'html', 'utf-8')
             msg.attach(html_part)
 
-        # MAIL_DEBUG: 不走SMTP，直接将HTML落盘
         if MAIL_DEBUG:
             try:
                 os.makedirs('log/mail', exist_ok=True)
@@ -218,15 +205,12 @@ def send_email(recipients: List[str], subject: str, content: str, html_content: 
                 logger.error("[DEBUG] 邮件落盘失败: %s", str(exc))
                 return False
 
-        # 创建SSL上下文
         context = ssl.create_default_context()
 
-        # 连接SMTP服务器并发送邮件
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls(context=context)  # 启用TLS加密
             server.login(SMTP_USER, SMTP_PASSWORD)
 
-            # 发送邮件
             text = msg.as_string()
             server.sendmail(SENDER_EMAIL, recipients, text)
 
@@ -265,7 +249,6 @@ def send_email_md(recipients: List[str], subject: str, md_content: str) -> bool:
         发送成功返回True，失败返回False
     """
     try:
-        # 渲染Markdown为HTML
         rendered_html_body = markdown.markdown(
             md_content or "",
             extensions=[
@@ -383,7 +366,6 @@ def main():
     print("🚀 启动Lacus-Log主播管理系统邮件发送工具")
     print("=" * 50)
 
-    # 检查配置
     if not SMTP_USER:
         print("⚠️  请先在.env文件中配置SMTP信息！")
         print("需要配置的环境变量：")
@@ -404,14 +386,12 @@ def main():
         print("需要在.env文件中配置SENDER_EMAIL环境变量")
         return
 
-    # 获取收件人邮箱
     try:
         recipient = input("请输入收件人邮箱地址: ").strip()
         if not recipient:
             print("❌ 收件人邮箱不能为空！")
             return
 
-        # 简单的邮箱格式验证
         if "@" not in recipient or "." not in recipient.split("@")[-1]:
             print("❌ 邮箱格式不正确！")
             return
@@ -423,7 +403,6 @@ def main():
         print(f"❌ 输入错误: {str(e)}")
         return
 
-    # 选择测试方式
     print("\n请选择测试方式：")
     print("1) 普通模板（纯文本+HTML）")
     print("2) Markdown（md 渲染为HTML，同时生成纯文本）")
@@ -433,7 +412,6 @@ def main():
         print("❌ 非法选项！仅支持 1 或 2")
         return
 
-    # 发送测试邮件
     print(f"\n📧 准备发送测试邮件到: {recipient}")
     if choice == "2":
         success = __send_test_email_by_md(recipient)

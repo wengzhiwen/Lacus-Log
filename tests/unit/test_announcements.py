@@ -32,7 +32,6 @@ class TestAnnouncementRecurrence:
         base_start = datetime(2025, 9, 10, 10)  # 9月10日10点
         ann = create_announcement(pilot, area, base_start, duration_hours=2.0)
 
-        # 设置每日重复，间隔1天，到9月15日结束
         ann.recurrence_type = RecurrenceType.DAILY
         ann.recurrence_pattern = '{"type": "每日", "interval": 1}'
         ann.recurrence_end = datetime(2025, 9, 15, 23, 59, 59)
@@ -40,7 +39,6 @@ class TestAnnouncementRecurrence:
 
         instances = Announcement.generate_recurrence_instances(ann)
 
-        # 应该生成6个实例：9/10, 9/11, 9/12, 9/13, 9/14, 9/15
         assert len(instances) == 6
         assert instances[0].start_time.date() == datetime(2025, 9, 10).date()
         assert instances[1].start_time.date() == datetime(2025, 9, 11).date()
@@ -51,7 +49,6 @@ class TestAnnouncementRecurrence:
         base_start = datetime(2025, 9, 8, 10)  # 周一
         ann = create_announcement(pilot, area, base_start, duration_hours=2.0)
 
-        # 设置每周重复，间隔1周，周一和周三，到9月30日结束
         ann.recurrence_type = RecurrenceType.WEEKLY
         ann.recurrence_pattern = '{"type": "每周", "interval": 1, "days_of_week": [1, 3]}'  # 周一、周三
         ann.recurrence_end = datetime(2025, 9, 30, 23, 59, 59)
@@ -59,11 +56,8 @@ class TestAnnouncementRecurrence:
 
         instances = Announcement.generate_recurrence_instances(ann)
 
-        # 应该生成多个实例，每个周一和周三
         assert len(instances) > 0
-        # 验证第一个是周一
         assert instances[0].start_time.weekday() == 0  # 周一
-        # 验证第二个是周三
         assert instances[1].start_time.weekday() == 2  # 周三
 
     def test_custom_dates_recurrence(self, pilot, area):
@@ -71,15 +65,12 @@ class TestAnnouncementRecurrence:
         base_start = datetime(2025, 9, 10, 10)
         ann = create_announcement(pilot, area, base_start, duration_hours=2.0)
 
-        # 设置自定义日期：9/10, 9/15, 9/20
         ann.recurrence_type = RecurrenceType.CUSTOM
         ann.recurrence_pattern = '{"type": "自定义", "specific_dates": ["2025-09-10", "2025-09-15", "2025-09-20"]}'
         ann.save()
 
         instances = Announcement.generate_recurrence_instances(ann)
 
-        # 应该生成3个实例
-        # 当前实现包含基准通告 + 3 个自定义日期实例
         assert len(instances) == 4
         assert instances[0].start_time.date() == datetime(2025, 9, 10).date()
         dates = {inst.start_time.date() for inst in instances}
@@ -110,13 +101,10 @@ class TestAnnouncementConflicts:
 
     def test_area_conflict_detection(self, pilot1, pilot2, area1):
         """测试区域冲突检测"""
-        # 创建第一个通告：9月10日10:00-12:00
         ann1 = create_announcement(pilot1, area1, datetime(2025, 9, 10, 10), duration_hours=2.0)
 
-        # 创建第二个通告：同一区域，时间重叠 9月10日11:00-13:00
         ann2 = create_announcement(pilot2, area1, datetime(2025, 9, 10, 11), duration_hours=2.0)
 
-        # 检查ann2的冲突
         conflicts = ann2.check_conflicts(exclude_self=True)
 
         assert len(conflicts['area_conflicts']) == 1
@@ -125,13 +113,10 @@ class TestAnnouncementConflicts:
 
     def test_pilot_conflict_detection(self, pilot1, area1, area2):
         """测试机师冲突检测"""
-        # 创建第一个通告：机师1在区域1，9月10日10:00-12:00
         ann1 = create_announcement(pilot1, area1, datetime(2025, 9, 10, 10), duration_hours=2.0)
 
-        # 创建第二个通告：同一机师在不同区域，时间重叠 9月10日11:00-13:00
         ann2 = create_announcement(pilot1, area2, datetime(2025, 9, 10, 11), duration_hours=2.0)
 
-        # 检查ann2的冲突
         conflicts = ann2.check_conflicts(exclude_self=True)
 
         assert len(conflicts['pilot_conflicts']) == 1
@@ -140,13 +125,10 @@ class TestAnnouncementConflicts:
 
     def test_no_conflict_scenario(self, pilot1, pilot2, area1, area2):
         """测试无冲突场景"""
-        # 创建第一个通告：机师1在区域1，9月10日10:00-12:00
         create_announcement(pilot1, area1, datetime(2025, 9, 10, 10), duration_hours=2.0)
 
-        # 创建第二个通告：机师2在区域2，不同时间 9月10日14:00-16:00
         ann2 = create_announcement(pilot2, area2, datetime(2025, 9, 10, 14), duration_hours=2.0)
 
-        # 检查ann2的冲突
         conflicts = ann2.check_conflicts(exclude_self=True)
 
         assert len(conflicts['area_conflicts']) == 0
@@ -156,13 +138,10 @@ class TestAnnouncementConflicts:
         """测试边界情况：相同开始时间"""
         start_time = datetime(2025, 9, 10, 10)
 
-        # 创建第一个通告
         ann1 = create_announcement(pilot1, area1, start_time, duration_hours=2.0)
 
-        # 创建第二个通告：相同开始时间
         ann2 = create_announcement(pilot2, area1, start_time, duration_hours=1.5)
 
-        # 检查ann2的冲突
         conflicts = ann2.check_conflicts(exclude_self=True)
 
         assert len(conflicts['area_conflicts']) == 1
@@ -184,7 +163,6 @@ class TestAnnouncementIntegration:
         pilot = create_pilot('复杂机师', owner=owner)
         area = create_battle_area('X1', 'Y1', '1')
 
-        # 创建每日重复的通告
         base_start = datetime(2025, 9, 10, 10)
         ann = create_announcement(pilot, area, base_start, duration_hours=2.0)
 
@@ -193,18 +171,14 @@ class TestAnnouncementIntegration:
         ann.recurrence_end = datetime(2025, 9, 12, 23, 59, 59)
         ann.save()
 
-        # 生成重复实例
         instances = Announcement.generate_recurrence_instances(ann)
 
-        # 保存所有实例
         for instance in instances[1:]:  # 跳过第一个（已保存）
             instance.save()
 
-        # 验证所有实例都已保存
         saved_announcements = Announcement.objects(pilot=pilot).order_by('start_time')
         assert saved_announcements.count() == 3
 
-        # 验证时间正确
         dates = [ann.start_time.date() for ann in saved_announcements]
         assert datetime(2025, 9, 10).date() in dates
         assert datetime(2025, 9, 11).date() in dates

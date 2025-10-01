@@ -56,7 +56,6 @@ class BattleArea(Document):
     def clean(self):
         """基本验证"""
         super().clean()
-        # 去除首尾空格
         if self.x_coord:
             self.x_coord = self.x_coord.strip()
         if self.y_coord:
@@ -64,7 +63,6 @@ class BattleArea(Document):
         if self.z_coord:
             self.z_coord = self.z_coord.strip()
 
-        # 字段必填控制（StringField required 已管控，再增加最小长度校验）
         if not self.x_coord:
             raise ValueError("基地为必填项")
         if not self.y_coord:

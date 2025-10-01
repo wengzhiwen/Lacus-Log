@@ -18,14 +18,12 @@ def ensure_database_indexes() -> None:
     logger.info('开始确保数据库索引创建...')
 
     try:
-        # 确保核心模型索引
         from models.announcement import Announcement
         from models.battle_area import BattleArea
         from models.battle_record import BattleRecord
         from models.pilot import Pilot
         from models.recruit import Recruit
 
-        # 按依赖顺序创建索引
         models_to_index = [
             (Role, 'Role'),
             (User, 'User'),
@@ -55,7 +53,6 @@ def ensure_initial_roles_and_admin(user_datastore) -> None:
     - 角色：gicho（议长）、kancho（舰长）
     - 默认议长：用户名 zala / 密码 plant4ever
     """
-    # 确保角色存在
     for role_name, desc in [('gicho', '议长'), ('kancho', '舰长')]:
         try:
             if not Role.objects(name=role_name).first():
@@ -64,7 +61,6 @@ def ensure_initial_roles_and_admin(user_datastore) -> None:
         except NotUniqueError:
             pass
 
-    # 如果没有任何议长，则创建默认议长
     gicho_role = Role.objects(name='gicho').first()
     if gicho_role is None:
         logger.error('未找到角色 gicho，无法创建默认议长')

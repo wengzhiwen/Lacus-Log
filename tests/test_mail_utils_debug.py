@@ -10,16 +10,13 @@ import time
 
 
 def _prepare_env():
-    # 准备最小化环境变量，开启调试模式避免真实发送
     os.environ['MAIL_DEBUG'] = 'true'
     os.environ['SES_SMTP_USER'] = os.environ.get('SES_SMTP_USER', 'user@example.com')
     os.environ['SES_SMTP_PASSWORD'] = os.environ.get('SES_SMTP_PASSWORD', 'secret')
     os.environ['SENDER_EMAIL'] = os.environ.get('SENDER_EMAIL', 'sender@example.com')
 
-    # 确保 log/mail 目录存在；清理旧文件，避免断言受历史影响
     log_mail_dir = os.path.join('log', 'mail')
     os.makedirs(log_mail_dir, exist_ok=True)
-    # 不强制删除历史文件，但记录基线用于后续 diff
     baseline = set(glob.glob(os.path.join(log_mail_dir, '*.html')))
     return log_mail_dir, baseline
 
@@ -45,7 +42,6 @@ def test_send_email_md_mail_debug_creates_html():
     new_files = _get_new_filepaths(log_mail_dir, baseline)
     assert len(new_files) >= 1
 
-    # 检查文件内容含表格与内联样式
     with open(new_files[-1], 'r', encoding='utf-8') as f:
         html = f.read()
     assert '<table' in html and 'style="border-collapse' in html

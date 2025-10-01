@@ -13,7 +13,6 @@ class Role(Document):
 
     name = StringField(required=True, unique=True)
     description = StringField()
-    # Flask-Security-Too 可选：基于角色的权限集合
     permissions = ListField(StringField(), default=list)
 
     meta = {
@@ -24,7 +23,6 @@ class Role(Document):
         }],
     }
 
-    # 供 Flask-Security-Too 的身份系统使用
     def get_permissions(self):  # pragma: no cover - 简单返回集合
         return set(self.permissions or [])
 
@@ -44,21 +42,17 @@ class User(Document):
     username = StringField(required=True, unique=True)
     password = StringField(required=True)  # 密文
     nickname = StringField(default='')
-    # 邮箱（可选，用于邮件报表通知）
     email = EmailField(required=False, null=True)
     active = BooleanField(default=True)
     created_at = DateTimeField(default=get_current_utc_time)
-    # Flask-Security-Too 要求：全局唯一标识
     fs_uniquifier = StringField(required=True, unique=True, default=lambda: uuid.uuid4().hex)
 
-    # Trackable（开启 SECURITY_TRACKABLE=True 时建议具备）
     last_login_at = DateTimeField()
     current_login_at = DateTimeField()
     last_login_ip = StringField()
     current_login_ip = StringField()
     login_count = IntField(default=0)
 
-    # 角色关联
     roles = ListField(ReferenceField(Role), default=list)
 
     meta = {
@@ -75,7 +69,6 @@ class User(Document):
         ],
     }
 
-    # ---- Flask-Security 期望的方法 ----
     def verify_and_update_password(self, password: str) -> bool:  # pragma: no cover - 简单委托
         """校验明文密码与存储的哈希。
 
@@ -98,7 +91,6 @@ class User(Document):
         """Flask-Security-Too需要的权限检查方法"""
         return False  # 暂时不实现权限系统
 
-    # ---- Flask-Login 期望的属性/方法 ----
     @property
     def is_active(self) -> bool:  # pragma: no cover - 简单映射
         return bool(self.active)
@@ -112,10 +104,8 @@ class User(Document):
         return False
 
     def get_id(self) -> str:  # pragma: no cover
-        # 使用 fs_uniquifier 作为稳定的会话标识
         return self.fs_uniquifier
 
-    # ---- 业务辅助方法 ----
     @classmethod
     def get_emails_by_role(cls, role_name: str | None = None, only_active: bool = True):
         """按角色名获取邮箱列表；不传角色名时返回全部用户邮箱。
@@ -137,5 +127,4 @@ class User(Document):
             query = query.filter(active=True)
 
         emails = [u.email for u in query if getattr(u, 'email', None)]
-        # 去重并稳定排序
         return sorted(set(emails))

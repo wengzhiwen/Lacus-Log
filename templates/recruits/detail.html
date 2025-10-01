@@ -292,8 +292,6 @@
   <!-- 历史兼容按钮 -->
   {% if recruit.status.value == '已启动' %}
   <a class="btn btn-primary" href="{{ url_for('recruit.training_recruit_page', recruit_id=recruit.id) }}">试播招募</a>
-  {% elif recruit.status.value == '训练征召中' %}
-  <a class="btn btn-primary" href="{{ url_for('recruit.final_recruit_page', recruit_id=recruit.id) }}">结束招募</a>
   {% endif %}
   
   <button class="btn btn-secondary" onclick="showChangesModal()">变更记录</button>

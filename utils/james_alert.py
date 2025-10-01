@@ -20,7 +20,6 @@ from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
 from utils.timezone_helper import get_current_local_time, utc_to_local
 
-# 配置日志
 logger = get_logger('james_alert')
 
 
@@ -37,25 +36,20 @@ def check_james_alert_trigger_conditions(battle_record, old_record=None):
         str: 跳过原因（如果不满足条件）
     """
     try:
-        # 条件1：流水不为0
         if battle_record.revenue_amount <= 0:
             return False, f"流水为{battle_record.revenue_amount}元，不符合触发条件（需要>0）"
 
-        # 条件2：如果是编辑，本次编辑流水有变化
         if old_record is not None:
             if battle_record.revenue_amount == old_record.revenue_amount:
                 return False, f"编辑未改变流水金额（{battle_record.revenue_amount}元），不触发告警"
 
-        # 条件3：流水小于250元
         if battle_record.revenue_amount >= 250:
             return False, f"流水为{battle_record.revenue_amount}元，不符合触发条件（需要<250）"
 
-        # 条件4：播时小于7小时
         duration_hours = battle_record.duration_hours or 0
         if duration_hours >= 7:
             return False, f"播时为{duration_hours}小时，不符合触发条件（需要<7）"
 
-        # 条件5：底薪大于等于100元
         if battle_record.base_salary < 100:
             return False, f"底薪为{battle_record.base_salary}元，不符合触发条件（需要>=100）"
 
@@ -82,22 +76,18 @@ def check_james_alert_calculation_conditions(pilot_stats):
         week_stats = pilot_stats.get('week_stats', {})
         three_day_stats = pilot_stats.get('three_day_stats', {})
 
-        # 条件1：近3日平均时数小于7小时
         three_day_avg_hours = three_day_stats.get('avg_hours', 0)
         if three_day_avg_hours >= 7:
             return False, f"近3日平均时数为{three_day_avg_hours}小时，不符合告警条件（需要<7）"
 
-        # 条件2：近3日盈亏小于100元
         three_day_profit = three_day_stats.get('operating_profit', 0)
         if three_day_profit >= 100:
             return False, f"近3日盈亏为{three_day_profit}元，不符合告警条件（需要<100）"
 
-        # 条件3：近7日盈亏小于250元
         week_profit = week_stats.get('operating_profit', 0)
         if week_profit >= 250:
             return False, f"近7日盈亏为{week_profit}元，不符合告警条件（需要<250）"
 
-        # 条件4：本月运营利润估算小于0
         month_profit = month_stats.get('operating_profit', 0)
         if month_profit >= 0:
             return False, f"本月运营利润估算为{month_profit}元，不符合告警条件（需要<0）"
@@ -120,13 +110,11 @@ def get_pilot_basic_info(pilot):
         dict: 主播基本信息
     """
     try:
-        # 计算年龄
         age = "未知"
         if pilot.birth_year:
             current_year = datetime.now().year
             age = current_year - pilot.birth_year
 
-        # 性别图标
         if pilot.gender == Gender.MALE:
             gender_icon = "♂"
         elif pilot.gender == Gender.FEMALE:
@@ -134,11 +122,9 @@ def get_pilot_basic_info(pilot):
         else:
             gender_icon = "?"
 
-        # 获取当前分成比例
         current_date = get_current_local_time().date()
         commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, current_date)
 
-        # 获取招募负责人（最新的招募记录）
         recruiter_name = "未知"
         try:
             latest_recruit = Recruit.objects.filter(pilot=pilot).order_by('-created_at').first()
@@ -206,10 +192,8 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
         three_day_stats = pilot_stats.get('three_day_stats', {})
         recent_records = pilot_stats.get('recent_records', [])
 
-        # 构建邮件内容
         content = f"""# {pilot_info['nickname']}（{pilot_info['real_name']}）正在受到詹姆斯的关注
 
-## 基本信息
 
 - {pilot_info['age']}岁{pilot_info['gender_icon']} **籍贯** {pilot_info['hometown']}
 - **主播分类**：{pilot_info['rank']}
@@ -218,7 +202,6 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
 - **招募负责人**：{pilot_info['recruiter_name']}
 - **主播状态**：{pilot_info['status']}
 
-## 本月统计
 
 | 指标 | 数值 |
 |------|------|
@@ -230,7 +213,6 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
 | 累计公司分成 | {format_number(month_stats.get('total_company_share', 0))}元 |
 | 运营利润估算 | {format_number(month_stats.get('operating_profit', 0))}元 [日均{format_number(month_stats.get('daily_avg_operating_profit', 0))}元] |
 
-## 近7日统计
 
 | 指标 | 数值 |
 |------|------|
@@ -242,7 +224,6 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
 | 累计公司分成 | {format_number(week_stats.get('total_company_share', 0))}元 |
 | 近日盈亏（不计返点） | {format_number(week_stats.get('operating_profit', 0))}元 [日均{format_number(week_stats.get('daily_avg_operating_profit', 0))}元] |
 
-## 近3日统计
 
 | 指标 | 数值 |
 |------|------|
@@ -254,12 +235,10 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
 | 累计公司分成 | {format_number(three_day_stats.get('total_company_share', 0))}元 |
 | 近日盈亏（不计返点） | {format_number(three_day_stats.get('operating_profit', 0))}元 [日均{format_number(three_day_stats.get('daily_avg_operating_profit', 0))}元] |
 
-## 最近开播记录
 
 | 开播时间 | 结束时间 | 播时 | 流水 | 底薪 | 备注 |
 |----------|----------|------|------|------|------|"""
 
-        # 添加开播记录
         for record in recent_records[:10]:  # 只显示前10条记录以适应邮件格式
             start_time = utc_to_local(record.start_time).strftime('%Y-%m-%d %H:%M') if record.start_time else '-'
             end_time = utc_to_local(record.end_time).strftime('%Y-%m-%d %H:%M') if record.end_time else '-'
@@ -285,7 +264,6 @@ def get_alert_recipients():
         list: 邮箱地址列表
     """
     try:
-        # 获取所有激活的运营和管理员
         recipients = []
         users = User.objects.filter(active=True).all()
 
@@ -294,7 +272,6 @@ def get_alert_recipients():
                 if user.email and user.email.strip():
                     recipients.append(user.email.strip())
 
-        # 去重
         recipients = list(set(recipients))
         logger.debug(f"获取到{len(recipients)}个告警邮件收件人")
 
@@ -317,16 +294,13 @@ def send_james_alert_email(pilot_info, pilot_stats):
         bool: 发送成功返回True，失败返回False
     """
     try:
-        # 获取收件人
         recipients = get_alert_recipients()
         if not recipients:
             logger.warning("没有找到告警邮件收件人，跳过发送")
             return False
 
-        # 构建邮件内容
         email_content = build_james_alert_email_content(pilot_info, pilot_stats)
 
-        # 发送邮件
         subject = "拉科斯警告 詹姆斯正在关注这个主播"
         success = send_email_md(recipients, subject, email_content)
 
@@ -356,37 +330,30 @@ def process_james_alert_async(battle_record, old_record=None):
             pilot = battle_record.pilot
             logger.debug(f"开始处理主播{pilot.nickname}的詹姆斯关注警告检查")
 
-            # 检查触发条件
             trigger_ok, trigger_reason = check_james_alert_trigger_conditions(battle_record, old_record)
             if not trigger_ok:
                 logger.info(f"主播{pilot.nickname}不触发詹姆斯关注警告: {trigger_reason}")
                 return
 
-            # 导入主播业绩计算函数
             from routes.pilot import _calculate_pilot_performance_stats
 
-            # 计算主播业绩
             now_local = get_current_local_time()
             month_stats = _calculate_pilot_performance_stats(pilot, now_local)
             week_stats = _calculate_pilot_performance_stats(pilot, now_local, 7)
             three_day_stats = _calculate_pilot_performance_stats(pilot, now_local, 3)
 
-            # 获取最近开播记录
             from models.battle_record import BattleRecord
             recent_records = BattleRecord.objects.filter(pilot=pilot).order_by('-start_time').limit(30)
 
             pilot_stats = {'month_stats': month_stats, 'week_stats': week_stats, 'three_day_stats': three_day_stats, 'recent_records': list(recent_records)}
 
-            # 检查运算条件
             calc_ok, calc_reason = check_james_alert_calculation_conditions(pilot_stats)
             if not calc_ok:
                 logger.info(f"主播{pilot.nickname}不触发詹姆斯关注告警邮件: {calc_reason}")
                 return
 
-            # 获取主播基本信息
             pilot_info = get_pilot_basic_info(pilot)
 
-            # 发送告警邮件
             success = send_james_alert_email(pilot_info, pilot_stats)
             if success:
                 logger.info(f"主播{pilot.nickname}的詹姆斯关注警告邮件已发送")
@@ -396,7 +363,6 @@ def process_james_alert_async(battle_record, old_record=None):
         except Exception as e:
             logger.error(f"处理詹姆斯关注警告时发生异常: {e}", exc_info=True)
 
-    # 使用线程异步执行，不阻塞主流程
     thread = threading.Thread(target=_process)
     thread.daemon = True
     thread.start()
@@ -417,7 +383,6 @@ def trigger_james_alert_if_needed(battle_record, old_record=None):
             logger.debug("开播记录或主播信息不完整，跳过詹姆斯关注警告检查")
             return
 
-        # 异步处理
         process_james_alert_async(battle_record, old_record)
 
     except Exception as e:

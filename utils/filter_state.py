@@ -36,17 +36,14 @@ def persist_and_restore_filters(page_key: str, *, allowed_keys: Iterable[str], d
     """
     allowed_keys = list(allowed_keys)
 
-    # 本次请求是否显式提供了任一筛选键
     has_filter_in_request = any(key in request.args for key in allowed_keys)
 
-    # 规范化：仅抽取允许的键；若请求未提供则不覆盖
     effective = dict(default_filters)
 
     bucket = _ensure_session_bucket()
     saved: Dict[str, str] = bucket.get(page_key) or {}
 
     if has_filter_in_request:
-        # 记录：将请求中的筛选键保存（允许值为空字符串，以便清除历史筛选）
         to_save = {}
         for key in allowed_keys:
             if key in request.args:
@@ -57,7 +54,6 @@ def persist_and_restore_filters(page_key: str, *, allowed_keys: Iterable[str], d
         session.modified = True
         return effective
 
-    # 未显式提供筛选键，尝试回填历史记录
     if saved:
         for key in allowed_keys:
             if key in saved:

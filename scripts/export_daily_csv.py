@@ -7,7 +7,8 @@
   PYTHONPATH=. venv/bin/python scripts/export_daily_csv.py 2025-09-26 2025-09-28
 无参数时默认导出 2025-09-26 与 2025-09-28。
 """
-#pylint: disable=no-member
+
+# pylint: disable=no-member
 
 import sys
 from pathlib import Path
@@ -22,17 +23,14 @@ from routes.report import export_daily_csv
 
 
 def export_for_date(app: Flask, date_str: str) -> Path:
-    # 确保日志目录存在
     out_dir = Path('log')
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f'daily_report_{date_str.replace("-", "")}.csv'
 
-    # 取默认议长用户
     user = User.objects(username='zala').first()
     if user is None:
         raise RuntimeError('未找到默认议长用户 zala，无法导出')
 
-    # 在测试请求上下文中登录并调用路由函数
     with app.test_request_context(f'/reports/daily/export.csv?date={date_str}'):
         login_user(user)
         resp = export_daily_csv()

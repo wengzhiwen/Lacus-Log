@@ -37,13 +37,11 @@ class TestCalendarAggregation:
 
     def test_aggregate_monthly_data(self, pilot, areas):
         """测试月视图数据聚合"""
-        # 创建9月份的通告
         create_announcement(pilot, areas[0], datetime(2025, 9, 1, 10))
         create_announcement(pilot, areas[1], datetime(2025, 9, 3, 14))
         create_announcement(pilot, areas[2], datetime(2025, 9, 5, 20))
         create_announcement(pilot, areas[0], datetime(2025, 9, 5, 22))  # 同一天多个
 
-        # 聚合月度数据
         result = aggregate_monthly_data(2025, 9)
 
         assert result['year'] == 2025
@@ -58,12 +56,10 @@ class TestCalendarAggregation:
 
     def test_aggregate_weekly_data(self, pilot, areas):
         """测试周视图数据聚合"""
-        # 创建一周的通告（2025-09-08是周一）
         create_announcement(pilot, areas[0], datetime(2025, 9, 8, 10))  # 周一
         create_announcement(pilot, areas[1], datetime(2025, 9, 10, 14))  # 周三
         create_announcement(pilot, areas[2], datetime(2025, 9, 12, 20))  # 周五
 
-        # 使用周三作为参考日期
         reference_date = datetime(2025, 9, 10)
         result = aggregate_weekly_data(reference_date)
 
@@ -73,25 +69,21 @@ class TestCalendarAggregation:
 
         week_data = result['week_data']
 
-        # 验证周一数据
         monday_data = week_data['2025-09-08']
         assert monday_data['day_name'] == '周一'
         assert monday_data['announcement_count'] == 1
         assert 'X1-Y1-1' in monday_data['used_areas']
 
-        # 验证周三数据
         wednesday_data = week_data['2025-09-10']
         assert wednesday_data['day_name'] == '周三'
         assert wednesday_data['announcement_count'] == 1
         assert 'X1-Y1-2' in wednesday_data['used_areas']
 
-        # 验证周五数据
         friday_data = week_data['2025-09-12']
         assert friday_data['day_name'] == '周五'
         assert friday_data['announcement_count'] == 1
         assert 'X2-Y2-1' in friday_data['used_areas']
 
-        # 验证没有通告的日期
         tuesday_data = week_data['2025-09-09']
         assert tuesday_data['day_name'] == '周二'
         assert tuesday_data['announcement_count'] == 0
@@ -99,11 +91,9 @@ class TestCalendarAggregation:
 
     def test_aggregate_daily_data(self, pilot, areas):
         """测试日视图数据聚合"""
-        # 创建同一天不同时段的通告
         create_announcement(pilot, areas[0], datetime(2025, 9, 10, 9), duration_hours=2.0)
         create_announcement(pilot, areas[1], datetime(2025, 9, 10, 14), duration_hours=3.0)
 
-        # 聚合日视图数据
         target_date = datetime(2025, 9, 10)
         result = aggregate_daily_data(target_date)
 
@@ -116,7 +106,6 @@ class TestCalendarAggregation:
         assert 'X1-Y1-1' in area_timelines
         assert 'X1-Y1-2' in area_timelines
 
-        # 验证区域1的时间轴
         area1_timeline = area_timelines['X1-Y1-1']
         assert area1_timeline['area_display'] == 'X1-Y1-1'
         assert len(area1_timeline['slots']) == 1
@@ -124,7 +113,6 @@ class TestCalendarAggregation:
         assert slot1['start_hour'] == 9
         assert slot1['end_hour'] == 11
 
-        # 验证区域2的时间轴
         area2_timeline = area_timelines['X1-Y1-2']
         assert area2_timeline['area_display'] == 'X1-Y1-2'
         assert len(area2_timeline['slots']) == 1
@@ -136,7 +124,6 @@ class TestCalendarAggregation:
 
     def test_aggregate_monthly_data_empty(self):
         """测试空月份数据聚合"""
-        # 查询一个没有数据的月份
         result = aggregate_monthly_data(2025, 12)
 
         assert result['year'] == 2025
@@ -145,7 +132,6 @@ class TestCalendarAggregation:
 
     def test_aggregate_weekly_data_empty(self):
         """测试空周数据聚合"""
-        # 查询一个没有数据的周
         reference_date = datetime(2025, 12, 15)
         result = aggregate_weekly_data(reference_date)
 
@@ -153,7 +139,6 @@ class TestCalendarAggregation:
         assert 'week_end' in result
         assert 'week_data' in result
 
-        # 验证每天都有初始化数据
         week_data = result['week_data']
         assert len(week_data) == 7
 
@@ -163,7 +148,6 @@ class TestCalendarAggregation:
 
     def test_aggregate_daily_data_empty(self):
         """测试空日数据聚合"""
-        # 查询一个没有数据的日期
         target_date = datetime(2025, 12, 15)
         result = aggregate_daily_data(target_date)
 
@@ -173,23 +157,17 @@ class TestCalendarAggregation:
 
     def test_cross_day_announcement_handling(self, pilot, areas):
         """测试跨天通告的处理"""
-        # 创建一个跨天的通告（晚上23点开始，持续3小时到次日凌晨2点）
         create_announcement(pilot, areas[0], datetime(2025, 9, 10, 23), duration_hours=3.0)
 
-        # 查询9月10日的数据
         result_day1 = aggregate_daily_data(datetime(2025, 9, 10))
 
-        # 查询9月11日的数据
         result_day2 = aggregate_daily_data(datetime(2025, 9, 11))
 
-        # 验证通告在两天都能被正确处理
-        # 9月10日应该能看到这个通告（23:00-23:59）
         assert len(result_day1['area_timelines']) == 1
         day1_slot = result_day1['area_timelines']['X1-Y1-1']['slots'][0]
         assert day1_slot['start_hour'] == 23
         assert day1_slot['end_hour'] == 23
 
-        # 9月11日也应该能看到这个通告（00:00-02:00）
         assert len(result_day2['area_timelines']) == 1
         day2_slot = result_day2['area_timelines']['X1-Y1-1']['slots'][0]
         assert day2_slot['start_hour'] == 0

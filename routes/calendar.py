@@ -55,11 +55,9 @@ def day_view():
 def month_data():
     """获取月视图数据"""
     try:
-        # 获取参数
         year = int(request.args.get('year', datetime.now().year))
         month = int(request.args.get('month', datetime.now().month))
 
-        # 使用公共聚合方法
         from utils.calendar_aggregator import aggregate_monthly_data
         result = aggregate_monthly_data(year, month)
         
@@ -76,11 +74,9 @@ def month_data():
 def week_data():
     """获取周视图数据"""
     try:
-        # 获取参数
         date_str = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         date = datetime.strptime(date_str, '%Y-%m-%d')
 
-        # 使用公共聚合方法
         from utils.calendar_aggregator import aggregate_weekly_data
         result = aggregate_weekly_data(date)
         
@@ -97,11 +93,9 @@ def week_data():
 def day_data():
     """获取日视图数据"""
     try:
-        # 获取参数
         date_str = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         date = datetime.strptime(date_str, '%Y-%m-%d')
 
-        # 使用公共聚合方法
         from utils.calendar_aggregator import aggregate_daily_data
         result = aggregate_daily_data(date)
         

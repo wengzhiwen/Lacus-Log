@@ -7,7 +7,6 @@ import sys
 import tempfile
 from typing import Generator
 
-# 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
@@ -39,27 +38,22 @@ def test_config():
 @pytest.fixture(scope='session', autouse=True)
 def test_db():
     """测试数据库连接 - 自动使用，确保所有测试都有数据库连接"""
-    # 先断开任何现有连接
     try:
         disconnect()
     except:
         pass
     
-    # 连接测试数据库
     connect(host='mongodb://localhost:27017/test_lacus', uuidRepresentation='standard')
     yield
-    # 测试结束后断开连接
     disconnect()
 
 
 @pytest.fixture
 def app(test_config) -> Generator[Flask, None, None]:
     """创建测试应用"""
-    # 设置测试环境变量（在创建应用之前）
     for key, value in test_config.items():
         os.environ[key] = str(value)
 
-    # 为避免别名冲突，先断开可能存在的默认连接，让 create_app 自行连接
     try:
         disconnect()
     except Exception:

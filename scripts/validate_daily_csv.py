@@ -63,7 +63,6 @@ def validate_file(path: str) -> Dict[str, int]:
             month_base_salary = parse_money(row["月累计底薪"])
             month_profit = parse_money(row["月累计毛利"])
 
-            # 分成折算
             assert commission_rate_base.endswith("%"), "当前分成比例应为百分比"
             base_rate = Decimal(commission_rate_base[:-1])  # 0~50
             pilot_rate_pct = (base_rate / Decimal("50")) * Decimal("42")  # %
@@ -75,7 +74,6 @@ def validate_file(path: str) -> Dict[str, int]:
             if not almost_equal(calc_pilot, pilot_share) or not almost_equal(calc_company, company_share):
                 errs += 1
 
-            # 返点与毛利
             calc_rebate = q2(revenue * rebate_rate)
             if not almost_equal(calc_rebate, rebate_amount):
                 errs += 1
@@ -84,7 +82,6 @@ def validate_file(path: str) -> Dict[str, int]:
             if not almost_equal(calc_daily_profit, daily_profit):
                 errs += 1
 
-            # 月累计毛利
             calc_month_profit = q2(month_company_share + month_rebate - month_base_salary)
             if not almost_equal(calc_month_profit, month_profit):
                 errs += 1

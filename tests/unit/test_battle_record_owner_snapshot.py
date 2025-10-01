@@ -62,7 +62,6 @@ class TestBattleRecordOwnerSnapshot:
         """owner_snapshot字段应该允许为空"""
         pilot = create_pilot('测试机师', owner=None)
 
-        # 应该能够创建owner_snapshot为None的记录
         record = BattleRecord(pilot=pilot,
                               start_time=datetime(2025, 9, 10, 10, 0, 0),
                               end_time=datetime(2025, 9, 10, 12, 0, 0),
@@ -70,7 +69,6 @@ class TestBattleRecordOwnerSnapshot:
                               owner_snapshot=None,
                               registered_by=registrar)
 
-        # 不应该抛出验证异常
         record.clean()
         assert record.owner_snapshot is None
 
@@ -79,7 +77,6 @@ class TestBattleRecordOwnerSnapshot:
         owner = create_user('原所属')
         pilot = create_pilot('机师', owner=owner)
 
-        # 创建记录时的快照
         record = BattleRecord(
             pilot=pilot,
             start_time=datetime(2025, 9, 10, 10, 0, 0),
@@ -91,10 +88,8 @@ class TestBattleRecordOwnerSnapshot:
         record.clean()
         original_owner = record.owner_snapshot
 
-        # 模拟机师所属发生变更
         new_owner = create_user('新所属')
         pilot.owner = new_owner
 
-        # 历史记录的快照不应该受影响
         assert record.owner_snapshot == original_owner
         assert record.owner_snapshot != pilot.owner

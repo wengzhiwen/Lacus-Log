@@ -34,7 +34,6 @@ class TestBattleAreaIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_db(self):
-        # 依赖 conftest 的连接
         yield
 
     def test_unique_constraint(self):

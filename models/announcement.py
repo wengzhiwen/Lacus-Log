@@ -27,26 +27,21 @@ class Announcement(Document):
     坐标快照等功能，类似日历应用的事件管理。
     """
 
-    # 关联信息字段
     pilot = ReferenceField(Pilot, required=True)
     battle_area = ReferenceField(BattleArea, required=True)
 
-    # 坐标快照字段（用于显示，避免关联数据变更影响历史记录）
     x_coord = StringField(required=True, max_length=50)  # 基地
     y_coord = StringField(required=True, max_length=50)  # 场地
     z_coord = StringField(required=True, max_length=50)  # 坐席
 
-    # 时间信息字段
     start_time = DateTimeField(required=True)
     duration_hours = FloatField(required=True, min_value=1.0, max_value=16.0)
 
-    # 重复规则字段
     recurrence_type = EnumField(RecurrenceType, default=RecurrenceType.NONE)
     recurrence_pattern = StringField()  # JSON格式存储重复规则
     recurrence_end = DateTimeField()  # 重复结束时间
     parent_announcement = ReferenceField('self')  # 父通告ID（用于关联重复事件组）
 
-    # 系统字段
     created_at = DateTimeField(default=get_current_utc_time)
     updated_at = DateTimeField(default=get_current_utc_time)
     created_by = ReferenceField(User, required=True)
@@ -73,7 +68,6 @@ class Announcement(Document):
             {
                 'fields': ['-start_time']
             },
-            # 优化冲突检查性能的复合索引
             {
                 'fields': ['start_time', 'duration_hours']
             },
@@ -90,35 +84,28 @@ class Announcement(Document):
         """数据验证和业务规则检查"""
         super().clean()
 
-        # 时间验证（移除开始时间不能早于当前时间的限制，允许创建历史记录）
 
-        # 时长验证（通过字段定义的min_value和max_value进行）
         if self.duration_hours:
             if self.duration_hours < 1.0 or self.duration_hours > 16.0:
                 raise ValueError("时长必须在1-16小时之间")
-            # 检查是否为0.5的倍数
             if (self.duration_hours * 2) % 1 != 0:
                 raise ValueError("时长必须是0.5小时的倍数")
 
-        # 重复规则验证
         if self.recurrence_type != RecurrenceType.NONE:
             if not self.recurrence_pattern:
                 raise ValueError("设置重复类型时必须提供重复规则")
 
-            # 验证JSON格式
             try:
                 pattern = json.loads(self.recurrence_pattern)
                 self._validate_recurrence_pattern(pattern)
             except (json.JSONDecodeError, ValueError) as e:
                 raise ValueError(f"重复规则格式错误：{str(e)}") from e
 
-            # 重复跨度不能超过60天
             if self.recurrence_end:
                 max_span = self.start_time + timedelta(days=60)
                 if self.recurrence_end > max_span:
                     raise ValueError("重复跨度不能超过60天")
 
-        # 从关联的开播地点复制坐标快照
         if self.battle_area and not self.x_coord:
             self.x_coord = self.battle_area.x_coord
             self.y_coord = self.battle_area.y_coord
@@ -234,7 +221,6 @@ class Announcement(Document):
 
         end_time = self.end_time
 
-        # 构建查询，排除指定的通告
         query = Announcement.objects
         exclude_list = []
 
@@ -247,15 +233,12 @@ class Announcement(Document):
         if exclude_list:
             query = query.filter(id__nin=exclude_list)
 
-        # 查找时间重叠的通告
         overlapping = query.filter(start_time__lt=end_time,
-                                   # 这里需要计算其他通告的结束时间，MongoDB中无法直接计算，需要在应用层处理
                                    )
 
         for other in overlapping:
             other_end = other.end_time
             if other_end and other.start_time < end_time and other_end > self.start_time:
-                # 检查区域冲突
                 if other.battle_area.id == self.battle_area.id:
                     conflicts['area_conflicts'].append({
                         'announcement': other,
@@ -263,7 +246,6 @@ class Announcement(Document):
                         'conflict_end': min(end_time, other_end)
                     })
 
-                # 检查主播冲突
                 if other.pilot.id == self.pilot.id:
                     conflicts['pilot_conflicts'].append({
                         'announcement': other,
@@ -340,8 +322,6 @@ class Announcement(Document):
         end_date = base.recurrence_end or (base.start_time + timedelta(days=60))
         max_instances = 60  # 最多生成60个实例
 
-        # 从基准周的周一开始计算，再按间隔推进
-        # Python中isoweekday: 周一=1, 周日=7
         base_week_monday = base.start_time - timedelta(days=base.start_time.isoweekday() - 1)
         week_start = base_week_monday
 
@@ -349,14 +329,11 @@ class Announcement(Document):
             for day_of_week in days_of_week:
                 if len(instances) >= max_instances:
                     break
-                # 确保day_of_week是整数
                 day_of_week = int(day_of_week) if isinstance(day_of_week, str) else day_of_week
-                # 计算具体日期（1=周一，7=周日）
                 days_ahead = day_of_week - 1  # 转换为0-6
                 target_date = week_start + timedelta(days=days_ahead)
                 target_datetime = target_date.replace(hour=base.start_time.hour, minute=base.start_time.minute, second=base.start_time.second)
 
-                # 仅生成不早于基准开始时间的实例，避免本周内回溯生成
                 if (target_datetime <= end_date and target_datetime >= base.start_time and target_datetime != base.start_time):
                     instance = cls(pilot=base.pilot,
                                    battle_area=base.battle_area,
@@ -385,7 +362,6 @@ class Announcement(Document):
             if len(instances) >= max_instances:
                 break
             try:
-                # 解析ISO格式的日期时间
                 target_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
 
                 instance = cls(pilot=base.pilot,
@@ -415,22 +391,17 @@ class Announcement(Document):
             list: 从当前通告开始的新循环组通告列表（包含当前通告）
         """
         if not self.parent_announcement and self.recurrence_type == RecurrenceType.NONE:
-            # 不是循环事件，直接返回当前通告
             return [self]
 
-        # 确定父通告和所有子通告
         if self.parent_announcement:
             parent = self.parent_announcement
         else:
             parent = self
 
-        # 获取所有相关通告（包括父通告）
         all_related = [parent] + list(Announcement.objects(parent_announcement=parent))
 
-        # 按开始时间排序
         all_related.sort(key=lambda x: x.start_time)
 
-        # 找到当前通告在序列中的位置
         current_index = -1
         for i, announcement in enumerate(all_related):
             if announcement.id == self.id:
@@ -438,21 +409,16 @@ class Announcement(Document):
                 break
 
         if current_index == -1:
-            # 找不到当前通告，返回单个通告
             return [self]
 
-        # 分割：current_index之前的保持原样，从current_index开始创建新组
         future_announcements = all_related[current_index:]
 
         if len(future_announcements) <= 1:
-            # 只有当前一个通告，无需分割
             return future_announcements
 
-        # 创建新的父通告（当前通告）
         new_parent = future_announcements[0]
         new_parent.parent_announcement = None
 
-        # 重新设置重复规则（基于原父通告的规则）
         if parent.recurrence_type != RecurrenceType.NONE and parent.recurrence_pattern:
             new_parent.recurrence_type = parent.recurrence_type
             new_parent.recurrence_pattern = parent.recurrence_pattern
@@ -464,7 +430,6 @@ class Announcement(Document):
 
         new_parent.save()
 
-        # 更新后续通告的父引用
         for announcement in future_announcements[1:]:
             announcement.parent_announcement = new_parent
             announcement.save()
@@ -483,19 +448,15 @@ class Announcement(Document):
         if not self.parent_announcement and self.recurrence_type == RecurrenceType.NONE:
             return [self] if include_self else []
 
-        # 确定父通告
         if self.parent_announcement:
             parent = self.parent_announcement
         else:
             parent = self
 
-        # 获取所有相关通告
         all_related = [parent] + list(Announcement.objects(parent_announcement=parent))
 
-        # 按开始时间排序
         all_related.sort(key=lambda x: x.start_time)
 
-        # 找到当前通告的位置
         current_index = -1
         for i, announcement in enumerate(all_related):
             if announcement.id == self.id:
@@ -505,7 +466,6 @@ class Announcement(Document):
         if current_index == -1:
             return [self] if include_self else []
 
-        # 返回从当前开始的未来通告
         start_index = current_index if include_self else current_index + 1
         return all_related[start_index:]
 

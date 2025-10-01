@@ -1,4 +1,4 @@
-#pylint: disable=no-member
+# pylint: disable=no-member
 import enum
 from datetime import datetime
 
@@ -38,7 +38,6 @@ class Rank(enum.Enum):
     INTERN = "实习主播"
     OFFICIAL = "正式主播"
 
-    # 历史兼容值（读老写新）
     CANDIDATE_OLD = "候补机师"  # 映射到 CANDIDATE
     TRAINEE_OLD = "训练机师"  # 映射到 TRAINEE
     INTERN_OLD = "实习机师"  # 映射到 INTERN
@@ -53,7 +52,6 @@ class Status(enum.Enum):
     CONTRACTED = "已签约"
     FALLEN = "流失"
 
-    # 历史兼容值（读老写新）
     NOT_RECRUITED_OLD = "未征召"  # 映射到 NOT_RECRUITED
     NOT_RECRUITING_OLD = "不征召"  # 映射到 NOT_RECRUITING
     RECRUITED_OLD = "已征召"  # 映射到 RECRUITED
@@ -63,23 +61,19 @@ class Status(enum.Enum):
 class Pilot(Document):
     """主播模型"""
 
-    # 基础信息字段
     nickname = StringField(required=True, unique=True, max_length=20)
     real_name = StringField(max_length=20)
     gender = EnumField(Gender, default=Gender.FEMALE)
     hometown = StringField(max_length=20)  # 籍贯
     birth_year = IntField()
 
-    # 关联信息字段
     owner = ReferenceField(User)
 
-    # 业务信息字段
     platform = EnumField(Platform, default=Platform.UNKNOWN)
     work_mode = EnumField(WorkMode, default=WorkMode.UNKNOWN)
     rank = EnumField(Rank, default=Rank.CANDIDATE)
     status = EnumField(Status, default=Status.NOT_RECRUITED)
 
-    # 系统字段
     created_at = DateTimeField(default=get_current_utc_time)
     updated_at = DateTimeField(default=get_current_utc_time)
 
@@ -113,7 +107,6 @@ class Pilot(Document):
         """数据验证和业务规则检查"""
         super().clean()
 
-        # 主播分类规则：实习主播和正式主播必须有直属运营、开播地点不能是未知、开播方式不能是未知
         if self.rank in [Rank.INTERN, Rank.OFFICIAL]:
             if not self.owner:
                 raise ValueError("实习主播和正式主播必须有直属运营")
@@ -122,14 +115,12 @@ class Pilot(Document):
             if self.work_mode == WorkMode.UNKNOWN:
                 raise ValueError("实习主播和正式主播的开播方式不能是未知")
 
-        # 状态规则：已招募和已签约状态必须填写姓名和出生年
         if self.status in [Status.RECRUITED, Status.CONTRACTED]:
             if not self.real_name:
                 raise ValueError("已招募和已签约状态必须填写姓名")
             if not self.birth_year:
                 raise ValueError("已招募和已签约状态必须填写出生年")
 
-        # 出生年份验证（距今60年前到距今10年前）
         if self.birth_year:
             current_year = datetime.now().year
             if self.birth_year < current_year - 60 or self.birth_year > current_year - 10:
@@ -156,7 +147,6 @@ class Pilot(Document):
     @property
     def rank_display(self):
         """主播分类显示名称（兼容历史数据）"""
-        # 读老写新：读取时映射历史数据，写入时使用新数据
         if self.rank == Rank.CANDIDATE:
             return "候选人"
         elif self.rank == Rank.TRAINEE:
@@ -171,7 +161,6 @@ class Pilot(Document):
     @property
     def status_display(self):
         """状态显示名称（兼容历史数据）"""
-        # 读老写新：读取时映射历史数据，写入时使用新数据
         if self.status == Status.NOT_RECRUITED:
             return "未招募"
         elif self.status == Status.NOT_RECRUITING:
@@ -188,7 +177,6 @@ class Pilot(Document):
     @property
     def work_mode_display(self):
         """开播方式显示名称（兼容历史数据）"""
-        # 读老写新：读取时映射历史数据，写入时使用新数据
         if self.work_mode == WorkMode.OFFLINE:
             return "线下"
         elif self.work_mode == WorkMode.ONLINE:
@@ -201,7 +189,6 @@ class Pilot(Document):
     @property
     def platform_display(self):
         """开播地点显示名称（兼容历史数据）"""
-        # 读老写新：读取时映射历史数据，写入时使用新数据
         if self.platform == Platform.KUAISHOU:
             return "快手"
         elif self.platform == Platform.DOUYIN:
@@ -219,7 +206,6 @@ class Pilot(Document):
         if not rank_value:
             return None
 
-        # 历史数据映射
         old_to_new_mapping = {
             "候补机师": Rank.CANDIDATE,
             "训练机师": Rank.TRAINEE,
@@ -227,11 +213,9 @@ class Pilot(Document):
             "正式机师": Rank.OFFICIAL,
         }
 
-        # 如果是历史数据，返回映射后的新值
         if rank_value in old_to_new_mapping:
             return old_to_new_mapping[rank_value]
 
-        # 如果是新数据，直接返回
         try:
             return Rank(rank_value)
         except ValueError:
@@ -243,7 +227,6 @@ class Pilot(Document):
         if not status_value:
             return None
 
-        # 历史数据映射
         old_to_new_mapping = {
             "未征召": Status.NOT_RECRUITED,
             "不征召": Status.NOT_RECRUITING,
@@ -251,11 +234,9 @@ class Pilot(Document):
             "已阵亡": Status.FALLEN,
         }
 
-        # 如果是历史数据，返回映射后的新值
         if status_value in old_to_new_mapping:
             return old_to_new_mapping[status_value]
 
-        # 如果是新数据，直接返回
         try:
             return Status(status_value)
         except ValueError:
@@ -323,18 +304,14 @@ class PilotChangeLog(Document):
 class PilotCommission(Document):
     """主播分成调整记录模型"""
 
-    # 关联字段
     pilot_id = ReferenceField(Pilot, required=True)
 
-    # 业务字段
     adjustment_date = DateTimeField(required=True)  # 调整生效日期（UTC时间）
     commission_rate = FloatField(required=True)  # 分成比例（0-50，表示0%-50%）
     remark = StringField(max_length=200)  # 备注说明
 
-    # 状态字段
     is_active = BooleanField(default=True)  # 是否有效（用于软删除）
 
-    # 系统字段
     created_at = DateTimeField(default=get_current_utc_time)
     updated_at = DateTimeField(default=get_current_utc_time)
 
@@ -364,11 +341,9 @@ class PilotCommission(Document):
         """数据验证和业务规则检查"""
         super().clean()
 
-        # 分成比例范围验证（0-50）
         if self.commission_rate < 0 or self.commission_rate > 50:
             raise ValueError("分成比例必须在0-50之间")
 
-        # 同一机师同一调整日唯一性验证（仅对有效记录）
         if self.is_active:
             existing = PilotCommission.objects(pilot_id=self.pilot_id, adjustment_date=self.adjustment_date, is_active=True).first()
             if existing and existing.id != self.id:

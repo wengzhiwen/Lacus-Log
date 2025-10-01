@@ -56,7 +56,6 @@ class TestAnnouncementRecurrenceLimit:
 
         instances = Announcement.generate_recurrence_instances(base_announcement)
 
-        # 包含原始通告，所以总数应该是61（1个原始 + 60个生成）
         assert len(instances) == 61
         assert instances[0] == base_announcement
         assert len(instances[1:]) == 60  # 生成的实例
@@ -82,14 +81,12 @@ class TestAnnouncementRecurrenceLimit:
 
         instances = Announcement.generate_recurrence_instances(base_announcement)
 
-        # 包含原始通告，生成的实例应该被限制在60个以内
         assert len(instances) == 61  # 1个原始 + 60个生成
         assert instances[0] == base_announcement
         assert len(instances[1:]) == 60
 
     def test_custom_recurrence_limited_to_60_instances(self, pilot, area, creator):
         """测试自定义重复最多生成60个实例"""
-        # 生成70个日期的列表
         specific_dates = []
         base_date = datetime(2025, 1, 1, 10, 0, 0)
         for i in range(1, 71):  # 生成70个日期（不包含原始日期）
@@ -112,7 +109,6 @@ class TestAnnouncementRecurrenceLimit:
 
         instances = Announcement.generate_recurrence_instances(base_announcement)
 
-        # 包含原始通告，生成的实例应该被限制在60个
         assert len(instances) == 61  # 1个原始 + 60个生成
         assert instances[0] == base_announcement
         assert len(instances[1:]) == 60
@@ -137,7 +133,6 @@ class TestAnnouncementRecurrenceLimit:
 
         instances = Announcement.generate_recurrence_instances(base_announcement)
 
-        # 应该生成原始通告 + 9个重复实例 = 10个
         assert len(instances) == 10
         assert instances[0] == base_announcement
         assert len(instances[1:]) == 9
@@ -156,6 +151,5 @@ class TestAnnouncementRecurrenceLimit:
 
         instances = Announcement.generate_recurrence_instances(base_announcement)
 
-        # 只应该有原始通告
         assert len(instances) == 1
         assert instances[0] == base_announcement

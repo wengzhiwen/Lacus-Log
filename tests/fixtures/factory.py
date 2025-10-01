@@ -39,11 +39,9 @@ def create_user(username: str, role_name: str = 'kancho', active: bool = True) -
     """创建用户，默认舰长角色。"""
     gicho, kancho = ensure_roles()
     role = gicho if role_name == 'gicho' else kancho
-    # 已存在则直接返回，避免唯一索引冲突
     existing = User.objects(username=username).first()
     if existing:
         return existing
-    # 在无应用上下文时，直接使用明文，避免hash_password访问app.config导致异常
     try:
         _ = current_app.config
         pwd = hash_password('test_password')
@@ -63,7 +61,6 @@ def create_battle_area(x: str = 'X1', y: str = 'Y1', z: str = '1', availability:
 def create_pilot(nickname: str = '测试机师', owner: User | None = None, rank: Rank = Rank.CANDIDATE, platform: Platform = Platform.KUAISHOU,
                  work_mode: WorkMode = WorkMode.ONLINE, status: Status = Status.NOT_RECRUITED, gender: Gender = Gender.MALE,
                  birth_year: int | None = 1998, real_name: str | None = None) -> Pilot:
-    # 自动补齐：当状态为已征召/已签约时，要求 real_name 和 birth_year
     if status in (Status.RECRUITED, Status.CONTRACTED):
         if not real_name:
             real_name = '测试姓名'
@@ -100,7 +97,6 @@ def create_announcement(pilot: Pilot, area: BattleArea, start_local: datetime, d
 def create_battle_record(pilot: Pilot, start_local: datetime | None = None, end_local: datetime | None = None, x: str = 'X1', y: str = 'Y1', z: str = '1',
                          work_mode: WorkMode = WorkMode.OFFLINE, revenue: Decimal = Decimal('100.00'), base_salary: Decimal = Decimal('50.00'),
                          registrar: User | None = None, **kwargs) -> BattleRecord:
-    # 兼容关键字 start_time/end_time（UTC），或 start_local/end_local（本地）
     if start_local is None and 'start_time' in kwargs:
         start_local = kwargs['start_time']
     if end_local is None and 'end_time' in kwargs:

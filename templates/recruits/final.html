@@ -45,7 +45,7 @@
   </div>
 
   <!-- 结束征召表单 -->
-  <form method="POST" action="{{ url_for('recruit.final_recruit', recruit_id=recruit.id) }}" class="final-form" id="final_form">
+  <form method="POST" action="#" class="final-form" id="final_form" onsubmit="return false;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     
     <div class="form-section">

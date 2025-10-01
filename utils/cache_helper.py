@@ -15,10 +15,8 @@ from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
 
-# 创建全局TTL缓存实例，15分钟过期时间
 monthly_report_cache = TTLCache(maxsize=1000, ttl=900)  # 900秒 = 15分钟
 
-# 创建主播业绩专用TTL缓存实例，5分钟过期时间
 pilot_performance_cache = TTLCache(maxsize=500, ttl=300)  # 300秒 = 5分钟
 
 
@@ -33,10 +31,8 @@ def generate_cache_key(func_name: str, *args, **kwargs) -> str:
     Returns:
         str: 缓存键
     """
-    # 将参数转换为可序列化的格式
     key_data = {'func': func_name, 'args': args, 'kwargs': kwargs}
 
-    # 使用JSON序列化并生成MD5哈希
     key_str = json.dumps(key_data, sort_keys=True, default=str)
     return hashlib.md5(key_str.encode('utf-8')).hexdigest()
 
@@ -52,19 +48,15 @@ def cached_monthly_report(ttl: int = 900):  # pylint: disable=unused-argument
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # 生成缓存键
             cache_key = generate_cache_key(func.__name__, *args, **kwargs)
 
-            # 检查缓存
             if cache_key in monthly_report_cache:
                 logger.debug('缓存命中：%s', func.__name__)
                 return monthly_report_cache[cache_key]
 
-            # 缓存未命中，执行计算
             logger.debug('缓存未命中，开始计算：%s', func.__name__)
             result = func(*args, **kwargs)
 
-            # 存储到缓存
             monthly_report_cache[cache_key] = result
             logger.debug('计算结果已缓存：%s', func.__name__)
 
@@ -92,19 +84,15 @@ def cached_pilot_performance(ttl: int = 300):  # pylint: disable=unused-argument
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # 生成缓存键
             cache_key = generate_cache_key(func.__name__, *args, **kwargs)
 
-            # 检查缓存
             if cache_key in pilot_performance_cache:
                 logger.debug('主播业绩缓存命中：%s', func.__name__)
                 return pilot_performance_cache[cache_key]
 
-            # 缓存未命中，执行计算
             logger.debug('主播业绩缓存未命中，开始计算：%s', func.__name__)
             result = func(*args, **kwargs)
 
-            # 存储到缓存
             pilot_performance_cache[cache_key] = result
             logger.debug('主播业绩计算结果已缓存：%s', func.__name__)
 

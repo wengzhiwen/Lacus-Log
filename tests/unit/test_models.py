@@ -41,12 +41,10 @@ class TestUserModel:
         """测试用户属性"""
         user = User(username='test_user', password='password')
 
-        # 测试 Flask-Login 期望的属性
         assert user.is_active is True
         assert user.is_authenticated is True
         assert user.is_anonymous is False
 
-        # 测试停用用户
         user.active = False
         assert user.is_active is False
 
@@ -62,14 +60,11 @@ class TestUserModel:
         role = Role(name='admin', description='管理员')
         user = User(username='test_user', password='password', roles=[role])
 
-        # 测试字符串角色名
         assert user.has_role('admin') is True
         assert user.has_role('user') is False
 
-        # 测试角色对象
         assert user.has_role(role) is True
 
-        # 测试无效角色
         assert user.has_role(None) is False
         assert user.has_role('') is False
 
@@ -83,10 +78,8 @@ class TestUserModel:
 
             user = User(username='test_user', password=hashed)
 
-            # 测试正确密码
             assert user.verify_and_update_password(password) is True
 
-            # 测试错误密码
             assert user.verify_and_update_password('wrong_password') is False
 
 
@@ -102,11 +95,9 @@ class TestUserModelIntegration:
 
     def test_role_save_and_load(self):
         """测试角色保存和加载"""
-        # 创建角色
         role = Role(name='test_role', description='测试角色')
         role.save()
 
-        # 加载角色
         loaded_role = Role.objects(name='test_role').first()
         assert loaded_role is not None
         assert loaded_role.name == 'test_role'
@@ -114,15 +105,12 @@ class TestUserModelIntegration:
 
     def test_user_save_and_load(self):
         """测试用户保存和加载"""
-        # 创建角色
         role = Role(name='test_role', description='测试角色')
         role.save()
 
-        # 创建用户
         user = User(username='test_user', password='hashed_password', nickname='测试用户', roles=[role])
         user.save()
 
-        # 加载用户
         loaded_user = User.objects(username='test_user').first()
         assert loaded_user is not None
         assert loaded_user.username == 'test_user'
@@ -132,22 +120,18 @@ class TestUserModelIntegration:
 
     def test_user_unique_constraints(self):
         """测试用户唯一约束"""
-        # 创建第一个用户
         user1 = User(username='unique_user', password='password1')
         user1.save()
 
-        # 尝试创建同名用户应该失败
         user2 = User(username='unique_user', password='password2')
         with pytest.raises(Exception):  # 应该是 NotUniqueError
             user2.save()
 
     def test_role_unique_constraints(self):
         """测试角色唯一约束"""
-        # 创建第一个角色
         role1 = Role(name='unique_role', description='角色1')
         role1.save()
 
-        # 尝试创建同名角色应该失败
         role2 = Role(name='unique_role', description='角色2')
         with pytest.raises(Exception):  # 应该是 NotUniqueError
             role2.save()
@@ -159,7 +143,6 @@ class TestModelImports:
 
     def test_pilot_model_import(self):
         """测试机师模型导入"""
-        # 测试机师模型可以正常导入
         pilot = Pilot(nickname="测试机师", gender=Gender.FEMALE)
         assert pilot.nickname == "测试机师"
         assert pilot.gender == Gender.FEMALE
@@ -167,7 +150,6 @@ class TestModelImports:
 
     def test_model_relationships(self):
         """测试模型关联关系"""
-        # 测试User和Pilot的关联
         user = User(username="test_user", password="password")
         pilot = Pilot(nickname="test_pilot", owner=user)
         assert pilot.owner == user

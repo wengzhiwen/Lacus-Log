@@ -36,22 +36,18 @@ def generate_random_database_name():
 @pytest.fixture(scope='session')
 def debug_database():
     """创建独立的调试数据库"""
-    # 先断开现有连接
     try:
         disconnect()
     except:
         pass
     
-    # 生成随机数据库名
     db_name = generate_random_database_name()
     print(f"创建调试数据库: {db_name}")
     
-    # 连接数据库
     connect(db_name, host='mongodb://localhost:27017')
     
     yield db_name
     
-    # 注意：不删除数据库，保留用于调试
     print(f"调试数据库 {db_name} 已创建，数据保留用于调试")
     disconnect()
 
@@ -78,21 +74,17 @@ def test_generate_debug_data(debug_app, debug_database):
     with debug_app.app_context():
         print(f"开始生成调试数据到数据库: {debug_database}")
         
-        # 1. 使用业务逻辑创建角色和默认用户
         user_datastore = create_user_datastore()
         ensure_initial_roles_and_admin(user_datastore)
         
-        # 获取角色
         gicho_role = Role.objects(name='gicho').first()
         kancho_role = Role.objects(name='kancho').first()
         
-        # 2. 使用业务逻辑创建2名舰长（参考routes/admin.py中的users_new函数）
         captains = []
         for i in range(2):
             username = f'captain_{i+1}'
             nickname = generate_random_nickname()
             
-            # 使用user_datastore创建用户（业务逻辑）
             captain = user_datastore.create_user(
                 username=username,
                 nickname=nickname,
@@ -103,16 +95,12 @@ def test_generate_debug_data(debug_app, debug_database):
             captains.append(captain)
             print(f"创建舰长: {captain.nickname}")
         
-        # 3. 使用业务逻辑创建10名机师（参考routes/pilot.py中的new_pilot函数）
         pilots = []
         for i in range(10):
-            # 随机分配舰长
             owner = random.choice(captains)
             
-            # 5名训练机师，5名正式机师
             rank = Rank.TRAINEE if i < 5 else Rank.OFFICIAL
             
-            # 使用业务逻辑创建机师
             pilot = Pilot(nickname=generate_random_nickname())
             pilot.real_name = f"真实姓名{generate_random_nickname(4)}"
             pilot.owner = owner
@@ -127,7 +115,6 @@ def test_generate_debug_data(debug_app, debug_database):
             pilots.append(pilot)
             print(f"创建机师: {pilot.nickname} (所属: {owner.nickname}, 阶级: {rank.value})")
         
-        # 4. 使用业务逻辑创建作战区域（参考routes/battle_area.py中的new_area函数）
         battle_areas = []
         for z in range(1, 11):
             area = BattleArea(
@@ -140,10 +127,8 @@ def test_generate_debug_data(debug_app, debug_database):
             battle_areas.append(area)
         print(f"创建作战区域: 测试宙域-测试房-1到10")
         
-        # 5. 创建作战计划
         announcements = []
         
-        # 5.1 随机抽取1名机师，每周一二三四五，下午16点开始6小时
         pilot1 = random.choice(pilots)
         for day in range(1, 31):  # 9月1日到30日
             date = datetime(2025, 9, day)
@@ -164,7 +149,6 @@ def test_generate_debug_data(debug_app, debug_database):
                 announcements.append(ann)
         print(f"为 {pilot1.nickname} 创建工作日16点计划")
         
-        # 5.2 随机抽取不重复的1名机师，每天中午12点开始6小时
         pilot2 = random.choice([p for p in pilots if p != pilot1])
         for day in range(1, 31):  # 9月1日到30日
             area = random.choice(battle_areas)
@@ -183,7 +167,6 @@ def test_generate_debug_data(debug_app, debug_database):
             announcements.append(ann)
         print(f"为 {pilot2.nickname} 创建每日12点计划")
         
-        # 5.3 随机抽取不重复的1名机师，每周二四五六日，下午14点开始6小时
         pilot3 = random.choice([p for p in pilots if p not in [pilot1, pilot2]])
         for day in range(1, 31):  # 9月1日到30日
             date = datetime(2025, 9, day)
@@ -204,7 +187,6 @@ def test_generate_debug_data(debug_app, debug_database):
                 announcements.append(ann)
         print(f"为 {pilot3.nickname} 创建二四五六日14点计划")
         
-        # 5.4 随机抽取不重复的1名机师，在9月1日到9月15日随机排7个计划，上午10点开始6小时
         pilot4 = random.choice([p for p in pilots if p not in [pilot1, pilot2, pilot3]])
         selected_days = random.sample(range(1, 16), 7)  # 9月1-15日选7天
         for day in selected_days:
@@ -224,7 +206,6 @@ def test_generate_debug_data(debug_app, debug_database):
             announcements.append(ann)
         print(f"为 {pilot4.nickname} 创建9月1-15日随机7天10点计划")
         
-        # 5.5 随机抽取不重复的1名机师，在9月10日到9月20日随机排7个计划，上午11点开始6小时
         pilot5 = random.choice([p for p in pilots if p not in [pilot1, pilot2, pilot3, pilot4]])
         selected_days = random.sample(range(10, 21), 7)  # 9月10-20日选7天
         for day in selected_days:
@@ -244,7 +225,6 @@ def test_generate_debug_data(debug_app, debug_database):
             announcements.append(ann)
         print(f"为 {pilot5.nickname} 创建9月10-20日随机7天11点计划")
         
-        # 5.6 剩下的5名机师，在9月1日到9月30日随机排26个计划
         remaining_pilots = [p for p in pilots if p not in [pilot1, pilot2, pilot3, pilot4, pilot5]]
         for pilot in remaining_pilots:
             selected_days = random.sample(range(1, 31), 26)  # 9月1-30日选26天
@@ -268,21 +248,16 @@ def test_generate_debug_data(debug_app, debug_database):
         
         print(f"总共创建了 {len(announcements)} 个作战计划")
         
-        # 6. 基于作战计划生成作战记录（参考routes/battle_record.py中的create_battle_record函数）
         battle_records = []
         for ann in announcements:
             if random.random() < 0.85:  # 85%概率生成作战记录
-                # 90%概率达成6小时播时，10%概率只有5小时
                 duration_hours = 6.0 if random.random() < 0.9 else 5.0
                 
-                # 底薪：6小时=150，5小时=0
                 base_salary = Decimal('150.00') if duration_hours == 6.0 else Decimal('0.00')
                 
-                # 流水：每小时10-200元随机
                 hourly_revenue = random.randint(10, 200)
                 revenue_amount = Decimal(str(hourly_revenue * duration_hours))
                 
-                # 使用业务逻辑创建作战记录
                 record = BattleRecord(
                     pilot=ann.pilot,
                     related_announcement=ann,
@@ -303,19 +278,16 @@ def test_generate_debug_data(debug_app, debug_database):
         
         print(f"基于计划生成了 {len(battle_records)} 个作战记录")
         
-        # 7. 生成10条没有作战计划的作战记录
         extra_records = []
         for i in range(5):  # 循环5次
             pilot = random.choice(pilots)
             
-            # 找到该机师没有作战计划的日子
             pilot_announcement_days = set()
             for ann in announcements:
                 if ann.pilot == pilot:
                     local_start = ann.start_time.replace(tzinfo=None) - timedelta(hours=8)
                     pilot_announcement_days.add(local_start.day)
             
-            # 从1-30日中排除有计划的日期
             available_days = [day for day in range(1, 31) if day not in pilot_announcement_days]
             
             if len(available_days) >= 2:
@@ -329,7 +301,6 @@ def test_generate_debug_data(debug_app, debug_database):
                     hourly_revenue = random.randint(10, 200)
                     revenue_amount = Decimal(str(hourly_revenue * duration_hours))
                     
-                    # 使用业务逻辑创建作战记录
                     record = BattleRecord(
                         pilot=pilot,
                         start_time=local_to_utc(datetime(2025, 9, day, hour, 0, 0)),
@@ -349,7 +320,6 @@ def test_generate_debug_data(debug_app, debug_database):
         
         print(f"生成了 {len(extra_records)} 个无计划的作战记录")
         
-        # 输出统计信息
         print("\n=== 调试数据生成完成 ===")
         print(f"数据库名: {debug_database}")
         print(f"舰长数量: {len(captains)}")

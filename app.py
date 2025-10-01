@@ -16,62 +16,43 @@ from routes.pilot import pilot_bp
 from routes.recruit import recruit_bp
 from routes.report import report_bp
 from routes.report_mail import report_mail_bp
-from utils.bootstrap import (ensure_database_indexes,
-                             ensure_initial_roles_and_admin)
+from utils.bootstrap import (ensure_database_indexes, ensure_initial_roles_and_admin)
 from utils.logging_setup import init_logging
 from utils.scheduler import init_scheduled_jobs
 from utils.security import create_user_datastore, init_security
-from utils.timezone_helper import (format_local_date, format_local_datetime,
-                                   format_local_time, get_local_date_for_input,
-                                   get_local_datetime_for_input,
+from utils.timezone_helper import (format_local_date, format_local_datetime, format_local_time, get_local_date_for_input, get_local_datetime_for_input,
                                    get_local_time_for_input, utc_to_local)
 
 
 def create_app() -> Flask:
-    """Flask应用工厂。
-
-    - 读取环境变量
-    - 初始化日志
-    - 连接MongoDB
-    - 配置Flask-Security-Too
-    - 注册蓝图
-    - 创建默认角色与默认管理员
-    """
-    # 读取 .env
+    """Flask 应用工厂：加载配置、初始化日志与数据库、注册蓝图与安全组件。"""
     load_dotenv()
 
-    # 初始化日志（最早进行，便于后续记录）
     init_logging()
 
     flask_app = Flask(__name__, template_folder="templates", static_folder="static")
 
-    # 基础配置
     flask_app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
     flask_app.config['SECURITY_PASSWORD_SALT'] = os.getenv('SECURITY_PASSWORD_SALT', 'dev-password-salt')
     flask_app.config['SECURITY_REMEMBER_SALT'] = os.getenv('SECURITY_REMEMBER_SALT', 'dev-remember-salt')
     flask_app.config['SECURITY_DEFAULT_REMEMBER_ME'] = os.getenv('SECURITY_DEFAULT_REMEMBER_ME', 'True') == 'True'
-    # 会话时长
     lifetime = int(os.getenv('PERMANENT_SESSION_LIFETIME', '36000'))
     flask_app.permanent_session_lifetime = timedelta(seconds=lifetime)
 
-    # Flask-Security-Too 配置（仅启用必须项）
     flask_app.config.update(
         SECURITY_REGISTERABLE=False,  # 禁止自注册
-        SECURITY_RECOVERABLE=False,  # 本期不启用邮件找回流程
+        SECURITY_RECOVERABLE=False,  # 未启用邮件找回
         SECURITY_CHANGEABLE=True,  # 允许登录后修改密码
         SECURITY_TRACKABLE=True,  # 记录登录时间
-        SECURITY_CONFIRMABLE=False,  # 本期不启用邮箱确认
+        SECURITY_CONFIRMABLE=False,  # 未启用邮箱确认
         SECURITY_USERNAME_ENABLE=True,  # 启用用户名登录字段（需 bleach）
         SECURITY_EMAIL_REQUIRED=False,  # 不要求邮箱
         SECURITY_PASSWORD_HASH='pbkdf2_sha512',  # 避免对外部加密库的额外依赖
         WTF_CSRF_ENABLED=True,
         SECURITY_FLASH_MESSAGES=True,
-        # 角色相关配置
         SECURITY_ROLES_ENABLED=True,  # 启用角色功能
-        # 修改密码相关配置
         SECURITY_CHANGE_PASSWORD_TEMPLATE='security/change_password.html',
         SECURITY_POST_CHANGE_VIEW='/',  # 修改密码后重定向到首页
-        # 登录失败与账户状态提示（中文）
         SECURITY_MSG_INVALID_PASSWORD=("用户名或密码错误", "error"),
         SECURITY_MSG_INVALID_USERNAME=("用户名或密码错误", "error"),
         SECURITY_MSG_USER_DOES_NOT_EXIST=("用户名或密码错误", "error"),
@@ -80,7 +61,6 @@ def create_app() -> Flask:
         SECURITY_POST_LOGOUT_VIEW='/login',
     )
 
-    # 连接 MongoDB（直接使用 mongoengine.connect）
     mongodb_uri = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017/lacus')
     try:
         connect(host=mongodb_uri, uuidRepresentation='standard')
@@ -89,7 +69,6 @@ def create_app() -> Flask:
         flask_app.logger.error('MongoDB 连接失败：%s', exc)
         raise
 
-    # 启动时清空所有已存在的令牌（避免重启冲突）
     try:
         from utils.job_token import JobPlan
         JobPlan.objects.delete()  # type: ignore[attr-defined]  # pylint: disable=no-member
@@ -97,14 +76,11 @@ def create_app() -> Flask:
     except Exception as exc:  # pylint: disable=broad-except
         flask_app.logger.error('清空任务计划令牌失败：%s', exc)
 
-    # 启用全局 CSRF 保护（包含自定义表单）
     CSRFProtect(flask_app)
 
-    # 初始化安全组件
     user_datastore = create_user_datastore()
     _security = init_security(flask_app, user_datastore)
 
-    # 注册蓝图
     flask_app.register_blueprint(main_bp)
     flask_app.register_blueprint(admin_bp, url_prefix='/admin')
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
@@ -116,7 +92,6 @@ def create_app() -> Flask:
     flask_app.register_blueprint(report_bp, url_prefix='/reports')
     flask_app.register_blueprint(report_mail_bp, url_prefix='/reports')
 
-    # 注册Jinja2过滤器
     @flask_app.template_filter('role_display_name')
     def role_display_name(role_name):
         """将角色英文代码转换为中文显示名称"""
@@ -131,7 +106,6 @@ def create_app() -> Flask:
             return [role_mapping.get(role.name if hasattr(role, 'name') else role, role.name if hasattr(role, 'name') else role) for role in roles]
         return [role_mapping.get(roles, roles)]
 
-    # 注册时间处理过滤器
     @flask_app.template_filter('local_datetime')
     def local_datetime_filter(utc_dt, format_str='%Y年%m月%d日 %H:%M'):
         """将UTC时间转换为GMT+8时间并格式化"""
@@ -152,7 +126,6 @@ def create_app() -> Flask:
         """将UTC时间转换为适合HTML datetime-local输入框的格式"""
         return get_local_datetime_for_input(utc_dt)
 
-    # 添加模板上下文变量
     @flask_app.context_processor
     def inject_template_vars():
         return {'datetime': datetime, 'timedelta': timedelta}
@@ -172,7 +145,6 @@ def create_app() -> Flask:
         """将UTC时间转换为适合HTML time输入框的格式"""
         return get_local_time_for_input(utc_dt)
 
-    # 注册用语转换过滤器
     @flask_app.template_filter('normalize_rank')
     def normalize_rank_filter(rank_value):
         """将主播分类旧用语转换为新用语显示"""
@@ -195,13 +167,11 @@ def create_app() -> Flask:
         }
         return status_mapping.get(status_value, status_value)
 
-    # 注册全局错误处理器
     def _render_500(error):
         """统一记录并渲染 500 错误页面。"""
         from flask import render_template, request
         logger = flask_app.logger
 
-        # 记录详细错误与请求上下文
         logger.error("500内部服务器错误: %s", str(error), exc_info=True)
         logger.error("请求URL: %s", request.url)
         logger.error("请求方法: %s", request.method)
@@ -238,14 +208,10 @@ def create_app() -> Flask:
         from flask import render_template
         return render_template('errors/403.html'), 403
 
-    # 启动时确保数据库索引和角色与默认管理员存在（需要应用上下文以支持密码哈希等）
     with flask_app.app_context():
-        # 首先确保数据库索引
         ensure_database_indexes()
-        # 然后确保角色和默认管理员
         ensure_initial_roles_and_admin(user_datastore)
 
-    # 初始化应用内置调度器（放在一切注册完成之后）
     # 说明：生产多进程/多实例部署时，应仅在“领导实例”启用该开关，避免重复触发任务
     enable_scheduler = os.getenv('ENABLE_SCHEDULER', 'false').lower() == 'true'
     is_dev = os.getenv('FLASK_ENV', '').lower() == 'development'
@@ -254,7 +220,6 @@ def create_app() -> Flask:
     if not enable_scheduler:
         flask_app.logger.info('ENABLE_SCHEDULER=false，跳过启动内置定时任务')
     else:
-        # 在开发环境（带自动重载）下，仅在重载主进程内启动，避免重复
         if (not is_dev) or (is_dev and is_reloader_main):
             try:
                 init_scheduled_jobs(flask_app)
@@ -266,7 +231,6 @@ def create_app() -> Flask:
     return flask_app
 
 
-# 便于 flask 命令行运行
 app = create_app()
 
 
@@ -286,5 +250,4 @@ def run_dev() -> None:
 
 
 if __name__ == '__main__':
-    # 允许：python app.py 直接启动调试
     run_dev()

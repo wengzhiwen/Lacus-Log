@@ -40,7 +40,6 @@ def _build_recruit_daily_markdown(statistics: dict) -> str:
             return 0
         return round((numerator / denominator) * 100)
 
-    # 计算百分比
     report_day = statistics['report_day']
     last_7_days = statistics['last_7_days']
     last_14_days = statistics['last_14_days']
@@ -64,21 +63,18 @@ def _build_recruit_daily_markdown(statistics: dict) -> str:
 
     lines = [header]
 
-    # 报表日行
     report_line = (f"| 报表日 | {report_day['appointments']} ({percentages['report_day']['appointments']}%) | "
                    f"{report_day['interviews']} ({percentages['report_day']['interviews']}%) | "
                    f"{report_day['trials']} ({percentages['report_day']['trials']}%) | "
                    f"{report_day['new_recruits']} ({percentages['report_day']['new_recruits']}%) |")
     lines.append(report_line)
 
-    # 近7日行
     week_line = (f"| 近7日 | {last_7_days['appointments']} ({percentages['last_7_days']['appointments']}%) | "
                  f"{last_7_days['interviews']} ({percentages['last_7_days']['interviews']}%) | "
                  f"{last_7_days['trials']} ({percentages['last_7_days']['trials']}%) | "
                  f"{last_7_days['new_recruits']} ({percentages['last_7_days']['new_recruits']}%) |")
     lines.append(week_line)
 
-    # 近14日行
     fortnight_line = (f"| 近14日 | {last_14_days['appointments']} | "
                       f"{last_14_days['interviews']} | "
                       f"{last_14_days['trials']} | "
@@ -100,36 +96,28 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
     """
     logger.info('触发招募日报邮件发送，来源：%s，报表日期：%s', triggered_by or '未知', report_date or '昨天')
 
-    # 确定报表日期
     if not report_date:
-        # 默认发送昨天的报表
         now_utc = get_current_utc_time()
         yesterday_local = utc_to_local(now_utc) - timedelta(days=1)
         report_date = yesterday_local.strftime('%Y-%m-%d')
 
-    # 解析报表日期
     try:
         report_date_obj = datetime.strptime(report_date, '%Y-%m-%d')
     except ValueError:
         logger.error('报表日期格式错误：%s', report_date)
         return {'sent': False, 'count': 0}
 
-    # 计算统计数据（复用招募日报的计算逻辑）
     statistics = _calculate_recruit_statistics(report_date_obj)
 
-    # 生成邮件内容
     md_content = _build_recruit_daily_markdown(statistics)
 
-    # 添加说明文字
     full_content = f"""# 主播招募日报
 
 **报表日期：** {report_date}
 
-## 统计概览
 
 {md_content}
 
-## 指标说明
 
 - **约面**：当天创建的招募数量
 - **到面**：当天发生的面试决策数量（完成面试决策的数量，不论是决定预约试播，还是决定不招募都算）
@@ -140,7 +128,6 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
 *本报表由 Lacus-Log 系统自动生成*
 """
 
-    # 获取收件人：运营和管理员
     recipients = []
     recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 管理员
     recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 运营
@@ -149,13 +136,10 @@ def run_recruit_daily_report_job(report_date: str = None, triggered_by: str = 's
         logger.error('收件人为空，未找到任何运营或管理员的邮箱')
         return {'sent': False, 'count': 0}
 
-    # 去重
     recipients = list(set(recipients))
 
-    # 生成邮件主题
     subject = f"[Lacus-Log] 主播招募日报 - {report_date}"
 
-    # 发送邮件
     ok = send_email_md(recipients, subject, full_content)
     if ok:
         logger.info('招募日报邮件已发送，收件人：%s', ', '.join(recipients))
@@ -189,7 +173,6 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
     Returns:
         str: Markdown格式的邮件内容
     """
-    # 月度数据表格
     month_table = """| 指标 | 数值 |
 | --- | ---: |
 | 总主播数量 | {pilot_count} |
@@ -201,7 +184,6 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
 | 累计公司分成 | ¥{company_share_sum:,.2f} |
 | 运营利润估算 | ¥{operating_profit:,.2f} |""".format(**month_summary)
 
-    # 日报汇总表格
     day_table = """| 指标 | 数值 |
 | --- | ---: |
 | 总主播数量 | {pilot_count} |
@@ -211,7 +193,6 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
 | 累计主播分成 | ¥{pilot_share_sum:,.2f} |
 | 累计公司分成 | ¥{company_share_sum:,.2f} |""".format(**day_summary)
 
-    # 明细表格（简化版，去掉用户要求的列）
     if details:
         detail_table = """| 主播 | 性别年龄 | 直属运营 | 播时 | 流水 | 底薪 | 月累计天数 | 月日均播时 | 月累计底薪 | 月累计毛利 |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"""
@@ -229,11 +210,9 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
 
 {month_table}
 
-## 日报汇总
 
 {day_table}
 
-## 日报明细
 
 {detail_table}
 
@@ -252,31 +231,25 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
     """
     logger.info('触发开播日报邮件发送，来源：%s，报表日期：%s', triggered_by or '未知', report_date or '昨天')
 
-    # 确定报表日期
     if not report_date:
-        # 默认发送昨天的报表
         now_utc = get_current_utc_time()
         yesterday_local = utc_to_local(now_utc) - timedelta(days=1)
         report_date = yesterday_local.strftime('%Y-%m-%d')
 
-    # 解析报表日期
     try:
         report_date_obj = datetime.strptime(report_date, '%Y-%m-%d')
     except ValueError:
         logger.error('报表日期格式错误：%s', report_date)
         return {'sent': False, 'count': 0}
 
-    # 计算开播日报数据（复用现有的计算逻辑）
     from routes.report import _calculate_month_summary, _calculate_day_summary, _calculate_daily_details
 
     month_summary = _calculate_month_summary(report_date_obj)
     day_summary = _calculate_day_summary(report_date_obj)
     details = _calculate_daily_details(report_date_obj)
 
-    # 生成邮件内容
     md_content = _build_daily_report_markdown(month_summary, day_summary, details)
 
-    # 添加说明文字
     full_content = f"""# 开播日报
 
 **报表日期：** {report_date}
@@ -287,7 +260,6 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
 *本报表由 Lacus-Log 系统自动生成*
 """
 
-    # 获取收件人：运营和管理员
     recipients = []
     recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 管理员
     recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 运营
@@ -296,13 +268,10 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
         logger.error('收件人为空，未找到任何运营或管理员的邮箱')
         return {'sent': False, 'count': 0}
 
-    # 去重
     recipients = list(set(recipients))
 
-    # 生成邮件主题
     subject = f"[Lacus-Log] 开播日报 - {report_date}"
 
-    # 发送邮件
     ok = send_email_md(recipients, subject, full_content)
     if ok:
         logger.info('开播日报邮件已发送，收件人：%s', ', '.join(recipients))
@@ -312,7 +281,6 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
     return {'sent': False, 'count': len(recipients)}
 
 
-# _calculate_period_stats 函数已移至 utils/recruit_stats.py
 
 
 def _build_unstarted_markdown(items: List[dict]) -> str:
@@ -334,10 +302,8 @@ def _build_unstarted_markdown(items: List[dict]) -> str:
 @roles_required('gicho')
 def mail_reports_page():
     """展示邮件报告入口页面（仅管理员可见）。"""
-    # 读取 MongoDB 中的下一次触发计划（UTC），界面显示为 GMT+8
     try:
         now_minute = get_current_utc_time().strftime('%Y%m%d%H%M')
-        # 未开播提醒
         unstarted_plan = (JobPlan.objects(job_code='daily_unstarted_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (JobPlan.objects(
             job_code='daily_unstarted_report').order_by('-fire_minute').first())
         unstarted_next_local = None
@@ -345,7 +311,6 @@ def mail_reports_page():
             fire_dt_utc = datetime.strptime(unstarted_plan.fire_minute, '%Y%m%d%H%M')
             unstarted_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
-        # 招募日报
         recruit_plan = (JobPlan.objects(job_code='daily_recruit_daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
             JobPlan.objects(job_code='daily_recruit_daily_report').order_by('-fire_minute').first())
         recruit_next_local = None
@@ -353,7 +318,6 @@ def mail_reports_page():
             fire_dt_utc = datetime.strptime(recruit_plan.fire_minute, '%Y%m%d%H%M')
             recruit_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
-        # 开播日报
         daily_plan = (JobPlan.objects(job_code='daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (JobPlan.objects(
             job_code='daily_report').order_by('-fire_minute').first())
         daily_next_local = None
@@ -378,13 +342,10 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
     """
     logger.info('触发未开播提醒报表，来源：%s', triggered_by or '未知')
 
-    # 统一使用项目的UTC naive时间口径，避免aware/naive相减报错
     now_utc = get_current_utc_time()
     window_start_utc = now_utc - timedelta(hours=48)
     deadline_threshold_utc = now_utc - timedelta(hours=4)
 
-    # 说明：此处将“计划的接受时间”按现有数据模型暂以 Announcement.start_time 代替
-    # 过滤48小时窗口内、且已超过4小时阈值的通告
     candidate_plans = Announcement.objects.filter(start_time__gte=window_start_utc, start_time__lte=deadline_threshold_utc).order_by('-start_time')
 
     logger.debug('候选计划数量（48小时内且超4小时）：%d', candidate_plans.count())
@@ -392,7 +353,6 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
     unstarted_items: List[dict] = []
     sample_logged = 0
     for ann in candidate_plans:
-        # 若存在与该计划关联的开播记录，则视为已开播
         exists_record = BattleRecord.objects.filter(related_announcement=ann).first() is not None
         if exists_record:
             continue
@@ -437,7 +397,6 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
 
         unstarted_items.append(item)
 
-    # 收件人：从用户模块获取所有激活用户的邮箱（去重、稳定排序）
     recipients = User.get_emails_by_role(role_name=None, only_active=True)
     subject_ts = utc_to_local(now_utc).strftime('%Y-%m-%d %H:%M')
     subject = f"[Lacus-Log] 未开播提醒（近48小时） - {subject_ts}"
@@ -476,13 +435,10 @@ def trigger_unstarted_report():
 def trigger_recruit_daily_report():
     """触发或显示招募日报。GET请求用于显示，POST请求用于触发邮件。"""
     if request.method == 'GET':
-        # 将GET请求重定向到新的、正确的显示页面
         return redirect(url_for('report.recruit_daily_report', **request.args))
 
-    # --- 以下为原有的POST逻辑 ---
     username = getattr(current_user, 'username', '未知')
 
-    # 获取请求参数
     report_date = request.json.get('report_date') if request.is_json else None
 
     result = run_recruit_daily_report_job(report_date=report_date, triggered_by=username)
@@ -496,7 +452,6 @@ def trigger_daily_report():
     """触发开播日报邮件发送。"""
     username = getattr(current_user, 'username', '未知')
 
-    # 获取请求参数
     report_date = request.json.get('report_date') if request.is_json else None
 
     result = run_daily_report_job(report_date=report_date, triggered_by=username)

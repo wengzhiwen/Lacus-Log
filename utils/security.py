@@ -28,20 +28,16 @@ def init_security(app: Flask,
     def _on_user_authenticated(sender, user, **extra):  # pylint: disable=unused-argument
         logger.info('用户登录成功：%s', getattr(user, 'username', 'unknown'))
 
-    # 使用 fs_uniquifier 作为会话标识，确保能够从会话中还原用户
     @security.login_manager.user_loader
     def _load_user(user_id):  # pylint: disable=unused-argument
-        # 优先用 fs_uniquifier 查找
         user = User.objects(fs_uniquifier=user_id).first()
         if user:
             return user
-        # 回退：尝试按 ObjectId 处理
         try:
             from bson import ObjectId  # 延迟导入，避免工具环境缺依赖报错
             return User.objects(id=ObjectId(user_id)).first()
         except Exception:  # pylint: disable=broad-except
             return None
 
-    # 其他失败/登出等信号在此版本中不保证可用，后续按需接入
 
     return security

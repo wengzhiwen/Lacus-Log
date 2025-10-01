@@ -58,7 +58,6 @@ def _record_changes(pilot, old_data, user, ip_address):
 
 def _check_pilot_permission(_pilot):
     """检查用户对主播的操作权限"""
-    # 管理员与运营权限一致：均可访问/编辑所有主播
     if current_user.has_role('gicho') or current_user.has_role('kancho'):
         return True
     return False
@@ -69,17 +68,14 @@ def _get_user_choices():
     users = User.objects.all()
     choices = [('', '无')]
 
-    # 第二顺位：当前用户
     if current_user.has_role('kancho') or current_user.has_role('gicho'):
         choices.append((str(current_user.id), current_user.nickname or current_user.username))
 
-    # 第三顺位：其他活跃运营/管理员（昵称字典顺序）
     active_users = [u for u in users if u.active and u.id != current_user.id and (u.has_role('kancho') or u.has_role('gicho'))]
     active_users.sort(key=lambda x: x.nickname or x.username)
     for user in active_users:
         choices.append((str(user.id), user.nickname or user.username))
 
-    # 第四顺位：其他非活跃运营/管理员（昵称字典顺序，标记[流失]）
     inactive_users = [u for u in users if not u.active and u.id != current_user.id and (u.has_role('kancho') or u.has_role('gicho'))]
     inactive_users.sort(key=lambda x: x.nickname or x.username)
     for user in inactive_users:
@@ -93,7 +89,6 @@ def _get_user_choices():
 @roles_accepted('gicho', 'kancho')
 def list_pilots():
     """主播列表页面"""
-    # 获取并持久化筛选参数（会话）
     filters = persist_and_restore_filters(
         'pilots_list',
         allowed_keys=['rank', 'status', 'owner', 'days'],
@@ -114,16 +109,12 @@ def list_pilots():
     except ValueError:
         days_filter = None
 
-    # 构建查询
     query = Pilot.objects
 
-    # 权限控制：管理员与运营权限一致，不做按直属运营的强制过滤
 
-    # 应用筛选条件
     if rank_filter:
         try:
             rank_enum = Rank(rank_filter)
-            # 兼容性筛选：同时筛选新用语和对应的旧用语
             if rank_enum == Rank.CANDIDATE:
                 query = query.filter(rank__in=[Rank.CANDIDATE, Rank.CANDIDATE_OLD])
             elif rank_enum == Rank.TRAINEE:
@@ -140,7 +131,6 @@ def list_pilots():
     if status_filter:
         try:
             status_enum = Status(status_filter)
-            # 兼容性筛选：同时筛选新用语和对应的旧用语
             if status_enum == Status.NOT_RECRUITED:
                 query = query.filter(status__in=[Status.NOT_RECRUITED, Status.NOT_RECRUITED_OLD])
             elif status_enum == Status.NOT_RECRUITING:
@@ -170,10 +160,8 @@ def list_pilots():
 
     pilots = query.order_by('-created_at').all()
 
-    # 获取筛选选项
     user_choices = _get_user_choices()
 
-    # 只显示新用语的筛选选项
     rank_choices = [
         (Rank.CANDIDATE.value, Rank.CANDIDATE.value),
         (Rank.TRAINEE.value, Rank.TRAINEE.value),
@@ -207,11 +195,9 @@ def pilot_detail(pilot_id):
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        # 获取当前分成信息
         current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
         calculation_info = _calculate_commission_distribution(current_rate)
 
@@ -231,7 +217,6 @@ def new_pilot():
     """新建主播"""
     if request.method == 'POST':
         try:
-            # 获取表单数据
             nickname = request.form.get('nickname', '').strip()
             real_name = request.form.get('real_name', '').strip() or None
             gender = request.form.get('gender')
@@ -243,17 +228,14 @@ def new_pilot():
             rank = request.form.get('rank')
             status = request.form.get('status')
 
-            # 基础验证
             if not nickname:
                 flash('昵称为必填项', 'error')
                 return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
 
-            # 检查昵称唯一性
             if Pilot.objects(nickname=nickname).first():
                 flash('该昵称已存在', 'error')
                 return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
 
-            # 创建主播对象
             pilot = Pilot(nickname=nickname)
 
             if real_name:
@@ -276,7 +258,6 @@ def new_pilot():
                     flash('所属用户不存在', 'error')
                     return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
             elif current_user.has_role('kancho') and not current_user.has_role('gicho'):
-                # 运营新建的主播默认属于自己
                 pilot.owner = current_user
 
             if platform:
@@ -291,7 +272,6 @@ def new_pilot():
             if status:
                 pilot.status = Status(status)
 
-            # 保存主播
             pilot.save()
             flash('创建主播成功', 'success')
             logger.info('用户%s创建主播：%s', current_user.username, nickname)
@@ -315,12 +295,10 @@ def edit_pilot(pilot_id):
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
         if request.method == 'POST':
-            # 记录原始数据用于变更记录
             old_data = {
                 'nickname': pilot.nickname,
                 'real_name': pilot.real_name,
@@ -335,7 +313,6 @@ def edit_pilot(pilot_id):
             }
 
             try:
-                # 获取表单数据
                 nickname = request.form.get('nickname', '').strip()
                 real_name = request.form.get('real_name', '').strip() or None
                 gender = request.form.get('gender')
@@ -347,18 +324,15 @@ def edit_pilot(pilot_id):
                 rank = request.form.get('rank')
                 status = request.form.get('status')
 
-                # 基础验证
                 if not nickname:
                     flash('昵称为必填项', 'error')
                     return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
 
-                # 检查昵称唯一性（排除自己）
                 existing_pilot = Pilot.objects(nickname=nickname).first()
                 if existing_pilot and existing_pilot.id != pilot.id:
                     flash('该昵称已存在', 'error')
                     return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
 
-                # 更新主播数据
                 pilot.nickname = nickname
                 pilot.real_name = real_name
 
@@ -394,10 +368,8 @@ def edit_pilot(pilot_id):
                 if status:
                     pilot.status = Status(status)
 
-                # 保存主播
                 pilot.save()
 
-                # 记录变更
                 _record_changes(pilot, old_data, current_user, _get_client_ip())
 
                 flash('更新主播成功', 'success')
@@ -424,11 +396,9 @@ def pilot_changes(pilot_id):
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        # 获取最近100条变更记录
         changes = PilotChangeLog.objects(pilot_id=pilot).order_by('-change_time').limit(100)
 
         return jsonify({
@@ -450,7 +420,6 @@ def pilot_changes(pilot_id):
         return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
 
 
-# ==================== 分成管理相关函数 ====================
 
 
 def _record_commission_changes(commission, old_data, user, ip_address):
@@ -481,27 +450,20 @@ def _record_commission_changes(commission, old_data, user, ip_address):
 
 def _get_pilot_current_commission_rate(pilot_id):
     """获取主播当前有效的分成比例"""
-    # 获取当前UTC时间
     current_time = get_current_utc_time()
 
-    # 查询主播的所有有效调整记录，按调整日升序排列
     commissions = PilotCommission.objects(pilot_id=pilot_id, is_active=True).order_by('adjustment_date')
 
-    # 使用更安全的方法检查是否有记录
     commission_list = list(commissions)
     if not commission_list:
-        # 如果没有记录，返回默认20%
         return 20.0, None, "默认分成比例"
 
-    # 根据当前日期找到生效的分成记录
-    # 找到调整日小于等于当前日期的最后一条记录
     effective_commission = None
     for commission in reversed(commission_list):  # 从最新记录开始查找
         if commission.adjustment_date <= current_time:
             effective_commission = commission
             break
 
-    # 如果没有找到生效的记录（所有记录的调整日都是未来日期），返回默认值
     if effective_commission is None:
         return 20.0, None, "默认分成比例"
 
@@ -510,20 +472,16 @@ def _get_pilot_current_commission_rate(pilot_id):
 
 def _calculate_commission_distribution(commission_rate):
     """根据分成比例计算主播和公司的收入分配"""
-    # 固定参数
     BASE_RATE = 50.0  # 50%
     COMPANY_RATE = 42.0  # 42%
 
-    # 主播收入 = (分成比例/50%) * 42%
     pilot_income = (commission_rate / BASE_RATE) * COMPANY_RATE
 
-    # 公司收入 = 42% - 主播收入
     company_income = COMPANY_RATE - pilot_income
 
     return {'pilot_income': pilot_income, 'company_income': company_income, 'calculation_formula': f'({commission_rate}%/50%) * 42% = {pilot_income:.1f}%'}
 
 
-# ==================== 分成管理路由 ====================
 
 
 @pilot_bp.route('/<pilot_id>/commission/')
@@ -533,15 +491,12 @@ def pilot_commission_index(pilot_id):
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        # 获取当前分成信息
         current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
         calculation_info = _calculate_commission_distribution(current_rate)
 
-        # 获取调整记录列表（按调整日降序排列）
         commissions = PilotCommission.objects(pilot_id=pilot_id).order_by('-adjustment_date')
 
         return render_template('pilots/commission/index.html',
@@ -563,18 +518,15 @@ def pilot_commission_new(pilot_id):
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
         if request.method == 'POST':
             try:
-                # 获取表单数据
                 adjustment_date_str = request.form.get('adjustment_date', '').strip()
                 commission_rate_str = request.form.get('commission_rate', '').strip()
                 remark = request.form.get('remark', '').strip() or None
 
-                # 基础验证
                 if not adjustment_date_str:
                     flash('调整日为必填项', 'error')
                     return render_template('pilots/commission/new.html', pilot=pilot)
@@ -583,11 +535,9 @@ def pilot_commission_new(pilot_id):
                     flash('分成比例为必填项', 'error')
                     return render_template('pilots/commission/new.html', pilot=pilot)
 
-                # 转换数据类型
                 try:
                     from datetime import datetime
                     adjustment_date = datetime.strptime(adjustment_date_str, '%Y-%m-%d')
-                    # 转换为UTC时间（假设输入的是GMT+8时间）
                     adjustment_date = local_to_utc(adjustment_date)
                 except ValueError:
                     flash('调整日格式错误', 'error')
@@ -599,10 +549,8 @@ def pilot_commission_new(pilot_id):
                     flash('分成比例必须是数字', 'error')
                     return render_template('pilots/commission/new.html', pilot=pilot)
 
-                # 创建分成调整记录
                 commission = PilotCommission(pilot_id=pilot, adjustment_date=adjustment_date, commission_rate=commission_rate, remark=remark)
 
-                # 保存记录
                 commission.save()
 
                 flash('创建分成调整记录成功', 'success')
@@ -631,12 +579,10 @@ def pilot_commission_edit(pilot_id, commission_id):
         pilot = Pilot.objects.get(id=pilot_id)
         commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
         if request.method == 'POST':
-            # 记录原始数据用于变更记录
             old_data = {
                 'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
                 'commission_rate': commission.commission_rate,
@@ -645,12 +591,10 @@ def pilot_commission_edit(pilot_id, commission_id):
             }
 
             try:
-                # 获取表单数据
                 commission_rate = request.form.get('commission_rate')
                 remark = request.form.get('remark', '').strip() or None
                 is_active = request.form.get('is_active') == 'on'  # checkbox返回'on'或None
 
-                # 验证分成比例
                 if commission_rate is not None:
                     try:
                         commission_rate = float(commission_rate)
@@ -661,14 +605,12 @@ def pilot_commission_edit(pilot_id, commission_id):
                         flash('分成比例必须是有效数字', 'error')
                         return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
 
-                # 更新数据
                 if commission_rate is not None:
                     commission.commission_rate = commission_rate
                 commission.remark = remark
                 commission.is_active = is_active
                 commission.save()
 
-                # 记录变更
                 _record_commission_changes(commission, old_data, current_user, _get_client_ip())
 
                 flash('更新分成调整记录成功', 'success')
@@ -694,11 +636,9 @@ def pilot_commission_delete(pilot_id, commission_id):
         pilot = Pilot.objects.get(id=pilot_id)
         commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        # 记录原始数据用于变更记录
         old_data = {
             'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
             'commission_rate': commission.commission_rate,
@@ -706,11 +646,9 @@ def pilot_commission_delete(pilot_id, commission_id):
             'is_active': commission.is_active,
         }
 
-        # 软删除
         commission.is_active = False
         commission.save()
 
-        # 记录变更
         _record_commission_changes(commission, old_data, current_user, _get_client_ip())
 
         flash('删除分成调整记录成功', 'success')
@@ -729,11 +667,9 @@ def pilot_commission_restore(pilot_id, commission_id):
         pilot = Pilot.objects.get(id=pilot_id)
         commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        # 记录原始数据用于变更记录
         old_data = {
             'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
             'commission_rate': commission.commission_rate,
@@ -741,11 +677,9 @@ def pilot_commission_restore(pilot_id, commission_id):
             'is_active': commission.is_active,
         }
 
-        # 恢复
         commission.is_active = True
         commission.save()
 
-        # 记录变更
         _record_commission_changes(commission, old_data, current_user, _get_client_ip())
 
         flash('恢复分成调整记录成功', 'success')
@@ -763,11 +697,9 @@ def pilot_commission_current(pilot_id):
     try:
         pilot = Pilot.objects.get(id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        # 获取当前分成信息
         current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
         calculation_info = _calculate_commission_distribution(current_rate)
 
@@ -794,11 +726,9 @@ def pilot_commission_changes(pilot_id, commission_id):
         pilot = Pilot.objects.get(id=pilot_id)
         commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
 
-        # 权限检查
         if not _check_pilot_permission(pilot):
             abort(403)
 
-        # 获取最近100条变更记录
         changes = PilotCommissionChangeLog.objects(commission_id=commission).order_by('-change_time').limit(100)
 
         return jsonify({
@@ -830,34 +760,24 @@ def pilot_export():
         import csv
         import io
 
-        # 获取所有主播数据
         pilots = Pilot.objects.all().order_by('-created_at')
 
-        # 创建CSV内容
         output = io.StringIO()
 
-        # 写入BOM头，确保Excel正确显示中文
         output.write('\ufeff')
 
-        # 创建CSV写入器
         writer = csv.writer(output)
 
-        # 写入表头
         headers = ['昵称', '姓名', '性别', '出生年', '籍贯', '开播平台', '直属运营昵称', '开播方式', '主播分类', '状态', '当前分成比例']
         writer.writerow(headers)
 
-        # 写入数据行
         for pilot in pilots:
-            # 获取当前分成比例
             current_rate, _, _ = _get_pilot_current_commission_rate(str(pilot.id))
 
-            # 性别显示
             gender_display = '男' if pilot.gender.value == 0 else '女' if pilot.gender.value == 1 else '不明确'
 
-            # 直属运营昵称
             owner_nickname = pilot.owner.nickname if pilot.owner else '无'
 
-            # 构建数据行
             row = [
                 pilot.nickname or '', pilot.real_name or '', gender_display, pilot.birth_year or '', pilot.hometown or '',
                 pilot.platform.value if pilot.platform else '', owner_nickname, pilot.work_mode.value if pilot.work_mode else '',
@@ -865,19 +785,15 @@ def pilot_export():
             ]
             writer.writerow(row)
 
-        # 获取CSV内容
         csv_content = output.getvalue()
         output.close()
 
-        # 生成文件名
         from datetime import datetime
         now = datetime.now()
         filename = f'主播数据导出_{now.strftime("%Y%m%d_%H%M%S")}.csv'
-        # 使用URL编码的文件名，避免HTTP头编码问题
         import urllib.parse
         encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
 
-        # 创建响应
         from flask import Response
         response = Response(csv_content,
                             mimetype='text/csv; charset=utf-8',
@@ -896,18 +812,15 @@ def pilot_export():
 def _calculate_pilot_rebate(pilot, end_date):
     """计算主播返点"""
     try:
-        # 获取当月1号到结束日期的所有开播记录
         month_start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_start_utc = local_to_utc(month_start)
         end_date_utc = local_to_utc(end_date.replace(hour=23, minute=59, second=59, microsecond=999999))
 
         records = BattleRecord.objects(pilot=pilot, start_time__gte=month_start_utc, start_time__lte=end_date_utc)
 
-        # 计算返点指标
         total_revenue = sum(float(record.revenue_amount) for record in records)
         total_hours = sum(float(record.duration_hours or 0) for record in records)
 
-        # 计算有效天数（单次播时≥60分钟的自然日去重数）
         valid_days = set()
         for record in records:
             local_start = utc_to_local(record.start_time)
@@ -915,7 +828,6 @@ def _calculate_pilot_rebate(pilot, end_date):
                 valid_days.add(local_start.date())
         valid_days_count = len(valid_days)
 
-        # 确定返点比例
         rebate_rate = 0
         if valid_days_count >= 22 and total_hours >= 130 and total_revenue >= 80000:
             rebate_rate = 18
@@ -946,11 +858,9 @@ def _calculate_pilot_rebate(pilot, end_date):
 def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
     """计算主播业绩统计"""
     try:
-        # 获取指定数量的最近开播记录
         if record_count:
             records = BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(record_count)
         else:
-            # 获取当月1号到结束日期的所有开播记录
             month_start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             month_start_utc = local_to_utc(month_start)
             end_date_utc = local_to_utc(end_date.replace(hour=23, minute=59, second=59, microsecond=999999))
@@ -972,14 +882,12 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
                 'daily_avg_operating_profit': 0.0
             }
 
-        # 基础统计
         actual_record_count = len(records)
         total_hours = sum(float(record.duration_hours or 0) for record in records)
         avg_hours = round(total_hours / actual_record_count, 1) if actual_record_count > 0 else 0.0
         total_revenue = sum(float(record.revenue_amount) for record in records)
         total_basepay = sum(float(record.base_salary) for record in records)
 
-        # 计算日均流水
         if actual_record_count:
             daily_avg_revenue = round(total_revenue / actual_record_count, 2)
         else:
@@ -987,13 +895,11 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
 
         logger.info(f"主播 {pilot.nickname} 基础统计: 记录数={actual_record_count}, 总时长={total_hours}, 总流水={total_revenue}, 总底薪={total_basepay}")
 
-        # 计算分成和返点
         total_company_share = 0.0
         total_rebate = 0.0
 
         for record in records:
             try:
-                # 获取该记录日期的分成比例
                 local_start = utc_to_local(record.start_time)
                 record_date = local_start.date()
                 commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
@@ -1001,10 +907,8 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
                 total_company_share += float(commission_amounts['company_amount'])
             except Exception as e:
                 logger.error(f"计算记录 {record.id} 分成失败: {e}")
-                # 如果分成计算失败，使用默认值
                 total_company_share += float(record.revenue_amount) * 0.5  # 假设50%分成
 
-        # 计算返点（仅当月统计使用）
         if record_count is None:  # 只有本月统计才计算返点
             try:
                 rebate_info = _calculate_pilot_rebate(pilot, end_date)
@@ -1015,7 +919,6 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
         else:
             total_rebate = 0.0  # 近N日统计不计算返点
 
-        # 计算运营利润
         if record_count is None:  # 本月统计：运营利润 = 公司分成 + 返点 - 底薪
             operating_profit = total_company_share + total_rebate - total_basepay
         else:  # 近N日统计：近日盈亏 = 公司分成 - 底薪（不计返点）
@@ -1023,7 +926,6 @@ def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
 
         logger.info(f"主播 {pilot.nickname} 最终统计: 公司分成={total_company_share}, 返点={total_rebate}, 运营利润={operating_profit}")
 
-        # 计算日均底薪和日均运营利润
         daily_avg_basepay = round(total_basepay / actual_record_count, 2) if actual_record_count > 0 else 0.0
         daily_avg_operating_profit = round(operating_profit / actual_record_count, 2) if actual_record_count > 0 else 0.0
 
@@ -1065,11 +967,9 @@ def pilot_performance(pilot_id):
         pilot = Pilot.objects.get(id=pilot_id)
         logger.info(f"用户 {current_user.username} 查看主播业绩 {pilot_id}")
 
-        # 获取当前时间（GMT+8）
         now_utc = get_current_utc_time()
         now_local = utc_to_local(now_utc)
 
-        # 主播基本信息
         gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
         pilot_info = {
             'nickname': pilot.nickname,
@@ -1082,12 +982,10 @@ def pilot_performance(pilot_id):
             'status': pilot.get_effective_status_display()
         }
 
-        # 计算各种统计
         month_stats = _calculate_pilot_performance_stats(pilot, now_local)
         week_stats = _calculate_pilot_performance_stats(pilot, now_local, 7)
         three_day_stats = _calculate_pilot_performance_stats(pilot, now_local, 3)
 
-        # 获取最近30条开播记录
         recent_records = BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(30)
         recent_records_data = []
 
@@ -1095,7 +993,6 @@ def pilot_performance(pilot_id):
             local_start = utc_to_local(record.start_time)
             local_end = utc_to_local(record.end_time)
 
-            # 获取分成信息
             record_date = local_start.date()
             commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
             commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)

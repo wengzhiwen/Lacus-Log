@@ -33,19 +33,16 @@ def main():
     print("=" * 50)
     print("注意: 此脚本只运行不需要数据库连接的测试")
 
-    # 检查是否在虚拟环境中
     if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and
                                                 sys.base_prefix != sys.prefix):
         print("警告: 建议在虚拟环境中运行测试")
 
-    # 运行基础测试（不需要数据库）
     if not run_command(
             "./venv/bin/pytest tests/unit/test_imports.py tests/unit/test_logging.py -v",
             "运行基础测试"):
         print("❌ 基础测试失败")
         return 1
 
-    # 运行用户模型测试（不需要数据库的部分）
     test_cmd = (
         "./venv/bin/pytest "
         "tests/unit/test_models.py::TestUserModel::test_role_creation "
@@ -59,7 +56,6 @@ def main():
         print("❌ 用户模型测试失败")
         return 1
 
-    # 运行工具函数测试（不需要数据库的部分）
     utils_cmd = (
         "./venv/bin/pytest "
         "tests/unit/test_utils.py::TestSecurityUtils::test_create_user_datastore "

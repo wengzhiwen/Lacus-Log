@@ -33,7 +33,6 @@ class TestRecruitStatusFlow:
 
     def test_recruit_creation_flow(self, pilot, recruiter):
         """测试征召创建流程"""
-        # 创建征召记录
         recruit = Recruit(pilot=pilot,
                           recruiter=recruiter,
                           appointment_time=datetime(2025, 9, 15, 14, 0),
@@ -43,13 +42,11 @@ class TestRecruitStatusFlow:
                           status=RecruitStatus.STARTED)
         recruit.save()
 
-        # 验证征召状态
         assert recruit.status == RecruitStatus.STARTED
         assert recruit.pilot.status == Status.NOT_RECRUITED  # 机师状态未变
 
     def test_recruit_confirmation_flow(self, pilot, recruiter):
         """测试征召确认流程"""
-        # 创建征召记录
         recruit = Recruit(pilot=pilot,
                           recruiter=recruiter,
                           appointment_time=datetime(2025, 9, 15, 14, 0),
@@ -59,11 +56,9 @@ class TestRecruitStatusFlow:
                           status=RecruitStatus.STARTED)
         recruit.save()
 
-        # 确认征召
         recruit.status = RecruitStatus.ENDED
         recruit.save()
 
-        # 更新机师状态和阶级
         pilot.real_name = '测试姓名'
         pilot.birth_year = 1995
         pilot.real_name = '测试姓名'
@@ -90,14 +85,12 @@ class TestRecruitStatusFlow:
         pilot.rank = Rank.TRAINEE
         pilot.save()
 
-        # 验证状态更新
         assert recruit.status == RecruitStatus.ENDED
         assert pilot.status == Status.RECRUITED
         assert pilot.rank == Rank.TRAINEE
 
     def test_recruit_abandonment_flow(self, pilot, recruiter):
         """测试征召放弃流程"""
-        # 创建征召记录
         recruit = Recruit(pilot=pilot,
                           recruiter=recruiter,
                           appointment_time=datetime(2025, 9, 15, 14, 0),
@@ -107,15 +100,12 @@ class TestRecruitStatusFlow:
                           status=RecruitStatus.STARTED)
         recruit.save()
 
-        # 放弃征召
         recruit.status = RecruitStatus.ENDED
         recruit.save()
 
-        # 更新机师状态
         pilot.status = Status.NOT_RECRUITING
         pilot.save()
 
-        # 验证状态更新
         assert recruit.status == RecruitStatus.ENDED
         assert pilot.status == Status.NOT_RECRUITING
 
@@ -134,7 +124,6 @@ class TestRecruitValidation:
 
     def test_channel_validation(self, pilot, recruiter):
         """测试征召渠道验证"""
-        # 测试有效渠道
         valid_channels = [RecruitChannel.BOSS, RecruitChannel.JOB_51, RecruitChannel.INTRODUCTION, RecruitChannel.OTHER]
 
         for channel in valid_channels:
@@ -149,7 +138,6 @@ class TestRecruitValidation:
 
     def test_introduction_fee_validation(self, pilot, recruiter):
         """测试介绍费验证"""
-        # 测试有效介绍费
         valid_fees = [Decimal('0.00'), Decimal('100.00'), Decimal('999.99')]
 
         for fee in valid_fees:
@@ -164,10 +152,8 @@ class TestRecruitValidation:
 
     def test_recruiter_permission_validation(self, pilot):
         """测试征召负责人权限验证"""
-        # 创建舰长用户
         kancho = create_user('kancho_user', role_name='kancho')
 
-        # 创建征召记录
         recruit = Recruit(pilot=pilot,
                           recruiter=kancho,
                           appointment_time=datetime(2025, 9, 15, 14, 0),
@@ -176,7 +162,6 @@ class TestRecruitValidation:
                           status=RecruitStatus.STARTED)
         recruit.save()
 
-        # 验证征召负责人
         assert recruit.recruiter.id == kancho.id
         assert kancho.has_role('kancho')
 
@@ -195,7 +180,6 @@ class TestRecruitBusinessRules:
 
     def test_only_not_recruited_pilot_can_start_recruit(self, pilot, recruiter):
         """测试只有未征召状态的机师才能启动征召"""
-        # 机师状态为未征召，可以启动征召
         assert pilot.status == Status.NOT_RECRUITED
 
         recruit = Recruit(pilot=pilot,
@@ -220,7 +204,6 @@ class TestRecruitBusinessRules:
 
         assert recruit.status.value == '已启动'
 
-        # 更新状态
         recruit.status = RecruitStatus.ENDED
         recruit.save()
 
@@ -250,12 +233,10 @@ class TestRecruitIntegration:
 
     def test_complete_recruit_workflow(self):
         """测试完整征召工作流"""
-        # 创建机师和征召负责人
         owner = create_user('owner_user')
         pilot = create_pilot('征召机师', owner=owner, status=Status.NOT_RECRUITED)
         recruiter = create_user('recruiter_user', role_name='kancho')
 
-        # 1. 启动征召
         recruit = Recruit(pilot=pilot,
                           recruiter=recruiter,
                           appointment_time=datetime(2025, 9, 15, 14, 0),
@@ -265,11 +246,9 @@ class TestRecruitIntegration:
                           status=RecruitStatus.STARTED)
         recruit.save()
 
-        # 验证征召已启动
         assert recruit.status == RecruitStatus.STARTED
         assert pilot.status == Status.NOT_RECRUITED
 
-        # 2. 确认征召
         recruit.status = RecruitStatus.ENDED
         recruit.save()
 
@@ -279,7 +258,6 @@ class TestRecruitIntegration:
         pilot.rank = Rank.TRAINEE
         pilot.save()
 
-        # 验证征召已确认
         assert recruit.status == RecruitStatus.ENDED
         assert pilot.status == Status.RECRUITED
         assert pilot.rank == Rank.TRAINEE
@@ -290,7 +268,6 @@ class TestRecruitIntegration:
         pilot = create_pilot('征召机师', owner=owner, status=Status.NOT_RECRUITED)
         recruiter = create_user('recruiter_user', role_name='kancho')
 
-        # 创建第一个征召
         recruit1 = Recruit(pilot=pilot,
                            recruiter=recruiter,
                            appointment_time=datetime(2025, 9, 15, 14, 0),
@@ -299,8 +276,6 @@ class TestRecruitIntegration:
                            status=RecruitStatus.STARTED)
         recruit1.save()
 
-        # 尝试创建第二个征召（应该被业务逻辑阻止）
-        # 在实际应用中，应该在路由层检查是否已有进行中的征召
         recruit2 = Recruit(pilot=pilot,
                            recruiter=recruiter,
                            appointment_time=datetime(2025, 9, 16, 14, 0),
@@ -309,5 +284,4 @@ class TestRecruitIntegration:
                            status=RecruitStatus.STARTED)
         recruit2.save()
 
-        # 验证两个征召都存在（业务逻辑需要在应用层实现）
         assert Recruit.objects(pilot=pilot).count() == 2

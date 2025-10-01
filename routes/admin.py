@@ -39,7 +39,6 @@ def users_new():
         password = request.form.get('password', '').strip()
         email = request.form.get('email', '').strip()
 
-        # 输入验证
         if not username or not password:
             flash('用户名与密码为必填项', 'error')
             return render_template('users/new.html', form=request.form)
@@ -52,7 +51,6 @@ def users_new():
             flash('密码长度至少6个字符', 'error')
             return render_template('users/new.html', form=request.form)
 
-        # 检查用户名是否包含非法字符
         if not username.replace('_', '').replace('-', '').isalnum():
             flash('用户名只能包含字母、数字、下划线和连字符', 'error')
             return render_template('users/new.html', form=request.form)
@@ -94,7 +92,6 @@ def users_edit(user_id: str):
         email = request.form.get('email', '').strip()
 
         user.nickname = nickname
-        # 允许清空邮箱
         user.email = (email or None)
         user.save()
         flash('已更新用户信息', 'success')
@@ -111,7 +108,6 @@ def users_toggle_active(user_id: str):
     try:
         user = User.objects.get(id=user_id)
 
-        # 安全检查：不能停用最后一个管理员
         if user.has_role('gicho') and not user.active:
             gicho_role = Role.objects(name='gicho').first()
             active_gicho_count = User.objects(roles=gicho_role,

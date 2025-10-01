@@ -77,7 +77,6 @@ class TestBattleRecordTimeValidation:
                               owner_snapshot=pilot.owner,
                               registered_by=registrar)
 
-        # 不应该抛出异常
         record.clean()
         assert record.duration_hours == 2.0
 
@@ -93,7 +92,6 @@ class TestBattleRecordTimeValidation:
                               owner_snapshot=pilot.owner,
                               registered_by=registrar)
 
-        # 不应该抛出异常
         record.clean()
         assert (end_time - start_time).total_seconds() > 0
 
@@ -101,5 +99,4 @@ class TestBattleRecordTimeValidation:
         """空时间不应该进行验证"""
         record = BattleRecord(pilot=pilot, start_time=None, end_time=None, work_mode=WorkMode.ONLINE, owner_snapshot=pilot.owner, registered_by=registrar)
 
-        # 不应该抛出时间验证异常
         record.clean()

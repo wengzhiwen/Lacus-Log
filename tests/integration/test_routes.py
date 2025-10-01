@@ -29,14 +29,11 @@ class TestMainRoutes:
         with app.app_context():
             from flask_security.utils import hash_password
 
-            # 使用已存在的角色（应用启动时自动创建）
             role = Role.objects(name='kancho').first()
 
             user = User(username='testuser', password=hash_password('test_password'), roles=[role], active=True)
             user.save()
 
-            # 模拟登录（这里需要实际的登录流程）
-            # 由于 Flask-Security-Too 的复杂性，这里只测试路由存在
             response = client.get('/')
             assert response.status_code in [302, 401]  # 重定向或未授权
 
@@ -91,19 +88,15 @@ class TestRouteConfiguration:
     def test_admin_blueprint_url_prefix(self, app):
         """测试管理蓝图 URL 前缀"""
         admin_bp = app.blueprints['admin']
-        # 检查蓝图是否正确注册，URL前缀在注册时设置
         assert admin_bp.name == 'admin'
-        # 验证URL生成是否正确
         with app.app_context():
             assert url_for('admin.users_list', _external=False) == '/admin/users'
 
     def test_route_urls(self, app):
         """测试路由 URL 生成"""
         with app.app_context():
-            # 测试主路由
             assert url_for('main.home', _external=False) == '/'
 
-            # 测试管理路由
             assert url_for('admin.users_list', _external=False) == '/admin/users'
             assert url_for('admin.users_new', _external=False) == '/admin/users/new'
             assert url_for('admin.users_toggle_active', user_id='test', _external=False) == '/admin/users/test/toggle'

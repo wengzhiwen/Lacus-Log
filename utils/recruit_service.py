@@ -1,7 +1,4 @@
-"""招募服务层模块
-
-提供招募相关的业务逻辑服务，确保数据操作的原子性和一致性。
-"""
+"""招募服务层：提供招募相关的原子性业务操作。"""
 # pylint: disable=no-member
 from mongoengine import ValidationError
 
@@ -19,10 +16,8 @@ class RecruitServiceError(Exception):
 
 
 def training_recruit_atomic(recruit, training_decision, training_time, pilot_basic_info, introduction_fee, remarks, current_user, _ip_address):
-    """原子性试播招募
-    
-    执行试播招募决策，更新招募状态和主播状态。
-    
+    """原子性试播招募。
+
     Args:
         recruit: 招募对象
         training_decision: 试播招募决策
@@ -32,15 +27,14 @@ def training_recruit_atomic(recruit, training_decision, training_time, pilot_bas
         remarks: 备注
         current_user: 当前用户
         _ip_address: IP地址
-        
+    
     Returns:
         bool: 操作是否成功
-        
+    
     Raises:
         RecruitServiceError: 服务层异常
     """
 
-    # 保存原始状态用于回滚
     original_recruit_data = {
         'status': recruit.status,
         'introduction_fee': recruit.introduction_fee,
@@ -60,7 +54,6 @@ def training_recruit_atomic(recruit, training_decision, training_time, pilot_bas
     }
 
     try:
-        # 第一步：更新招募记录
         recruit.training_decision = training_decision
         recruit.training_decision_maker = current_user
         recruit.training_decision_time = get_current_utc_time()
@@ -76,13 +69,10 @@ def training_recruit_atomic(recruit, training_decision, training_time, pilot_bas
         recruit.save()
         logger.debug('招募记录更新成功：ID=%s', recruit.id)
 
-        # 第二步：更新主播信息
         if training_decision == TrainingDecision.RECRUIT_AS_TRAINEE:
-            # 招募为试播主播
             recruit.pilot.rank = Rank.TRAINEE
             recruit.pilot.status = Status.RECRUITED
 
-            # 更新主播基本信息
             if pilot_basic_info.get('real_name'):
                 recruit.pilot.real_name = pilot_basic_info['real_name']
             if pilot_basic_info.get('birth_year'):
@@ -90,7 +80,6 @@ def training_recruit_atomic(recruit, training_decision, training_time, pilot_bas
             if pilot_basic_info.get('work_mode'):
                 recruit.pilot.work_mode = WorkMode(pilot_basic_info['work_mode'])
         else:
-            # 不招募
             recruit.pilot.status = Status.NOT_RECRUITING
 
         recruit.pilot.save()
@@ -110,10 +99,8 @@ def training_recruit_atomic(recruit, training_decision, training_time, pilot_bas
 
 
 def final_recruit_atomic(recruit, final_decision, pilot_assignment_info, introduction_fee, remarks, current_user, _ip_address):
-    """原子性结束招募
-    
-    执行结束招募决策，更新招募状态和主播状态。
-    
+    """原子性结束招募。
+
     Args:
         recruit: 招募对象
         final_decision: 结束招募决策
@@ -122,15 +109,14 @@ def final_recruit_atomic(recruit, final_decision, pilot_assignment_info, introdu
         remarks: 备注
         current_user: 当前用户
         _ip_address: IP地址
-        
+    
     Returns:
         bool: 操作是否成功
-        
+    
     Raises:
         RecruitServiceError: 服务层异常
     """
 
-    # 保存原始状态用于回滚
     original_recruit_data = {
         'status': recruit.status,
         'introduction_fee': recruit.introduction_fee,
@@ -148,7 +134,6 @@ def final_recruit_atomic(recruit, final_decision, pilot_assignment_info, introdu
     }
 
     try:
-        # 第一步：更新招募记录
         recruit.final_decision = final_decision
         recruit.final_decision_maker = current_user
         recruit.final_decision_time = get_current_utc_time()
@@ -159,9 +144,7 @@ def final_recruit_atomic(recruit, final_decision, pilot_assignment_info, introdu
 
         logger.debug('招募记录更新成功：ID=%s', recruit.id)
 
-        # 第二步：更新主播信息
         if final_decision in [FinalDecision.OFFICIAL, FinalDecision.INTERN]:
-            # 招募成功，根据决策自动设置主播分类
             if final_decision == FinalDecision.OFFICIAL:
                 recruit.pilot.rank = Rank.OFFICIAL
             elif final_decision == FinalDecision.INTERN:
@@ -169,17 +152,14 @@ def final_recruit_atomic(recruit, final_decision, pilot_assignment_info, introdu
 
             recruit.pilot.status = Status.RECRUITED
 
-            # 分配所属
             if pilot_assignment_info.get('owner'):
                 owner = User.objects.get(id=pilot_assignment_info['owner'])
                 recruit.pilot.owner = owner
 
-            # 设置开播地点
             if pilot_assignment_info.get('platform'):
                 from models.pilot import Platform
                 recruit.pilot.platform = Platform(pilot_assignment_info['platform'])
         else:
-            # 不招募
             recruit.pilot.status = Status.NOT_RECRUITING
 
         recruit.pilot.save()
@@ -199,14 +179,12 @@ def final_recruit_atomic(recruit, final_decision, pilot_assignment_info, introdu
 
 
 def _rollback_recruit_and_pilot(recruit, original_recruit_data, original_pilot_data):
-    """回滚招募和主播数据"""
+    """回滚招募与主播数据。"""
     try:
-        # 回滚主播数据
         for field, value in original_pilot_data.items():
             setattr(recruit.pilot, field, value)
         recruit.pilot.save()
 
-        # 回滚招募数据
         for field, value in original_recruit_data.items():
             setattr(recruit, field, value)
         recruit.save()
@@ -217,13 +195,9 @@ def _rollback_recruit_and_pilot(recruit, original_recruit_data, original_pilot_d
 
 
 def confirm_recruit_atomic(recruit, introduction_fee, remarks, _current_user, _ip_address):
-    """原子性确认招募（已废弃，保留用于兼容性）
-    
-    此方法已被三步制流程替代，保留用于现有代码的兼容性。
-    """
+    """原子性确认招募（已废弃，保留用于兼容性）。"""
     logger.warning('使用已废弃的confirm_recruit_atomic方法，建议使用三步制流程')
 
-    # 保存原始状态用于回滚
     original_recruit_status = recruit.status
     original_recruit_fee = recruit.introduction_fee
     original_recruit_remarks = recruit.remarks
@@ -231,7 +205,6 @@ def confirm_recruit_atomic(recruit, introduction_fee, remarks, _current_user, _i
     original_pilot_rank = recruit.pilot.rank
 
     try:
-        # 第一步：更新招募记录
         recruit.introduction_fee = introduction_fee
         recruit.remarks = remarks
         recruit.status = RecruitStatus.ENDED
@@ -239,7 +212,6 @@ def confirm_recruit_atomic(recruit, introduction_fee, remarks, _current_user, _i
 
         logger.debug('招募记录更新成功：ID=%s', recruit.id)
 
-        # 第二步：更新主播状态和主播分类
         recruit.pilot.rank = Rank.TRAINEE
         recruit.pilot.status = Status.RECRUITED
         recruit.pilot.save()
@@ -249,7 +221,6 @@ def confirm_recruit_atomic(recruit, introduction_fee, remarks, _current_user, _i
 
     except ValidationError as e:
         logger.error('招募确认验证失败：%s', str(e))
-        # 回滚招募记录
         try:
             recruit.status = original_recruit_status
             recruit.introduction_fee = original_recruit_fee
@@ -263,14 +234,11 @@ def confirm_recruit_atomic(recruit, introduction_fee, remarks, _current_user, _i
 
     except Exception as e:
         logger.error('招募确认失败：%s', str(e))
-        # 回滚操作
         try:
-            # 回滚主播状态
             recruit.pilot.status = original_pilot_status
             recruit.pilot.rank = original_pilot_rank
             recruit.pilot.save()
 
-            # 回滚招募记录
             recruit.status = original_recruit_status
             recruit.introduction_fee = original_recruit_fee
             recruit.remarks = original_recruit_remarks
@@ -284,24 +252,18 @@ def confirm_recruit_atomic(recruit, introduction_fee, remarks, _current_user, _i
 
 
 def abandon_recruit_atomic(recruit, _current_user, _ip_address):
-    """原子性放弃招募（已废弃，保留用于兼容性）
-    
-    此方法已被三步制流程替代，建议在试播招募或结束招募步骤中选择"不招募"。
-    """
+    """原子性放弃招募（已废弃，保留用于兼容性）。"""
     logger.warning('使用已废弃的abandon_recruit_atomic方法，建议使用三步制流程')
 
-    # 保存原始状态用于回滚
     original_recruit_status = recruit.status
     original_pilot_status = recruit.pilot.status
 
     try:
-        # 第一步：更新招募记录
         recruit.status = RecruitStatus.ENDED
         recruit.save()
 
         logger.debug('招募记录状态更新成功：ID=%s', recruit.id)
 
-        # 第二步：更新主播状态
         recruit.pilot.status = Status.NOT_RECRUITING
         recruit.pilot.save()
 
@@ -310,7 +272,6 @@ def abandon_recruit_atomic(recruit, _current_user, _ip_address):
 
     except ValidationError as e:
         logger.error('招募放弃验证失败：%s', str(e))
-        # 回滚招募记录
         try:
             recruit.status = original_recruit_status
             recruit.save()
@@ -322,13 +283,10 @@ def abandon_recruit_atomic(recruit, _current_user, _ip_address):
 
     except Exception as e:
         logger.error('招募放弃失败：%s', str(e))
-        # 回滚操作
         try:
-            # 回滚主播状态
             recruit.pilot.status = original_pilot_status
             recruit.pilot.save()
 
-            # 回滚招募记录
             recruit.status = original_recruit_status
             recruit.save()
 
