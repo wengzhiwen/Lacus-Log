@@ -9,13 +9,35 @@
 
 <div class="date-navigation">
   <div class="date-controls">
-    <a href="{{ url_for('report.monthly_report', month=pagination.prev_month) }}" class="btn btn-secondary btn-sm">← 上个月</a>
+    <a href="{{ url_for('report.monthly_report', month=pagination.prev_month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 上个月</a>
     <input type="month" id="monthSelector" value="{{ pagination.month }}" class="date-input">
-    <a href="{{ url_for('report.monthly_report', month=pagination.next_month) }}" class="btn btn-secondary btn-sm">下个月 →</a>
+    <a href="{{ url_for('report.monthly_report', month=pagination.next_month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">下个月 →</a>
   </div>
   <div class="export-actions">
-    <a href="{{ url_for('report.export_monthly_csv', month=pagination.month) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+    <a href="{{ url_for('report.export_monthly_csv', month=pagination.month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
   </div>
+</div>
+
+<div class="filter-section">
+  <div class="filter-controls">
+    <label for="ownerSelector" class="filter-label">直属运营：</label>
+    <select id="ownerSelector" class="filter-select">
+      <option value="all" {% if selected_owner == 'all' %}selected{% endif %}>全部</option>
+      {% for owner in owners %}
+      <option value="{{ owner.id }}" {% if selected_owner == owner.id|string %}selected{% endif %}>
+        {{ owner.nickname or owner.username }}
+      </option>
+      {% endfor %}
+    </select>
+
+    <label for="modeSelector" class="filter-label">开播方式：</label>
+    <select id="modeSelector" class="filter-select">
+      <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
+      <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
+      <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
+    </select>
+  </div>
+  
 </div>
 
 <div class="summary-section">
@@ -339,9 +361,46 @@
 <script>
 document.getElementById('monthSelector').addEventListener('change', function() {
   const selectedMonth = this.value;
+  const selectedOwner = document.getElementById('ownerSelector') ? document.getElementById('ownerSelector').value : 'all';
+  const selectedMode = document.getElementById('modeSelector') ? document.getElementById('modeSelector').value : 'all';
   if (selectedMonth) {
-    window.location.href = '{{ url_for("report.monthly_report") }}?month=' + selectedMonth;
+    let url = '{{ url_for("report.monthly_report") }}?month=' + selectedMonth;
+    if (selectedOwner && selectedOwner !== 'all') {
+      url += '&owner=' + selectedOwner;
+    }
+    if (selectedMode && selectedMode !== 'all') {
+      url += '&mode=' + selectedMode;
+    }
+    window.location.href = url;
   }
+});
+
+document.getElementById('ownerSelector').addEventListener('change', function() {
+  const selectedOwner = this.value;
+  const selectedMode = document.getElementById('modeSelector').value;
+  const selectedMonth = document.getElementById('monthSelector').value;
+  let url = '{{ url_for("report.monthly_report") }}?month=' + selectedMonth;
+  if (selectedOwner && selectedOwner !== 'all') {
+    url += '&owner=' + selectedOwner;
+  }
+  if (selectedMode && selectedMode !== 'all') {
+    url += '&mode=' + selectedMode;
+  }
+  window.location.href = url;
+});
+
+document.getElementById('modeSelector').addEventListener('change', function() {
+  const selectedMode = this.value;
+  const selectedOwner = document.getElementById('ownerSelector').value;
+  const selectedMonth = document.getElementById('monthSelector').value;
+  let url = '{{ url_for("report.monthly_report") }}?month=' + selectedMonth;
+  if (selectedOwner && selectedOwner !== 'all') {
+    url += '&owner=' + selectedOwner;
+  }
+  if (selectedMode && selectedMode !== 'all') {
+    url += '&mode=' + selectedMode;
+  }
+  window.location.href = url;
 });
 
 // 页面加载后触发“炸裂”入场动画

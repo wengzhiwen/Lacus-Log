@@ -9,12 +9,12 @@
 
 <div class="date-navigation">
   <div class="date-controls">
-    <a href="{{ url_for('report.daily_report', date=pagination.prev_date, owner=selected_owner) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+    <a href="{{ url_for('report.daily_report', date=pagination.prev_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 前一日</a>
     <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
-    <a href="{{ url_for('report.daily_report', date=pagination.next_date, owner=selected_owner) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+    <a href="{{ url_for('report.daily_report', date=pagination.next_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">后一日 →</a>
   </div>
   <div class="export-actions">
-    <a href="{{ url_for('report.export_daily_csv', date=pagination.date, owner=selected_owner) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+    <a href="{{ url_for('report.export_daily_csv', date=pagination.date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
   </div>
 </div>
 
@@ -29,49 +29,17 @@
       </option>
       {% endfor %}
     </select>
+
+    <label for="modeSelector" class="filter-label">开播方式：</label>
+    <select id="modeSelector" class="filter-select">
+      <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
+      <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
+      <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
+    </select>
   </div>
 </div>
 
-<div class="summary-section">
-  <h2 class="section-title">本月数据（截至{{ pagination.date }}）</h2>
-  <div class="summary-cards epic-intro" data-animate-group="month">
-    <div class="summary-card">
-      <div class="card-label">总主播数量</div>
-      <div class="card-value">{{ month_summary.pilot_count }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">有效主播数量</div>
-      <div class="card-value">{{ month_summary.effective_pilot_count }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计流水</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.revenue_sum) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计底薪支出</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.basepay_sum) }}</div>
-      {% if month_summary.conversion_rate is not none %}
-      <div class="card-sub">转换率{{ month_summary.conversion_rate }}%</div>
-      {% endif %}
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计返点</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.rebate_sum) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计主播分成</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.pilot_share_sum) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计公司分成</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.company_share_sum) }}</div>
-    </div>
-    <div class="summary-card {% if month_summary.operating_profit < 0 %}danger-outline{% endif %}">
-      <div class="card-label">运营利润估算</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(month_summary.operating_profit) }}</div>
-    </div>
-  </div>
-</div>
+<!-- 月度数据已从日报页面移除，聚焦日维度展示 -->
 
 <div class="summary-section">
   <h2 class="section-title">{{ pagination.date }} 日报汇总</h2>
@@ -133,14 +101,6 @@
           <th>底薪</th>
           <th>当日毛利</th>
           <th>3日平均流水</th>
-          <th>月累计天数</th>
-          <th>月日均播时</th>
-          <th>月累计流水</th>
-          <th>月累计主播分成</th>
-          <th>月累计公司分成</th>
-          <th>月累计返点</th>
-          <th>月累计底薪</th>
-          <th>月累计毛利</th>
         </tr>
       </thead>
       <tbody>
@@ -165,14 +125,6 @@
           <td>¥{{ "{:,.2f}".format(detail.base_salary) }}</td>
           <td class="{% if detail.daily_profit < 0 %}text-danger{% endif %}">¥{{ "{:,.2f}".format(detail.daily_profit) }}</td>
           <td>{% if detail.three_day_avg_revenue %}¥{{ "{:,.2f}".format(detail.three_day_avg_revenue) }}{% endif %}</td>
-          <td>{{ detail.monthly_stats.month_days_count }}</td>
-          <td>{{ "%.1f"|format(detail.monthly_stats.month_avg_duration) }}小时</td>
-          <td>¥{{ "{:,.2f}".format(detail.monthly_stats.month_total_revenue) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_pilot_share) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_company_share) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.month_rebate_amount) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.monthly_stats.month_total_base_salary) }}</td>
-          <td class="{% if detail.monthly_commission_stats.month_total_profit < 0 %}text-danger{% endif %}">¥{{ "{:,.2f}".format(detail.monthly_commission_stats.month_total_profit) }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -462,10 +414,14 @@
 document.getElementById('dateSelector').addEventListener('change', function() {
   const selectedDate = this.value;
   const selectedOwner = document.getElementById('ownerSelector').value;
+  const selectedMode = document.getElementById('modeSelector').value;
   if (selectedDate) {
     let url = '{{ url_for("report.daily_report") }}?date=' + selectedDate;
     if (selectedOwner && selectedOwner !== 'all') {
       url += '&owner=' + selectedOwner;
+    }
+    if (selectedMode && selectedMode !== 'all') {
+      url += '&mode=' + selectedMode;
     }
     window.location.href = url;
   }
@@ -474,9 +430,27 @@ document.getElementById('dateSelector').addEventListener('change', function() {
 document.getElementById('ownerSelector').addEventListener('change', function() {
   const selectedOwner = this.value;
   const selectedDate = document.getElementById('dateSelector').value;
+  const selectedMode = document.getElementById('modeSelector').value;
   let url = '{{ url_for("report.daily_report") }}?date=' + selectedDate;
   if (selectedOwner && selectedOwner !== 'all') {
     url += '&owner=' + selectedOwner;
+  }
+  if (selectedMode && selectedMode !== 'all') {
+    url += '&mode=' + selectedMode;
+  }
+  window.location.href = url;
+});
+
+document.getElementById('modeSelector').addEventListener('change', function() {
+  const selectedMode = this.value;
+  const selectedOwner = document.getElementById('ownerSelector').value;
+  const selectedDate = document.getElementById('dateSelector').value;
+  let url = '{{ url_for("report.daily_report") }}?date=' + selectedDate;
+  if (selectedOwner && selectedOwner !== 'all') {
+    url += '&owner=' + selectedOwner;
+  }
+  if (selectedMode && selectedMode !== 'all') {
+    url += '&mode=' + selectedMode;
   }
   window.location.href = url;
 });

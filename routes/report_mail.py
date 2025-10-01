@@ -162,28 +162,16 @@ def _calculate_recruit_statistics(report_date):
     return calculate_recruit_daily_stats(report_date)
 
 
-def _build_daily_report_markdown(month_summary, day_summary, details):
-    """将开播日报数据渲染为Markdown格式。
+def _build_daily_report_markdown(day_summary, details):
+    """将开播日报数据渲染为Markdown格式（仅日报）。
     
     Args:
-        month_summary: 月度数据
         day_summary: 日报汇总数据
         details: 日报明细数据
         
     Returns:
         str: Markdown格式的邮件内容
     """
-    month_table = """| 指标 | 数值 |
-| --- | ---: |
-| 总主播数量 | {pilot_count} |
-| 有效主播数量 | {effective_pilot_count} |
-| 累计流水 | ¥{revenue_sum:,.2f} |
-| 累计底薪支出 | ¥{basepay_sum:,.2f} |
-| 累计返点 | ¥{rebate_sum:,.2f} |
-| 累计主播分成 | ¥{pilot_share_sum:,.2f} |
-| 累计公司分成 | ¥{company_share_sum:,.2f} |
-| 运营利润估算 | ¥{operating_profit:,.2f} |""".format(**month_summary)
-
     day_table = """| 指标 | 数值 |
 | --- | ---: |
 | 总主播数量 | {pilot_count} |
@@ -194,23 +182,18 @@ def _build_daily_report_markdown(month_summary, day_summary, details):
 | 累计公司分成 | ¥{company_share_sum:,.2f} |""".format(**day_summary)
 
     if details:
-        detail_table = """| 主播 | 性别年龄 | 直属运营 | 播时 | 流水 | 底薪 | 月累计天数 | 月日均播时 | 月累计底薪 | 月累计毛利 |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"""
+        detail_table = """| 主播 | 性别年龄 | 直属运营 | 播时 | 流水 | 底薪 | 当日毛利 |
+| --- | --- | --- | ---: | ---: | ---: | ---: |"""
 
         for detail in details:
             row = (f"| {detail['pilot_display']} | {detail['gender_age']} | {detail['owner']} | "
                    f"{detail['duration']:.1f}小时 | ¥{detail['revenue']:,.2f} | ¥{detail['base_salary']:,.2f} | "
-                   f"{detail['monthly_stats']['month_days_count']} | {detail['monthly_stats']['month_avg_duration']:.1f}小时 | "
-                   f"¥{detail['monthly_stats']['month_total_base_salary']:,.2f} | ¥{detail['monthly_commission_stats']['month_total_profit']:,.2f} |")
+                   f"¥{detail['daily_profit']:,.2f} |")
             detail_table += "\n" + row
     else:
         detail_table = "暂无开播记录"
 
-    return f"""## 本月数据（截至报表日）
-
-{month_table}
-
-
+    return f"""
 {day_table}
 
 
@@ -242,13 +225,12 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
         logger.error('报表日期格式错误：%s', report_date)
         return {'sent': False, 'count': 0}
 
-    from routes.report import _calculate_month_summary, _calculate_day_summary, _calculate_daily_details
+    from routes.report import _calculate_day_summary, _calculate_daily_details
 
-    month_summary = _calculate_month_summary(report_date_obj)
     day_summary = _calculate_day_summary(report_date_obj)
     details = _calculate_daily_details(report_date_obj)
 
-    md_content = _build_daily_report_markdown(month_summary, day_summary, details)
+    md_content = _build_daily_report_markdown(day_summary, details)
 
     full_content = f"""# 开播日报
 

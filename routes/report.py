@@ -10,6 +10,7 @@ from flask import Blueprint, Response, render_template, request, url_for
 from flask_security import roles_accepted
 
 from models.battle_record import BattleRecord
+from models.pilot import WorkMode
 from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
@@ -30,22 +31,53 @@ def get_local_date_from_string(date_str):
         return None
 
 
-def get_battle_records_for_date_range(start_local_date, end_local_date, owner_id=None):
-    """获取本地日期范围内的开播记录；可按直属运营筛选。"""
+def get_battle_records_for_date_range(start_local_date, end_local_date, owner_id=None, mode: str = 'all'):
+    """获取本地日期范围内的开播记录；可按直属运营与开播方式筛选。
+
+    Args:
+        start_local_date: 本地开始时间（含）
+        end_local_date: 本地结束时间（不含）
+        owner_id: 直属运营ID，'all' 或 None 表示不过滤
+        mode: 开播方式筛选（'all' | 'online' | 'offline'），默认'all'
+    """
     start_utc = local_to_utc(start_local_date)
     end_utc = local_to_utc(end_local_date)
 
     records = BattleRecord.objects.filter(start_time__gte=start_utc, start_time__lt=end_utc)
 
-    if owner_id and owner_id != 'all':
+    if (owner_id and owner_id != 'all') or (mode and mode != 'all'):
         from models.user import User
         try:
-            owner_user = User.objects.get(id=owner_id)
+            owner_user = None
+            if owner_id and owner_id != 'all':
+                owner_user = User.objects.get(id=owner_id)
+
+            # 规则：以筛选范围内“每位主播最后一次开播记录”的运营与开播方式为准，
+            # 若最后一次记录同时满足所选的 owner 与 mode（若提供），则计入该主播在本范围内的所有记录；否则剔除该主播的所有记录。
+            pilot_to_records = {}
+            for rec in records:
+                pid = str(rec.pilot.id)
+                pilot_to_records.setdefault(pid, []).append(rec)
+
             filtered_records = []
-            for record in records:
-                record_owner = record.owner_snapshot if record.owner_snapshot else record.pilot.owner
-                if record_owner and str(record_owner.id) == str(owner_user.id):
-                    filtered_records.append(record)
+            for rec_list in pilot_to_records.values():
+                rec_list.sort(key=lambda r: r.start_time)
+                last_rec = rec_list[-1]
+                # 校验 owner 条件
+                owner_ok = True
+                if owner_user is not None:
+                    last_owner = last_rec.owner_snapshot if last_rec.owner_snapshot else last_rec.pilot.owner
+                    owner_ok = bool(last_owner and str(last_owner.id) == str(owner_user.id))
+
+                # 校验 mode 条件
+                mode_ok = True
+                if mode and mode != 'all':
+                    target_mode = WorkMode.ONLINE if mode == 'online' else WorkMode.OFFLINE
+                    mode_ok = (last_rec.work_mode == target_mode)
+
+                if owner_ok and mode_ok:
+                    filtered_records.extend(rec_list)
+
             return filtered_records
         except User.DoesNotExist:
             logger.warning('指定的直属运营用户不存在：%s', owner_id)
@@ -54,14 +86,14 @@ def get_battle_records_for_date_range(start_local_date, end_local_date, owner_id
     return list(records)
 
 
-def calculate_pilot_three_day_avg_revenue(pilot, report_date, owner_id=None):
+def calculate_pilot_three_day_avg_revenue(pilot, report_date, owner_id=None, mode: str = 'all'):
     """计算主播近3个有记录自然日的平均流水。"""
     days_with_records = []
     for i in range(7):
         check_date = report_date - timedelta(days=i)
         check_date_start = check_date.replace(hour=0, minute=0, second=0, microsecond=0)
         check_date_end = check_date_start + timedelta(days=1)
-        daily_records = get_battle_records_for_date_range(check_date_start, check_date_end, owner_id)
+        daily_records = get_battle_records_for_date_range(check_date_start, check_date_end, owner_id, mode)
         pilot_daily_records = [record for record in daily_records if record.pilot.id == pilot.id]
         if len(pilot_daily_records) > 0:
             daily_revenue = sum(record.revenue_amount for record in pilot_daily_records)
@@ -74,11 +106,11 @@ def calculate_pilot_three_day_avg_revenue(pilot, report_date, owner_id=None):
     return total_revenue / 3
 
 
-def calculate_pilot_rebate(pilot, report_date, owner_id=None):
+def calculate_pilot_rebate(pilot, report_date, owner_id=None, mode: str = 'all'):
     """计算主播返点金额。"""
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
     pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
     valid_days = set()
     total_duration = 0
@@ -149,11 +181,11 @@ def calculate_pilot_rebate(pilot, report_date, owner_id=None):
     }
 
 
-def calculate_pilot_monthly_stats(pilot, report_date, owner_id=None):
+def calculate_pilot_monthly_stats(pilot, report_date, owner_id=None, mode: str = 'all'):
     """计算主播月度统计。"""
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
     pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
     record_dates = set()
     total_duration = 0
@@ -177,12 +209,12 @@ def calculate_pilot_monthly_stats(pilot, report_date, owner_id=None):
 
 
 @cached_monthly_report()
-def _calculate_month_summary(report_date, owner_id=None):
+def _calculate_month_summary(report_date, owner_id=None, mode: str = 'all'):
     """计算月度汇总（截至报表日）。"""
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
 
     pilot_ids = set()
     effective_pilot_ids = set()  # 播时≥6小时的主播
@@ -239,12 +271,12 @@ def _calculate_month_summary(report_date, owner_id=None):
 
 
 @cached_monthly_report()
-def _calculate_day_summary(report_date, owner_id=None):
+def _calculate_day_summary(report_date, owner_id=None, mode: str = 'all'):
     """计算日报汇总（仅报表日）。"""
     day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
     day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id)
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id, mode)
 
     pilot_ids = set()
     effective_pilot_ids = set()  # 播时≥6小时的主播
@@ -294,12 +326,12 @@ def _calculate_day_summary(report_date, owner_id=None):
 
 
 @cached_monthly_report()
-def _calculate_daily_details(report_date, owner_id=None):
+def _calculate_daily_details(report_date, owner_id=None, mode: str = 'all'):
     """计算日报明细。"""
     day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
     day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id)
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id, mode)
 
     details = []
 
@@ -327,17 +359,17 @@ def _calculate_daily_details(report_date, owner_id=None):
         commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
         commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
 
-        rebate_info = calculate_pilot_rebate(pilot, report_date, owner_id)
+        rebate_info = calculate_pilot_rebate(pilot, report_date, owner_id, mode)
 
         daily_profit = commission_amounts['company_amount'] + rebate_info['rebate_amount'] - record.base_salary
 
-        three_day_avg_revenue = calculate_pilot_three_day_avg_revenue(pilot, report_date, owner_id)
+        three_day_avg_revenue = calculate_pilot_three_day_avg_revenue(pilot, report_date, owner_id, mode)
 
-        monthly_stats = calculate_pilot_monthly_stats(pilot, report_date, owner_id)
+        monthly_stats = calculate_pilot_monthly_stats(pilot, report_date, owner_id, mode)
 
         month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-        month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+        month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
         pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
 
         month_total_pilot_share = Decimal('0')
@@ -412,13 +444,15 @@ def daily_report():
     if owner_id == '':
         owner_id = 'all'
 
-    logger.info('生成开播日报，报表日期：%s，直属运营：%s', report_date.strftime('%Y-%m-%d'), owner_id)
+    mode = request.args.get('mode', 'all') or 'all'
+    if mode not in ['all', 'online', 'offline']:
+        mode = 'all'
 
-    month_summary = _calculate_month_summary(report_date, owner_id)
+    logger.info('生成开播日报，报表日期：%s，直属运营：%s，开播方式：%s', report_date.strftime('%Y-%m-%d'), owner_id, mode)
 
-    day_summary = _calculate_day_summary(report_date, owner_id)
+    day_summary = _calculate_day_summary(report_date, owner_id, mode)
 
-    details = _calculate_daily_details(report_date, owner_id)
+    details = _calculate_daily_details(report_date, owner_id, mode)
 
     owners = _get_recruit_users()
 
@@ -429,12 +463,12 @@ def daily_report():
     }
 
     return render_template('reports/daily.html',
-                           month_summary=month_summary,
                            day_summary=day_summary,
                            details=details,
                            pagination=pagination,
                            owners=owners,
-                           selected_owner=owner_id)
+                           selected_owner=owner_id,
+                           selected_mode=mode)
 
 
 @report_bp.route('/daily/export.csv')
@@ -457,9 +491,13 @@ def export_daily_csv():
     if owner_id == '':
         owner_id = 'all'
 
-    logger.info('导出开播日报CSV，报表日期：%s，直属运营：%s', report_date.strftime('%Y-%m-%d'), owner_id)
+    mode = request.args.get('mode', 'all') or 'all'
+    if mode not in ['all', 'online', 'offline']:
+        mode = 'all'
 
-    details = _calculate_daily_details(report_date, owner_id)
+    logger.info('导出开播日报CSV，报表日期：%s，直属运营：%s，开播方式：%s', report_date.strftime('%Y-%m-%d'), owner_id, mode)
+
+    details = _calculate_daily_details(report_date, owner_id, mode)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -539,7 +577,7 @@ def get_local_month_from_string(month_str):
         return None
 
 
-def get_battle_records_for_month(year, month, owner_id=None):
+def get_battle_records_for_month(year, month, owner_id=None, mode: str = 'all'):
     """获取指定月份开播记录。"""
     month_start = datetime(year, month, 1, 0, 0, 0, 0)
     if month == 12:
@@ -548,7 +586,7 @@ def get_battle_records_for_month(year, month, owner_id=None):
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
 
-    return get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    return get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
 
 
 def calculate_pilot_monthly_commission_stats(pilot, year, month, owner_id=None):
@@ -591,9 +629,9 @@ def calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id=None):
 
 
 @cached_monthly_report()
-def _calculate_monthly_summary(year, month, owner_id=None):
+def _calculate_monthly_summary(year, month, owner_id=None, mode: str = 'all'):
     """计算月度汇总。"""
-    month_records = get_battle_records_for_month(year, month, owner_id)
+    month_records = get_battle_records_for_month(year, month, owner_id, mode)
 
     pilot_ids = set()
     pilot_duration = {}  # 主播ID -> 累计播时
@@ -649,9 +687,9 @@ def _calculate_monthly_summary(year, month, owner_id=None):
 
 
 @cached_monthly_report()
-def _calculate_monthly_details(year, month, owner_id=None):
+def _calculate_monthly_details(year, month, owner_id=None, mode: str = 'all'):
     """计算月度明细数据。"""
-    month_records = get_battle_records_for_month(year, month, owner_id)
+    month_records = get_battle_records_for_month(year, month, owner_id, mode)
 
     pilot_stats = {}
 
@@ -843,11 +881,19 @@ def monthly_report():
             return '无效的月份格式', 400
         report_month = report_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    logger.info('生成开播月报，报表月份：%s', report_month.strftime('%Y-%m'))
+    owner_id = request.args.get('owner', 'all')
+    if owner_id == '':
+        owner_id = 'all'
 
-    month_summary = _calculate_monthly_summary(report_month.year, report_month.month)
+    mode = request.args.get('mode', 'all') or 'all'
+    if mode not in ['all', 'online', 'offline']:
+        mode = 'all'
 
-    details = _calculate_monthly_details(report_month.year, report_month.month)
+    logger.info('生成开播月报，报表月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
+
+    month_summary = _calculate_monthly_summary(report_month.year, report_month.month, owner_id, mode)
+
+    details = _calculate_monthly_details(report_month.year, report_month.month, owner_id, mode)
 
     pagination = {
         'month': report_month.strftime('%Y-%m'),
@@ -855,7 +901,9 @@ def monthly_report():
         'next_month': (report_month.replace(day=28) + timedelta(days=4)).replace(day=1).strftime('%Y-%m')
     }
 
-    return render_template('reports/monthly.html', month_summary=month_summary, details=details, pagination=pagination, report_month=report_month)
+    owners = _get_recruit_users()
+
+    return render_template('reports/monthly.html', month_summary=month_summary, details=details, pagination=pagination, report_month=report_month, owners=owners, selected_owner=owner_id, selected_mode=mode)
 
 
 @report_bp.route('/monthly/export.csv')
@@ -874,9 +922,17 @@ def export_monthly_csv():
             return '无效的月份格式', 400
         report_month = report_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    logger.info('导出开播月报CSV，报表月份：%s', report_month.strftime('%Y-%m'))
+    owner_id = request.args.get('owner', 'all')
+    if owner_id == '':
+        owner_id = 'all'
 
-    details = _calculate_monthly_details(report_month.year, report_month.month)
+    mode = request.args.get('mode', 'all') or 'all'
+    if mode not in ['all', 'online', 'offline']:
+        mode = 'all'
+
+    logger.info('导出开播月报CSV，报表月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
+
+    details = _calculate_monthly_details(report_month.year, report_month.month, owner_id, mode)
 
     output = io.StringIO()
     writer = csv.writer(output)
