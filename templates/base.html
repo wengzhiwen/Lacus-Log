@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{% block title %}Lacus-Log{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="mask-icon" href="{{ url_for('static', filename='favicon.svg') }}" color="#000000">
@@ -56,10 +57,108 @@
     </ul>
     {% endif %}
     {% endwith %}
+    
+    <!-- 动态消息提示容器 -->
+    <div id="messageContainer" class="message-container"></div>
+    
     {% block content %}{% endblock %}
   </main>
 
   <script>
+    // 全局错误处理
+    window.addEventListener('error', function(event) {
+      logFrontendError('javascript', event.message, event.error?.stack, window.location.href, navigator.userAgent);
+    });
+    
+    window.addEventListener('unhandledrejection', function(event) {
+      logFrontendError('promise', event.reason?.message || 'Unhandled Promise Rejection', event.reason?.stack, window.location.href, navigator.userAgent);
+    });
+    
+    // 前端错误日志记录函数
+    function logFrontendError(type, message, stack, url, userAgent) {
+      try {
+        fetch('/api/errors/frontend', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+          },
+          body: JSON.stringify({
+            type: type,
+            message: message,
+            stack: stack,
+            url: url,
+            userAgent: userAgent
+          })
+        }).catch(function(err) {
+          console.error('Failed to log frontend error:', err);
+        });
+      } catch (err) {
+        console.error('Failed to log frontend error:', err);
+      }
+    }
+    
+    // 获取CSRF令牌
+    function getCSRFToken() {
+      return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+             window.CSRF_TOKEN || '';
+    }
+    
+    // 全局消息提示系统
+    function showMessage(message, type = 'info', duration = 5000) {
+      try {
+        const container = document.getElementById('messageContainer');
+        if (!container) {
+          console.error('找不到messageContainer元素');
+          return;
+        }
+        
+        const messageEl = document.createElement('div');
+        messageEl.className = `message message-${type}`;
+        messageEl.textContent = message;
+        
+        // 添加关闭按钮
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'message-close';
+        closeBtn.innerHTML = '×';
+        closeBtn.onclick = () => {
+          try {
+            messageEl.remove();
+          } catch (e) {
+            console.error('移除消息失败:', e);
+          }
+        };
+        messageEl.appendChild(closeBtn);
+        
+        container.appendChild(messageEl);
+        console.log('消息已添加:', message, '类型:', type, '持续时间:', duration);
+        
+        // 自动移除
+        if (duration > 0) {
+          setTimeout(() => {
+            try {
+              if (messageEl.parentNode) {
+                messageEl.remove();
+                console.log('消息已自动移除:', message);
+              }
+            } catch (e) {
+              console.error('自动移除消息失败:', e);
+            }
+          }, duration);
+        }
+      } catch (e) {
+        console.error('显示消息失败:', e);
+      }
+    }
+    
+    // 将showMessage函数暴露到全局作用域
+    window.showMessage = showMessage;
+    
+    // 测试函数
+    window.testMessage = function() {
+      showMessage('测试消息 - 5秒后消失', 'success', 5000);
+    };
+    
     document.addEventListener('DOMContentLoaded', function() {
       const menuToggle = document.getElementById('menuToggle');
       const topNav = document.getElementById('topNav');

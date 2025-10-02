@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}用户详情 - {{ user.username }} - Lacus-Log{% endblock %}
+{% block title %}用户详情 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="user-detail">
   <div class="back-nav">
@@ -8,105 +8,272 @@
     </a>
   </div>
 
-  <div class="user-info-card">
-    <div class="card-header">
-      <div class="user-avatar">
-        <div class="avatar-icon">👤</div>
-      </div>
-      <div class="user-main-info">
-        <h1 class="user-name">{{ user.username }}</h1>
-        <div class="user-nickname">{{ user.nickname or '未设置昵称' }}</div>
-        <div class="user-badges">
-          <span class="role-badge role-{{ (user.roles | map(attribute='name') | list) | first or 'unknown' }}">
-            {{ ((user.roles | map(attribute='name') | list) | first or 'unknown') | role_display_name }}
-          </span>
-          <span class="status-badge status-{{ 'active' if user.active else 'inactive' }}">
-            {{ '启用' if user.active else '停用' }}
-          </span>
-        </div>
-      </div>
+  <div id="userDetailContent">
+    <div class="loading-state" id="loadingState">
+      <div class="loading-spinner">⏳</div>
+      <div class="loading-text">加载中...</div>
     </div>
+  </div>
+</section>
+
+<script>
+// 获取CSRF令牌
+function getCSRFToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+         window.CSRF_TOKEN || '';
+}
+
+// 格式化日期时间
+function formatDateTime(dateString) {
+  if (!dateString) return '未知';
+  const date = new Date(dateString);
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+// 格式化日期
+function formatDate(dateString) {
+  if (!dateString) return '未知';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('zh-CN');
+}
+
+// 获取角色显示名称
+function getRoleDisplayName(roleName) {
+  const roleMapping = {
+    'gicho': '管理员',
+    'kancho': '运营'
+  };
+  return roleMapping[roleName] || roleName;
+}
+
+// 加载用户详情
+async function loadUserDetail() {
+  // 从URL中提取用户ID: /admin/users/{userId}
+  const pathParts = window.location.pathname.split('/');
+  const userId = pathParts[pathParts.length - 1]; // 最后一个部分
+  console.log('Detail page - URL:', window.location.pathname, 'UserID:', userId);
+  const loadingState = document.getElementById('loadingState');
+  const content = document.getElementById('userDetailContent');
+  
+  try {
+    if (loadingState) {
+      loadingState.style.display = 'block';
+    }
     
-    <div class="card-body">
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">用户名</div>
-          <div class="info-value">{{ user.username }}</div>
+    const response = await fetch(`/api/users/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载用户详情失败');
+    }
+    
+    renderUserDetail(result.data);
+    
+  } catch (error) {
+    console.error('加载用户详情失败:', error);
+    content.innerHTML = `
+      <div class="error-state">
+        <div class="error-icon">❌</div>
+        <div class="error-title">加载失败</div>
+        <div class="error-description">${error.message}</div>
+        <button class="btn btn-primary" onclick="loadUserDetail()">重试</button>
+      </div>
+    `;
+  } finally {
+    if (loadingState) {
+      loadingState.style.display = 'none';
+    }
+  }
+}
+
+// 渲染用户详情
+function renderUserDetail(user) {
+  const content = document.getElementById('userDetailContent');
+  
+  if (!content) {
+    console.error('找不到userDetailContent元素');
+    return;
+  }
+  
+  const rolesDisplay = user.roles.map(role => getRoleDisplayName(role)).join(', ');
+  
+  content.innerHTML = `
+    <div class="user-info-card">
+      <div class="card-header">
+        <div class="user-main-info">
+          <h1 class="user-name">${user.username}</h1>
+          <div class="user-nickname">${user.nickname || '未设置昵称'}</div>
         </div>
-        <div class="info-item">
-          <div class="info-label">昵称</div>
-          <div class="info-value">{{ user.nickname or '未设置' }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">邮箱</div>
-          <div class="info-value">{{ user.email or '未设置' }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">角色</div>
-          <div class="info-value">{{ (user.roles | map(attribute='name') | list) | map('role_display_name') | join(', ') }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">状态</div>
-          <div class="info-value">
-            <span class="status-badge status-{{ 'active' if user.active else 'inactive' }}">
-              {{ '启用' if user.active else '停用' }}
-            </span>
+      </div>
+      
+      <div class="card-body">
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">邮箱</div>
+            <div class="info-value">${user.email || '未设置'}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">角色</div>
+            <div class="info-value">${rolesDisplay}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">状态</div>
+            <div class="info-value">
+              <span class="status-badge status-${user.active ? 'active' : 'inactive'}">
+                ${user.active ? '启用' : '停用'}
+              </span>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">创建时间</div>
+            <div class="info-value">${formatDateTime(user.created_at)}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">最后登录</div>
+            <div class="info-value">${user.last_login_at ? formatDateTime(user.last_login_at) : '从未登录'}</div>
           </div>
         </div>
-        <div class="info-item">
-          <div class="info-label">创建时间</div>
-          <div class="info-value">{{ user.created_at | local_datetime('%Y-%m-%d %H:%M') if user.created_at else '未知' }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">最后登录</div>
-          <div class="info-value">{{ user.last_login_at | local_datetime('%Y-%m-%d %H:%M') if user.last_login_at else '从未登录' }}</div>
-        </div>
       </div>
     </div>
-  </div>
 
-  <div class="action-section">
-    <h2 class="section-title">用户操作</h2>
-    <div class="action-buttons">
-      <a class="btn btn-primary" href="{{ url_for('admin.users_edit', user_id=(user.id|string)) }}">编辑</a>
-      <form method="post" action="{{ url_for('admin.users_toggle_active', user_id=(user.id|string)) }}" class="action-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button class="btn btn-secondary" type="submit">
-          {{ '停用用户' if user.active else '启用用户' }}
+    <div class="action-section">
+      <h2 class="section-title">用户操作</h2>
+      <div class="action-buttons">
+        <a class="btn btn-primary" href="/admin/users/${user.id}/edit">编辑</a>
+        <button class="btn btn-secondary" onclick="toggleUserActivation('${user.id}', ${user.active})">
+          ${user.active ? '停用用户' : '启用用户'}
         </button>
-      </form>
-      
-      <form method="post" action="{{ url_for('admin.users_reset_password', user_id=(user.id|string)) }}" class="action-form" onsubmit="return confirm('确定重置密码为 123456？')">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button class="btn btn-warning" type="submit">
+        <button class="btn btn-warning" onclick="resetUserPassword('${user.id}')">
           重置密码
         </button>
-      </form>
+      </div>
     </div>
-  </div>
 
-  {% if user.last_login_at %}
-  <div class="login-history">
-    <h2 class="section-title">登录信息</h2>
-    <div class="history-card">
-      <div class="history-item">
-        <div class="history-label">最后登录时间</div>
-        <div class="history-value">{{ user.last_login_at | local_datetime('%Y-%m-%d %H:%M:%S') }}</div>
+    ${user.last_login_at ? `
+    <div class="login-history">
+      <h2 class="section-title">登录信息</h2>
+      <div class="history-card">
+        <div class="history-item">
+          <div class="history-label">最后登录时间</div>
+          <div class="history-value">${formatDateTime(user.last_login_at)}</div>
+        </div>
+        ${user.last_login_ip ? `
+        <div class="history-item">
+          <div class="history-label">最后登录IP</div>
+          <div class="history-value">${user.last_login_ip}</div>
+        </div>
+        ` : ''}
+        ${user.login_count ? `
+        <div class="history-item">
+          <div class="history-label">登录次数</div>
+          <div class="history-value">${user.login_count} 次</div>
+        </div>
+        ` : ''}
       </div>
-      {% if user.last_login_ip %}
-      <div class="history-item">
-        <div class="history-label">最后登录IP</div>
-        <div class="history-value">{{ user.last_login_ip }}</div>
-      </div>
-      {% endif %}
-      {% if user.login_count %}
-      <div class="history-item">
-        <div class="history-label">登录次数</div>
-        <div class="history-value">{{ user.login_count }} 次</div>
-      </div>
-      {% endif %}
     </div>
-  </div>
-  {% endif %}
-</section>
+    ` : ''}
+  `;
+}
+
+// 切换用户激活状态
+async function toggleUserActivation(userId, currentActive) {
+  try {
+    const response = await fetch(`/api/users/${userId}/activation`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      },
+      body: JSON.stringify({ active: !currentActive })
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '操作失败');
+    }
+    
+    // 重新加载用户详情
+    loadUserDetail();
+    
+    // 显示成功消息
+    showMessage(result.data.active ? '用户已启用' : '用户已停用', 'success');
+    
+  } catch (error) {
+    console.error('切换用户状态失败:', error);
+    showMessage(error.message, 'error');
+  }
+}
+
+// 重置用户密码
+async function resetUserPassword(userId) {
+  if (!confirm('确定重置密码为 123456？')) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '操作失败');
+    }
+    
+    showMessage(result.data.message, 'success');
+    
+  } catch (error) {
+    console.error('重置密码失败:', error);
+    showMessage(error.message, 'error');
+  }
+}
+
+// 显示消息 - 使用全局消息提示系统
+function showMessage(message, type = 'info', duration = 5000) {
+  if (window.showMessage) {
+    window.showMessage(message, type, duration);
+  } else {
+    // 降级到console输出
+    console.log(`[${type.toUpperCase()}] ${message}`);
+  }
+}
+
+// 初始化页面
+document.addEventListener('DOMContentLoaded', function() {
+  // 设置CSRF令牌到全局变量
+  window.CSRF_TOKEN = getCSRFToken();
+  
+  // 检查URL参数中的成功消息
+  const urlParams = new URLSearchParams(window.location.search);
+  const success = urlParams.get('success');
+  if (success === 'updated') {
+    showMessage('已更新用户信息', 'success');
+    // 清理URL参数
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  
+  // 加载用户详情
+  loadUserDetail();
+});
+</script>
 {% endblock %}

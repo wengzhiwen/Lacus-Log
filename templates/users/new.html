@@ -3,24 +3,140 @@
 {% block content %}
 <section>
   <h1 class="title">新增运营</h1>
-  <form class="form" method="post">
+  <form class="form" id="createUserForm">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <label>用户名</label>
-    <input class="input" type="text" name="username" value="{{ (form.username if form else '') | default('') }}" required />
+    <input class="input" type="text" name="username" id="username" required />
 
     <label>昵称</label>
-    <input class="input" type="text" name="nickname" value="{{ (form.nickname if form else '') | default('') }}" />
+    <input class="input" type="text" name="nickname" id="nickname" />
 
     <label>邮箱（可选）</label>
-    <input class="input" type="email" name="email" value="{{ (form.email if form else '') | default('') }}" placeholder="name@example.com" />
+    <input class="input" type="email" name="email" id="email" placeholder="name@example.com" />
 
     <label>密码</label>
-    <input class="input" type="password" name="password" required />
+    <input class="input" type="password" name="password" id="password" required />
 
     <div class="form-actions">
-      <button class="btn btn-primary" type="submit">创建</button>
+      <button class="btn btn-primary" type="submit" id="submitBtn">创建</button>
       <a class="btn btn-secondary" href="{{ url_for('admin.users_list') }}">取消</a>
     </div>
   </form>
 </section>
+
+<script>
+// 获取CSRF令牌
+function getCSRFToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+         window.CSRF_TOKEN || '';
+}
+
+// 显示消息 - 使用全局消息提示系统
+function showMessage(message, type = 'info', duration = 5000) {
+  if (window.showMessage) {
+    window.showMessage(message, type, duration);
+  } else {
+    // 降级到console输出
+    console.log(`[${type.toUpperCase()}] ${message}`);
+  }
+}
+
+// 创建用户
+async function createUser(formData) {
+  try {
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      },
+      body: JSON.stringify(formData)
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '创建用户失败');
+    }
+    
+    // 跳转到用户列表，并传递成功消息
+    window.location.href = '/admin/users?success=created';
+    
+  } catch (error) {
+    console.error('创建用户失败:', error);
+    showMessage(error.message, 'error');
+  }
+}
+
+// 表单提交处理
+document.addEventListener('DOMContentLoaded', function() {
+  // 设置CSRF令牌到全局变量
+  window.CSRF_TOKEN = getCSRFToken();
+  
+  const form = document.getElementById('createUserForm');
+  const submitBtn = document.getElementById('submitBtn');
+  
+  if (!form || !submitBtn) {
+    console.error('找不到表单元素');
+    return;
+  }
+  
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // 禁用提交按钮
+    submitBtn.disabled = true;
+    submitBtn.textContent = '创建中...';
+    
+    try {
+      // 收集表单数据
+      const usernameEl = document.getElementById('username');
+      const nicknameEl = document.getElementById('nickname');
+      const emailEl = document.getElementById('email');
+      const passwordEl = document.getElementById('password');
+      
+      if (!usernameEl || !nicknameEl || !emailEl || !passwordEl) {
+        throw new Error('找不到表单字段');
+      }
+      
+      const formData = {
+        username: usernameEl.value.trim(),
+        nickname: nicknameEl.value.trim(),
+        email: emailEl.value.trim(),
+        password: passwordEl.value.trim()
+      };
+      
+      // 验证必需字段
+      if (!formData.username || !formData.password) {
+        throw new Error('用户名与密码为必填项');
+      }
+      
+      // 验证用户名长度
+      if (formData.username.length < 3 || formData.username.length > 20) {
+        throw new Error('用户名长度应在3-20个字符之间');
+      }
+      
+      // 验证密码长度
+      if (formData.password.length < 6) {
+        throw new Error('密码长度至少6个字符');
+      }
+      
+      // 验证用户名格式
+      if (!formData.username.replace('_', '').replace('-', '').match(/^[a-zA-Z0-9_-]+$/)) {
+        throw new Error('用户名只能包含字母、数字、下划线和连字符');
+      }
+      
+      // 提交数据
+      await createUser(formData);
+      
+    } catch (error) {
+      showMessage(error.message, 'error');
+    } finally {
+      // 恢复提交按钮
+      submitBtn.disabled = false;
+      submitBtn.textContent = '创建';
+    }
+  });
+});
+</script>
 {% endblock %}

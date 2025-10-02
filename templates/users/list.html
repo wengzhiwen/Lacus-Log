@@ -4,57 +4,283 @@
 <section class="user-management">
   <div class="page-header">
     <h1 class="page-title">用户管理</h1>
-    <a class="btn btn-primary" href="{{ url_for('admin.users_new') }}">
-      <span class="btn-icon">+</span>
-      新增运营
-    </a>
   </div>
 
   <div class="filter-bar">
-    <form class="filter-form" method="get">
+    <form class="filter-form" id="filterForm">
       <div class="filter-group">
         <label class="filter-label">角色筛选</label>
-        <select class="filter-select" name="role" onchange="this.form.submit()">
+        <select class="filter-select" name="role" id="roleFilter">
           <option value="">全部用户</option>
-          <option value="gicho" {% if selected_role=='gicho' %}selected{% endif %}>管理员</option>
-          <option value="kancho" {% if selected_role=='kancho' %}selected{% endif %}>运营</option>
+          <option value="gicho">管理员</option>
+          <option value="kancho">运营</option>
         </select>
       </div>
     </form>
   </div>
 
-  <div class="user-list">
-    {% if users %}
-      <div class="user-cards">
-        {% for u in users %}
-        <a href="{{ url_for('admin.users_detail', user_id=(u.id|string)) }}" class="user-card">
-          <div class="card-header">
-            <div class="user-info">
-              <div class="user-name">{{ u.username }}</div>
-              <div class="user-nickname">{{ u.nickname or '未设置昵称' }}</div>
-            </div>
-            <div class="user-badges">
-              <span class="role-badge role-{{ (u.roles | map(attribute='name') | list) | first or 'unknown' }}">
-                {{ ((u.roles | map(attribute='name') | list) | first or 'unknown') | role_display_name }}
-              </span>
-              <span class="status-badge status-{{ 'active' if u.active else 'inactive' }}">
-                {{ '启用' if u.active else '停用' }}
-              </span>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
+  <div class="user-list" id="userList">
+    <div class="loading-state" id="loadingState">
+      <div class="loading-spinner">⏳</div>
+      <div class="loading-text">加载中...</div>
+    </div>
+  </div>
+</section>
+
+<script>
+// 全局变量
+let currentPage = 1;
+let currentRole = '';
+let isLoading = false;
+
+// 获取CSRF令牌
+function getCSRFToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+         window.CSRF_TOKEN || '';
+}
+
+// 获取用户列表
+async function loadUsers(page = 1, role = '') {
+  if (isLoading) return;
+  
+  isLoading = true;
+  const loadingState = document.getElementById('loadingState');
+  const userList = document.getElementById('userList');
+  
+  try {
+    if (loadingState) {
+      loadingState.style.display = 'block';
+    }
+    
+    const params = new URLSearchParams({
+      page: page.toString(),
+      per_page: '20'
+    });
+    
+    if (role) {
+      params.append('role', role);
+    }
+    
+    const response = await fetch(`/api/users?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载用户列表失败');
+    }
+    
+    renderUserList(result.data, result.meta);
+    currentPage = page;
+    currentRole = role;
+    
+  } catch (error) {
+    console.error('加载用户列表失败:', error);
+    logFrontendError('api', `加载用户列表失败: ${error.message}`, error.stack, window.location.href, navigator.userAgent);
+    userList.innerHTML = `
+      <div class="error-state">
+        <div class="error-icon">❌</div>
+        <div class="error-title">加载失败</div>
+        <div class="error-description">${error.message}</div>
+        <button class="btn btn-primary" onclick="loadUsers()">重试</button>
       </div>
-    {% else %}
+    `;
+  } finally {
+    if (loadingState) {
+      loadingState.style.display = 'none';
+    }
+    isLoading = false;
+  }
+}
+
+// 渲染用户列表
+function renderUserList(users, meta) {
+  const userList = document.getElementById('userList');
+  
+  if (!userList) {
+    console.error('找不到userList元素');
+    logFrontendError('dom', '找不到userList元素', '', window.location.href, navigator.userAgent);
+    return;
+  }
+  
+  if (!users || users.length === 0) {
+    userList.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">👥</div>
         <div class="empty-title">暂无用户</div>
         <div class="empty-description">点击上方"新增运营"按钮创建第一个用户</div>
       </div>
-    {% endif %}
+    `;
+    return;
+  }
+  
+  const userCards = users.map(user => `
+    <a href="/admin/users/${user.id}" class="user-card">
+      <div class="card-header">
+        <div class="user-info">
+          <div class="user-name">${user.username}</div>
+          <div class="user-nickname">${user.nickname || '未设置昵称'}</div>
+        </div>
+        <div class="user-badges">
+          <span class="role-badge role-${user.roles[0] || 'unknown'}">
+            ${getRoleDisplayName(user.roles[0] || 'unknown')}
+          </span>
+          <span class="status-badge status-${user.active ? 'active' : 'inactive'}">
+            ${user.active ? '启用' : '停用'}
+          </span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="card-arrow">→</div>
+      </div>
+    </a>
+  `).join('');
+  
+  userList.innerHTML = `
+    <div class="user-cards">
+      ${userCards}
+    </div>
+  `;
+}
+
+// 获取角色显示名称
+function getRoleDisplayName(roleName) {
+  const roleMapping = {
+    'gicho': '管理员',
+    'kancho': '运营'
+  };
+  return roleMapping[roleName] || roleName;
+}
+
+// 切换用户激活状态
+async function toggleUserActivation(userId, currentActive) {
+  try {
+    const response = await fetch(`/api/users/${userId}/activation`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      },
+      body: JSON.stringify({ active: !currentActive })
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '操作失败');
+    }
+    
+    // 重新加载用户列表
+    loadUsers(currentPage, currentRole);
+    
+    // 显示成功消息
+    showMessage(result.data.active ? '用户已启用' : '用户已停用', 'success');
+    
+  } catch (error) {
+    console.error('切换用户状态失败:', error);
+    logFrontendError('api', `切换用户状态失败: ${error.message}`, error.stack, window.location.href, navigator.userAgent);
+    showMessage(error.message, 'error');
+  }
+}
+
+// 重置用户密码
+async function resetUserPassword(userId) {
+  if (!confirm('确定重置密码为 123456？')) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      }
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '操作失败');
+    }
+    
+    showMessage(result.data.message, 'success');
+    
+  } catch (error) {
+    console.error('重置密码失败:', error);
+    logFrontendError('api', `重置密码失败: ${error.message}`, error.stack, window.location.href, navigator.userAgent);
+    showMessage(error.message, 'error');
+  }
+}
+
+// 显示消息 - 使用全局消息提示系统
+function showMessage(message, type = 'info', duration = 5000) {
+  if (window.showMessage) {
+    window.showMessage(message, type, duration);
+  } else {
+    // 降级到console输出
+    console.log(`[${type.toUpperCase()}] ${message}`);
+  }
+}
+
+// 初始化页面
+document.addEventListener('DOMContentLoaded', function() {
+  // 设置CSRF令牌到全局变量
+  window.CSRF_TOKEN = getCSRFToken();
+  
+  // 检查URL参数中的成功消息
+  const urlParams = new URLSearchParams(window.location.search);
+  const success = urlParams.get('success');
+  if (success === 'created') {
+    showMessage('创建运营成功', 'success');
+    // 清理URL参数
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  
+  // 绑定筛选器事件
+  const roleFilter = document.getElementById('roleFilter');
+  if (roleFilter) {
+    roleFilter.addEventListener('change', function() {
+      loadUsers(1, this.value);
+    });
+  }
+  
+  // 加载初始数据
+  loadUsers();
+});
+</script>
+
+<div class="footbar">
+  <div class="inner">
+    <a class="btn btn-primary" href="{{ url_for('admin.users_new') }}">
+      <span class="btn-icon">+</span>
+      新增运营
+    </a>
   </div>
-</section>
+</div>
+
+<style>
+.footbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid var(--table-header);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
+  z-index: 100;
+}
+
+.footbar .inner {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+</style>
 {% endblock %}
