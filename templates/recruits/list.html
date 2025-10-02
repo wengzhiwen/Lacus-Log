@@ -30,6 +30,15 @@
     </form>
   </div>
 
+  <div class="search-bar">
+    <div class="search-input-group">
+      <input type="text" id="recruit-pilot-search" class="search-input" placeholder="搜索主播昵称或真实姓名..." />
+      <button type="button" class="search-button" onclick="performRecruitSearch()">
+        <span class="search-icon">🔍</span>
+      </button>
+    </div>
+  </div>
+
   <div class="quick-nav" id="quick-nav">
     {% if grouped_recruits.pending_interview %}
     <button class="quick-nav-btn" onclick="scrollToGroup('pending-interview')">待面试</button>
@@ -69,6 +78,9 @@
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              {% if recruit.pilot.real_name %}
+              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
+              {% endif %}
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
                 <span class="status-badge status-待面试">待面试</span>
@@ -99,6 +111,9 @@
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              {% if recruit.pilot.real_name %}
+              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
+              {% endif %}
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
                 <span class="status-badge status-待预约试播">待预约试播</span>
@@ -129,6 +144,9 @@
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              {% if recruit.pilot.real_name %}
+              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
+              {% endif %}
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
                 <span class="status-badge status-待试播">待试播</span>
@@ -159,6 +177,9 @@
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              {% if recruit.pilot.real_name %}
+              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
+              {% endif %}
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
                 <span class="status-badge status-待预约开播">待预约开播</span>
@@ -189,6 +210,9 @@
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              {% if recruit.pilot.real_name %}
+              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
+              {% endif %}
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
                 <span class="status-badge status-待开播">待开播</span>
@@ -228,6 +252,9 @@
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              {% if recruit.pilot.real_name %}
+              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
+              {% endif %}
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
                 <span class="status-badge status-鸽">鸽</span>
@@ -256,6 +283,9 @@
             </div>
             <div class="record-info">
               <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
+              {% if recruit.pilot.real_name %}
+              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
+              {% endif %}
               <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
               <div class="status-line">
                 <span class="status-badge status-已结束">已结束</span>
@@ -299,6 +329,86 @@
   </button>
 </section>
 
+<script>
+let allRecruits = [];
+
+function performRecruitSearch() {
+  const searchInput = document.getElementById('recruit-pilot-search');
+  const searchTerm = (searchInput.value || '').trim().toLowerCase();
+
+  if (!searchTerm) {
+    showAllRecruits();
+    return;
+  }
+
+  const filtered = allRecruits.filter(item => {
+    const nickname = (item.nickname || '').toLowerCase();
+    const realName = (item.realName || '').toLowerCase();
+    return nickname.includes(searchTerm) || realName.includes(searchTerm);
+  });
+
+  showFilteredRecruits(filtered);
+}
+
+function showAllRecruits() {
+  const cards = document.querySelectorAll('.record-card');
+  cards.forEach(card => { card.style.display = 'block'; });
+  updateRecruitEmptyState(cards.length > 0);
+}
+
+function showFilteredRecruits(filtered) {
+  const idSet = new Set(filtered.map(i => i.id));
+  const cards = document.querySelectorAll('.record-card');
+  cards.forEach(card => {
+    const id = (card.getAttribute('href') || '').split('/').pop();
+    if (idSet.has(id)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  updateRecruitEmptyState(filtered.length > 0);
+}
+
+function updateRecruitEmptyState(hasResults) {
+  const emptyState = document.querySelector('.empty-state');
+  if (emptyState) {
+    emptyState.style.display = hasResults ? 'none' : 'block';
+  }
+}
+
+function initRecruitSearch() {
+  const cards = document.querySelectorAll('.record-card');
+  allRecruits = Array.from(cards).map(card => {
+    const nicknameEl = card.querySelector('.pilot-name');
+    const realNameEl = card.querySelector('.pilot-real-name');
+    const href = card.getAttribute('href') || '';
+    return {
+      id: href.split('/').pop(),
+      nickname: nicknameEl ? nicknameEl.textContent.trim() : '',
+      realName: realNameEl ? realNameEl.textContent.trim() : ''
+    };
+  });
+
+  const searchInput = document.getElementById('recruit-pilot-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', performRecruitSearch);
+    searchInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        performRecruitSearch();
+      } else if (event.key === 'Backspace' || event.key === 'Delete') {
+        setTimeout(performRecruitSearch, 10);
+      }
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  initRecruitSearch();
+});
+</script>
+
 <style>
 
 .filter-toggle {
@@ -323,6 +433,42 @@
 .filter-label { font-size: 14px; color: var(--text); display: block; margin-bottom: 4px; }
 .filter-select { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--table-header); background: #fff; }
 
+.search-bar {
+  margin-bottom: 16px;
+}
+
+.search-input-group {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--table-header);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+.search-button {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-icon {
+  font-size: 16px;
+}
 
 .quick-nav {
   display: flex;
@@ -403,6 +549,7 @@
 .broadcast-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .record-info { flex: 1; text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
 .pilot-name { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.2; margin-bottom: 2px; }
+.pilot-real-name { font-size: 12px; color: var(--muted); line-height: 1.1; margin-bottom: 2px; }
 .meta-line { font-size: 12px; color: var(--muted); line-height: 1.1; }
 .status-line { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .status-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500; }
