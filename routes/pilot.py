@@ -91,6 +91,21 @@ def pilot_commission_new(pilot_id):
     return render_template('pilots/commission/new.html', pilot=pilot)
 
 
+@pilot_bp.route('/<pilot_id>/commission/<commission_id>/edit', methods=['GET', 'POST'])
+@roles_accepted('gicho', 'kancho')
+def pilot_commission_edit(pilot_id, commission_id):
+    """编辑主播分成记录"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)  # pylint: disable=no-member
+        from models.pilot import PilotCommission
+        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)  # pylint: disable=no-member
+    except DoesNotExist:
+        flash('主播或分成记录不存在', 'error')
+        return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
+
+    return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
+
+
 @pilot_bp.route('/<pilot_id>/performance')
 @roles_accepted('gicho', 'kancho')
 def pilot_performance(pilot_id):

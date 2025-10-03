@@ -499,10 +499,72 @@ function renderBackNav(params) {
 }
 
 // 渲染主播信息卡片
-function renderPilotInfo(pilot) {
+function renderPilotInfo(pilot, commission = null) {
   const infoCard = document.getElementById('pilotInfoCard');
   const normalizedRank = normalizeRank(pilot.rank || '');
   const normalizedStatus = normalizeStatus(pilot.status || '');
+  
+  // 分成信息渲染部分
+  let commissionHtml = '';
+  if (commission) {
+    commissionHtml = `
+    <div class="info-section">
+      <h3 class="section-title">分成信息</h3>
+      <div class="commission-card">
+        <div class="commission-header">
+          <div class="commission-rate">
+            <span class="rate-value">${commission.current_rate}%</span>
+            <span class="rate-label">当前分成比例</span>
+          </div>
+          <div class="commission-calculation">
+            <div class="calc-item">
+              <span class="calc-value">${commission.calculation_info.pilot_income.toFixed(1)}%</span>
+              <span class="calc-label">主播收入</span>
+            </div>
+            <div class="calc-item">
+              <span class="calc-value">${commission.calculation_info.company_income.toFixed(1)}%</span>
+              <span class="calc-label">公司收入</span>
+            </div>
+          </div>
+        </div>
+        <div class="commission-footer">
+          <div class="commission-formula">${commission.calculation_info.calculation_formula}</div>
+          <div class="commission-date">
+            ${commission.effective_date ? '生效时间：' + formatDate(commission.effective_date) : '默认分成比例'}
+          </div>
+          ${commission.remark ? '<div class="commission-remark">备注：' + commission.remark + '</div>' : ''}
+        </div>
+      </div>
+    </div>`;
+  } else {
+    commissionHtml = `
+    <div class="info-section">
+      <h3 class="section-title">分成信息</h3>
+      <div class="commission-card">
+        <div class="commission-header">
+          <div class="commission-rate">
+            <span class="rate-value">加载中...</span>
+            <span class="rate-label">当前分成比例</span>
+          </div>
+          <div class="commission-calculation">
+            <div class="calc-item">
+              <span class="calc-value">加载中...</span>
+              <span class="calc-label">主播收入</span>
+            </div>
+            <div class="calc-item">
+              <span class="calc-value">加载中...</span>
+              <span class="calc-label">公司收入</span>
+            </div>
+          </div>
+        </div>
+        <div class="commission-footer">
+          <div class="commission-card" style="text-align: center; color: #666;">
+            分成信息加载中...
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
   
   infoCard.innerHTML = `
     <div class="card-header">
@@ -563,34 +625,7 @@ function renderPilotInfo(pilot) {
       </div>
     </div>
 
-    <div class="info-section">
-      <h3 class="section-title">分成信息</h3>
-      <div class="commission-card">
-        <div class="commission-header">
-          <div class="commission-rate">
-            <span class="rate-value">${pilot.commission.current_rate}%</span>
-            <span class="rate-label">当前分成比例</span>
-          </div>
-          <div class="commission-calculation">
-            <div class="calc-item">
-              <span class="calc-value">${pilot.commission.calculation_info.pilot_income.toFixed(1)}%</span>
-              <span class="calc-label">主播收入</span>
-            </div>
-            <div class="calc-item">
-              <span class="calc-value">${pilot.commission.calculation_info.company_income.toFixed(1)}%</span>
-              <span class="calc-label">公司收入</span>
-            </div>
-          </div>
-        </div>
-        <div class="commission-footer">
-          <div class="commission-formula">${pilot.commission.calculation_info.calculation_formula}</div>
-          <div class="commission-date">
-            ${pilot.commission.effective_date ? '生效时间：' + formatDate(pilot.commission.effective_date) : '默认分成比例'}
-          </div>
-          ${pilot.commission.remark ? '<div class="commission-remark">备注：' + pilot.commission.remark + '</div>' : ''}
-        </div>
-      </div>
-    </div>
+    ${commissionHtml}
 
     <div class="info-section">
       <h3 class="section-title">系统信息</h3>
@@ -642,6 +677,23 @@ function renderActionButtons(pilot) {
   `;
 }
 
+// 加载主播分成信息
+async function loadPilotCommission(pilotId) {
+  try {
+    const response = await fetch(`/api/pilots/${pilotId}/commission/current`);
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载分成分信息失败');
+    }
+    
+    return result.data;
+  } catch (error) {
+    console.error('加载分成分信息失败:', error);
+    return null;
+  }
+}
+
 // 加载主播详情
 async function loadPilotDetail() {
   const loadingState = document.getElementById('loadingState');
@@ -652,19 +704,25 @@ async function loadPilotDetail() {
   
   try {
     const pilotId = getPilotIdFromUrl();
-    const response = await fetch(`/api/pilots/${pilotId}`);
-    const result = await response.json();
     
-    if (!result.success) {
-      throw new Error(result.error?.message || '加载主播详情失败');
+    // 并行加载主播基本信息和分成信息
+    const [pilotResponse, commission] = await Promise.all([
+      fetch(`/api/pilots/${pilotId}`),
+      loadPilotCommission(pilotId)
+    ]);
+    
+    const pilotResult = await pilotResponse.json();
+    
+    if (!pilotResult.success) {
+      throw new Error(pilotResult.error?.message || '加载主播详情失败');
     }
     
-    currentPilot = result.data;
+    currentPilot = pilotResult.data;
     document.title = `主播详情 - ${currentPilot.nickname} - Lacus-Log`;
     
     const params = getUrlParams();
     renderBackNav(params);
-    renderPilotInfo(currentPilot);
+    renderPilotInfo(currentPilot, commission);
     renderActionButtons(currentPilot);
     
     loadingState.style.display = 'none';

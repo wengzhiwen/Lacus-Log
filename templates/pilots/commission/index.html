@@ -20,47 +20,38 @@
     </div>
     <div class="commission-summary">
       <div class="summary-item">
-        <div class="summary-value">{{ current_rate }}%</div>
+        <div id="current-rate-value" class="summary-value">--</div>
         <div class="summary-label">当前分成比例</div>
       </div>
       <div class="summary-item">
-        <div class="summary-value pilot-income">{{ "%.1f"|format(calculation_info.pilot_income) }}%</div>
+        <div id="pilot-income-value" class="summary-value pilot-income">--</div>
         <div class="summary-label">主播收入</div>
       </div>
       <div class="summary-item">
-        <div class="summary-value company-income">{{ "%.1f"|format(calculation_info.company_income) }}%</div>
+        <div id="company-income-value" class="summary-value company-income">--</div>
         <div class="summary-label">公司收入</div>
       </div>
     </div>
     <div class="commission-details">
       <div class="detail-item">
         <span class="detail-label">计算公式：</span>
-        <span class="detail-value">{{ calculation_info.calculation_formula }}</span>
+        <span id="calculation-formula-value" class="detail-value">加载中...</span>
       </div>
-      {% if effective_date %}
-        <div class="detail-item">
-          <span class="detail-label">生效时间：</span>
-          <span class="detail-value">{{ effective_date|local_date }}</span>
-        </div>
-      {% else %}
-        <div class="detail-item">
-          <span class="detail-label">生效时间：</span>
-          <span class="detail-value">默认分成比例</span>
-        </div>
-      {% endif %}
-      {% if remark %}
-        <div class="detail-item">
-          <span class="detail-label">备注：</span>
-          <span class="detail-value">{{ remark }}</span>
-        </div>
-      {% endif %}
+      <div class="detail-item">
+        <span class="detail-label">生效时间：</span>
+        <span id="effective-date-value" class="detail-value">--</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">备注：</span>
+        <span id="remark-value" class="detail-value">--</span>
+      </div>
     </div>
   </div>
 
   <div class="action-section">
     <div class="action-header">
       <h3 class="section-title">分成调整记录</h3>
-      <a href="{{ url_for('pilot.pilot_commission_new', pilot_id=pilot.id) }}" class="btn btn-primary">
+      <a href="{{ url_for('pilot.pilot_commission_new', pilot_id=pilot.id) }}" id="createRecordBtn" class="btn btn-primary">
         <span class="btn-icon">+</span>
         新增调整记录
       </a>
@@ -68,56 +59,12 @@
   </div>
 
   <div class="records-section">
-    {% if commissions %}
-      <div class="records-list">
-        {% for commission in commissions %}
-          <div class="record-card {% if not commission.is_active %}inactive{% endif %}">
-            <div class="record-header">
-              <div class="record-date">{{ commission.adjustment_date|local_date }}</div>
-              <div class="record-rate">{{ commission.commission_rate }}%</div>
-              <div class="record-status">
-                {% if commission.is_active %}
-                  <span class="status-badge active">有效</span>
-                {% else %}
-                  <span class="status-badge inactive">无效</span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="record-content">
-              {% if commission.remark %}
-                <div class="record-remark">{{ commission.remark }}</div>
-              {% endif %}
-              <div class="record-meta">
-                <span class="meta-item">创建：{{ commission.created_at|local_datetime }}</span>
-              </div>
-            </div>
-            <div class="record-actions">
-              {% if commission.is_active %}
-                <a href="{{ url_for('pilot.pilot_commission_edit', pilot_id=pilot.id, commission_id=commission.id) }}" 
-                   class="btn btn-sm btn-secondary" title="编辑">
-                  <span class="btn-icon">✏️</span>
-                </a>
-              {% else %}
-                <a href="{{ url_for('pilot.pilot_commission_edit', pilot_id=pilot.id, commission_id=commission.id) }}" 
-                   class="btn btn-sm btn-primary" title="编辑">
-                  <span class="btn-icon">✏️</span>
-                </a>
-              {% endif %}
-              <button type="button" class="btn btn-sm btn-secondary" 
-                      onclick="showChanges('{{ commission.id }}')" title="变更记录">
-                <span class="btn-icon">📜</span>
-              </button>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="empty-state">
-        <div class="empty-icon">💰</div>
-        <div class="empty-title">暂无分成调整记录</div>
-        <div class="empty-description">点击上方"新增调整记录"按钮创建第一条记录</div>
-      </div>
-    {% endif %}
+    <div id="records-list" class="records-list"></div>
+    <div id="records-empty" class="empty-state" style="display:none;">
+      <div class="empty-icon">💰</div>
+      <div class="empty-title">暂无分成调整记录</div>
+      <div class="empty-description">点击上方"新增调整记录"按钮创建第一条记录</div>
+    </div>
   </div>
 </section>
 
@@ -489,17 +436,113 @@
 </style>
 
 <script>
+function getPilotIdFromUrl() {
+  const match = window.location.pathname.match(/\/pilots\/(.+?)\/commission\//);
+  return match ? match[1] : '{{ pilot.id }}';
+}
+
+function getCommissionEditUrl(commissionId) {
+  const pilotId = getPilotIdFromUrl();
+  return `/pilots/${pilotId}/commission/${commissionId}/edit`;
+}
+
+async function loadCurrentCommission() {
+  const pilotId = getPilotIdFromUrl();
+  try {
+    const resp = await fetch(`/api/pilots/${pilotId}/commission/current`);
+    const result = await resp.json();
+    if (result && result.success) {
+      const data = result.data || {};
+      document.getElementById('current-rate-value').textContent = (data.current_rate ?? '--') + '%';
+      const calc = data.calculation_info || {};
+      document.getElementById('pilot-income-value').textContent = (calc.pilot_income ?? '--') + '%';
+      document.getElementById('company-income-value').textContent = (calc.company_income ?? '--') + '%';
+      document.getElementById('calculation-formula-value').textContent = calc.calculation_formula || '--';
+      document.getElementById('effective-date-value').textContent = data.effective_date ? data.effective_date.slice(0, 10) : '默认分成比例';
+      document.getElementById('remark-value').textContent = data.remark || '--';
+    }
+  } catch (e) {
+    // 静默失败，保留占位
+  }
+}
+
+function renderRecordItem(item) {
+  const inactiveClass = item.is_active ? '' : 'inactive';
+  const statusBadge = item.is_active ? '<span class="status-badge active">有效</span>' : '<span class="status-badge inactive">无效</span>';
+  const remarkHtml = item.remark ? `<div class="record-remark">${item.remark}</div>` : '';
+  const createdAt = item.created_at ? item.created_at.replace('T', ' ').slice(0, 16) : '';
+  return `
+    <div class="record-card ${inactiveClass}">
+      <div class="record-header">
+        <div class="record-date">${(item.adjustment_date || '').slice(0,10)}</div>
+        <div class="record-rate">${item.commission_rate}%</div>
+        <div class="record-status">${statusBadge}</div>
+      </div>
+      <div class="record-content">
+        ${remarkHtml}
+        <div class="record-meta">
+          <span class="meta-item">创建：${createdAt}</span>
+        </div>
+      </div>
+      <div class="record-actions">
+        <a href="${getCommissionEditUrl(item.id)}" class="btn btn-sm btn-secondary" title="编辑">
+          <span class="btn-icon">✏️</span>
+        </a>
+        ${item.is_active 
+          ? `<button type="button" class="btn btn-sm btn-secondary" onclick="deactivateRecord('${item.id}')" title="停用">停用</button>` 
+          : `<button type="button" class="btn btn-sm btn-primary" onclick="activateRecord('${item.id}')" title="恢复">恢复</button>`}
+        <button type="button" class="btn btn-sm btn-secondary" onclick="showChanges('${item.id}')" title="变更记录">
+          <span class="btn-icon">📜</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function loadCommissionRecords() {
+  const pilotId = getPilotIdFromUrl();
+  try {
+    const resp = await fetch(`/api/pilots/${pilotId}/commission/records?page=1&page_size=50`);
+    const result = await resp.json();
+    const listEl = document.getElementById('records-list');
+    const emptyEl = document.getElementById('records-empty');
+    if (result && result.success) {
+      const items = (result.data && result.data.items) || [];
+      if (items.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.style.display = '';
+      } else {
+        emptyEl.style.display = 'none';
+        listEl.innerHTML = items.map(renderRecordItem).join('');
+      }
+    } else {
+      listEl.innerHTML = '';
+      emptyEl.style.display = '';
+    }
+  } catch (e) {
+    const listEl = document.getElementById('records-list');
+    const emptyEl = document.getElementById('records-empty');
+    listEl.innerHTML = '';
+    emptyEl.style.display = '';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadCurrentCommission();
+  loadCommissionRecords();
+});
 function showChanges(commissionId) {
   document.getElementById('changesModal').style.display = 'flex';
   
-  fetch("{{ url_for('pilot.pilot_commission_changes', pilot_id=pilot.id, commission_id='PLACEHOLDER') }}".replace('PLACEHOLDER', commissionId))
+  fetch(`/api/pilots/${getPilotIdFromUrl()}/commission/records/${commissionId}/changes`)
     .then(response => response.json())
     .then(data => {
       const content = document.getElementById('changesContent');
-      if (data.success) {
-        if (data.changes.length > 0) {
+      if (data && data.success) {
+        const items = (data.data && data.data.items) || [];
+        if (items.length > 0) {
           let html = '<div class="changes-list">';
-          data.changes.forEach(change => {
+          items.forEach(change => {
             html += `<div class="change-item">
               <div class="change-header">
                 <span class="change-field">${change.field_name}</span>
@@ -511,7 +554,7 @@ function showChanges(commissionId) {
                 <span class="new-value">${change.new_value || '空'}</span>
               </div>
               <div class="change-meta">
-                <span>操作者：${change.user_name}</span>
+                <span>操作者：${(change.user && (change.user.nickname || change.user.username)) || ''}</span>
                 <span>IP：${change.ip_address}</span>
               </div>
             </div>`;
@@ -539,5 +582,110 @@ document.addEventListener('click', function(e) {
     e.target.style.display = 'none';
   }
 });
+</script>
+
+<script>
+function getCSRFToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+function promptDate(defaultValue) {
+  const v = prompt('调整日期 (YYYY-MM-DD):', defaultValue || '');
+  if (v === null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    alert('请输入YYYY-MM-DD格式');
+    return null;
+  }
+  return v;
+}
+
+function promptRate(defaultValue) {
+  const v = prompt('分成比例 (0-50):', defaultValue != null ? String(defaultValue) : '');
+  if (v === null) return null;
+  const num = parseFloat(v);
+  if (Number.isNaN(num) || num < 0 || num > 50) {
+    alert('分成比例必须在0-50之间');
+    return null;
+  }
+  return num;
+}
+
+async function createRecordPrompt() {
+  const pilotId = getPilotIdFromUrl();
+  const dateStr = promptDate('');
+  if (dateStr === null) return;
+  const rate = promptRate('');
+  if (rate === null) return;
+  const remark = prompt('备注（可选）:', '') || '';
+  
+  try {
+    const resp = await fetch(`/api/pilots/${pilotId}/commission/records`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'X-CSRFToken': getCSRFToken() 
+      },
+      body: JSON.stringify({ 
+        adjustment_date: dateStr, 
+        commission_rate: rate, 
+        remark: remark 
+      })
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      showMessage(result.error?.message || '创建失败', 'error');
+      return;
+    }
+    showMessage('创建成功', 'success');
+    loadCurrentCommission();
+    loadCommissionRecords();
+  } catch (e) {
+    showMessage('创建失败', 'error');
+  }
+}
+
+
+async function deactivateRecord(recordId) {
+  if (!confirm('确定停用该记录吗？')) return;
+  const pilotId = getPilotIdFromUrl();
+  
+  try {
+    const resp = await fetch(`/api/pilots/${pilotId}/commission/records/${recordId}/deactivate`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCSRFToken() }
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      showMessage(result.error?.message || '停用失败', 'error');
+      return;
+    }
+    showMessage('已停用', 'success');
+    loadCurrentCommission();
+    loadCommissionRecords();
+  } catch (e) {
+    showMessage('停用失败', 'error');
+  }
+}
+
+async function activateRecord(recordId) {
+  const pilotId = getPilotIdFromUrl();
+  
+  try {
+    const resp = await fetch(`/api/pilots/${pilotId}/commission/records/${recordId}/activate`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCSRFToken() }
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      showMessage(result.error?.message || '恢复失败', 'error');
+      return;
+    }
+    showMessage('已恢复', 'success');
+    loadCurrentCommission();
+    loadCommissionRecords();
+  } catch (e) {
+    showMessage('恢复失败', 'error');
+  }
+}
 </script>
 {% endblock %}

@@ -19,11 +19,10 @@
       <h3 class="card-title">调整记录信息</h3>
     </div>
     <div class="form-content">
-      <form method="POST" id="commissionForm">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div id="commissionForm" class="form-container">
         <div class="form-group">
           <label for="adjustment_date" class="form-label">调整日 <span class="required">*</span></label>
-          <input type="date" class="form-input" id="adjustment_date" name="adjustment_date" 
+          <input type="date" class="form-input" id="adjustment_date"
                  value="{{ request.form.adjustment_date or '' }}" required>
           <div class="form-help">分成比例在此日期当天生效（GMT+8时间），支持选择未来日期</div>
         </div>
@@ -31,7 +30,7 @@
         <div class="form-group">
           <label for="commission_rate" class="form-label">分成比例 <span class="required">*</span></label>
           <div class="input-group">
-            <input type="number" class="form-input" id="commission_rate" name="commission_rate" 
+            <input type="number" class="form-input" id="commission_rate"
                    value="{{ request.form.commission_rate or '' }}" 
                    min="0" max="50" step="0.1" required>
             <span class="input-suffix">%</span>
@@ -41,7 +40,7 @@
 
         <div class="form-group">
           <label for="remark" class="form-label">备注</label>
-          <textarea class="form-textarea" id="remark" name="remark" rows="3" 
+          <textarea class="form-textarea" id="remark" rows="3" 
                     placeholder="请输入调整原因或说明">{{ request.form.remark or '' }}</textarea>
           <div class="form-help">可选，用于记录调整原因或相关说明</div>
         </div>
@@ -70,12 +69,17 @@
             <span class="btn-icon">×</span>
             取消
           </a>
-          <button type="submit" class="btn btn-primary">
+          <button type="button" id="saveBtn" class="btn btn-primary">
             <span class="btn-icon">✓</span>
             保存
           </button>
         </div>
-      </form>
+      </div>
+      
+      <!-- 错误提示区域 -->
+      <div id="errorAlert" class="error-alert" style="display: none;">
+        <div id="errorMessage"></div>
+      </div>
     </div>
   </div>
 </section>
@@ -292,9 +296,38 @@
     width: 100%;
   }
 }
+
+.error-alert {
+  background: #FFEBEE;
+  border: 1px solid #FFCDD2;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-top: 16px;
+  color: #C62828;
+  font-size: 14px;
+}
 </style>
 
 <script>
+function getPilotIdFromUrl() {
+  const pathParts = window.location.pathname.split('/');
+  return pathParts[pathParts.indexOf('pilots') + 1];
+}
+
+function getCSRFToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+function showErrorAlert(message) {
+  const box = document.getElementById('errorAlert');
+  document.getElementById('errorMessage').textContent = message || '保存失败';
+  box.style.display = 'flex';
+}
+
+function hideErrorAlert() {
+  document.getElementById('errorAlert').style.display = 'none';
+}
+
 function updatePreview() {
   const rate = parseFloat(document.getElementById('commission_rate').value);
   if (isNaN(rate) || rate < 0 || rate > 50) {
@@ -316,34 +349,65 @@ function updatePreview() {
   document.getElementById('previewFormula').textContent = `计算公式：(${rate}%/50%) * 42% = ${pilotIncome.toFixed(1)}%`;
 }
 
-document.getElementById('commission_rate').addEventListener('input', updatePreview);
-
-document.addEventListener('DOMContentLoaded', function() {
-  updatePreview();
-});
-
-document.getElementById('commissionForm').addEventListener('submit', function(e) {
+async function saveCommission() {
   const adjustmentDate = document.getElementById('adjustment_date').value;
   const commissionRate = document.getElementById('commission_rate').value;
+  const remark = document.getElementById('remark').value;
   
   if (!adjustmentDate) {
-    e.preventDefault();
-    alert('请选择调整日');
+    showErrorAlert('请选择调整日');
     return;
   }
   
   if (!commissionRate) {
-    e.preventDefault();
-    alert('请输入分成比例');
+    showErrorAlert('请输入分成比例');
     return;
   }
   
   const rate = parseFloat(commissionRate);
   if (isNaN(rate) || rate < 0 || rate > 50) {
-    e.preventDefault();
-    alert('分成比例必须在0-50之间');
+    showErrorAlert('分成比例必须在0-50之间');
     return;
   }
+
+  try {
+    const pilotId = getPilotIdFromUrl();
+    const response = await fetch(`/api/pilots/${pilotId}/commission/records`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      },
+      body: JSON.stringify({
+        adjustment_date: adjustmentDate,
+        commission_rate: rate,
+        remark: remark
+      })
+    });
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      showErrorAlert(result.error?.message || '创建失败');
+      return;
+    }
+    
+    // 保存成功，跳转到分成管理页面
+    window.location.href = `/pilots/${pilotId}/commission/`;
+    
+  } catch (error) {
+    console.error('保存失败:', error);
+    showErrorAlert('保存失败');
+  }
+}
+
+document.getElementById('commission_rate').addEventListener('input', updatePreview);
+
+document.addEventListener('DOMContentLoaded', function() {
+  updatePreview();
+  
+  // 绑定保存按钮事件
+  document.getElementById('saveBtn').addEventListener('click', saveCommission);
 });
 </script>
 {% endblock %}

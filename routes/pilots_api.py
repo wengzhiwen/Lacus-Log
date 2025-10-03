@@ -263,11 +263,8 @@ def get_pilots():
 @pilots_api_bp.route('/api/pilots/<pilot_id>', methods=['GET'])
 @roles_accepted('gicho', 'kancho')
 def get_pilot_detail(pilot_id):
-    """获取主播详情"""
+    """获取主播详情（不包含分成分数据，分成分数据通过独立的commission API获取）"""
     try:
-        from datetime import date as date_class
-        from utils.commission_helper import get_pilot_commission_rate_for_date, calculate_commission_distribution
-
         pilot = Pilot.objects.get(id=pilot_id)
 
         # 获取最近的变更记录（不超总记录，给展示用）
@@ -283,18 +280,6 @@ def get_pilot_detail(pilot_id):
             'user_nickname': change.user_id.nickname if change.user_id else '未知用户',
             'changes_summary': getattr(change, 'changes_summary', '')
         } for change in recent_changes]
-
-        # 获取当前分成信息
-        current_date = date_class.today()
-        commission_rate, effective_date, remark = get_pilot_commission_rate_for_date(pilot.id, current_date)
-        calculation_info = calculate_commission_distribution(commission_rate)
-
-        pilot_data['commission'] = {
-            'current_rate': commission_rate,
-            'effective_date': utc_to_local(effective_date).isoformat() if effective_date else None,
-            'remark': remark,
-            'calculation_info': calculation_info
-        }
 
         logger.info('获取主播详情成功：%s', pilot.nickname)
         return jsonify(create_success_response(pilot_data))

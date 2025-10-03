@@ -1,87 +1,136 @@
 # REST化经验谈
 
-> 总结本次将模板渲染改为通过 REST API 交互的落地经验，聚焦真实踩坑与可复用规范。示例来自“主播管理/用户管理”。
+> 这份笔记面向后续负责 REST 改造的 Coding Agent / 开发者，用来统一做法、避免踩坑。内容基于已落地的用户/主播管理 API 与多次复盘总结。
 
-## 1. 接口与通用约定
-- 统一响应结构：success / data / error / meta。
-  - 成功：{"success": true, "data": {...}, "error": null, "meta": {...}}
-  - 失败：{"success": false, "data": null, "error": {"code": "...", "message": "..."}, "meta": {}}
-- 写操作权限固定用法：@roles_accepted('gicho','kancho')。遗漏导入会触发运行期 NameError。
-- CSRF：仅写操作需要，统一从请求头 X-CSRFToken 校验。
+## 1. 目标与适用范围
+- 适用于“原有 Flask 模板 + 表单”逐步迁移到“模板保持 UI，数据/动作走 REST API”的场景。
+- 强调 **最小必要改动**：布局、交互习惯尽量不变，只替换数据来源和提交流程。
+- 适用于新接口设计、旧接口维护、以及尚未 REST 化模块的规划评估。
 
-## 2. 模型/序列化一致性
-- 字段名必须与模型一致。
-  - 经验：PilotChangeLog 实际是 pilot_id / change_time，不是 pilot / created_at。
-- 只读属性不可写（如 Pilot.age 由 birth_year 计算）。更新逻辑只写“持久化字段”。
-- 统一“空值”处理：封装 safe_strip(value)，将 None 与空白字符串安全归一。
+## 2. 基础规范
+### 2.1 响应结构
+所有 REST 接口统一使用：
+```json
+{
+  "success": true,
+  "data": { ... },
+  "error": null,
+  "meta": { ... }
+}
+```
+- 成功：`success=true`，结果放在 `data`；需要分页/统计时写入 `meta`。
+- 失败：`success=false`，`error={code,message}`，`data=null`。状态码与语义匹配（400 参数错误、401 未登录/CSRF 失败、403 无权限、404 找不到、409 业务冲突）。
+- 推荐错误码命名：`USER_NOT_FOUND`、`INVALID_OWNER`、`VALIDATION_ERROR`、`CSRF_ERROR` 等，方便前端做分支处理。
 
-## 3. 业务校验与错误回传
-- 模型 clean() 的业务错误用 ValueError 表达；接口层显式 except ValueError as e 返回 VALIDATION_ERROR 与清晰 message。
-- 保存顺序：校验 -> 赋值 -> save() -> 写变更日志。缺少 save() 会出现“日志有、数据没变”。
+### 2.2 权限约定
+- 内部管理功能统一使用 `@roles_accepted('gicho', 'kancho')` 或 `@roles_required('gicho')`。
+- 如果接口只允许管理员操作（如创建用户、重置密码），显式改成 `@roles_required('gicho')`。
+- 接口里如需进一步校验（例如“不能停用最后一名管理员”），在业务逻辑处返回 409 + 语义化错误信息。
 
-## 4. 变更记录与审计
-- 严格按模型写入：PilotChangeLog(pilot_id=..., user_id=..., field_name, old_value, new_value, ...)。
-- 仅写存在于模型的字段；需要扩展先改模型。
-- 序列化时将 Enum 统一转 .value，前端按统一字典渲染。
+### 2.3 序列化
+- 数据出口集中在 `utils/<module>_serializers.py`，保证字段顺序、空值处理一致。
+- 模型新增字段 → 同步更新序列化、变更日志映射以及前端解析代码。
+- 字段空值统一通过 `safe_strip(value)`/`None` 归一，避免前端出现混合空字符串。
 
-## 5. 前端交互与错误展示
-- 固定错误区 + toast：表单上方常驻错误区展示后端 error.message，同时用短 toast 提醒。
-- 枚举/下拉“去耦”：如直属运营下拉改为 /api/users/operators 独立接口，页面加载时与枚举并行拉取。
+## 3. CSRF 与安全策略
+### 3.1 双提交 Cookie 模式
+- 生成 token：`generate_csrf()`，写入 cookie（`csrf_token`，`SameSite=Lax`），同时在登录响应或单独的 `/api/auth/csrf` 返回给前端。
+- 前端所有写操作在 Header 加 `X-CSRFToken`，值与 cookie 保持一致。
+- 中间层编写统一校验函数：比对 cookie 与 header，失败返回 401 并记录日志。
 
-## 6. 导出下载的可靠实现
-- 后端响应头：
-  - Content-Disposition: attachment; filename="pilot_export.csv"
-  - Content-Type: text/csv; charset=utf-8
-  - 在内容前加 BOM："\ufeff" + csv_content 以兼容 Excel 中文。
-- 前端优先使用 window.location.href = '/api/.../export?...' 触发下载；只有在需要自定义鉴权头/跨域时才降级到 fetch -> blob 方案。
+### 3.2 JWT 协同时序（若未来落地）
+1. 登录成功：返回 access token（Authorization header）+ refresh/httpOnly cookie + csrf cookie。
+2. 后续请求：`Authorization: Bearer <access>` + `X-CSRFToken`。
+3. 刷新 token 时复用 refresh cookie 并重新生成 CSRF。
 
-## 7. 筛选/枚举/导出一致性
-- 多选参数统一使用 getlist 语义：?owner_id=a&owner_id=b。
-- 后端过滤前做枚举合法性检查（非法值忽略）以避免 500。
-- 导出列头与详情页字段一致；时间统一本地化格式化。
+### 3.3 测试要求
+- 单元测试可用 `with app.test_client()` + `csrf_disable()` 等方式豁免。
+- 集成/端到端测试必须按照真实流程获取 CSRF，避免上线后前端踩坑。
 
-## 8. 改造 Checklist（强烈建议）
-1) 明确页面数据点，分离“布局（保留）/数据（API化）”。
-2) 先列表/详情（只读），再创建/更新/状态变更（写入）。
-3) 统一响应结构与错误码；前端接入固定错误区。
-4) 审核模型字段：只读/可空/枚举；同步更新序列化与变更日志映射。
-5) 统一空值策略：前端可能传 null，后端用 safe_strip() 配合处理。
-6) 导出链路单独走通：响应头、BOM、文件名、触发方式。
-7) 日志：接口入口/出口 INFO，异常 ERROR+exc_info=True，必要 DEBUG。
+## 4. 日志与审计
+- 入口/出口 INFO：记录接口、操作者、关键参数摘要（脱敏）。
+- 异常 ERROR：`logger.error('xxx', exc_info=True)` 方便排查。
+- 变更记录写入专表（如 `PilotChangeLog`、`RecruitChangeLog`），字段与模型保持同步。
 
-## 9. 可复用片段
+## 5. 前端协作要点
+- 初始化阶段用 `Promise.all` 并发拉取字典、列表等接口。
+- 错误处理统一：后台返回的 `error.message` → 页面常驻错误区 + toast。
+- 导出优先用浏览器直接跳转 `/api/.../export?...`，若必须加 Header 再用 `fetch -> blob`。
+- 原模板链接如果指向旧路由（如 `/pilots/export`），新增兼容跳板 302 到 REST 接口，避免 404。
+
+## 6. 测试策略
+1. **接口单测**：使用 Flask test client 构造请求，校验 `success/error/meta`；写操作带真实 CSRF。
+2. **集成测试**：模拟真实登录 → 存储 cookie + token → 后续请求携带 header。
+3. **回归脚本**：覆盖分页、筛选、错误分支（缺字段、非法枚举、冲突等）。
+
+## 7. 典型实施流程（Checklist）
+1. **梳理页面数据点**：明确列表、详情、表单字段；UI 保持不变。
+2. **只读接口优先**：先实现列表/详情/选项；页面改为 `fetch` 获取数据。
+3. **再改写操作**：实现创建/更新/状态变更接口，前端提交改为 AJAX；原表单可保留备用。
+4. **补充导出**：处理好响应头、BOM、文件名；确保与筛选条件一致。
+5. **审计与 CSRF**：写操作日志、双提交 cookie 校验到位。
+6. **移除冗余脚本**：临时 polyfill/调试脚本在上线前删掉。
+
+## 8. 常见坑与对策
+| 场景 | 症状 | 对策 |
+| --- | --- | --- |
+| 模板仍引用旧路由 | 页面 500 或跳转 404 | 保留兼容路由或改链接直指新 API。|
+| 枚举值非法导致 500 | `Enum(value)` 抛异常 | 过滤参数前先校验；忽略非法值或返回 400。|
+| 变更记录缺字段 | 序列化 KeyError | 按模型字段更新 `_record_changes`；增加保护逻辑。|
+| JS 中字符串模板处理错误 | URL 出现 `${item.id}` | 直接传变量 `getUrl(item.id)`，不要再套字符串。|
+| 时区误差 | 统计跨日错误 | 统一使用 `utils/timezone_helper`，业务口径按 GMT+8。|
+| 导出乱码 | Excel 中文乱码 | 在 CSV 前加 `\ufeff`，响应头设 `text/csv; charset=utf-8`。|
+
+## 9. 可复用代码片段
 ```python
-# 安全去空格
-def safe_strip(value):
-    if value is None:
-        return None
-    if isinstance(value, str):
-        s = value.strip()
-        return s if s else None
-    return None
+# CSRF 校验示例
+from flask import request
+from flask_wtf import csrf
 
-# 业务错误回传
-try:
-    pilot.save()
-except ValueError as e:
-    return jsonify(create_error_response('VALIDATION_ERROR', str(e))), 400
+def validate_csrf_header():
+    token_header = request.headers.get('X-CSRFToken')
+    token_cookie = request.cookies.get('csrf_token')
+    if not token_header or token_header != token_cookie:
+        raise ValueError('CSRF token mismatch')
+    csrf.validate_csrf(token_header)
+```
+
+```python
+# 统一成功/失败响应
+from flask import jsonify
+
+def create_success_response(data=None, meta=None):
+    return {'success': True, 'data': data or {}, 'error': None, 'meta': meta or {}}
+
+def create_error_response(code, message):
+    return {'success': False, 'data': None, 'error': {'code': code, 'message': message}, 'meta': {}}
+
+# 使用
+return jsonify(create_success_response(payload, meta)), 200
 ```
 
 ```javascript
-// 固定错误区
-function showErrorAlert(message) {
-  const box = document.getElementById('errorAlert');
-  document.getElementById('errorMessage').textContent = message || '保存失败';
-  box.style.display = 'flex';
-}
-
-// 导出（优先浏览器下载）
-function exportPilots() {
-  const params = new URLSearchParams(/* 当前筛选 */);
-  window.location.href = `/api/pilots/export?${params.toString()}`;
+// fetch 封装示例
+async function apiRequest(url, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': getCsrfTokenFromCookie(),
+    ...options.headers,
+  };
+  const res = await fetch(url, { ...options, headers });
+  const payload = await res.json();
+  if (!payload.success) throw new Error(payload.error?.message || '操作失败');
+  return payload;
 }
 ```
 
----
-以上规范可作为后续模块 REST 化基线：最小必要改动、UI 不变、错误清晰、日志可追踪。
+## 10. 尚未 REST 化模块（现状提醒）
+- 招募管理、分成管理、通告主流程、通告导出、开播记录 CRUD、开播日报/周报/月报、招募日报、仪表板、开播地点、邮件发送/报告等仍以传统表单或模板为主。任何任务若要使用 REST 接口，需要先落地对应蓝图，再更新模块专属指南。
 
+## 11. 后续改造建议
+- 建议以模块为单位逐步推进：先“补充只读 API + 统一序列化”，再“改写写入逻辑 + CSRF 中间件”。
+- 每落地一组接口，同时更新对应的 `docs/模块-REST化指南.md`，保持文档与实现一致。
+- 在同一个 PR 中同步新增集成测试（真实 CSRF + 权限 + 业务场景），为后续重构打下回归基础。
+
+---
+保持这份经验谈的及时更新，可以显著降低后续 REST 改造的沟通与排错成本。
