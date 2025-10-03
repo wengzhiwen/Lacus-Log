@@ -1,29 +1,21 @@
 {% extends 'base.html' %}
-{% block title %}编辑主播 - {{ pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}编辑主播 - Lacus-Log{% endblock %}
 {% block content %}
-<section class="pilot-form">
-  <div class="back-nav">
-    <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_detail', pilot_id=(pilot.id|string)) }}">
-      <span>←</span>
-      返回主播详情
-    </a>
-  </div>
+<section class="pilot-form" id="pilotEditForm" style="display: none;">
+  <div class="back-nav" id="backNav"></div>
 
   <div class="form-container">
     <div class="form-header">
-      <h1 class="form-title">编辑主播 - {{ pilot.nickname }}</h1>
+      <h1 class="form-title" id="formTitle">编辑主播</h1>
     </div>
 
-    <form method="post" class="pilot-form-content">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-      
+    <form class="pilot-form-content">
       <div class="form-section">
         <h3 class="section-title">基础信息</h3>
         <div class="form-grid">
           <div class="form-group">
             <label for="nickname" class="form-label">昵称 <span class="required">*</span></label>
             <input type="text" id="nickname" name="nickname" class="form-input" 
-                   value="{{ pilot.nickname }}" 
                    placeholder="请输入昵称" maxlength="20" required>
             <div class="form-help">最多20个字符，必须唯一</div>
           </div>
@@ -31,7 +23,6 @@
           <div class="form-group">
             <label for="real_name" class="form-label">姓名</label>
             <input type="text" id="real_name" name="real_name" class="form-input" 
-                   value="{{ pilot.real_name or '' }}" 
                    placeholder="请输入真实姓名" maxlength="20">
             <div class="form-help">最多20个字符</div>
           </div>
@@ -39,16 +30,15 @@
           <div class="form-group">
             <label for="gender" class="form-label">性别</label>
             <select id="gender" name="gender" class="form-select">
-              <option value="1" {% if pilot.gender.value == 1 %}selected{% endif %}>女</option>
-              <option value="0" {% if pilot.gender.value == 0 %}selected{% endif %}>男</option>
-              <option value="2" {% if pilot.gender.value == 2 %}selected{% endif %}>不明确</option>
+              <option value="1">女</option>
+              <option value="0">男</option>
+              <option value="2">不明确</option>
             </select>
           </div>
           
           <div class="form-group">
             <label for="hometown" class="form-label">籍贯</label>
             <input type="text" id="hometown" name="hometown" class="form-input" 
-                   value="{{ pilot.hometown or '' }}" 
                    placeholder="请输入籍贯" maxlength="20">
             <div class="form-help">最多20个字符</div>
           </div>
@@ -56,7 +46,6 @@
           <div class="form-group">
             <label for="birth_year" class="form-label">出生年</label>
             <input type="number" id="birth_year" name="birth_year" class="form-input" 
-                   value="{{ pilot.birth_year or '' }}" 
                    placeholder="如：1995" min="1964" max="2014">
             <div class="form-help">用于计算年龄</div>
           </div>
@@ -67,14 +56,22 @@
         <h3 class="section-title">关联信息</h3>
         <div class="form-grid">
           <div class="form-group">
-            <label for="owner" class="form-label">所属</label>
+            <label for="owner" class="form-label">直属运营</label>
             <select id="owner" name="owner" class="form-select">
-              {% for value, display in user_choices %}
-              <option value="{{ value }}" {% if (pilot.owner and value == (pilot.owner.id|string)) or (not pilot.owner and not value) %}selected{% endif %}>{{ display }}</option>
-              {% endfor %}
+              <option value="">无</option>
             </select>
           </div>
         </div>
+      </div>
+
+      <!-- 错误提示区域 -->
+      <div id="errorAlert" class="error-alert" style="display: none;">
+        <div class="error-icon">⚠️</div>
+        <div class="error-content">
+          <div class="error-title">保存失败</div>
+          <div id="errorMessage" class="error-message"></div>
+        </div>
+        <button type="button" class="error-close" onclick="closeErrorAlert()">✕</button>
       </div>
 
       <div class="form-section">
@@ -83,40 +80,40 @@
           <div class="form-group">
             <label for="platform" class="form-label">开播平台</label>
             <select id="platform" name="platform" class="form-select">
-              <option value="未知" {% if pilot.platform.value == '未知' %}selected{% endif %}>未知</option>
-              <option value="快手" {% if pilot.platform.value == '快手' %}selected{% endif %}>快手</option>
-              <option value="抖音" {% if pilot.platform.value == '抖音' %}selected{% endif %}>抖音</option>
-              <option value="其他" {% if pilot.platform.value == '其他' %}selected{% endif %}>其他</option>
+              <option value="未知">未知</option>
+              <option value="快手">快手</option>
+              <option value="抖音">抖音</option>
+              <option value="其他">其他</option>
             </select>
           </div>
           
           <div class="form-group">
             <label for="work_mode" class="form-label">开播方式</label>
             <select id="work_mode" name="work_mode" class="form-select">
-              <option value="未知" {% if pilot.work_mode.value == '未知' %}selected{% endif %}>未知</option>
-              <option value="线下" {% if pilot.work_mode.value == '线下' %}selected{% endif %}>线下</option>
-              <option value="线上" {% if pilot.work_mode.value == '线上' %}selected{% endif %}>线上</option>
+              <option value="未知">未知</option>
+              <option value="线下">线下</option>
+              <option value="线上">线上</option>
             </select>
           </div>
           
           <div class="form-group">
             <label for="rank" class="form-label">主播分类</label>
             <select id="rank" name="rank" class="form-select">
-              <option value="候选人" {% if pilot.rank.value == '候选人' %}selected{% endif %}>候选人</option>
-              <option value="试播主播" {% if pilot.rank.value == '试播主播' %}selected{% endif %}>试播主播</option>
-              <option value="实习主播" {% if pilot.rank.value == '实习主播' %}selected{% endif %}>实习主播</option>
-              <option value="正式主播" {% if pilot.rank.value == '正式主播' %}selected{% endif %}>正式主播</option>
+              <option value="候选人">候选人</option>
+              <option value="试播主播">试播主播</option>
+              <option value="实习主播">实习主播</option>
+              <option value="正式主播">正式主播</option>
             </select>
           </div>
           
           <div class="form-group">
             <label for="status" class="form-label">状态</label>
             <select id="status" name="status" class="form-select">
-              <option value="未招募" {% if pilot.status.value == '未招募' %}selected{% endif %}>未招募</option>
-              <option value="不招募" {% if pilot.status.value == '不招募' %}selected{% endif %}>不招募</option>
-              <option value="已招募" {% if pilot.status.value == '已招募' %}selected{% endif %}>已招募</option>
-              <option value="已签约" {% if pilot.status.value == '已签约' %}selected{% endif %}>已签约</option>
-              <option value="流失" {% if pilot.status.value == '流失' %}selected{% endif %}>流失</option>
+              <option value="未招募">未招募</option>
+              <option value="不招募">不招募</option>
+              <option value="已招募">已招募</option>
+              <option value="已签约">已签约</option>
+              <option value="流失">流失</option>
             </select>
           </div>
         </div>
@@ -127,7 +124,7 @@
           <span class="btn-icon">✓</span>
           保存修改
         </button>
-        <a href="{{ url_for('pilot.pilot_detail', pilot_id=(pilot.id|string)) }}" class="btn btn-secondary">
+        <a id="cancelBtn" href="#" class="btn btn-secondary">
           <span class="btn-icon">✕</span>
           取消
         </a>
@@ -135,6 +132,11 @@
     </form>
   </div>
 </section>
+
+<div id="loadingState" class="loading-state">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">加载中...</div>
+</div>
 
 <style>
 
@@ -246,10 +248,266 @@
     width: 100%;
   }
 }
+
+/* 错误提示样式 */
+.error-alert {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-alert.error {
+  background: #f8d7da;
+  border-color: #dc3545;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+}
+
+.error-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.error-content {
+  flex: 1;
+}
+
+.error-title {
+  font-weight: 600;
+  color: #856404;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.error-alert.error .error-title {
+  color: #721c24;
+}
+
+.error-message {
+  color: #664d03;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.error-alert.error .error-message {
+  color: #58151c;
+}
+
+.error-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #856404;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.error-alert.error .error-close {
+  color: #721c24;
+}
+
+.error-close:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
 </style>
 
 <script>
+let currentPilot = null;
+
+// 获取URL中的pilot_id
+function getPilotIdFromUrl() {
+  const pathParts = window.location.pathname.split('/');
+  return pathParts[pathParts.length - 2]; // /pilots/<id>/edit
+}
+
+// 规范化枚举值
+function normalizeRank(value) {
+  const mapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+  return mapping[value] || value;
+}
+
+function normalizeStatus(value) {
+  const mapping = {
+    '未征召': '未招募',
+    '不征召': '不招募',
+    '已征召': '已招募',
+    '已阵亡': '流失'
+  };
+  return mapping[value] || value;
+}
+
+// 加载直属运营选项
+async function loadOwnerOptions() {
+  try {
+    const response = await fetch('/api/users/operators');
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '获取运营列表失败');
+    }
+    
+    const ownerSelect = document.getElementById('owner');
+    result.data.forEach(operator => {
+      const option = document.createElement('option');
+      option.value = operator.id;
+      option.textContent = operator.nickname;
+      ownerSelect.appendChild(option);
+    });
+    
+    // 如果已经加载了主播数据，设置选中值
+    if (currentPilot && currentPilot.owner) {
+      ownerSelect.value = currentPilot.owner.id;
+    }
+  } catch (error) {
+    console.error('加载直属运营选项失败:', error);
+    showMessage('加载直属运营选项失败', 'error');
+  }
+}
+
+// 加载主播详情
+async function loadPilotDetail() {
+  const loadingState = document.getElementById('loadingState');
+  const editForm = document.getElementById('pilotEditForm');
+  
+  loadingState.style.display = 'block';
+  editForm.style.display = 'none';
+  
+  try {
+    const pilotId = getPilotIdFromUrl();
+    const response = await fetch(`/api/pilots/${pilotId}`);
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载主播详情失败');
+    }
+    
+    currentPilot = result.data;
+    document.title = `编辑主播 - ${currentPilot.nickname} - Lacus-Log`;
+    
+    // 填充表单
+    document.getElementById('formTitle').textContent = `编辑主播 - ${currentPilot.nickname}`;
+    document.getElementById('nickname').value = currentPilot.nickname || '';
+    document.getElementById('real_name').value = currentPilot.real_name || '';
+    document.getElementById('gender').value = currentPilot.gender !== null ? currentPilot.gender : 1;
+    document.getElementById('hometown').value = currentPilot.hometown || '';
+    document.getElementById('birth_year').value = currentPilot.birth_year || '';
+    document.getElementById('platform').value = currentPilot.platform || '未知';
+    document.getElementById('work_mode').value = currentPilot.work_mode || '未知';
+    document.getElementById('rank').value = normalizeRank(currentPilot.rank) || '候选人';
+    document.getElementById('status').value = normalizeStatus(currentPilot.status) || '未招募';
+    
+    // 设置返回和取消按钮
+    document.getElementById('backNav').innerHTML = `
+      <a class="btn btn-secondary" href="/pilots/${currentPilot.id}">
+        <span>←</span>
+        返回主播详情
+      </a>
+    `;
+    document.getElementById('cancelBtn').href = `/pilots/${currentPilot.id}`;
+    
+    // 加载完成后加载直属运营选项
+    await loadOwnerOptions();
+    
+    loadingState.style.display = 'none';
+    editForm.style.display = 'block';
+  } catch (error) {
+    console.error('加载主播详情失败:', error);
+    showMessage('加载主播详情失败', 'error');
+    loadingState.style.display = 'none';
+  }
+}
+
+// 显示错误提示
+function showErrorAlert(message, type = 'error') {
+  const errorAlert = document.getElementById('errorAlert');
+  const errorMessage = document.getElementById('errorMessage');
+  
+  errorMessage.textContent = message;
+  errorAlert.className = 'error-alert';
+  if (type === 'error') {
+    errorAlert.classList.add('error');
+  }
+  errorAlert.style.display = 'flex';
+  
+  // 滚动到错误提示位置
+  errorAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// 关闭错误提示
+function closeErrorAlert() {
+  const errorAlert = document.getElementById('errorAlert');
+  errorAlert.style.display = 'none';
+}
+
+// 更新主播
+async function updatePilot(formData) {
+  // 先清除之前的错误提示
+  closeErrorAlert();
+  
+  try {
+    const pilotId = getPilotIdFromUrl();
+    const response = await fetch(`/api/pilots/${pilotId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      },
+      body: JSON.stringify(formData)
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      const errorMsg = result.error?.message || '更新主播失败';
+      showErrorAlert(errorMsg, 'error');
+      showMessage('保存失败', 'error');
+      return;
+    }
+    
+    showMessage('主播信息已更新', 'success');
+    setTimeout(() => {
+      window.location.href = `/pilots/${result.data.id}`;
+    }, 1000);
+  } catch (error) {
+    console.error('更新主播失败:', error);
+    showErrorAlert(error.message || '网络错误，请重试', 'error');
+    showMessage('保存失败', 'error');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  loadPilotDetail();
+  
   const form = document.querySelector('.pilot-form-content');
   const nicknameInput = document.getElementById('nickname');
   const hometownInput = document.getElementById('hometown');
@@ -283,6 +541,25 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       this.setCustomValidity('');
     }
+  });
+  
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = {
+      nickname: document.getElementById('nickname').value.trim(),
+      real_name: document.getElementById('real_name').value.trim() || null,
+      gender: parseInt(document.getElementById('gender').value),
+      hometown: document.getElementById('hometown').value.trim() || null,
+      birth_year: parseInt(document.getElementById('birth_year').value) || null,
+      owner_id: document.getElementById('owner').value || null,
+      platform: document.getElementById('platform').value,
+      work_mode: document.getElementById('work_mode').value,
+      rank: document.getElementById('rank').value,
+      status: document.getElementById('status').value
+    };
+    
+    await updatePilot(formData);
   });
 });
 </script>

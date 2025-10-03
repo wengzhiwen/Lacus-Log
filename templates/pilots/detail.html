@@ -1,188 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}主播详情 - {{ pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}主播详情 - Lacus-Log{% endblock %}
 {% block content %}
-<section class="pilot-detail">
-  <div class="back-nav">
-    {% set from_param = request.args.get('from') %}
-    {% if from_param == 'recruit_detail' %}
-      {% set recruit_id = request.args.get('recruit_id') %}
-      <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">
-        <span>←</span>
-        返回
-      </a>
-    {% elif from_param == 'announcement_detail' %}
-      {% set announcement_id = request.args.get('announcement_id') %}
-      <a class="btn btn-secondary" href="{{ url_for('announcement.announcement_detail', announcement_id=announcement_id) }}">
-        <span>←</span>
-        返回
-      </a>
-    {% elif from_param == 'battle_record_detail' %}
-      {% set record_id = request.args.get('record_id') %}
-      <a class="btn btn-secondary" href="{{ url_for('battle_record.detail_battle_record', record_id=record_id) }}">
-        <span>←</span>
-        返回
-      </a>
-    {% elif from_param == 'performance' %}
-      <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_performance', pilot_id=pilot.id) }}">
-        <span>←</span>
-        返回
-      </a>
-    {% else %}
-      <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
-        <span>←</span>
-        返回
-      </a>
-    {% endif %}
-  </div>
+<section class="pilot-detail" id="pilotDetail" style="display: none;">
+  <div class="back-nav" id="backNav"></div>
 
-  <div class="pilot-info-card">
-    <div class="card-header">
-      <div class="pilot-avatar">
-        <span class="avatar-icon">
-          {% if pilot.gender.value == 0 %}♂{% elif pilot.gender.value == 1 %}♀{% else %}?{% endif %}
-        </span>
-      </div>
-      <div class="pilot-main-info">
-        <div class="pilot-name">{{ pilot.nickname }}</div>
-        <div class="pilot-real-name">{{ pilot.real_name or '未填写姓名' }}</div>
-        <div class="pilot-badges">
-          <span class="rank-badge rank-{{ (pilot.rank.value | normalize_rank).replace(' ', '') }}">{{ pilot.rank.value | normalize_rank }}</span>
-          <span class="status-badge status-{{ (pilot.status.value | normalize_status).replace(' ', '') }}">{{ pilot.status.value | normalize_status }}</span>
-        </div>
-      </div>
-    </div>
+  <div class="pilot-info-card" id="pilotInfoCard"></div>
 
-    <div class="info-section">
-      <h3 class="section-title">基础信息</h3>
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">昵称</div>
-          <div class="info-value">{{ pilot.nickname }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">姓名</div>
-          <div class="info-value">{{ pilot.real_name or '未填写' }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">性别</div>
-          <div class="info-value">{{ pilot.gender_display }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">籍贯</div>
-          <div class="info-value">{{ pilot.hometown or '未填写' }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">年龄</div>
-          <div class="info-value">
-            {% if pilot.age %}{{ pilot.age }}岁{% else %}未知{% endif %}
-            {% if pilot.birth_year %}({{ pilot.birth_year }}年){% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="info-section">
-      <h3 class="section-title">业务信息</h3>
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">直属运营</div>
-          <div class="info-value">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无' }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">开播平台</div>
-          <div class="info-value">{{ pilot.platform.value }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">开播方式</div>
-          <div class="info-value">{{ pilot.work_mode.value }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">主播分类</div>
-          <div class="info-value rank-{{ (pilot.rank.value | normalize_rank).replace(' ', '') }}">{{ pilot.rank.value | normalize_rank }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">状态</div>
-          <div class="info-value status-{{ (pilot.status.value | normalize_status).replace(' ', '') }}">{{ pilot.status.value | normalize_status }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="info-section">
-      <h3 class="section-title">分成信息</h3>
-      <div class="commission-card">
-        <div class="commission-header">
-          <div class="commission-rate">
-            <span class="rate-value">{{ current_rate }}%</span>
-            <span class="rate-label">当前分成比例</span>
-          </div>
-          <div class="commission-calculation">
-            <div class="calc-item">
-              <span class="calc-value">{{ "%.1f"|format(calculation_info.pilot_income) }}%</span>
-              <span class="calc-label">主播收入</span>
-            </div>
-            <div class="calc-item">
-              <span class="calc-value">{{ "%.1f"|format(calculation_info.company_income) }}%</span>
-              <span class="calc-label">公司收入</span>
-            </div>
-          </div>
-        </div>
-        <div class="commission-footer">
-          <div class="commission-formula">{{ calculation_info.calculation_formula }}</div>
-          {% if effective_date %}
-            <div class="commission-date">生效时间：{{ effective_date|local_date }}</div>
-          {% else %}
-            <div class="commission-date">默认分成比例</div>
-          {% endif %}
-          {% if remark %}
-            <div class="commission-remark">备注：{{ remark }}</div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <div class="info-section">
-      <h3 class="section-title">系统信息</h3>
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">创建时间</div>
-          <div class="info-value">{{ pilot.created_at | local_datetime('%Y-%m-%d %H:%M:%S') }}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">最后修改</div>
-          <div class="info-value">{{ pilot.updated_at | local_datetime('%Y-%m-%d %H:%M:%S') }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="action-section">
-    <h3 class="section-title">操作</h3>
-    <div class="action-buttons">
-      <a class="btn btn-primary" href="{{ url_for('pilot.edit_pilot', pilot_id=(pilot.id|string)) }}">
-        <span class="btn-icon">✏️</span>
-        编辑
-      </a>
-      {% if pilot.status.value == '未招募' %}
-      <a class="btn btn-primary" href="{{ url_for('recruit.start_recruit', pilot_id=pilot.id) }}">
-        <span class="btn-icon">🎯</span>
-        启动招募
-      </a>
-      {% endif %}
-      <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_commission_index', pilot_id=pilot.id) }}">
-        <span class="btn-icon">💰</span>
-        分成管理
-      </a>
-      <a class="btn btn-primary" href="{{ url_for('pilot.pilot_performance', pilot_id=pilot.id, from='pilot_detail') }}">
-        <span class="btn-icon">📊</span>
-        业绩查看
-      </a>
-      <button class="btn btn-secondary" onclick="showChanges()">
-        <span class="btn-icon">📜</span>
-        变更记录
-      </button>
-    </div>
-  </div>
+  <div class="action-section" id="actionSection"></div>
 </section>
+
+<div id="loadingState" class="loading-state">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">加载中...</div>
+</div>
 
 <div id="changesModal" class="modal" style="display: none;">
   <div class="modal-content">
@@ -564,6 +394,289 @@
 </style>
 
 <script>
+let currentPilot = null;
+
+// 获取URL中的pilot_id
+function getPilotIdFromUrl() {
+  const pathParts = window.location.pathname.split('/');
+  return pathParts[pathParts.length - 1];
+}
+
+// 获取URL参数
+function getUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    from: params.get('from'),
+    recruit_id: params.get('recruit_id'),
+    announcement_id: params.get('announcement_id'),
+    record_id: params.get('record_id')
+  };
+}
+
+// 规范化枚举值
+function normalizeRank(value) {
+  const mapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+  return mapping[value] || value;
+}
+
+function normalizeStatus(value) {
+  const mapping = {
+    '未征召': '未招募',
+    '不征召': '不招募',
+    '已征召': '已招募',
+    '已阵亡': '流失'
+  };
+  return mapping[value] || value;
+}
+
+// 获取性别显示
+function getGenderDisplay(gender) {
+  if (gender === 0) return '男';
+  if (gender === 1) return '女';
+  return '不明确';
+}
+
+// 获取性别图标
+function getGenderIcon(gender) {
+  if (gender === 0) return '♂';
+  if (gender === 1) return '♀';
+  return '?';
+}
+
+// 格式化日期时间
+function formatDateTime(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).replace(/\//g, '-');
+}
+
+// 格式化日期
+function formatDate(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).replace(/\//g, '-');
+}
+
+// 渲染返回按钮
+function renderBackNav(params) {
+  const backNav = document.getElementById('backNav');
+  let backUrl = '/pilots';
+  let backText = '返回';
+  
+  if (params.from === 'recruit_detail' && params.recruit_id) {
+    backUrl = `/recruit/${params.recruit_id}`;
+  } else if (params.from === 'announcement_detail' && params.announcement_id) {
+    backUrl = `/announcement/${params.announcement_id}`;
+  } else if (params.from === 'battle_record_detail' && params.record_id) {
+    backUrl = `/battle_record/${params.record_id}`;
+  } else if (params.from === 'performance') {
+    backUrl = `/pilots/${currentPilot.id}/performance`;
+  }
+  
+  backNav.innerHTML = `
+    <a class="btn btn-secondary" href="${backUrl}">
+      <span>←</span>
+      ${backText}
+    </a>
+  `;
+}
+
+// 渲染主播信息卡片
+function renderPilotInfo(pilot) {
+  const infoCard = document.getElementById('pilotInfoCard');
+  const normalizedRank = normalizeRank(pilot.rank || '');
+  const normalizedStatus = normalizeStatus(pilot.status || '');
+  
+  infoCard.innerHTML = `
+    <div class="card-header">
+      <div class="pilot-main-info">
+        <div class="pilot-name">${pilot.nickname || ''}</div>
+        <div class="pilot-real-name">${pilot.real_name || '未填写姓名'}</div>
+        <div class="pilot-badges">
+          <span class="rank-badge rank-${normalizedRank.replace(/ /g, '')}">${normalizedRank}</span>
+          <span class="status-badge status-${normalizedStatus.replace(/ /g, '')}">${normalizedStatus}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h3 class="section-title">基础信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">性别</div>
+          <div class="info-value">${getGenderDisplay(pilot.gender)}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">籍贯</div>
+          <div class="info-value">${pilot.hometown || '未填写'}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">年龄</div>
+          <div class="info-value">
+            ${pilot.age ? pilot.age + '岁' : '未知'}
+            ${pilot.birth_year ? '(' + pilot.birth_year + '年)' : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h3 class="section-title">业务信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">直属运营</div>
+          <div class="info-value">${pilot.owner ? (pilot.owner.nickname || '无') : '无'}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">开播平台</div>
+          <div class="info-value">${pilot.platform || ''}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">开播方式</div>
+          <div class="info-value">${pilot.work_mode || ''}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">主播分类</div>
+          <div class="info-value rank-${normalizedRank.replace(/ /g, '')}">${normalizedRank}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">状态</div>
+          <div class="info-value status-${normalizedStatus.replace(/ /g, '')}">${normalizedStatus}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h3 class="section-title">分成信息</h3>
+      <div class="commission-card">
+        <div class="commission-header">
+          <div class="commission-rate">
+            <span class="rate-value">${pilot.commission.current_rate}%</span>
+            <span class="rate-label">当前分成比例</span>
+          </div>
+          <div class="commission-calculation">
+            <div class="calc-item">
+              <span class="calc-value">${pilot.commission.calculation_info.pilot_income.toFixed(1)}%</span>
+              <span class="calc-label">主播收入</span>
+            </div>
+            <div class="calc-item">
+              <span class="calc-value">${pilot.commission.calculation_info.company_income.toFixed(1)}%</span>
+              <span class="calc-label">公司收入</span>
+            </div>
+          </div>
+        </div>
+        <div class="commission-footer">
+          <div class="commission-formula">${pilot.commission.calculation_info.calculation_formula}</div>
+          <div class="commission-date">
+            ${pilot.commission.effective_date ? '生效时间：' + formatDate(pilot.commission.effective_date) : '默认分成比例'}
+          </div>
+          ${pilot.commission.remark ? '<div class="commission-remark">备注：' + pilot.commission.remark + '</div>' : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h3 class="section-title">系统信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">创建时间</div>
+          <div class="info-value">${formatDateTime(pilot.created_at)}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">最后修改</div>
+          <div class="info-value">${formatDateTime(pilot.updated_at)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 渲染操作按钮
+function renderActionButtons(pilot) {
+  const actionSection = document.getElementById('actionSection');
+  const normalizedStatus = normalizeStatus(pilot.status || '');
+  
+  actionSection.innerHTML = `
+    <h3 class="section-title">操作</h3>
+    <div class="action-buttons">
+      <a class="btn btn-primary" href="/pilots/${pilot.id}/edit">
+        <span class="btn-icon">✏️</span>
+        编辑
+      </a>
+      ${normalizedStatus === '未招募' ? `
+      <a class="btn btn-primary" href="/recruit/start?pilot_id=${pilot.id}">
+        <span class="btn-icon">🎯</span>
+        启动招募
+      </a>
+      ` : ''}
+      <a class="btn btn-secondary" href="/pilots/${pilot.id}/commission/">
+        <span class="btn-icon">💰</span>
+        分成管理
+      </a>
+      <a class="btn btn-primary" href="/pilots/${pilot.id}/performance?from=pilot_detail">
+        <span class="btn-icon">📊</span>
+        业绩查看
+      </a>
+      <button class="btn btn-secondary" onclick="showChanges()">
+        <span class="btn-icon">📜</span>
+        变更记录
+      </button>
+    </div>
+  `;
+}
+
+// 加载主播详情
+async function loadPilotDetail() {
+  const loadingState = document.getElementById('loadingState');
+  const pilotDetail = document.getElementById('pilotDetail');
+  
+  loadingState.style.display = 'block';
+  pilotDetail.style.display = 'none';
+  
+  try {
+    const pilotId = getPilotIdFromUrl();
+    const response = await fetch(`/api/pilots/${pilotId}`);
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载主播详情失败');
+    }
+    
+    currentPilot = result.data;
+    document.title = `主播详情 - ${currentPilot.nickname} - Lacus-Log`;
+    
+    const params = getUrlParams();
+    renderBackNav(params);
+    renderPilotInfo(currentPilot);
+    renderActionButtons(currentPilot);
+    
+    loadingState.style.display = 'none';
+    pilotDetail.style.display = 'block';
+  } catch (error) {
+    console.error('加载主播详情失败:', error);
+    showMessage('加载主播详情失败', 'error');
+    loadingState.style.display = 'none';
+  }
+}
+
+// 显示变更记录
 async function showChanges() {
   const modal = document.getElementById('changesModal');
   const loading = document.getElementById('changesLoading');
@@ -575,35 +688,39 @@ async function showChanges() {
   changesList.innerHTML = '';
   
   try {
-    const response = await fetch('{{ url_for("pilot.pilot_changes", pilot_id=(pilot.id|string)) }}');
-    const data = await response.json();
+    const pilotId = getPilotIdFromUrl();
+    const response = await fetch(`/api/pilots/${pilotId}/changes`);
+    const result = await response.json();
     
-    if (data.success) {
-      if (data.changes.length === 0) {
-        changesList.innerHTML = '<div class="empty-state"><div class="empty-title">暂无变更记录</div></div>';
-      } else {
-        const changesHtml = data.changes.map(change => `
-          <div class="change-item">
-            <div class="change-header">
-              <span>操作人：${change.user_name}</span>
-              <span>${change.change_time}</span>
-            </div>
-            <div class="change-content">
-              <span class="change-field">${change.field_name}</span>
-              <div class="change-values">
-                <span class="old-value">${change.old_value || '空'}</span>
-                →
-                <span class="new-value">${change.new_value || '空'}</span>
-              </div>
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载变更记录失败');
+    }
+    
+    const changes = result.data || [];
+    
+    if (changes.length === 0) {
+      changesList.innerHTML = '<div class="empty-state"><div class="empty-title">暂无变更记录</div></div>';
+    } else {
+      const changesHtml = changes.map(change => `
+        <div class="change-item">
+          <div class="change-header">
+            <span>操作人：${change.user ? (change.user.nickname || change.user.username) : '未知'}</span>
+            <span>${formatDateTime(change.created_at)}</span>
+          </div>
+          <div class="change-content">
+            <span class="change-field">${change.field_name}</span>
+            <div class="change-values">
+              <span class="old-value">${change.old_value || '空'}</span>
+              →
+              <span class="new-value">${change.new_value || '空'}</span>
             </div>
           </div>
-        `).join('');
-        changesList.innerHTML = changesHtml;
-      }
-    } else {
-      changesList.innerHTML = '<div class="empty-state"><div class="empty-title">加载失败</div></div>';
+        </div>
+      `).join('');
+      changesList.innerHTML = changesHtml;
     }
   } catch (error) {
+    console.error('加载变更记录失败:', error);
     changesList.innerHTML = '<div class="empty-state"><div class="empty-title">加载失败</div></div>';
   }
   
@@ -616,9 +733,17 @@ function hideChanges() {
   modal.style.display = 'none';
 }
 
-document.getElementById('changesModal').addEventListener('click', function(e) {
-  if (e.target === this) {
-    hideChanges();
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+  loadPilotDetail();
+  
+  const modal = document.getElementById('changesModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        hideChanges();
+      }
+    });
   }
 });
 </script>

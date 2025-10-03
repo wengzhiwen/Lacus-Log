@@ -7,75 +7,45 @@
   </div>
 
   <div class="filter-bar">
-    {% set selected_items = [] %}
-    {% if rank_filter %}{% set _ = selected_items.append(rank_filter) %}{% endif %}
-    {% if status_filter %}{% set _ = selected_items.append(status_filter) %}{% endif %}
-    {% if owner_filter %}
-      {% if owner_filter == 'none' %}
-        {% set _ = selected_items.append('无直属运营') %}
-      {% else %}
-        {% for value, display in user_choices %}
-          {% if value and owner_filter == value %}{% set _ = selected_items.append(display) %}{% endif %}
-        {% endfor %}
-      {% endif %}
-    {% endif %}
-    {% if days_filter %}
-      {% if days_filter == 7 %}{% set _ = selected_items.append('最近7天') %}
-      {% elif days_filter == 14 %}{% set _ = selected_items.append('最近14天') %}
-      {% elif days_filter == 30 %}{% set _ = selected_items.append('最近30天') %}
-      {% endif %}
-    {% endif %}
-    {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
     <button type="button" class="filter-toggle" onclick="toggleFilters()">
-      <span id="filter-summary">{{ filter_summary }}</span>
+      <span id="filter-summary">全部显示</span>
       <span class="toggle-icon" id="filter-toggle-icon">▼</span>
     </button>
-    <form class="filter-form is-collapsed" id="filter-form" method="get">
+    <div class="filter-form is-collapsed" id="filter-form">
       <div class="filter-group">
         <label class="filter-label">主播分类筛选</label>
-        <select class="filter-select" name="rank" onchange="this.form.submit()">
+        <select class="filter-select" id="rank-filter">
           <option value="">全部主播分类</option>
-          {% for value, display in rank_choices %}
-          <option value="{{ value }}" {% if rank_filter==value %}selected{% endif %}>{{ display }}</option>
-          {% endfor %}
         </select>
       </div>
       
       <div class="filter-group">
         <label class="filter-label">状态筛选</label>
-        <select class="filter-select" name="status" onchange="this.form.submit()">
+        <select class="filter-select" id="status-filter">
           <option value="">全部状态</option>
-          {% for value, display in status_choices %}
-          <option value="{{ value }}" {% if status_filter==value %}selected{% endif %}>{{ display }}</option>
-          {% endfor %}
         </select>
       </div>
       
       {% if current_user.has_role('gicho') %}
       <div class="filter-group">
         <label class="filter-label">直属运营筛选</label>
-        <select class="filter-select" name="owner" onchange="this.form.submit()">
+        <select class="filter-select" id="owner-filter">
           <option value="">全部直属运营</option>
-          <option value="none" {% if owner_filter=='none' %}selected{% endif %}>无直属运营</option>
-          {% for value, display in user_choices %}
-          {% if value %}
-          <option value="{{ value }}" {% if owner_filter==value %}selected{% endif %}>{{ display }}</option>
-          {% endif %}
-          {% endfor %}
+          <option value="none">无直属运营</option>
         </select>
       </div>
       {% endif %}
       
       <div class="filter-group">
         <label class="filter-label">时间筛选</label>
-        <select class="filter-select" name="days" onchange="this.form.submit()">
+        <select class="filter-select" id="days-filter">
           <option value="">全部时间</option>
-          <option value="7" {% if days_filter==7 %}selected{% endif %}>最近7天</option>
-          <option value="14" {% if days_filter==14 %}selected{% endif %}>最近14天</option>
-          <option value="30" {% if days_filter==30 %}selected{% endif %}>最近30天</option>
+          <option value="7">最近7天</option>
+          <option value="14">最近14天</option>
+          <option value="30">最近30天</option>
         </select>
       </div>
-    </form>
+    </div>
   </div>
 
   <div class="search-bar">
@@ -88,43 +58,16 @@
   </div>
 
   <div class="pilot-list">
-    {% if pilots %}
-      <div class="pilot-cards">
-        {% for pilot in pilots %}
-        <a href="{{ url_for('pilot.pilot_detail', pilot_id=(pilot.id|string)) }}" class="pilot-card">
-          <div class="card-header">
-            <div class="pilot-info">
-              <div class="pilot-name">{{ pilot.nickname }}</div>
-              <div class="pilot-real-name">{{ pilot.real_name or '未填写姓名' }}</div>
+    <div id="loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
             </div>
-            <div class="pilot-meta">
-              <div class="meta-inline">
-                <span class="gender-icon">
-                  {% if pilot.gender.value == 0 %}♂{% elif pilot.gender.value == 1 %}♀{% else %}?{% endif %}
-                </span>
-                <span class="age">{{ pilot.age or '未知' }}岁</span>
-                <span class="meta-break"></span>
-                <span class="owner">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无' }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div class="badges">
-              <span class="rank-badge rank-{{ (pilot.rank.value | normalize_rank).replace(' ', '') }}">{{ pilot.rank.value | normalize_rank }}</span>
-              <span class="status-badge status-{{ (pilot.status.value | normalize_status).replace(' ', '') }}">{{ pilot.status.value | normalize_status }}</span>
-            </div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="empty-state">
+    <div id="pilot-cards-container" class="pilot-cards" style="display: none;"></div>
+    <div id="empty-state" class="empty-state" style="display: none;">
         <div class="empty-icon">👩‍✈️</div>
-        <div class="empty-title">暂无机师</div>
-        <div class="empty-description">点击上方"新主播"按钮创建第一个主播</div>
+      <div class="empty-title">暂无主播</div>
+      <div class="empty-description">点击下方"新主播"按钮创建第一个主播</div>
       </div>
-    {% endif %}
   </div>
 </section>
 
@@ -134,14 +77,38 @@
       <span class="btn-icon">+</span>
       新主播
     </a>
-    <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_export') }}">
+    <button class="btn btn-secondary" onclick="exportPilots()">
       <span class="btn-icon">📊</span>
       导出（CSV）
-    </a>
+    </button>
   </div>
 </div>
 
 <style>
+
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 4px solid var(--table-header);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px;
+}
 
 .pilot-cards {
   display: block;
@@ -160,6 +127,7 @@
   padding: 12px 14px;
   margin-bottom: 10px;
   font-size: 14px;
+  cursor: pointer;
 }
 
 
@@ -211,7 +179,7 @@
 }
 
 .filter-form.is-collapsed { display: none; }
-.filter-form { margin-bottom: 12px; }
+.filter-form { margin-bottom: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 
 .pilot-card {
   display: block;
@@ -325,7 +293,258 @@
 </style>
 <script>
 let allPilots = [];
+let pilotsOptions = null;
+const currentFilters = {
+  rank: '',
+  status: '',
+  owner: '',
+  days: ''
+};
 
+// 规范化枚举值显示
+function normalizeRank(value) {
+  const mapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+  return mapping[value] || value;
+}
+
+function normalizeStatus(value) {
+  const mapping = {
+    '未征召': '未招募',
+    '不征召': '不招募',
+    '已征召': '已招募',
+    '已阵亡': '流失'
+  };
+  return mapping[value] || value;
+}
+
+// 获取性别图标
+function getGenderIcon(gender) {
+  if (gender === 0) return '♂';
+  if (gender === 1) return '♀';
+  return '?';
+}
+
+// 加载筛选器选项
+async function loadOptions() {
+  try {
+    // 并行加载枚举选项和运营列表
+    const [enumResponse, operatorsResponse] = await Promise.all([
+      fetch('/api/pilots/options'),
+      fetch('/api/users/operators')
+    ]);
+    
+    const enumResult = await enumResponse.json();
+    const operatorsResult = await operatorsResponse.json();
+    
+    console.log('枚举选项结果:', enumResult);
+    console.log('运营列表结果:', operatorsResult);
+    
+    if (!enumResult.success) {
+      throw new Error(enumResult.error?.message || '获取枚举选项失败');
+    }
+    
+    if (!operatorsResult.success) {
+      throw new Error(operatorsResult.error?.message || '获取运营列表失败');
+    }
+    
+    pilotsOptions = {
+      enums: enumResult.data.enums,
+      owners: operatorsResult.data
+    };
+    
+    console.log('pilotsOptions:', pilotsOptions);
+    console.log('owners数量:', pilotsOptions.owners ? pilotsOptions.owners.length : 0);
+    
+    populateFilters();
+  } catch (error) {
+    console.error('加载选项失败:', error);
+    showMessage('加载筛选选项失败', 'error');
+  }
+}
+
+// 填充筛选器
+function populateFilters() {
+  if (!pilotsOptions) return;
+  
+  // 填充主播分类
+  const rankFilter = document.getElementById('rank-filter');
+  Object.keys(pilotsOptions.enums.rank).forEach(key => {
+    const value = pilotsOptions.enums.rank[key];
+    // 只显示新值，过滤旧值
+    if (!value.includes('机师') && !value.includes('征召') && !value.includes('阵亡')) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      rankFilter.appendChild(option);
+    }
+  });
+  
+  // 填充状态
+  const statusFilter = document.getElementById('status-filter');
+  Object.keys(pilotsOptions.enums.status).forEach(key => {
+    const value = pilotsOptions.enums.status[key];
+    // 只显示新值
+    if (!value.includes('征召') && !value.includes('阵亡')) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      statusFilter.appendChild(option);
+    }
+  });
+  
+  // 填充直属运营
+  const ownerFilter = document.getElementById('owner-filter');
+  if (ownerFilter) {
+    console.log('开始填充直属运营筛选器，数据:', pilotsOptions.owners);
+    if (pilotsOptions.owners && pilotsOptions.owners.length > 0) {
+      pilotsOptions.owners.forEach(owner => {
+        const option = document.createElement('option');
+        option.value = owner.id;
+        option.textContent = owner.nickname;
+        ownerFilter.appendChild(option);
+        console.log('添加运营选项:', owner.nickname, owner.id);
+      });
+    } else {
+      console.warn('直属运营数据为空或不存在');
+    }
+  } else {
+    console.warn('找不到owner-filter元素');
+  }
+}
+
+// 加载主播列表
+async function loadPilots() {
+  const loadingState = document.getElementById('loading-state');
+  const pilotsContainer = document.getElementById('pilot-cards-container');
+  const emptyState = document.getElementById('empty-state');
+  
+  loadingState.style.display = 'block';
+  pilotsContainer.style.display = 'none';
+  emptyState.style.display = 'none';
+  
+  try {
+    const params = new URLSearchParams();
+    if (currentFilters.rank) params.append('rank', currentFilters.rank);
+    if (currentFilters.status) params.append('status', currentFilters.status);
+    if (currentFilters.owner) {
+      if (currentFilters.owner === 'none') {
+        // 无直属运营的筛选由后端处理
+      } else {
+        params.append('owner_id', currentFilters.owner);
+      }
+    }
+    if (currentFilters.days) {
+      const daysAgo = new Date();
+      daysAgo.setDate(daysAgo.getDate() - parseInt(currentFilters.days));
+      params.append('created_from', daysAgo.toISOString());
+    }
+    
+    const response = await fetch(`/api/pilots?${params.toString()}`);
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载主播列表失败');
+    }
+    
+    allPilots = result.data.items || [];
+    renderPilots(allPilots);
+    updateFilterSummary();
+  } catch (error) {
+    console.error('加载主播列表失败:', error);
+    showMessage('加载主播列表失败', 'error');
+    loadingState.style.display = 'none';
+    emptyState.style.display = 'block';
+  }
+}
+
+// 渲染主播列表
+function renderPilots(pilots) {
+  const loadingState = document.getElementById('loading-state');
+  const pilotsContainer = document.getElementById('pilot-cards-container');
+  const emptyState = document.getElementById('empty-state');
+  
+  loadingState.style.display = 'none';
+  
+  if (pilots.length === 0) {
+    pilotsContainer.style.display = 'none';
+    emptyState.style.display = 'block';
+    return;
+  }
+  
+  pilotsContainer.innerHTML = '';
+  pilotsContainer.style.display = 'block';
+  emptyState.style.display = 'none';
+  
+  pilots.forEach(pilot => {
+    const card = createPilotCard(pilot);
+    pilotsContainer.appendChild(card);
+  });
+}
+
+// 创建主播卡片
+function createPilotCard(pilot) {
+  const card = document.createElement('a');
+  card.href = `/pilots/${pilot.id}`;
+  card.className = 'pilot-card';
+  
+  const normalizedRank = normalizeRank(pilot.rank || '');
+  const normalizedStatus = normalizeStatus(pilot.status || '');
+  
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="pilot-info">
+        <div class="pilot-name">${pilot.nickname || ''}</div>
+        <div class="pilot-real-name">${pilot.real_name || '未填写姓名'}</div>
+      </div>
+      <div class="pilot-meta">
+        <div class="meta-inline">
+          <span class="gender-icon">${getGenderIcon(pilot.gender)}</span>
+          <span class="age">${pilot.age || '未知'}岁</span>
+          <span class="meta-break"></span>
+          <span class="owner">${pilot.owner ? (pilot.owner.nickname || '无') : '无'}</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <div class="badges">
+        <span class="rank-badge rank-${normalizedRank.replace(/ /g, '')}">${normalizedRank}</span>
+        <span class="status-badge status-${normalizedStatus.replace(/ /g, '')}">${normalizedStatus}</span>
+      </div>
+      <div class="card-arrow">→</div>
+    </div>
+  `;
+  
+  return card;
+}
+
+// 更新筛选摘要
+function updateFilterSummary() {
+  const summary = document.getElementById('filter-summary');
+  const selectedItems = [];
+  
+  if (currentFilters.rank) selectedItems.push(currentFilters.rank);
+  if (currentFilters.status) selectedItems.push(currentFilters.status);
+  if (currentFilters.owner) {
+    if (currentFilters.owner === 'none') {
+      selectedItems.push('无直属运营');
+    } else if (pilotsOptions) {
+      const owner = pilotsOptions.owners.find(o => o.id === currentFilters.owner);
+      if (owner) selectedItems.push(owner.nickname || owner.username);
+    }
+  }
+  if (currentFilters.days) {
+    selectedItems.push(`最近${currentFilters.days}天`);
+  }
+  
+  summary.textContent = selectedItems.length > 0 ? selectedItems.join(' + ') : '全部显示';
+}
+
+// 切换筛选器显示
 function toggleFilters() {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
@@ -333,6 +552,7 @@ function toggleFilters() {
   icon.textContent = collapsed ? '▼' : '▲';
 }
 
+// 搜索功能
 function performSearch() {
   const searchInput = document.getElementById('pilot-search');
   const searchTerm = searchInput.value.trim().toLowerCase();
@@ -344,89 +564,97 @@ function performSearch() {
   
   const filteredPilots = allPilots.filter(pilot => {
     const nickname = (pilot.nickname || '').toLowerCase();
-    const realName = (pilot.realName || '').toLowerCase();
-    
+    const realName = (pilot.real_name || '').toLowerCase();
     return nickname.includes(searchTerm) || realName.includes(searchTerm);
   });
   
-  showFilteredPilots(filteredPilots);
+  renderPilots(filteredPilots);
 }
 
 function showAllPilots() {
-  const pilotCards = document.querySelectorAll('.pilot-card');
-  pilotCards.forEach(card => {
-    card.style.display = 'block';
-  });
-  
-  updateEmptyState(pilotCards.length > 0);
+  renderPilots(allPilots);
 }
 
-function showFilteredPilots(filteredPilots) {
-  const pilotCards = document.querySelectorAll('.pilot-card');
-  const pilotIds = filteredPilots.map(pilot => pilot.id);
-  
-  pilotCards.forEach(card => {
-    const pilotId = card.getAttribute('href').split('/').pop();
-    if (pilotIds.includes(pilotId)) {
-      card.style.display = 'block';
-    } else {
-      card.style.display = 'none';
+// 导出主播数据
+function exportPilots() {
+  try {
+    showMessage('正在导出数据...', 'info');
+    
+    // 构建导出URL，包含当前筛选参数
+    const params = new URLSearchParams();
+    
+    if (currentFilters.rank) {
+      params.append('rank', currentFilters.rank);
     }
-  });
-  
-  updateEmptyState(filteredPilots.length > 0);
-}
-
-function updateEmptyState(hasResults) {
-  const emptyState = document.querySelector('.empty-state');
-  if (emptyState) {
-    emptyState.style.display = hasResults ? 'none' : 'block';
+    if (currentFilters.status) {
+      params.append('status', currentFilters.status);
+    }
+    if (currentFilters.owner) {
+      params.append('owner_id', currentFilters.owner);
+    }
+    if (currentFilters.platform) {
+      params.append('platform', currentFilters.platform);
+    }
+    if (currentFilters.work_mode) {
+      params.append('work_mode', currentFilters.work_mode);
+    }
+    
+    const exportUrl = `/api/pilots/export?${params.toString()}`;
+    console.log('导出URL:', exportUrl);
+    
+    // 直接通过window.location触发下载
+    // 浏览器会自动处理CSV文件的下载
+    window.location.href = exportUrl;
+    
+    // 延迟显示成功消息，给浏览器时间开始下载
+    setTimeout(() => {
+      showMessage('数据导出成功', 'success');
+    }, 500);
+    
+  } catch (error) {
+    console.error('导出失败:', error);
+    showMessage('导出失败：' + error.message, 'error');
   }
 }
 
-function initSearch() {
+// 初始化
+document.addEventListener('DOMContentLoaded', async function() {
+  await loadOptions();
+  await loadPilots();
+  
+  // 绑定筛选器事件
+  document.getElementById('rank-filter').addEventListener('change', function(e) {
+    currentFilters.rank = e.target.value;
+    loadPilots();
+  });
+  
+  document.getElementById('status-filter').addEventListener('change', function(e) {
+    currentFilters.status = e.target.value;
+    loadPilots();
+  });
+  
+  const ownerFilter = document.getElementById('owner-filter');
+  if (ownerFilter) {
+    ownerFilter.addEventListener('change', function(e) {
+      currentFilters.owner = e.target.value;
+      loadPilots();
+    });
+  }
+  
+  document.getElementById('days-filter').addEventListener('change', function(e) {
+    currentFilters.days = e.target.value;
+    loadPilots();
+  });
+  
+  // 绑定搜索事件
   const searchInput = document.getElementById('pilot-search');
-  
-  const pilotCards = document.querySelectorAll('.pilot-card');
-  allPilots = Array.from(pilotCards).map(card => {
-    const pilotNameElement = card.querySelector('.pilot-name');
-    const pilotRealNameElement = card.querySelector('.pilot-real-name');
-    const href = card.getAttribute('href');
-    
-    return {
-      id: href.split('/').pop(),
-      nickname: pilotNameElement ? pilotNameElement.textContent.trim() : '',
-      realName: pilotRealNameElement ? pilotRealNameElement.textContent.trim() : ''
-    };
-  });
-  
-  searchInput.addEventListener('input', function() {
-    performSearch();
-  });
-  
+  searchInput.addEventListener('input', performSearch);
   searchInput.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
       performSearch();
-    } else if (event.key === 'Backspace' || event.key === 'Delete') {
-      setTimeout(() => performSearch(), 10);
     }
   });
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('filter-form');
-  const icon = document.getElementById('filter-toggle-icon');
-  const hasQuery = window.location.search.length > 1;
-  if (!hasQuery) {
-    if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
-    icon.textContent = '▼';
-  } else {
-    form.classList.remove('is-collapsed');
-    icon.textContent = '▲';
-  }
-  
-  initSearch();
 });
 </script>
 {% endblock %}

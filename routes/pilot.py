@@ -1,1028 +1,115 @@
+# -*- coding: utf-8 -*-
 # pylint: disable=no-member
-from datetime import timedelta
+"""
+主播管理路由 - REST化版本
+所有核心功能已迁移到API驱动，这里只保留简单的模板渲染路由
+"""
 
-from flask import (Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for)
-from flask_security import current_user, roles_accepted
-from mongoengine import DoesNotExist, ValidationError
-
-from models.pilot import (Gender, Pilot, PilotChangeLog, PilotCommission, PilotCommissionChangeLog, Platform, Rank, Status, WorkMode)
-from models.battle_record import BattleRecord
-from models.user import User
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_security import roles_accepted
+from mongoengine import DoesNotExist
+from models.pilot import Pilot, PilotChangeLog  # pylint: disable=no-member
 from utils.logging_setup import get_logger
-from utils.timezone_helper import get_current_utc_time, utc_to_local, local_to_utc
-from utils.filter_state import persist_and_restore_filters
-from utils.commission_helper import get_pilot_commission_rate_for_date, calculate_commission_amounts
-from utils.cache_helper import cached_pilot_performance
 
 logger = get_logger('pilot')
-
 pilot_bp = Blueprint('pilot', __name__)
-
-
-def _get_client_ip():
-    """获取客户端IP地址"""
-    return request.environ.get('HTTP_X_FORWARDED_FOR') or request.environ.get('REMOTE_ADDR')
-
-
-def _record_changes(pilot, old_data, user, ip_address):
-    """记录主播字段变更"""
-    changes = []
-    field_mapping = {
-        'nickname': pilot.nickname,
-        'real_name': pilot.real_name,
-        'gender': pilot.gender.value if pilot.gender else None,
-        'hometown': pilot.hometown,
-        'birth_year': pilot.birth_year,
-        'owner': str(pilot.owner.id) if pilot.owner else None,
-        'platform': pilot.platform.value if pilot.platform else None,
-        'work_mode': pilot.work_mode.value if pilot.work_mode else None,
-        'rank': pilot.rank.value if pilot.rank else None,
-        'status': pilot.status.value if pilot.status else None,
-    }
-
-    for field_name, new_value in field_mapping.items():
-        old_value = old_data.get(field_name)
-        if str(old_value) != str(new_value):
-            change_log = PilotChangeLog(pilot_id=pilot,
-                                        user_id=user,
-                                        field_name=field_name,
-                                        old_value=str(old_value) if old_value is not None else '',
-                                        new_value=str(new_value) if new_value is not None else '',
-                                        ip_address=ip_address)
-            changes.append(change_log)
-
-    if changes:
-        PilotChangeLog.objects.insert(changes)
-        logger.info('记录主播变更：%s，共%d个字段', pilot.nickname, len(changes))
-
-
-def _check_pilot_permission(_pilot):
-    """检查用户对主播的操作权限"""
-    if current_user.has_role('gicho') or current_user.has_role('kancho'):
-        return True
-    return False
-
-
-def _get_user_choices():
-    """获取用户选择列表，按特定顺序排序"""
-    users = User.objects.all()
-    choices = [('', '无')]
-
-    if current_user.has_role('kancho') or current_user.has_role('gicho'):
-        choices.append((str(current_user.id), current_user.nickname or current_user.username))
-
-    active_users = [u for u in users if u.active and u.id != current_user.id and (u.has_role('kancho') or u.has_role('gicho'))]
-    active_users.sort(key=lambda x: x.nickname or x.username)
-    for user in active_users:
-        choices.append((str(user.id), user.nickname or user.username))
-
-    inactive_users = [u for u in users if not u.active and u.id != current_user.id and (u.has_role('kancho') or u.has_role('gicho'))]
-    inactive_users.sort(key=lambda x: x.nickname or x.username)
-    for user in inactive_users:
-        display_name = f"{user.nickname or user.username}[流失]"
-        choices.append((str(user.id), display_name))
-
-    return choices
 
 
 @pilot_bp.route('/')
 @roles_accepted('gicho', 'kancho')
 def list_pilots():
-    """主播列表页面"""
-    filters = persist_and_restore_filters(
-        'pilots_list',
-        allowed_keys=['rank', 'status', 'owner', 'days'],
-        default_filters={
-            'rank': '',
-            'status': '',
-            'owner': '',
-            'days': ''
-        },
-    )
-
-    rank_filter = filters.get('rank') or None
-    status_filter = filters.get('status') or None
-    owner_filter = filters.get('owner') or None
-    days_raw = filters.get('days') or None
-    try:
-        days_filter = int(days_raw) if days_raw else None
-    except ValueError:
-        days_filter = None
-
-    query = Pilot.objects
-
-
-    if rank_filter:
-        try:
-            rank_enum = Rank(rank_filter)
-            if rank_enum == Rank.CANDIDATE:
-                query = query.filter(rank__in=[Rank.CANDIDATE, Rank.CANDIDATE_OLD])
-            elif rank_enum == Rank.TRAINEE:
-                query = query.filter(rank__in=[Rank.TRAINEE, Rank.TRAINEE_OLD])
-            elif rank_enum == Rank.INTERN:
-                query = query.filter(rank__in=[Rank.INTERN, Rank.INTERN_OLD])
-            elif rank_enum == Rank.OFFICIAL:
-                query = query.filter(rank__in=[Rank.OFFICIAL, Rank.OFFICIAL_OLD])
-            else:
-                query = query.filter(rank=rank_enum)
-        except ValueError:
-            pass
-
-    if status_filter:
-        try:
-            status_enum = Status(status_filter)
-            if status_enum == Status.NOT_RECRUITED:
-                query = query.filter(status__in=[Status.NOT_RECRUITED, Status.NOT_RECRUITED_OLD])
-            elif status_enum == Status.NOT_RECRUITING:
-                query = query.filter(status__in=[Status.NOT_RECRUITING, Status.NOT_RECRUITING_OLD])
-            elif status_enum == Status.RECRUITED:
-                query = query.filter(status__in=[Status.RECRUITED, Status.RECRUITED_OLD])
-            elif status_enum == Status.FALLEN:
-                query = query.filter(status__in=[Status.FALLEN, Status.FALLEN_OLD])
-            else:
-                query = query.filter(status=status_enum)
-        except ValueError:
-            pass
-
-    if owner_filter:
-        if owner_filter == 'none':
-            query = query.filter(owner=None)
-        else:
-            try:
-                owner_user = User.objects.get(id=owner_filter)
-                query = query.filter(owner=owner_user)
-            except (DoesNotExist, ValidationError):
-                pass
-
-    if days_filter:
-        cutoff_date = get_current_utc_time() - timedelta(days=days_filter)
-        query = query.filter(created_at__gte=cutoff_date)
-
-    pilots = query.order_by('-created_at').all()
-
-    user_choices = _get_user_choices()
-
-    rank_choices = [
-        (Rank.CANDIDATE.value, Rank.CANDIDATE.value),
-        (Rank.TRAINEE.value, Rank.TRAINEE.value),
-        (Rank.INTERN.value, Rank.INTERN.value),
-        (Rank.OFFICIAL.value, Rank.OFFICIAL.value),
-    ]
-
-    status_choices = [
-        (Status.NOT_RECRUITED.value, Status.NOT_RECRUITED.value),
-        (Status.NOT_RECRUITING.value, Status.NOT_RECRUITING.value),
-        (Status.RECRUITED.value, Status.RECRUITED.value),
-        (Status.CONTRACTED.value, Status.CONTRACTED.value),
-        (Status.FALLEN.value, Status.FALLEN.value),
-    ]
-
-    return render_template('pilots/list.html',
-                           pilots=pilots,
-                           rank_filter=rank_filter,
-                           status_filter=status_filter,
-                           owner_filter=owner_filter,
-                           days_filter=days_filter,
-                           user_choices=user_choices,
-                           rank_choices=rank_choices,
-                           status_choices=status_choices)
+    """主播列表页面 - REST化版本"""
+    return render_template('pilots/list.html')
 
 
 @pilot_bp.route('/<pilot_id>')
 @roles_accepted('gicho', 'kancho')
-def pilot_detail(pilot_id):
-    """主播详情页面"""
-    try:
-        pilot = Pilot.objects.get(id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
-        calculation_info = _calculate_commission_distribution(current_rate)
-
-        return render_template('pilots/detail.html',
-                               pilot=pilot,
-                               current_rate=current_rate,
-                               effective_date=effective_date,
-                               remark=remark,
-                               calculation_info=calculation_info)
-    except DoesNotExist:
-        abort(404)
+def pilot_detail(pilot_id):  # pylint: disable=unused-argument
+    """主播详情页面 - REST化版本"""
+    return render_template('pilots/detail.html')
 
 
 @pilot_bp.route('/new', methods=['GET', 'POST'])
 @roles_accepted('gicho', 'kancho')
 def new_pilot():
-    """新建主播"""
-    if request.method == 'POST':
-        try:
-            nickname = request.form.get('nickname', '').strip()
-            real_name = request.form.get('real_name', '').strip() or None
-            gender = request.form.get('gender')
-            hometown = request.form.get('hometown', '').strip() or None
-            birth_year = request.form.get('birth_year')
-            owner_id = request.form.get('owner') or None
-            platform = request.form.get('platform')
-            work_mode = request.form.get('work_mode')
-            rank = request.form.get('rank')
-            status = request.form.get('status')
-
-            if not nickname:
-                flash('昵称为必填项', 'error')
-                return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
-
-            if Pilot.objects(nickname=nickname).first():
-                flash('该昵称已存在', 'error')
-                return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
-
-            pilot = Pilot(nickname=nickname)
-
-            if real_name:
-                pilot.real_name = real_name
-
-            if gender:
-                pilot.gender = Gender(int(gender))
-
-            if hometown:
-                pilot.hometown = hometown
-
-            if birth_year:
-                pilot.birth_year = int(birth_year)
-
-            if owner_id:
-                try:
-                    owner = User.objects.get(id=owner_id)
-                    pilot.owner = owner
-                except DoesNotExist:
-                    flash('所属用户不存在', 'error')
-                    return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
-            elif current_user.has_role('kancho') and not current_user.has_role('gicho'):
-                pilot.owner = current_user
-
-            if platform:
-                pilot.platform = Platform(platform)
-
-            if work_mode:
-                pilot.work_mode = WorkMode(work_mode)
-
-            if rank:
-                pilot.rank = Rank(rank)
-
-            if status:
-                pilot.status = Status(status)
-
-            pilot.save()
-            flash('创建主播成功', 'success')
-            logger.info('用户%s创建主播：%s', current_user.username, nickname)
-            return redirect(url_for('pilot.list_pilots'))
-
-        except (ValueError, ValidationError) as e:
-            flash(f'数据验证失败：{str(e)}', 'error')
-            return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
-        except Exception as e:
-            flash(f'创建失败：{str(e)}', 'error')
-            logger.error('创建主播失败：%s', str(e))
-            return render_template('pilots/new.html', form=request.form, user_choices=_get_user_choices())
-
-    return render_template('pilots/new.html', user_choices=_get_user_choices())
+    """新建主播页面 - REST化版本"""
+    return render_template('pilots/new.html')
 
 
 @pilot_bp.route('/<pilot_id>/edit', methods=['GET', 'POST'])
 @roles_accepted('gicho', 'kancho')
-def edit_pilot(pilot_id):
-    """编辑主播"""
-    try:
-        pilot = Pilot.objects.get(id=pilot_id)
+def edit_pilot(pilot_id):  # pylint: disable=unused-argument
+    """编辑主播页面 - REST化版本"""
+    return render_template('pilots/edit.html')
 
-        if not _check_pilot_permission(pilot):
-            abort(403)
 
-        if request.method == 'POST':
-            old_data = {
-                'nickname': pilot.nickname,
-                'real_name': pilot.real_name,
-                'gender': pilot.gender.value if pilot.gender else None,
-                'hometown': pilot.hometown,
-                'birth_year': pilot.birth_year,
-                'owner': str(pilot.owner.id) if pilot.owner else None,
-                'platform': pilot.platform.value if pilot.platform else None,
-                'work_mode': pilot.work_mode.value if pilot.work_mode else None,
-                'rank': pilot.rank.value if pilot.rank else None,
-                'status': pilot.status.value if pilot.status else None,
-            }
-
-            try:
-                nickname = request.form.get('nickname', '').strip()
-                real_name = request.form.get('real_name', '').strip() or None
-                gender = request.form.get('gender')
-                hometown = request.form.get('hometown', '').strip() or None
-                birth_year = request.form.get('birth_year')
-                owner_id = request.form.get('owner') or None
-                platform = request.form.get('platform')
-                work_mode = request.form.get('work_mode')
-                rank = request.form.get('rank')
-                status = request.form.get('status')
-
-                if not nickname:
-                    flash('昵称为必填项', 'error')
-                    return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
-
-                existing_pilot = Pilot.objects(nickname=nickname).first()
-                if existing_pilot and existing_pilot.id != pilot.id:
-                    flash('该昵称已存在', 'error')
-                    return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
-
-                pilot.nickname = nickname
-                pilot.real_name = real_name
-
-                if gender:
-                    pilot.gender = Gender(int(gender))
-
-                pilot.hometown = hometown
-
-                if birth_year:
-                    pilot.birth_year = int(birth_year)
-                else:
-                    pilot.birth_year = None
-
-                if owner_id:
-                    try:
-                        owner = User.objects.get(id=owner_id)
-                        pilot.owner = owner
-                    except DoesNotExist:
-                        flash('所属用户不存在', 'error')
-                        return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
-                else:
-                    pilot.owner = None
-
-                if platform:
-                    pilot.platform = Platform(platform)
-
-                if work_mode:
-                    pilot.work_mode = WorkMode(work_mode)
-
-                if rank:
-                    pilot.rank = Rank(rank)
-
-                if status:
-                    pilot.status = Status(status)
-
-                pilot.save()
-
-                _record_changes(pilot, old_data, current_user, _get_client_ip())
-
-                flash('更新主播成功', 'success')
-                logger.info('用户%s更新主播：%s', current_user.username, nickname)
-                return redirect(url_for('pilot.pilot_detail', pilot_id=pilot_id))
-
-            except (ValueError, ValidationError) as e:
-                flash(f'数据验证失败：{str(e)}', 'error')
-                return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
-            except Exception as e:
-                flash(f'更新失败：{str(e)}', 'error')
-                logger.error('更新主播失败：%s', str(e))
-                return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
-
-        return render_template('pilots/edit.html', pilot=pilot, user_choices=_get_user_choices())
-    except DoesNotExist:
-        abort(404)
+# ============ 以下为非核心功能的传统实现（commission, performance等） ============
 
 
 @pilot_bp.route('/<pilot_id>/changes')
 @roles_accepted('gicho', 'kancho')
 def pilot_changes(pilot_id):
-    """主播变更记录"""
+    """主播变更记录页面"""
     try:
-        pilot = Pilot.objects.get(id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        changes = PilotChangeLog.objects(pilot_id=pilot).order_by('-change_time').limit(100)
-
-        return jsonify({
-            'success':
-            True,
-            'changes': [{
-                'field_name': change.field_display_name,
-                'old_value': change.old_value,
-                'new_value': change.new_value,
-                'change_time': change.change_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'user_name': change.user_id.nickname or change.user_id.username if change.user_id else '未知用户',
-                'ip_address': change.ip_address or '未知'
-            } for change in changes]
-        })
+        pilot = Pilot.objects.get(id=pilot_id)  # pylint: disable=no-member
     except DoesNotExist:
-        return jsonify({'success': False, 'error': '主播不存在'}), 404
-    except Exception as e:
-        logger.error('获取变更记录失败：%s', str(e))
-        return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
+        flash('主播不存在', 'error')
+        return redirect(url_for('pilot.list_pilots'))
 
+    # 获取最近的变更记录
+    changes = PilotChangeLog.objects(pilot=pilot).order_by('-created_at').limit(100)  # pylint: disable=no-member
 
-
-
-def _record_commission_changes(commission, old_data, user, ip_address):
-    """记录分成调整记录字段变更"""
-    changes = []
-    field_mapping = {
-        'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
-        'commission_rate': commission.commission_rate,
-        'remark': commission.remark,
-        'is_active': commission.is_active,
-    }
-
-    for field_name, new_value in field_mapping.items():
-        old_value = old_data.get(field_name)
-        if str(old_value) != str(new_value):
-            change_log = PilotCommissionChangeLog(commission_id=commission,
-                                                  user_id=user,
-                                                  field_name=field_name,
-                                                  old_value=str(old_value) if old_value is not None else '',
-                                                  new_value=str(new_value) if new_value is not None else '',
-                                                  ip_address=ip_address)
-            changes.append(change_log)
-
-    if changes:
-        PilotCommissionChangeLog.objects.insert(changes)
-        logger.info('记录分成调整记录变更：%s，共%d个字段', commission.pilot_id.nickname, len(changes))
-
-
-def _get_pilot_current_commission_rate(pilot_id):
-    """获取主播当前有效的分成比例"""
-    current_time = get_current_utc_time()
-
-    commissions = PilotCommission.objects(pilot_id=pilot_id, is_active=True).order_by('adjustment_date')
-
-    commission_list = list(commissions)
-    if not commission_list:
-        return 20.0, None, "默认分成比例"
-
-    effective_commission = None
-    for commission in reversed(commission_list):  # 从最新记录开始查找
-        if commission.adjustment_date <= current_time:
-            effective_commission = commission
-            break
-
-    if effective_commission is None:
-        return 20.0, None, "默认分成比例"
-
-    return effective_commission.commission_rate, effective_commission.adjustment_date, effective_commission.remark
-
-
-def _calculate_commission_distribution(commission_rate):
-    """根据分成比例计算主播和公司的收入分配"""
-    BASE_RATE = 50.0  # 50%
-    COMPANY_RATE = 42.0  # 42%
-
-    pilot_income = (commission_rate / BASE_RATE) * COMPANY_RATE
-
-    company_income = COMPANY_RATE - pilot_income
-
-    return {'pilot_income': pilot_income, 'company_income': company_income, 'calculation_formula': f'({commission_rate}%/50%) * 42% = {pilot_income:.1f}%'}
-
-
+    return render_template('pilots/changes.html', pilot=pilot, changes=changes)
 
 
 @pilot_bp.route('/<pilot_id>/commission/')
 @roles_accepted('gicho', 'kancho')
 def pilot_commission_index(pilot_id):
-    """主播分成管理页面"""
+    """主播分成管理首页"""
     try:
-        pilot = Pilot.objects.get(id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
-        calculation_info = _calculate_commission_distribution(current_rate)
-
-        commissions = PilotCommission.objects(pilot_id=pilot_id).order_by('-adjustment_date')
-
-        return render_template('pilots/commission/index.html',
-                               pilot=pilot,
-                               current_rate=current_rate,
-                               effective_date=effective_date,
-                               remark=remark,
-                               calculation_info=calculation_info,
-                               commissions=commissions)
-
+        pilot = Pilot.objects.get(id=pilot_id)  # pylint: disable=no-member
     except DoesNotExist:
-        abort(404)
+        flash('主播不存在', 'error')
+        return redirect(url_for('pilot.list_pilots'))
+
+    return render_template(
+        'pilots/commission/index.html',
+        pilot=pilot,
+    )
 
 
 @pilot_bp.route('/<pilot_id>/commission/new', methods=['GET', 'POST'])
 @roles_accepted('gicho', 'kancho')
 def pilot_commission_new(pilot_id):
-    """新增分成调整记录"""
+    """新建主播分成"""
     try:
-        pilot = Pilot.objects.get(id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        if request.method == 'POST':
-            try:
-                adjustment_date_str = request.form.get('adjustment_date', '').strip()
-                commission_rate_str = request.form.get('commission_rate', '').strip()
-                remark = request.form.get('remark', '').strip() or None
-
-                if not adjustment_date_str:
-                    flash('调整日为必填项', 'error')
-                    return render_template('pilots/commission/new.html', pilot=pilot)
-
-                if not commission_rate_str:
-                    flash('分成比例为必填项', 'error')
-                    return render_template('pilots/commission/new.html', pilot=pilot)
-
-                try:
-                    from datetime import datetime
-                    adjustment_date = datetime.strptime(adjustment_date_str, '%Y-%m-%d')
-                    adjustment_date = local_to_utc(adjustment_date)
-                except ValueError:
-                    flash('调整日格式错误', 'error')
-                    return render_template('pilots/commission/new.html', pilot=pilot)
-
-                try:
-                    commission_rate = float(commission_rate_str)
-                except ValueError:
-                    flash('分成比例必须是数字', 'error')
-                    return render_template('pilots/commission/new.html', pilot=pilot)
-
-                commission = PilotCommission(pilot_id=pilot, adjustment_date=adjustment_date, commission_rate=commission_rate, remark=remark)
-
-                commission.save()
-
-                flash('创建分成调整记录成功', 'success')
-                logger.info('用户%s为主播%s创建分成调整记录：%s%%', current_user.username, pilot.nickname, commission_rate)
-                return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
-
-            except (ValueError, ValidationError) as e:
-                flash(f'数据验证失败：{str(e)}', 'error')
-                return render_template('pilots/commission/new.html', pilot=pilot)
-            except Exception as e:
-                flash(f'创建失败：{str(e)}', 'error')
-                logger.error('创建分成调整记录失败：%s', str(e))
-                return render_template('pilots/commission/new.html', pilot=pilot)
-
-        return render_template('pilots/commission/new.html', pilot=pilot)
-
+        pilot = Pilot.objects.get(id=pilot_id)  # pylint: disable=no-member
     except DoesNotExist:
-        abort(404)
+        flash('主播不存在', 'error')
+        return redirect(url_for('pilot.list_pilots'))
 
-
-@pilot_bp.route('/<pilot_id>/commission/<commission_id>/edit', methods=['GET', 'POST'])
-@roles_accepted('gicho', 'kancho')
-def pilot_commission_edit(pilot_id, commission_id):
-    """编辑分成调整记录"""
-    try:
-        pilot = Pilot.objects.get(id=pilot_id)
-        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        if request.method == 'POST':
-            old_data = {
-                'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
-                'commission_rate': commission.commission_rate,
-                'remark': commission.remark,
-                'is_active': commission.is_active,
-            }
-
-            try:
-                commission_rate = request.form.get('commission_rate')
-                remark = request.form.get('remark', '').strip() or None
-                is_active = request.form.get('is_active') == 'on'  # checkbox返回'on'或None
-
-                if commission_rate is not None:
-                    try:
-                        commission_rate = float(commission_rate)
-                        if not 0 <= commission_rate <= 50:
-                            flash('分成比例必须在0-50之间', 'error')
-                            return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
-                    except ValueError:
-                        flash('分成比例必须是有效数字', 'error')
-                        return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
-
-                if commission_rate is not None:
-                    commission.commission_rate = commission_rate
-                commission.remark = remark
-                commission.is_active = is_active
-                commission.save()
-
-                _record_commission_changes(commission, old_data, current_user, _get_client_ip())
-
-                flash('更新分成调整记录成功', 'success')
-                logger.info('用户%s更新主播%s的分成调整记录', current_user.username, pilot.nickname)
-                return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
-
-            except Exception as e:
-                flash(f'更新失败：{str(e)}', 'error')
-                logger.error('更新分成调整记录失败：%s', str(e))
-                return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
-
-        return render_template('pilots/commission/edit.html', pilot=pilot, commission=commission)
-
-    except DoesNotExist:
-        abort(404)
-
-
-@pilot_bp.route('/<pilot_id>/commission/<commission_id>/delete', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
-def pilot_commission_delete(pilot_id, commission_id):
-    """软删除分成调整记录"""
-    try:
-        pilot = Pilot.objects.get(id=pilot_id)
-        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        old_data = {
-            'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
-            'commission_rate': commission.commission_rate,
-            'remark': commission.remark,
-            'is_active': commission.is_active,
-        }
-
-        commission.is_active = False
-        commission.save()
-
-        _record_commission_changes(commission, old_data, current_user, _get_client_ip())
-
-        flash('删除分成调整记录成功', 'success')
-        logger.info('用户%s软删除主播%s的分成调整记录', current_user.username, pilot.nickname)
-        return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
-
-    except DoesNotExist:
-        abort(404)
-
-
-@pilot_bp.route('/<pilot_id>/commission/<commission_id>/restore', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
-def pilot_commission_restore(pilot_id, commission_id):
-    """恢复软删除的分成调整记录"""
-    try:
-        pilot = Pilot.objects.get(id=pilot_id)
-        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        old_data = {
-            'adjustment_date': commission.adjustment_date.strftime('%Y-%m-%d') if commission.adjustment_date else None,
-            'commission_rate': commission.commission_rate,
-            'remark': commission.remark,
-            'is_active': commission.is_active,
-        }
-
-        commission.is_active = True
-        commission.save()
-
-        _record_commission_changes(commission, old_data, current_user, _get_client_ip())
-
-        flash('恢复分成调整记录成功', 'success')
-        logger.info('用户%s恢复主播%s的分成调整记录', current_user.username, pilot.nickname)
-        return redirect(url_for('pilot.pilot_commission_index', pilot_id=pilot_id))
-
-    except DoesNotExist:
-        abort(404)
-
-
-@pilot_bp.route('/<pilot_id>/commission/current')
-@roles_accepted('gicho', 'kancho')
-def pilot_commission_current(pilot_id):
-    """获取主播当前分成信息API"""
-    try:
-        pilot = Pilot.objects.get(id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        current_rate, effective_date, remark = _get_pilot_current_commission_rate(pilot_id)
-        calculation_info = _calculate_commission_distribution(current_rate)
-
-        return jsonify({
-            'success': True,
-            'current_rate': current_rate,
-            'effective_date': effective_date.strftime('%Y-%m-%d') if effective_date else None,
-            'remark': remark,
-            'calculation_info': calculation_info
-        })
-
-    except DoesNotExist:
-        return jsonify({'success': False, 'error': '主播不存在'}), 404
-    except Exception as e:
-        logger.error('获取当前分成信息失败：%s', str(e))
-        return jsonify({'success': False, 'error': '获取当前分成信息失败'}), 500
-
-
-@pilot_bp.route('/<pilot_id>/commission/<commission_id>/changes')
-@roles_accepted('gicho', 'kancho')
-def pilot_commission_changes(pilot_id, commission_id):
-    """分成调整记录变更记录"""
-    try:
-        pilot = Pilot.objects.get(id=pilot_id)
-        commission = PilotCommission.objects.get(id=commission_id, pilot_id=pilot_id)
-
-        if not _check_pilot_permission(pilot):
-            abort(403)
-
-        changes = PilotCommissionChangeLog.objects(commission_id=commission).order_by('-change_time').limit(100)
-
-        return jsonify({
-            'success':
-            True,
-            'changes': [{
-                'field_name': change.field_display_name,
-                'old_value': change.old_value,
-                'new_value': change.new_value,
-                'change_time': change.change_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'user_name': change.user_id.nickname or change.user_id.username if change.user_id else '未知用户',
-                'ip_address': change.ip_address or '未知'
-            } for change in changes]
-        })
-
-    except DoesNotExist:
-        return jsonify({'success': False, 'error': '记录不存在'}), 404
-    except Exception as e:
-        logger.error('获取变更记录失败：%s', str(e))
-        return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
-
-
-@pilot_bp.route('/export')
-@roles_accepted('gicho', 'kancho')
-def pilot_export():
-    """导出所有主播数据为CSV文件"""
-    try:
-        from datetime import datetime
-        import csv
-        import io
-
-        pilots = Pilot.objects.all().order_by('-created_at')
-
-        output = io.StringIO()
-
-        output.write('\ufeff')
-
-        writer = csv.writer(output)
-
-        headers = ['昵称', '姓名', '性别', '出生年', '籍贯', '开播平台', '直属运营昵称', '开播方式', '主播分类', '状态', '当前分成比例']
-        writer.writerow(headers)
-
-        for pilot in pilots:
-            current_rate, _, _ = _get_pilot_current_commission_rate(str(pilot.id))
-
-            gender_display = '男' if pilot.gender.value == 0 else '女' if pilot.gender.value == 1 else '不明确'
-
-            owner_nickname = pilot.owner.nickname if pilot.owner else '无'
-
-            row = [
-                pilot.nickname or '', pilot.real_name or '', gender_display, pilot.birth_year or '', pilot.hometown or '',
-                pilot.platform.value if pilot.platform else '', owner_nickname, pilot.work_mode.value if pilot.work_mode else '',
-                pilot.rank.value if pilot.rank else '', pilot.status.value if pilot.status else '', f'{current_rate}%'
-            ]
-            writer.writerow(row)
-
-        csv_content = output.getvalue()
-        output.close()
-
-        from datetime import datetime
-        now = datetime.now()
-        filename = f'主播数据导出_{now.strftime("%Y%m%d_%H%M%S")}.csv'
-        import urllib.parse
-        encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
-
-        from flask import Response
-        response = Response(csv_content,
-                            mimetype='text/csv; charset=utf-8',
-                            headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
-
-        logger.info('主播数据导出成功，共导出 %d 条记录', pilots.count())
-        return response
-
-    except Exception as e:
-        logger.error('导出主播数据失败：%s', str(e))
-        flash('导出失败，请稍后重试', 'error')
-        return redirect(url_for('pilot.pilot_list'))
-
-
-@cached_pilot_performance()
-def _calculate_pilot_rebate(pilot, end_date):
-    """计算主播返点"""
-    try:
-        month_start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        month_start_utc = local_to_utc(month_start)
-        end_date_utc = local_to_utc(end_date.replace(hour=23, minute=59, second=59, microsecond=999999))
-
-        records = BattleRecord.objects(pilot=pilot, start_time__gte=month_start_utc, start_time__lte=end_date_utc)
-
-        total_revenue = sum(float(record.revenue_amount) for record in records)
-        total_hours = sum(float(record.duration_hours or 0) for record in records)
-
-        valid_days = set()
-        for record in records:
-            local_start = utc_to_local(record.start_time)
-            if record.duration_hours and record.duration_hours >= 1.0:  # 60分钟 = 1小时
-                valid_days.add(local_start.date())
-        valid_days_count = len(valid_days)
-
-        rebate_rate = 0
-        if valid_days_count >= 22 and total_hours >= 130 and total_revenue >= 80000:
-            rebate_rate = 18
-        elif valid_days_count >= 22 and total_hours >= 130 and total_revenue >= 30000:
-            rebate_rate = 14
-        elif valid_days_count >= 18 and total_hours >= 100 and total_revenue >= 10000:
-            rebate_rate = 11
-        elif valid_days_count >= 18 and total_hours >= 100 and total_revenue >= 5000:
-            rebate_rate = 7
-        elif valid_days_count >= 12 and total_hours >= 42 and total_revenue >= 1000:
-            rebate_rate = 5
-
-        rebate_amount = total_revenue * (rebate_rate / 100)
-
-        return {
-            'rebate_rate': rebate_rate,
-            'rebate_amount': rebate_amount,
-            'valid_days': valid_days_count,
-            'total_hours': total_hours,
-            'total_revenue': total_revenue
-        }
-    except Exception as e:
-        logger.error(f"计算主播返点失败: {e}")
-        return {'rebate_rate': 0, 'rebate_amount': 0, 'valid_days': 0, 'total_hours': 0, 'total_revenue': 0}
-
-
-@cached_pilot_performance()
-def _calculate_pilot_performance_stats(pilot, end_date, record_count=None):
-    """计算主播业绩统计"""
-    try:
-        if record_count:
-            records = BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(record_count)
-        else:
-            month_start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            month_start_utc = local_to_utc(month_start)
-            end_date_utc = local_to_utc(end_date.replace(hour=23, minute=59, second=59, microsecond=999999))
-            records = BattleRecord.objects(pilot=pilot, start_time__gte=month_start_utc, start_time__lte=end_date_utc)
-
-        if not records:
-            logger.info(f"主播 {pilot.nickname} 没有找到开播记录")
-            return {
-                'record_count': 0,
-                'total_hours': 0.0,
-                'avg_hours': 0.0,
-                'total_revenue': 0.0,
-                'daily_avg_revenue': 0.0,
-                'total_basepay': 0.0,
-                'daily_avg_basepay': 0.0,
-                'total_rebate': 0.0,
-                'total_company_share': 0.0,
-                'operating_profit': 0.0,
-                'daily_avg_operating_profit': 0.0
-            }
-
-        actual_record_count = len(records)
-        total_hours = sum(float(record.duration_hours or 0) for record in records)
-        avg_hours = round(total_hours / actual_record_count, 1) if actual_record_count > 0 else 0.0
-        total_revenue = sum(float(record.revenue_amount) for record in records)
-        total_basepay = sum(float(record.base_salary) for record in records)
-
-        if actual_record_count:
-            daily_avg_revenue = round(total_revenue / actual_record_count, 2)
-        else:
-            daily_avg_revenue = 0.0
-
-        logger.info(f"主播 {pilot.nickname} 基础统计: 记录数={actual_record_count}, 总时长={total_hours}, 总流水={total_revenue}, 总底薪={total_basepay}")
-
-        total_company_share = 0.0
-        total_rebate = 0.0
-
-        for record in records:
-            try:
-                local_start = utc_to_local(record.start_time)
-                record_date = local_start.date()
-                commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
-                commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
-                total_company_share += float(commission_amounts['company_amount'])
-            except Exception as e:
-                logger.error(f"计算记录 {record.id} 分成失败: {e}")
-                total_company_share += float(record.revenue_amount) * 0.5  # 假设50%分成
-
-        if record_count is None:  # 只有本月统计才计算返点
-            try:
-                rebate_info = _calculate_pilot_rebate(pilot, end_date)
-                total_rebate = rebate_info['rebate_amount']
-            except Exception as e:
-                logger.error(f"计算主播 {pilot.nickname} 返点失败: {e}")
-                total_rebate = 0.0
-        else:
-            total_rebate = 0.0  # 近N日统计不计算返点
-
-        if record_count is None:  # 本月统计：运营利润 = 公司分成 + 返点 - 底薪
-            operating_profit = total_company_share + total_rebate - total_basepay
-        else:  # 近N日统计：近日盈亏 = 公司分成 - 底薪（不计返点）
-            operating_profit = total_company_share - total_basepay
-
-        logger.info(f"主播 {pilot.nickname} 最终统计: 公司分成={total_company_share}, 返点={total_rebate}, 运营利润={operating_profit}")
-
-        daily_avg_basepay = round(total_basepay / actual_record_count, 2) if actual_record_count > 0 else 0.0
-        daily_avg_operating_profit = round(operating_profit / actual_record_count, 2) if actual_record_count > 0 else 0.0
-
-        return {
-            'record_count': actual_record_count,
-            'total_hours': round(total_hours, 1),
-            'avg_hours': avg_hours,
-            'total_revenue': round(total_revenue, 2),
-            'daily_avg_revenue': daily_avg_revenue,
-            'total_basepay': round(total_basepay, 2),
-            'daily_avg_basepay': daily_avg_basepay,
-            'total_rebate': round(total_rebate, 2),
-            'total_company_share': round(total_company_share, 2),
-            'operating_profit': round(operating_profit, 2),
-            'daily_avg_operating_profit': daily_avg_operating_profit
-        }
-    except Exception as e:
-        logger.error(f"计算主播业绩统计失败: {e}", exc_info=True)
-        return {
-            'record_count': 0,
-            'total_hours': 0.0,
-            'avg_hours': 0.0,
-            'total_revenue': 0.0,
-            'daily_avg_revenue': 0.0,
-            'total_basepay': 0.0,
-            'daily_avg_basepay': 0.0,
-            'total_rebate': 0.0,
-            'total_company_share': 0.0,
-            'operating_profit': 0.0,
-            'daily_avg_operating_profit': 0.0
-        }
+    return render_template('pilots/commission/new.html', pilot=pilot)
 
 
 @pilot_bp.route('/<pilot_id>/performance')
 @roles_accepted('gicho', 'kancho')
 def pilot_performance(pilot_id):
-    """主播业绩页"""
+    """主播绩效页面"""
     try:
         pilot = Pilot.objects.get(id=pilot_id)
-        logger.info(f"用户 {current_user.username} 查看主播业绩 {pilot_id}")
-
-        now_utc = get_current_utc_time()
-        now_local = utc_to_local(now_utc)
-
-        gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
-        pilot_info = {
-            'nickname': pilot.nickname,
-            'real_name': pilot.real_name,
-            'age': pilot.age,
-            'gender_icon': gender_icon,
-            'hometown': pilot.hometown,
-            'owner': pilot.owner.nickname if pilot.owner else '无',
-            'rank': pilot.rank.value if pilot.rank else '未知',
-            'status': pilot.get_effective_status_display()
-        }
-
-        month_stats = _calculate_pilot_performance_stats(pilot, now_local)
-        week_stats = _calculate_pilot_performance_stats(pilot, now_local, 7)
-        three_day_stats = _calculate_pilot_performance_stats(pilot, now_local, 3)
-
-        recent_records = BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(30)
-        recent_records_data = []
-
-        for record in recent_records:
-            local_start = utc_to_local(record.start_time)
-            local_end = utc_to_local(record.end_time)
-
-            record_date = local_start.date()
-            commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
-            commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
-
-            recent_records_data.append({
-                'id': str(record.id),
-                'start_time': local_start,
-                'end_time': local_end,
-                'duration_hours': record.duration_hours or 0,
-                'revenue_amount': float(record.revenue_amount),
-                'base_salary': float(record.base_salary),
-                'commission_rate': commission_rate,
-                'pilot_share': commission_amounts['pilot_amount'],
-                'company_share': commission_amounts['company_amount'],
-                'work_mode': record.work_mode.value if record.work_mode else '未知',
-                'battle_location': record.battle_location
-            })
-
-        return render_template('pilots/performance.html',
-                               pilot=pilot,
-                               pilot_info=pilot_info,
-                               month_stats=month_stats,
-                               week_stats=week_stats,
-                               three_day_stats=three_day_stats,
-                               recent_records=recent_records_data)
-
-    except Pilot.DoesNotExist:
+    except DoesNotExist:
         flash('主播不存在', 'error')
         return redirect(url_for('pilot.list_pilots'))
-    except Exception as e:
-        logger.error(f"获取主播业绩失败: {e}")
-        flash('获取主播业绩失败，请稍后重试', 'error')
-        return redirect(url_for('pilot.list_pilots'))
+
+    return render_template('pilots/performance.html', pilot=pilot)
+
+
+@pilot_bp.route('/export')
+@roles_accepted('gicho', 'kancho')
+def pilot_export():
+    """兼容旧模板的导出入口：重定向到 REST 导出接口，保留查询串。"""
+    query = request.query_string.decode() if request.query_string else ''
+    target = '/api/pilots/export'
+    if query:
+        target = f"{target}?{query}"
+    return redirect(target)

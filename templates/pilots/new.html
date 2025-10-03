@@ -67,11 +67,9 @@
         <h3 class="section-title">关联信息</h3>
         <div class="form-grid">
           <div class="form-group">
-            <label for="owner" class="form-label">所属</label>
+            <label for="owner" class="form-label">直属运营</label>
             <select id="owner" name="owner" class="form-select">
-              {% for value, display in user_choices %}
-              <option value="{{ value }}" {% if form and form.owner == value %}selected{% endif %}>{{ display }}</option>
-              {% endfor %}
+              <option value="">无</option>
             </select>
             <div class="form-help">
               {% if current_user.has_role('kancho') and not current_user.has_role('gicho') %}
@@ -82,11 +80,21 @@
         </div>
       </div>
 
+      <!-- 错误提示区域 -->
+      <div id="errorAlert" class="error-alert" style="display: none;">
+        <div class="error-icon">⚠️</div>
+        <div class="error-content">
+          <div class="error-title">保存失败</div>
+          <div id="errorMessage" class="error-message"></div>
+        </div>
+        <button type="button" class="error-close" onclick="closeErrorAlert()">✕</button>
+      </div>
+
       <div class="form-section">
         <h3 class="section-title">业务信息</h3>
         <div class="form-grid">
           <div class="form-group">
-            <label for="platform" class="form-label">战区</label>
+            <label for="platform" class="form-label">开播平台</label>
             <select id="platform" name="platform" class="form-select">
               <option value="未知" {% if form and form.platform == '未知' %}selected{% endif %}>未知</option>
               <option value="快手" {% if form and form.platform == '快手' %}selected{% endif %}>快手</option>
@@ -96,7 +104,7 @@
           </div>
           
           <div class="form-group">
-            <label for="work_mode" class="form-label">参战形式</label>
+            <label for="work_mode" class="form-label">开播方式</label>
             <select id="work_mode" name="work_mode" class="form-select">
               <option value="未知" {% if form and form.work_mode == '未知' %}selected{% endif %}>未知</option>
               <option value="线下" {% if form and form.work_mode == '线下' %}selected{% endif %}>线下</option>
@@ -251,10 +259,178 @@
     width: 100%;
   }
 }
+
+/* 错误提示样式 */
+.error-alert {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-alert.error {
+  background: #f8d7da;
+  border-color: #dc3545;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
+}
+
+.error-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.error-content {
+  flex: 1;
+}
+
+.error-title {
+  font-weight: 600;
+  color: #856404;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.error-alert.error .error-title {
+  color: #721c24;
+}
+
+.error-message {
+  color: #664d03;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.error-alert.error .error-message {
+  color: #58151c;
+}
+
+.error-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #856404;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.error-alert.error .error-close {
+  color: #721c24;
+}
+
+.error-close:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
 </style>
 
 <script>
+// 加载直属运营选项
+async function loadOwnerOptions() {
+  try {
+    const response = await fetch('/api/users/operators');
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '获取运营列表失败');
+    }
+    
+    const ownerSelect = document.getElementById('owner');
+    result.data.forEach(operator => {
+      const option = document.createElement('option');
+      option.value = operator.id;
+      option.textContent = operator.nickname;
+      ownerSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('加载直属运营选项失败:', error);
+    showMessage('加载直属运营选项失败', 'error');
+  }
+}
+
+// 显示错误提示
+function showErrorAlert(message, type = 'error') {
+  const errorAlert = document.getElementById('errorAlert');
+  const errorMessage = document.getElementById('errorMessage');
+  
+  errorMessage.textContent = message;
+  errorAlert.className = 'error-alert';
+  if (type === 'error') {
+    errorAlert.classList.add('error');
+  }
+  errorAlert.style.display = 'flex';
+  
+  // 滚动到错误提示位置
+  errorAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// 关闭错误提示
+function closeErrorAlert() {
+  const errorAlert = document.getElementById('errorAlert');
+  errorAlert.style.display = 'none';
+}
+
+// 创建主播
+async function createPilot(formData) {
+  // 先清除之前的错误提示
+  closeErrorAlert();
+  
+  try {
+    const response = await fetch('/api/pilots', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      },
+      body: JSON.stringify(formData)
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      const errorMsg = result.error?.message || '创建主播失败';
+      showErrorAlert(errorMsg, 'error');
+      showMessage('保存失败', 'error');
+      return;
+    }
+    
+    showMessage('主播创建成功', 'success');
+    setTimeout(() => {
+      window.location.href = `/pilots/${result.data.id}`;
+    }, 1000);
+  } catch (error) {
+    console.error('创建主播失败:', error);
+    showErrorAlert(error.message || '网络错误，请重试', 'error');
+    showMessage('保存失败', 'error');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  loadOwnerOptions();
+  
   const form = document.querySelector('.pilot-form-content');
   const nicknameInput = document.getElementById('nickname');
   const hometownInput = document.getElementById('hometown');
@@ -288,6 +464,25 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       this.setCustomValidity('');
     }
+  });
+  
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = {
+      nickname: document.getElementById('nickname').value.trim(),
+      real_name: document.getElementById('real_name').value.trim() || null,
+      gender: parseInt(document.getElementById('gender').value),
+      hometown: document.getElementById('hometown').value.trim() || null,
+      birth_year: parseInt(document.getElementById('birth_year').value) || null,
+      owner_id: document.getElementById('owner').value || null,
+      platform: document.getElementById('platform').value,
+      work_mode: document.getElementById('work_mode').value,
+      rank: document.getElementById('rank').value,
+      status: document.getElementById('status').value
+    };
+    
+    await createPilot(formData);
   });
 });
 </script>

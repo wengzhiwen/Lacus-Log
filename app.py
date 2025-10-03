@@ -17,6 +17,7 @@ from routes.recruit import recruit_bp
 from routes.report import report_bp
 from routes.report_mail import report_mail_bp
 from routes.users_api import users_api_bp
+from routes.pilots_api import pilots_api_bp
 from utils.bootstrap import (ensure_database_indexes, ensure_initial_roles_and_admin)
 from utils.logging_setup import init_logging
 from utils.scheduler import init_scheduled_jobs
@@ -85,6 +86,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(main_bp)
     flask_app.register_blueprint(admin_bp, url_prefix='/admin')
     flask_app.register_blueprint(users_api_bp)
+    flask_app.register_blueprint(pilots_api_bp)
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
     flask_app.register_blueprint(recruit_bp, url_prefix='/recruits')
     flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')
