@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function loadMonthData() {
     loadingEl.style.display = 'flex';
     
-    fetch(`{{ url_for('calendar.month_data') }}?year=${currentYear}&month=${currentMonth}`)
+    fetch(`{{ url_for('calendar_api.month_data') }}?year=${currentYear}&month=${currentMonth}`)
       .then(response => response.json())
       .then(data => {
         if (data.error) {

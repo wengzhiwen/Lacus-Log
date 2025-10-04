@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const dateStr = formatDate(currentDate);
     
-    fetch(`{{ url_for('calendar.week_data') }}?date=${dateStr}`)
+    fetch(`{{ url_for('calendar_api.week_data') }}?date=${dateStr}`)
       .then(response => response.json())
       .then(data => {
         if (data.error) {
