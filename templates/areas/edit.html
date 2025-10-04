@@ -3,34 +3,34 @@
 {% block content %}
 <section class="area-form">
   <div class="page-header"><h1 class="page-title">编辑开播地点</h1></div>
-  <form id="area-edit-form" method="post" class="form-card">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <form id="area-edit-form" class="form-card">
     <div class="form-group">
-      <label>基地</label>
-      <input type="text" name="x_coord" value="{{ area.x_coord }}" required>
+      <label for="edit-x">基地</label>
+      <input type="text" id="edit-x" required>
     </div>
     <div class="form-group">
-      <label>场地</label>
-      <input type="text" name="y_coord" value="{{ area.y_coord }}" required>
+      <label for="edit-y">场地</label>
+      <input type="text" id="edit-y" required>
     </div>
     <div class="form-group">
-      <label>坐席</label>
-      <input type="text" name="z_coord" value="{{ area.z_coord }}" required>
+      <label for="edit-z">坐席</label>
+      <input type="text" id="edit-z" required>
     </div>
     <div class="form-group">
-      <label>可用性</label>
-      <select name="availability">
-        <option value="可用" {% if area.availability.value=='可用' %}selected{% endif %}>可用</option>
-        <option value="禁用" {% if area.availability.value=='禁用' %}selected{% endif %}>禁用</option>
+      <label for="edit-availability">可用性</label>
+      <select id="edit-availability">
+        <option value="可用">可用</option>
+        <option value="禁用">禁用</option>
       </select>
     </div>
+    <div id="edit-error" class="form-error" style="display: none;"></div>
   </form>
 </section>
 
 <div class="footbar">
   <div class="inner">
     <button class="btn btn-primary" type="submit" form="area-edit-form">保存</button>
-    <a class="btn" href="{{ url_for('battle_area.area_detail', area_id=area.id) }}">取消</a>
+    <a class="btn" id="cancel-link" href="#">取消</a>
   </div>
 </div>
 
@@ -39,8 +39,93 @@
 .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .form-group label { font-size: 12px; color: var(--muted); }
 .form-group input, .form-group select { padding: 10px; border: 1px solid var(--table-header); border-radius: 6px; }
+.form-error { margin-top: 4px; color: var(--error); font-size: 12px; }
 .footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
 .footbar .inner { display: flex; gap: 12px; justify-content: center; }
 .container { padding-bottom: 88px; }
 </style>
+<script>
+const editAreaId = '{{ area_id }}';
+
+function showEditError(message) {
+  const errorBox = document.getElementById('edit-error');
+  errorBox.textContent = message;
+  errorBox.style.display = message ? 'block' : 'none';
+}
+
+function fillForm(data) {
+  document.getElementById('edit-x').value = data.x_coord || '';
+  document.getElementById('edit-y').value = data.y_coord || '';
+  document.getElementById('edit-z').value = data.z_coord || '';
+  document.getElementById('edit-availability').value = data.availability || '可用';
+}
+
+async function loadArea() {
+  try {
+    const response = await fetch(`/api/battle-areas/${editAreaId}`);
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载开播地点失败');
+    }
+    fillForm(result.data);
+    document.getElementById('cancel-link').href = `/areas/${editAreaId}`;
+  } catch (error) {
+    console.error('加载开播地点失败:', error);
+    showMessage(error.message || '加载开播地点失败', 'error');
+    setTimeout(() => {
+      window.location.href = '/areas';
+    }, 1500);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadArea();
+
+  const form = document.getElementById('area-edit-form');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    showEditError('');
+
+    const payload = {
+      x_coord: document.getElementById('edit-x').value.trim(),
+      y_coord: document.getElementById('edit-y').value.trim(),
+      z_coord: document.getElementById('edit-z').value.trim(),
+      availability: document.getElementById('edit-availability').value,
+    };
+
+    if (!payload.x_coord || !payload.y_coord || !payload.z_coord) {
+      showEditError('基地、场地、坐席均为必填项');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/battle-areas/${editAreaId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        const message = result.error?.message || '保存开播地点失败';
+        showEditError(message);
+        showMessage(message, 'error');
+        return;
+      }
+
+      showMessage('保存成功', 'success');
+      setTimeout(() => {
+        window.location.href = `/areas/${editAreaId}`;
+      }, 800);
+    } catch (error) {
+      console.error('保存开播地点失败:', error);
+      showEditError('网络错误，请稍后再试');
+      showMessage('保存开播地点失败', 'error');
+    }
+  });
+});
+</script>
 {% endblock %}

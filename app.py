@@ -9,6 +9,7 @@ from mongoengine import connect
 from routes.admin import admin_bp
 from routes.announcement import announcement_bp
 from routes.battle_area import battle_area_bp
+from routes.battle_areas_api import battle_areas_api_bp
 from routes.battle_record import battle_record_bp
 from routes.calendar import calendar_bp
 from routes.commissions_api import commissions_api_bp
@@ -20,14 +21,11 @@ from routes.recruits_api import recruits_api_bp
 from routes.report import report_bp
 from routes.report_mail import report_mail_bp
 from routes.users_api import users_api_bp
-from utils.bootstrap import (ensure_database_indexes,
-                             ensure_initial_roles_and_admin)
+from utils.bootstrap import (ensure_database_indexes, ensure_initial_roles_and_admin)
 from utils.logging_setup import init_logging
 from utils.scheduler import init_scheduled_jobs
 from utils.security import create_user_datastore, init_security
-from utils.timezone_helper import (format_local_date, format_local_datetime,
-                                   format_local_time, get_local_date_for_input,
-                                   get_local_datetime_for_input,
+from utils.timezone_helper import (format_local_date, format_local_datetime, format_local_time, get_local_date_for_input, get_local_datetime_for_input,
                                    get_local_time_for_input, utc_to_local)
 
 
@@ -94,6 +92,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(pilots_api_bp)
     flask_app.register_blueprint(commissions_api_bp)
     flask_app.register_blueprint(recruits_api_bp)
+    flask_app.register_blueprint(battle_areas_api_bp)
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
     flask_app.register_blueprint(recruit_bp, url_prefix='/recruits')
     flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')

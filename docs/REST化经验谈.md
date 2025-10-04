@@ -74,7 +74,7 @@
 ## 8. 常见坑与对策
 | 场景 | 症状 | 对策 |
 | --- | --- | --- |
-| 模板仍引用旧路由 | 页面 500 或跳转 404 | 保留兼容路由或改链接直指新流转 |
+| 模板仍引用旧路由 | 页面 500 或跳转 404 | 旧路由只渲染基础页面，要做的是彻底的REST化 |
 | 枚举值非法导致 500 | `Enum(value)` 抛异常 | 过滤参数前先校验；忽略非法值或返回 400。|
 | 变更记录缺字段 | 序列化 KeyError | 按模型字段更新 `_record_changes`；增加保护逻辑。|
 | JS 中字符串模板处理错误 | URL 出现 `${item.id}` | 直接传变量 `getUrl(item.id)`，不要再套字符串。|
@@ -134,13 +134,46 @@ async function apiRequest(url, options = {}) {
 }
 ```
 
-## 10. 尚未 REST 化模块（现状提醒）
-- 招募管理、分成管理、通告主流程、通告导出、开播记录 CRUD、开播日报/周报/月报、招募日报、仪表板、开播地点、邮件发送/报告等仍以传统表单或模板为主。任何任务若要使用 REST 接口，需要先落地对应蓝图，再更新模块专属指南。
+## 10. 通告模块 REST 化对照指南
 
-## 11. 后续改造建议
-- 建议以模块为单位逐步推进：先"补充只读 API + 统一序列化"，再"改写写入逻辑 + CSRF 中间件"。
-- 每落地一组接口，同时更新对应的 `docs/模块-REST化指南.md`，保持文档与实现一致。
-- 在同一个 PR 中同步新增集成测试（真实 CSRF + 权限 + 业务场景），为后续重构打下回归基础。
+### 10.1 业务与体验约束
+- 参照 `docs/主播-通告.md`：所有操作仍需保留“日历工具式”体验，循环通告在编辑/删除时必须提供“仅本次/全部/未来”选项。
+- 新建流程先点“检查”再启用“登录通告”按钮，冲突列表需展示**所有**拟生成的通告实例（而非只列冲突项），以便用户确认。
+- 列表默认筛选“两天内”，筛选项需持久化在 session（`persist_and_restore_filters`）；任何 REST 改造都不能破坏默认筛选口径与快速检索体验。
+- 通告默认写入基地/场地/坐席快照，后端仍以 UTC 存储时间，页面展示沿用 `utils.timezone_helper`，避免时区漂移。
+
+### 10.2 现有 JSON / REST 接口
+| 功能 | 方法 | 路径 | 说明 |
+| --- | --- | --- | --- |
+| 冲突预检查 | POST | `/announcements/check-conflicts` | 接收 JSON 表单，返回计划实例与冲突列表；编辑循环时依赖 `exclude_id`、`edit_scope`。|
+| 通告变更记录 | GET | `/announcements/<id>/changes` | 返回最近 100 条字段变更，字段名、操作者、IP 等已封装为 JSON。|
+| 获取场地联动（基地→场地） | GET | `/announcements/api/areas/<x_coord>` | 返回可用场地列表，保持字典序。|
+| 获取坐席联动（基地+场地→坐席） | GET | `/announcements/api/areas/<x_coord>/<y_coord>` | 返回可用坐席及 `battle_area_id`，支持数字排序。|
+| 主播筛选器枚举 | GET | `/announcements/api/pilot-filters` | 返回直属运营、主播分类枚举，用于前端本地搜索。|
+| 按所属筛选主播 | GET | `/announcements/api/pilots/by-owner/<owner_id>` | 用于快速锁定直属运营名下主播，`owner_id=none` 表示无所属。|
+| 条件过滤主播列表 | GET | `/announcements/api/pilots-filtered` | 支持 `owner`、`rank` 筛选，返回昵称、真实姓名、状态等信息。|
+
+> 以上接口已部分采用统一的 `success/error` 包装，但尚未纳入统一序列化/错误码工具，需要在后续改造中补齐。
+
+### 10.3 仍由模板 / 表单承担的能力
+- `/announcements/`：列表页含筛选持久化、卡片渲染、100 条限制。
+- `/announcements/new` 与 `/announcements/<id>/edit`：表单提交负责创建/编辑/循环拆分；最终提交前仍会调用一次冲突检查。
+- `/announcements/<id>/delete`：POST 表单触发删除，包含循环范围判断。
+- `/announcements/cleanup` 与 `/announcements/cleanup/delete-future`：面向“流失”主播的批量清理仍是同步表单流程。
+- `/announcements/export`：生成整月通告预定表，继续依赖模板渲染。
+
+### 10.4 REST 化落地重点
+1. **拆分读写**：优先抽离列表、详情等只读接口，`GET /announcements/api/list` 应复用现有筛选逻辑（时间默认值、session 持久化），并返回分页元信息，避免一次性返回全部数据。
+2. **循环与冲突保持一致**：`Announcement.generate_recurrence_instances`、`split_recurrence_group_from_current()` 等方法要复用在 REST 层，防止新接口绕过既有校验导致孤儿循环。
+3. **冲突检查前置**：新增 REST 写接口时，仍需在落库前调用 `/check-conflicts` 或内嵌同样逻辑，确保“先检查再提交”的体验不变。
+4. **清理功能拆分**：若要为通告清理提供 API，需保留 GMT+8→UTC 边界换算与“不可恢复”提示，建议在 REST 层返回受影响条数以及二次确认提示文案。
+5. **日志与变更记录**：REST 写接口必须调用 `_record_changes` 并写 INFO 日志（操作者、坐席、时间段），以保持现有审计链路。
+
+### 10.5 实施顺序建议
+1. 列表/详情改造：补齐 `GET /announcements/api/<id>`、`/api/list`，页面以 AJAX 渲染卡片但继续沿用既有模板骨架。
+2. 表单双轨期：在前端保留旧表单提交入口，同时新增 JS 版提交，待 API 稳定后再逐步下线旧表单。
+3. 清理与导出：可保持模板渲染，但补充 REST 导出与清理 API 以便后续前端改造；导出接口需复用 `generate_export_table()`，保证字段一致。
+4. 最终收敛：前端逐渐切换到统一的 fetch 封装，并通过 `create_success_response` / `create_error_response` 生成响应，完成与本经验谈其余章节的统一。
 
 ---
 保持这份经验谈的及时更新，可以显著降低后续 REST 改造的沟通与排错成本。

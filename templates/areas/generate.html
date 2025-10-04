@@ -5,40 +5,34 @@
   <div class="page-header"><h1 class="page-title">批量生成开播地点</h1></div>
 
   <div class="info-card">
-    <div class="row"><span class="label">源基地</span><span class="value">{{ src.x_coord }}</span></div>
-    <div class="row"><span class="label">源场地</span><span class="value">{{ src.y_coord }}</span></div>
+    <div class="row"><span class="label">源基地</span><span class="value" id="source-x">-</span></div>
+    <div class="row"><span class="label">源场地</span><span class="value" id="source-y">-</span></div>
   </div>
 
-  <form method="post" class="form-card">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <form id="generate-form" class="form-card">
     <div class="form-group">
-      <label>坐席开始</label>
-      <input type="number" name="z_start" required>
+      <label for="input-start">坐席开始</label>
+      <input type="number" id="input-start" required>
     </div>
     <div class="form-group">
-      <label>坐席结束</label>
-      <input type="number" name="z_end" required>
+      <label for="input-end">坐席结束</label>
+      <input type="number" id="input-end" required>
     </div>
-
-    <div class="footbar">
-      <div class="inner">
-        <button class="btn btn-primary" type="submit">生成</button>
-        <a class="btn" href="{{ url_for('battle_area.area_detail', area_id=src.id) }}">返回</a>
-      </div>
-    </div>
+    <div id="generate-error" class="form-error" style="display: none;"></div>
   </form>
 
-  {% if duplicates %}
-  <div class="info-card" style="margin-top:12px;">
+  <div id="duplicate-panel" class="info-card" style="display: none; margin-top:12px;">
     <strong>以下项目已存在，未生成：</strong>
-    <ul>
-      {% for d in duplicates %}
-      <li>{{ d.x }} - {{ d.y }} - {{ d.z }}</li>
-      {% endfor %}
-    </ul>
+    <ul id="duplicate-list"></ul>
   </div>
-  {% endif %}
 </section>
+
+<div class="footbar">
+  <div class="inner">
+    <button class="btn btn-primary" type="submit" form="generate-form">生成</button>
+    <a class="btn" id="back-link" href="#">返回</a>
+  </div>
+</div>
 
 <style>
 .info-card, .form-card { background: #fff; border: 1px solid var(--table-header); border-radius: 8px; padding: 14px; }
@@ -49,8 +43,108 @@
 .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .form-group label { font-size: 12px; color: var(--muted); }
 .form-group input { padding: 10px; border: 1px solid var(--table-header); border-radius: 6px; }
+.form-error { margin-top: 4px; color: var(--error); font-size: 12px; }
 .footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
 .footbar .inner { display: flex; gap: 12px; justify-content: center; }
 .container { padding-bottom: 88px; }
 </style>
+<script>
+const generateAreaId = '{{ area_id }}';
+const storageKey = `battle-area-generate-result:${generateAreaId}`;
+
+function showDuplicateList(duplicates) {
+  const panel = document.getElementById('duplicate-panel');
+  const list = document.getElementById('duplicate-list');
+  if (!duplicates || duplicates.length === 0) {
+    panel.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  panel.style.display = 'block';
+  list.innerHTML = '';
+  duplicates.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = `${item.x} - ${item.y} - ${item.z}`;
+    list.appendChild(li);
+  });
+}
+
+function showGenerateError(message) {
+  const box = document.getElementById('generate-error');
+  box.textContent = message;
+  box.style.display = message ? 'block' : 'none';
+}
+
+async function loadSourceArea() {
+  try {
+    const response = await fetch(`/api/battle-areas/${generateAreaId}`);
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载开播地点失败');
+    }
+    document.getElementById('source-x').textContent = result.data.x_coord || '-';
+    document.getElementById('source-y').textContent = result.data.y_coord || '-';
+    document.getElementById('back-link').href = `/areas/${generateAreaId}`;
+  } catch (error) {
+    console.error('加载开播地点失败:', error);
+    showMessage(error.message || '加载开播地点失败', 'error');
+    setTimeout(() => {
+      window.location.href = '/areas';
+    }, 1500);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSourceArea();
+
+  const form = document.getElementById('generate-form');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    showGenerateError('');
+    showDuplicateList([]);
+
+    const startValue = document.getElementById('input-start').value.trim();
+    const endValue = document.getElementById('input-end').value.trim();
+
+    if (!startValue || !endValue) {
+      showGenerateError('坐席开始与结束均为必填项');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/battle-areas/bulk-generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+          source_id: generateAreaId,
+          z_start: startValue,
+          z_end: endValue
+        })
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        const message = result.error?.message || '批量生成失败';
+        showGenerateError(message);
+        showMessage(message, 'error');
+        if (result.error?.code === 'DUPLICATED_COORDINATE' && result.meta?.duplicates) {
+          showDuplicateList(result.meta.duplicates);
+        }
+        return;
+      }
+
+      sessionStorage.setItem(storageKey, JSON.stringify(result.data));
+      showMessage('批量生成成功', 'success');
+      window.location.href = `/areas/${generateAreaId}/generate?result=1`;
+    } catch (error) {
+      console.error('批量生成失败:', error);
+      showGenerateError('网络错误，请稍后再试');
+      showMessage('批量生成失败', 'error');
+    }
+  });
+});
+</script>
 {% endblock %}

@@ -5,16 +5,12 @@
   <div class="page-header"><h1 class="page-title">生成结果</h1></div>
 
   <div class="info-card">
-    <div class="row"><span class="label">源基地</span><span class="value">{{ src.x_coord }}</span></div>
-    <div class="row"><span class="label">源场地</span><span class="value">{{ src.y_coord }}</span></div>
-    <div class="row"><span class="label">生成数量</span><span class="value">{{ created|length }}</span></div>
+    <div class="row"><span class="label">源基地</span><span class="value" id="result-source-x">-</span></div>
+    <div class="row"><span class="label">源场地</span><span class="value" id="result-source-y">-</span></div>
+    <div class="row"><span class="label">生成数量</span><span class="value" id="result-count">0</span></div>
   </div>
 
-  <ul class="result-list">
-    {% for a in created %}
-    <li class="result-item">{{ a.x_coord }} - {{ a.y_coord }} - {{ a.z_coord }}</li>
-    {% endfor %}
-  </ul>
+  <ul class="result-list" id="result-list"></ul>
 </section>
 
 <div class="footbar">
@@ -34,4 +30,57 @@
 .footbar .inner { display: flex; justify-content: center; }
 .container { padding-bottom: 88px; }
 </style>
+<script>
+const resultAreaId = '{{ area_id }}';
+const storageKey = `battle-area-generate-result:${resultAreaId}`;
+
+function renderResults(data) {
+  document.getElementById('result-source-x').textContent = data.source?.x_coord || '-';
+  document.getElementById('result-source-y').textContent = data.source?.y_coord || '-';
+  const created = data.created || [];
+  document.getElementById('result-count').textContent = created.length;
+
+  const list = document.getElementById('result-list');
+  list.innerHTML = '';
+  if (created.length === 0) {
+    const placeholder = document.createElement('li');
+    placeholder.className = 'result-item';
+    placeholder.textContent = '未生成任何开播地点';
+    list.appendChild(placeholder);
+    return;
+  }
+
+  created.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'result-item';
+    li.textContent = `${item.x_coord} - ${item.y_coord} - ${item.z_coord}`;
+    list.appendChild(li);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const cached = sessionStorage.getItem(storageKey);
+  if (!cached) {
+    showMessage('缺少生成结果，请重新操作', 'error');
+    setTimeout(() => {
+      window.location.href = `/areas/${resultAreaId}/generate`;
+    }, 1200);
+    return;
+  }
+
+  try {
+    const data = JSON.parse(cached);
+    renderResults(data);
+  } catch (error) {
+    console.error('解析生成结果失败:', error);
+    showMessage('解析生成结果失败，请重试', 'error');
+    setTimeout(() => {
+      window.location.href = `/areas/${resultAreaId}/generate`;
+    }, 1200);
+    return;
+  } finally {
+    sessionStorage.removeItem(storageKey);
+  }
+});
+</script>
 {% endblock %}

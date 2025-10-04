@@ -7,84 +7,46 @@
   </div>
 
   <div class="filter-bar">
-    {% set selected_items = [] %}
-    {% if x_filter %}{% set _ = selected_items.append(x_filter) %}{% endif %}
-    {% if y_filter %}{% set _ = selected_items.append(y_filter) %}{% endif %}
-    {% if availability_filter %}{% set _ = selected_items.append(availability_filter) %}{% endif %}
-    {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
-
     <button type="button" class="filter-toggle" onclick="toggleFilters()">
-      <span id="filter-summary">{{ filter_summary }}</span>
+      <span id="filter-summary">全部显示</span>
       <span class="toggle-icon" id="filter-toggle-icon">▼</span>
     </button>
 
-    <form class="filter-form is-collapsed" id="filter-form" method="get">
+    <div class="filter-form is-collapsed" id="filter-form">
       <div class="filter-group">
         <label class="filter-label">基地</label>
-        <select class="filter-select" name="x" onchange="this.form.submit()">
-          <option value="">全部</option>
-          {% for x in x_choices %}
-          <option value="{{ x }}" {% if x_filter==x %}selected{% endif %}>{{ x }}</option>
-          {% endfor %}
+        <select class="filter-select" id="filter-x">
+          <option value="">全部基地</option>
         </select>
       </div>
 
       <div class="filter-group">
         <label class="filter-label">场地</label>
-        <select class="filter-select" name="y" onchange="this.form.submit()">
-          <option value="">全部</option>
-          {% for y in y_choices %}
-          <option value="{{ y }}" {% if y_filter==y %}selected{% endif %}>{{ y }}</option>
-          {% endfor %}
+        <select class="filter-select" id="filter-y">
+          <option value="">全部场地</option>
         </select>
       </div>
 
       <div class="filter-group">
         <label class="filter-label">可用性</label>
-        <select class="filter-select" name="availability" onchange="this.form.submit()">
-          <option value="">全部</option>
-          {% for val, label in availability_choices %}
-          <option value="{{ val }}" {% if availability_filter==val %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
+        <select class="filter-select" id="filter-availability">
+          <option value="">全部可用性</option>
         </select>
       </div>
-    </form>
+    </div>
   </div>
 
   <div class="area-list">
-    {% if areas and areas|length > 0 %}
-      <div class="area-cards">
-        {% for a in areas %}
-        <a href="{{ url_for('battle_area.area_detail', area_id=(a.id|string)) }}" class="area-card">
-          <div class="card-header">
-            <div class="area-info">
-              <div class="area-name">{{ a.x_coord }} - {{ a.y_coord }}</div>
-              <div class="area-sub">座位：{{ a.z_coord }}</div>
-            </div>
-            <div class="area-meta">
-              <div class="badges">
-                <span class="availability-badge availability-{{ a.availability.value }}">{{ a.availability.value }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div class="meta-inline">
-              <span class="muted">X: {{ a.x_coord }}</span>
-              <span class="muted">Y: {{ a.y_coord }}</span>
-              <span class="muted">Z: {{ a.z_coord }}</span>
-            </div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="empty-state">
-        <div class="empty-icon">🛰️</div>
-        <div class="empty-title">暂无战斗区域</div>
-        <div class="empty-description">点击下方“新建开播地点”创建第一个区域</div>
-      </div>
-    {% endif %}
+    <div id="loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div id="area-cards-container" class="area-cards" style="display: none;"></div>
+    <div id="empty-state" class="empty-state" style="display: none;">
+      <div class="empty-icon">🛰️</div>
+      <div class="empty-title">暂无战斗区域</div>
+      <div class="empty-description">点击下方“新建开播地点”创建第一个区域</div>
+    </div>
   </div>
 </section>
 
@@ -98,6 +60,30 @@
 </div>
 
 <style>
+
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 4px solid var(--table-header);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px;
+}
 
 .area-cards { display: block; }
 .area-card {
@@ -132,7 +118,6 @@
 .filter-form.is-collapsed { display: none; }
 .filter-form { margin-bottom: 12px; }
 
-
 .footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
 .footbar .inner { display: flex; justify-content: center; }
 .container { padding-bottom: 88px; }
@@ -142,6 +127,10 @@
 }
 </style>
 <script>
+let filterOptions = { x_choices: [], y_choices: [], availability_choices: [] };
+let currentFilters = { x: '', y: '', availability: '' };
+let suppressFilterChange = false;
+
 function toggleFilters() {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
@@ -149,17 +138,174 @@ function toggleFilters() {
   icon.textContent = collapsed ? '▼' : '▲';
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+function showLoading(isLoading) {
+  document.getElementById('loading-state').style.display = isLoading ? 'block' : 'none';
+  document.getElementById('area-cards-container').style.display = isLoading ? 'none' : 'block';
+  document.getElementById('empty-state').style.display = 'none';
+}
+
+function updateFilterSummary() {
+  const summary = [];
+  if (currentFilters.x) summary.push(currentFilters.x);
+  if (currentFilters.y) summary.push(currentFilters.y);
+  if (currentFilters.availability) summary.push(currentFilters.availability);
+  document.getElementById('filter-summary').textContent = summary.length ? summary.join(' + ') : '全部显示';
+}
+
+function populateSelect(selectEl, choices, currentValue, placeholderText) {
+  const previousValue = currentValue || '';
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = placeholderText;
+
+  selectEl.innerHTML = '';
+  selectEl.appendChild(placeholderOption);
+
+  choices.forEach(choice => {
+    const option = document.createElement('option');
+    option.value = choice;
+    option.textContent = choice;
+    selectEl.appendChild(option);
+  });
+
+  selectEl.value = previousValue;
+}
+
+function populateFilters() {
+  suppressFilterChange = true;
+  const xSelect = document.getElementById('filter-x');
+  const ySelect = document.getElementById('filter-y');
+  const availabilitySelect = document.getElementById('filter-availability');
+
+  populateSelect(xSelect, filterOptions.x_choices, currentFilters.x, '全部基地');
+  populateSelect(ySelect, filterOptions.y_choices, currentFilters.y, '全部场地');
+  populateSelect(availabilitySelect, filterOptions.availability_choices, currentFilters.availability, '全部可用性');
+
+  suppressFilterChange = false;
+}
+
+function renderAreaList(items) {
+  const container = document.getElementById('area-cards-container');
+  container.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    container.style.display = 'none';
+    const empty = document.getElementById('empty-state');
+    empty.style.display = 'block';
+    return;
+  }
+
+  container.style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+
+  items.forEach(item => {
+    const card = document.createElement('a');
+    card.className = 'area-card';
+    card.href = `/areas/${item.id}`;
+
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="area-info">
+          <div class="area-name">${item.x_coord} - ${item.y_coord}</div>
+          <div class="area-sub">座位：${item.z_coord}</div>
+        </div>
+        <div class="area-meta">
+          <div class="badges">
+            <span class="availability-badge availability-${item.availability}">${item.availability}</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="meta-inline">
+          <span class="muted">X: ${item.x_coord}</span>
+          <span class="muted">Y: ${item.y_coord}</span>
+          <span class="muted">Z: ${item.z_coord}</span>
+        </div>
+        <div class="card-arrow">→</div>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+async function loadAreas({ useCurrentFilters } = { useCurrentFilters: false }) {
+  try {
+    showLoading(true);
+    let query = '';
+    if (useCurrentFilters) {
+      const params = new URLSearchParams();
+      params.append('x', currentFilters.x || '');
+      params.append('y', currentFilters.y || '');
+      params.append('availability', currentFilters.availability || '');
+      query = params.toString();
+    }
+
+    const response = await fetch(`/api/battle-areas${query ? `?${query}` : ''}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载开播地点列表失败');
+    }
+
+    filterOptions = result.meta?.options || filterOptions;
+    currentFilters = {
+      x: result.meta?.filters?.x || '',
+      y: result.meta?.filters?.y || '',
+      availability: result.meta?.filters?.availability || '',
+    };
+
+    populateFilters();
+    updateFilterSummary();
+    renderAreaList(result.data?.items || []);
+  } catch (error) {
+    console.error('加载开播地点列表失败:', error);
+    showMessage(error.message || '加载开播地点列表失败', 'error');
+    document.getElementById('area-cards-container').style.display = 'none';
+    const empty = document.getElementById('empty-state');
+    empty.style.display = 'block';
+    empty.querySelector('.empty-title').textContent = '加载失败';
+    empty.querySelector('.empty-description').textContent = '请刷新页面重试';
+  } finally {
+    showLoading(false);
+  }
+}
+
+function bindFilterEvents() {
+  const xSelect = document.getElementById('filter-x');
+  const ySelect = document.getElementById('filter-y');
+  const availabilitySelect = document.getElementById('filter-availability');
+
+  xSelect.addEventListener('change', () => {
+    if (suppressFilterChange) return;
+    currentFilters.x = xSelect.value;
+    if (!currentFilters.x) {
+      currentFilters.y = '';
+    }
+    loadAreas({ useCurrentFilters: true });
+  });
+
+  ySelect.addEventListener('change', () => {
+    if (suppressFilterChange) return;
+    currentFilters.y = ySelect.value;
+    loadAreas({ useCurrentFilters: true });
+  });
+
+  availabilitySelect.addEventListener('change', () => {
+    if (suppressFilterChange) return;
+    currentFilters.availability = availabilitySelect.value;
+    loadAreas({ useCurrentFilters: true });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
-  const hasQuery = window.location.search.length > 1;
-  if (!hasQuery) {
-    if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
-    icon.textContent = '▼';
-  } else {
-    form.classList.remove('is-collapsed');
-    icon.textContent = '▲';
-  }
+  if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
+  icon.textContent = '▼';
+
+  bindFilterEvents();
+  loadAreas();
 });
 </script>
 {% endblock %}

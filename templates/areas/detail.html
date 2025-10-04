@@ -2,22 +2,28 @@
 {% block title %}开播地点详情 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="area-detail">
+  <div class="back-nav">
+    <a class="btn btn-secondary" href="{{ url_for('battle_area.list_areas') }}">
+      <span class="icon">←</span>
+      返回列表
+    </a>
+  </div>
   <div class="page-header"><h1 class="page-title">开播地点详情</h1></div>
 
-  <div class="area-card-detail">
-    <div class="row"><span class="label">基地</span><span class="value">{{ area.x_coord }}</span></div>
-    <div class="row"><span class="label">场地</span><span class="value">{{ area.y_coord }}</span></div>
-    <div class="row"><span class="label">坐席</span><span class="value">{{ area.z_coord }}</span></div>
-    <div class="row"><span class="label">可用性</span><span class="value">{{ area.availability.value }}</span></div>
-    <div class="row"><span class="label">创建时间</span><span class="value">{{ area.created_at }}</span></div>
-    <div class="row"><span class="label">更新时间</span><span class="value">{{ area.updated_at }}</span></div>
+  <div class="area-card-detail" id="area-detail-card">
+    <div class="row"><span class="label">基地</span><span class="value" id="detail-x">-</span></div>
+    <div class="row"><span class="label">场地</span><span class="value" id="detail-y">-</span></div>
+    <div class="row"><span class="label">坐席</span><span class="value" id="detail-z">-</span></div>
+    <div class="row"><span class="label">可用性</span><span class="value" id="detail-availability">-</span></div>
+    <div class="row"><span class="label">创建时间</span><span class="value" id="detail-created">-</span></div>
+    <div class="row"><span class="label">更新时间</span><span class="value" id="detail-updated">-</span></div>
   </div>
 </section>
 
 <div class="footbar">
   <div class="inner">
-    <a class="btn" href="{{ url_for('battle_area.edit_area', area_id=area.id) }}">编辑</a>
-    <a class="btn btn-primary" href="{{ url_for('battle_area.generate_areas', area_id=area.id) }}">生成更多</a>
+    <a class="btn" id="edit-link" href="#">编辑</a>
+    <a class="btn btn-primary" id="generate-link" href="#">生成更多</a>
   </div>
 </div>
 
@@ -28,8 +34,52 @@
 .area-card-detail .label { color: var(--muted); font-size: 12px; }
 .area-card-detail .value { color: var(--text); font-size: 14px; }
 
+.back-nav { margin-bottom: 12px; }
+.back-nav .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; }
+.back-nav .icon { font-size: 16px; }
+
 .footbar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--table-header); box-shadow: 0 -2px 8px rgba(0,0,0,0.06); padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px; z-index: 100; }
 .footbar .inner { display: flex; gap: 12px; justify-content: center; }
 .container { padding-bottom: 88px; }
 </style>
+<script>
+const areaId = '{{ area_id }}';
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+
+async function loadAreaDetail() {
+  try {
+    const response = await fetch(`/api/battle-areas/${areaId}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载开播地点详情失败');
+    }
+
+    const data = result.data;
+    document.getElementById('detail-x').textContent = data.x_coord || '-';
+    document.getElementById('detail-y').textContent = data.y_coord || '-';
+    document.getElementById('detail-z').textContent = data.z_coord || '-';
+    document.getElementById('detail-availability').textContent = data.availability || '-';
+    document.getElementById('detail-created').textContent = formatDate(data.created_at);
+    document.getElementById('detail-updated').textContent = formatDate(data.updated_at);
+
+    document.getElementById('edit-link').href = `/areas/${areaId}/edit`;
+    document.getElementById('generate-link').href = `/areas/${areaId}/generate`;
+  } catch (error) {
+    console.error('加载开播地点详情失败:', error);
+    showMessage(error.message || '加载开播地点详情失败', 'error');
+    setTimeout(() => {
+      window.location.href = '/areas';
+    }, 1500);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadAreaDetail);
+</script>
 {% endblock %}
