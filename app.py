@@ -8,6 +8,7 @@ from mongoengine import connect
 
 from routes.admin import admin_bp
 from routes.announcement import announcement_bp
+from routes.announcements_api import announcements_api_bp
 from routes.battle_area import battle_area_bp
 from routes.battle_areas_api import battle_areas_api_bp
 from routes.battle_record import battle_record_bp
@@ -92,6 +93,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(pilots_api_bp)
     flask_app.register_blueprint(commissions_api_bp)
     flask_app.register_blueprint(recruits_api_bp)
+    flask_app.register_blueprint(announcements_api_bp)
     flask_app.register_blueprint(battle_areas_api_bp)
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')
     flask_app.register_blueprint(recruit_bp, url_prefix='/recruits')

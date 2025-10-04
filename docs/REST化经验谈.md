@@ -145,35 +145,40 @@ async function apiRequest(url, options = {}) {
 ### 10.2 现有 JSON / REST 接口
 | 功能 | 方法 | 路径 | 说明 |
 | --- | --- | --- | --- |
-| 冲突预检查 | POST | `/announcements/check-conflicts` | 接收 JSON 表单，返回计划实例与冲突列表；编辑循环时依赖 `exclude_id`、`edit_scope`。|
-| 通告变更记录 | GET | `/announcements/<id>/changes` | 返回最近 100 条字段变更，字段名、操作者、IP 等已封装为 JSON。|
-| 获取场地联动（基地→场地） | GET | `/announcements/api/areas/<x_coord>` | 返回可用场地列表，保持字典序。|
-| 获取坐席联动（基地+场地→坐席） | GET | `/announcements/api/areas/<x_coord>/<y_coord>` | 返回可用坐席及 `battle_area_id`，支持数字排序。|
-| 主播筛选器枚举 | GET | `/announcements/api/pilot-filters` | 返回直属运营、主播分类枚举，用于前端本地搜索。|
-| 按所属筛选主播 | GET | `/announcements/api/pilots/by-owner/<owner_id>` | 用于快速锁定直属运营名下主播，`owner_id=none` 表示无所属。|
+| 通告列表 | GET | `/announcements/api/announcements` | 复用 session 筛选，返回 `items` 与当前筛选、可选项元信息。|
+| 通告详情 | GET | `/announcements/api/announcements/<id>` | 返回通告基础信息、循环信息、审计信息及相关事件列表。|
+| 新建通告 | POST | `/announcements/api/announcements` | 统一 JSON 提交，落库前执行冲突校验，返回重定向地址与提示文案。|
+| 更新通告 | PATCH | `/announcements/api/announcements/<id>` | 支持 `edit_scope`=`this_only`/`future_all`，复用循环拆分逻辑并写入变更记录。|
+| 删除通告 | DELETE | `/announcements/api/announcements/<id>` | 接受 `delete_scope`，返回影响数量与提示信息。|
+| 冲突预检查 | POST | `/announcements/api/check-conflicts` | 返回计划实例与冲突列表；编辑循环时需要传入 `exclude_id`、`edit_scope`。|
+| 通告变更记录 | GET | `/announcements/api/announcements/<id>/changes` | 返回最近 100 条字段变更，字段名、操作者、IP 等字段齐备。|
+| 基地选项 | GET | `/announcements/api/areas/options` | 返回可用基地列表及默认值。|
+| 获取场地联动 | GET | `/announcements/api/areas/<x_coord>` | 返回指定基地下的可用场地列表。|
+| 获取坐席联动 | GET | `/announcements/api/areas/<x_coord>/<y_coord>` | 返回指定基地+场地下的坐席与 `battle_area_id`。|
+| 主播筛选器枚举 | GET | `/announcements/api/pilot-filters` | 返回直属运营、主播分类枚举，用于本地搜索。|
 | 条件过滤主播列表 | GET | `/announcements/api/pilots-filtered` | 支持 `owner`、`rank` 筛选，返回昵称、真实姓名、状态等信息。|
+| 按所属筛选主播 | GET | `/announcements/api/pilots/by-owner/<owner_id>` | 快速列出指定运营/无所属名下的主播，供选择器使用。|
 
-> 以上接口已部分采用统一的 `success/error` 包装，但尚未纳入统一序列化/错误码工具，需要在后续改造中补齐。
+所有接口统一使用 `success/data/error/meta` 结构，并通过 `utils/announcement_serializers` 提供字段收敛。
 
-### 10.3 仍由模板 / 表单承担的能力
-- `/announcements/`：列表页含筛选持久化、卡片渲染、100 条限制。
-- `/announcements/new` 与 `/announcements/<id>/edit`：表单提交负责创建/编辑/循环拆分；最终提交前仍会调用一次冲突检查。
-- `/announcements/<id>/delete`：POST 表单触发删除，包含循环范围判断。
-- `/announcements/cleanup` 与 `/announcements/cleanup/delete-future`：面向“流失”主播的批量清理仍是同步表单流程。
-- `/announcements/export`：生成整月通告预定表，继续依赖模板渲染。
+### 10.3 模板与 API 协作方式
+- `/announcements/`：页面骨架由模板渲染，数据加载完全依赖 `GET /announcements/api/announcements`，筛选、搜索均在前端处理。
+- `/announcements/new`、`/announcements/<id>/edit`：表单展示由模板负责（含默认值），校验与提交改为调用 REST API，仍要求先运行冲突检查再提交。
+- `/announcements/<id>`：详情信息继续由模板渲染，但删除、变更记录等操作均使用 REST API（变更记录弹窗、删除按钮）。
+- `/announcements/cleanup`、`/announcements/export`：暂保持模板同步流程，后续可视需求补充 API。
 
-### 10.4 REST 化落地重点
-1. **拆分读写**：优先抽离列表、详情等只读接口，`GET /announcements/api/list` 应复用现有筛选逻辑（时间默认值、session 持久化），并返回分页元信息，避免一次性返回全部数据。
-2. **循环与冲突保持一致**：`Announcement.generate_recurrence_instances`、`split_recurrence_group_from_current()` 等方法要复用在 REST 层，防止新接口绕过既有校验导致孤儿循环。
-3. **冲突检查前置**：新增 REST 写接口时，仍需在落库前调用 `/check-conflicts` 或内嵌同样逻辑，确保“先检查再提交”的体验不变。
-4. **清理功能拆分**：若要为通告清理提供 API，需保留 GMT+8→UTC 边界换算与“不可恢复”提示，建议在 REST 层返回受影响条数以及二次确认提示文案。
-5. **日志与变更记录**：REST 写接口必须调用 `_record_changes` 并写 INFO 日志（操作者、坐席、时间段），以保持现有审计链路。
+### 10.4 实施重点与注意事项
+1. **冲突检查仍是第一道闸**：无论新建还是编辑接口，均需在落库前调度 `check-conflicts` 逻辑，返回冲突明细与计划实例。
+2. **循环组操作复用模型方法**：更新/删除时仍调用 `split_recurrence_group_from_current()`、`get_future_announcements_in_group()` 等方法，确保循环组数据一致。
+3. **序列化集中维护**：所有通告相关响应通过 `utils/announcement_serializers` 出口，新增字段需同步更新序列化与前端解析。
+4. **前端统一 fetch 封装**：提交请求时默认带上 `X-CSRFToken`，错误信息通过 `showMessage` 提示，加载态使用全局 overlay。
+5. **审计链路不可缺席**：API 层更新/删除操作必须写 INFO 日志并调用 `_record_changes`，维持与历史操作一致的审计记录。
 
-### 10.5 实施顺序建议
-1. 列表/详情改造：补齐 `GET /announcements/api/<id>`、`/api/list`，页面以 AJAX 渲染卡片但继续沿用既有模板骨架。
-2. 表单双轨期：在前端保留旧表单提交入口，同时新增 JS 版提交，待 API 稳定后再逐步下线旧表单。
-3. 清理与导出：可保持模板渲染，但补充 REST 导出与清理 API 以便后续前端改造；导出接口需复用 `generate_export_table()`，保证字段一致。
-4. 最终收敛：前端逐渐切换到统一的 fetch 封装，并通过 `create_success_response` / `create_error_response` 生成响应，完成与本经验谈其余章节的统一。
+### 10.5 后续优化方向
+1. **清理与导出 API 化**：参考现有模式补充 `/announcements/api/cleanup`、`/announcements/api/export`，逐步下线同步表单。
+2. **详情页数据切换**：后续可将详情主体也迁移到 REST 数据源，模板仅保留骨架。
+3. **批量操作封装**：复用通用的 `fetchJson` 封装，减少各页面重复代码，统一错误与 loading 体验。
+4. **复杂校验下沉服务层**：随着接口扩展，可将冲突校验、循环拆分抽离到 `services/announcement_service.py`，降低 API 函数复杂度。
 
 ---
 保持这份经验谈的及时更新，可以显著降低后续 REST 改造的沟通与排错成本。

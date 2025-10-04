@@ -9,52 +9,25 @@
     </div>
 
     <div class="filter-bar">
-        {% set selected_items = [] %}
-        {% if owner_filter %}
-            {% for value, display in owner_choices %}
-                {% if value and owner_filter == value %}{% set _ = selected_items.append(display) %}{% endif %}
-            {% endfor %}
-        {% endif %}
-        {% if x_filter %}{% set _ = selected_items.append('基地:' + x_filter) %}{% endif %}
-        {% if time_scope %}
-            {% if time_scope == 'two_days' %}{% set _ = selected_items.append('这两天') %}
-            {% elif time_scope == 'today' %}{% set _ = selected_items.append('今天') %}
-            {% elif time_scope == 'seven_days' %}{% set _ = selected_items.append('近7天') %}
-            {% endif %}
-        {% endif %}
-        {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
-        
         <button type="button" class="filter-toggle" onclick="toggleFilters()">
-            <span id="filter-summary">{{ filter_summary }}</span>
+            <span id="filter-summary">全部显示</span>
             <span class="toggle-icon" id="filter-toggle-icon">▼</span>
         </button>
         
-        <form class="filter-form is-collapsed" id="filter-form" method="GET">
+        <form class="filter-form is-collapsed" id="filter-form" onsubmit="return false;">
             <div class="filter-group">
                 <label class="filter-label">直属运营</label>
-                <select class="filter-select" name="owner" onchange="this.form.submit()">
-                    {% for value, label in owner_choices %}
-                    <option value="{{ value }}" {% if owner_filter == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
+                <select class="filter-select" id="filter-owner"></select>
             </div>
 
             <div class="filter-group">
                 <label class="filter-label">基地</label>
-                <select class="filter-select" name="x" onchange="this.form.submit()">
-                    {% for value, label in x_choices %}
-                    <option value="{{ value }}" {% if x_filter == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
+                <select class="filter-select" id="filter-x"></select>
             </div>
 
             <div class="filter-group">
                 <label class="filter-label">时间</label>
-                <select class="filter-select" name="time" onchange="this.form.submit()">
-                    {% for value, label in time_choices %}
-                    <option value="{{ value }}" {% if (time_scope or 'two_days') == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
+                <select class="filter-select" id="filter-time"></select>
             </div>
         </form>
     </div>
@@ -69,63 +42,12 @@
     </div>
 
     <div class="announcement-list">
-        {% if announcements %}
-            <div class="announcement-cards">
-                {% for announcement in announcements %}
-                <a href="{{ url_for('announcement.announcement_detail', announcement_id=announcement.id) }}" class="announcement-card">
-                    <div class="card-header">
-                        <div class="pilot-info">
-                            <div class="pilot-name">{{ announcement.pilot.nickname }}</div>
-                            <div class="pilot-details">
-                                {% if announcement.pilot.real_name %}
-                                <span class="real-name">[{{ announcement.pilot.real_name }}]</span>
-                                {% endif %}
-                                <span class="rank">{{ announcement.pilot.rank.value }}</span>
-                                {% if announcement.pilot.owner %}
-                                <span class="owner">- {{ announcement.pilot.owner.nickname or announcement.pilot.owner.username }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="time-info">
-                            <span class="start-time">{{ announcement.start_time | local_datetime('%m-%d %H:%M') }}</span>
-                            <span class="duration">{{ announcement.duration_display }}</span>
-                        </div>
-                    </div>
-
-                    <div class="announcement-body">
-                        <div class="coords">
-                            <span class="coord-label">开播地点：</span>
-                            <span class="coords-value">{{ announcement.x_coord }}-{{ announcement.y_coord }}-{{ announcement.z_coord }}</span>
-                        </div>
-                        {% if announcement.recurrence_type.value != '无重复' %}
-                        <div class="recurrence">
-                            <span class="recurrence-label">循环：</span>
-                            <span class="recurrence-value">{{ announcement.recurrence_display }}</span>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="card-footer">
-                        <div class="announcement-meta">
-                            <span class="created-time">创建：{{ announcement.created_at | local_datetime('%Y-%m-%d %H:%M') }}</span>
-                            {% if announcement.parent_announcement %}
-                            <span class="parent-indicator">循环事件</span>
-                            {% elif announcement.recurrence_type.value != '无重复' %}
-                            <span class="parent-indicator">循环组</span>
-                            {% endif %}
-                        </div>
-                        <div class="card-arrow">→</div>
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">📋</div>
-                <div class="empty-title">暂无通告数据</div>
-                <div class="empty-description">点击下方"新建通告"按钮创建第一个通告</div>
-            </div>
-        {% endif %}
+        <div id="announcement-cards-container" class="announcement-cards"></div>
+        <div id="empty-state" class="empty-state" style="display:none;">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">暂无通告数据</div>
+            <div class="empty-description">点击下方"新建通告"按钮创建第一个通告</div>
+        </div>
     </div>
 </section>
 
@@ -465,99 +387,277 @@
 </style>
 
 <script>
-function toggleFilters() {
-    const form = document.getElementById('filter-form');
-    const icon = document.getElementById('filter-toggle-icon');
-    const collapsed = form.classList.toggle('is-collapsed');
-    icon.textContent = collapsed ? '▼' : '▲';
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('filter-form');
-    const icon = document.getElementById('filter-toggle-icon');
-    const hasQuery = window.location.search.length > 1;
-    if (!hasQuery) {
-        if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
-        icon.textContent = '▼';
-    } else {
-        form.classList.remove('is-collapsed');
-        icon.textContent = '▲';
-    }
-    initAnnouncementSearch();
-});
-
+const filtersFromServer = {{ filters | tojson }} || {};
+let filterOptions = { owners: [], x_coords: [], time_ranges: [] };
+let currentFilters = {
+  owner: filtersFromServer.owner || '',
+  x: filtersFromServer.x || '',
+  time: filtersFromServer.time || 'two_days',
+};
 let allAnnouncements = [];
+let suppressFilterChange = false;
 
-function performAnnouncementSearch() {
-    const searchInput = document.getElementById('announcement-pilot-search');
-    const searchTerm = (searchInput.value || '').trim().toLowerCase();
+function toggleFilters() {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  if (!form || !icon) return;
+  const collapsed = form.classList.toggle('is-collapsed');
+  icon.textContent = collapsed ? '▼' : '▲';
+}
 
-    if (!searchTerm) {
-        showAllAnnouncements();
-        return;
+function showLoading(isLoading) {
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
+  overlay.style.display = isLoading ? 'flex' : 'none';
+}
+
+function updateFilterSummary() {
+  const summaryEl = document.getElementById('filter-summary');
+  if (!summaryEl) return;
+  const parts = [];
+  if (currentFilters.owner) {
+    const ownerOption = filterOptions.owners.find(item => item.value === currentFilters.owner);
+    if (ownerOption) parts.push(ownerOption.label);
+  }
+  if (currentFilters.x) {
+    parts.push(`基地:${currentFilters.x}`);
+  }
+  if (currentFilters.time) {
+    const timeOption = filterOptions.time_ranges.find(item => item.value === currentFilters.time);
+    if (timeOption) parts.push(timeOption.label);
+  }
+  summaryEl.textContent = parts.length > 0 ? parts.join(' + ') : '全部显示';
+}
+
+function populateFilters() {
+  suppressFilterChange = true;
+  try {
+    const ownerSelect = document.getElementById('filter-owner');
+    const xSelect = document.getElementById('filter-x');
+    const timeSelect = document.getElementById('filter-time');
+
+    if (ownerSelect) {
+      ownerSelect.innerHTML = '';
+      filterOptions.owners.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        if (option.value === currentFilters.owner) opt.selected = true;
+        ownerSelect.appendChild(opt);
+      });
     }
 
-    const filtered = allAnnouncements.filter(item => {
-        const nickname = (item.nickname || '').toLowerCase();
-        const realName = (item.realName || '').toLowerCase();
-        return nickname.includes(searchTerm) || realName.includes(searchTerm);
-    });
+    if (xSelect) {
+      xSelect.innerHTML = '';
+      filterOptions.x_coords.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        if (option.value === currentFilters.x) opt.selected = true;
+        xSelect.appendChild(opt);
+      });
+    }
 
-    showFilteredAnnouncements(filtered);
+    if (timeSelect) {
+      timeSelect.innerHTML = '';
+      filterOptions.time_ranges.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option.value;
+        opt.textContent = option.label;
+        if (option.value === currentFilters.time) opt.selected = true;
+        timeSelect.appendChild(opt);
+      });
+    }
+  } finally {
+    suppressFilterChange = false;
+  }
+  updateFilterSummary();
 }
 
-function showAllAnnouncements() {
-    const cards = document.querySelectorAll('.announcement-card');
-    cards.forEach(card => { card.style.display = 'block'; });
-    updateAnnouncementEmptyState(cards.length > 0);
-}
+function renderAnnouncementCard(item) {
+  const card = document.createElement('a');
+  card.className = 'announcement-card';
+  card.href = `/announcements/${item.id}`;
 
-function showFilteredAnnouncements(filtered) {
-    const idSet = new Set(filtered.map(i => i.id));
-    const cards = document.querySelectorAll('.announcement-card');
-    cards.forEach(card => {
-        const id = (card.getAttribute('href') || '').split('/').pop();
-        if (idSet.has(id)) {
-            card.style.display = 'block';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-    updateAnnouncementEmptyState(filtered.length > 0);
+  const ownerDisplay = item.pilot.owner && item.pilot.owner.display_name ? `- ${item.pilot.owner.display_name}` : '';
+  const recurrenceHtml = item.recurrence && item.recurrence.display && item.recurrence.display !== '不重复'
+    ? `<div class="recurrence"><span class="recurrence-label">循环：</span><span class="recurrence-value">${item.recurrence.display}</span></div>`
+    : '';
+  const parentIndicator = item.recurrence && item.recurrence.indicator ? `<span class="parent-indicator">${item.recurrence.indicator}</span>` : '';
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="pilot-info">
+        <div class="pilot-name">${item.pilot.nickname || ''}</div>
+        <div class="pilot-details">
+          ${item.pilot.real_name ? `<span class="real-name">[${item.pilot.real_name}]</span>` : ''}
+          <span class="rank">${item.pilot.rank || ''}</span>
+          ${ownerDisplay ? `<span class="owner">${ownerDisplay}</span>` : ''}
+        </div>
+      </div>
+      <div class="time-info">
+        <span class="start-time">${item.start_time.display || ''}</span>
+        <span class="duration">${item.duration.display || ''}</span>
+      </div>
+    </div>
+    <div class="announcement-body">
+      <div class="coords">
+        <span class="coord-label">开播地点：</span>
+        <span class="coords-value">${item.coordinates.display || ''}</span>
+      </div>
+      ${recurrenceHtml}
+    </div>
+    <div class="card-footer">
+      <div class="announcement-meta">
+        <span class="created-time">创建：${item.created_at.display || ''}</span>
+        ${parentIndicator}
+      </div>
+      <div class="card-arrow">→</div>
+    </div>
+  `;
+
+  return card;
 }
 
 function updateAnnouncementEmptyState(hasResults) {
-    const emptyState = document.querySelector('.empty-state');
-    if (emptyState) {
-        emptyState.style.display = hasResults ? 'none' : 'block';
-    }
+  const emptyState = document.getElementById('empty-state');
+  const container = document.getElementById('announcement-cards-container');
+  if (!emptyState || !container) return;
+  emptyState.style.display = hasResults ? 'none' : 'block';
+  container.style.display = hasResults ? 'block' : 'none';
 }
 
-function initAnnouncementSearch() {
-    const cards = document.querySelectorAll('.announcement-card');
-    allAnnouncements = Array.from(cards).map(card => {
-        const nicknameEl = card.querySelector('.pilot-name');
-        const realNameEl = card.querySelector('.pilot-details .real-name');
-        const href = card.getAttribute('href') || '';
-        return {
-            id: href.split('/').pop(),
-            nickname: nicknameEl ? nicknameEl.textContent.trim() : '',
-            realName: realNameEl ? realNameEl.textContent.replace(/[\[\]]/g, '').trim() : ''
-        };
+function renderAnnouncementList(items, { isFiltered = false } = {}) {
+  const container = document.getElementById('announcement-cards-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  if (!Array.isArray(items) || items.length === 0) {
+    updateAnnouncementEmptyState(false);
+    if (!isFiltered) {
+      allAnnouncements = [];
+    }
+    return;
+  }
+
+  items.forEach(item => {
+    container.appendChild(renderAnnouncementCard(item));
+  });
+
+  updateAnnouncementEmptyState(true);
+  if (!isFiltered) {
+    allAnnouncements = items;
+  }
+}
+
+async function loadAnnouncements({ useCurrentFilters = false } = {}) {
+  try {
+    showLoading(true);
+    const params = new URLSearchParams();
+    if (useCurrentFilters) {
+      if (currentFilters.owner) params.append('owner', currentFilters.owner);
+      if (currentFilters.x) params.append('x', currentFilters.x);
+      if (currentFilters.time) params.append('time', currentFilters.time);
+    }
+
+    const queryString = params.toString();
+    const response = await fetch(`/announcements/api/announcements${queryString ? `?${queryString}` : ''}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载通告列表失败');
+    }
+
+    filterOptions = result.meta?.options || filterOptions;
+    currentFilters = {
+      owner: result.meta?.filters?.owner || '',
+      x: result.meta?.filters?.x || '',
+      time: result.meta?.filters?.time || 'two_days',
+    };
+
+    populateFilters();
+    renderAnnouncementList(result.data?.items || []);
+  } catch (error) {
+    console.error('加载通告列表失败:', error);
+    showMessage(error.message || '加载通告列表失败', 'error');
+    renderAnnouncementList([], { isFiltered: true });
+  } finally {
+    showLoading(false);
+  }
+}
+
+function bindFilterEvents() {
+  const ownerSelect = document.getElementById('filter-owner');
+  const xSelect = document.getElementById('filter-x');
+  const timeSelect = document.getElementById('filter-time');
+
+  if (ownerSelect) {
+    ownerSelect.addEventListener('change', () => {
+      if (suppressFilterChange) return;
+      currentFilters.owner = ownerSelect.value;
+      loadAnnouncements({ useCurrentFilters: true });
     });
+  }
 
-    const searchInput = document.getElementById('announcement-pilot-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', performAnnouncementSearch);
-        searchInput.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                performAnnouncementSearch();
-            } else if (event.key === 'Backspace' || event.key === 'Delete') {
-                setTimeout(performAnnouncementSearch, 10);
-            }
-        });
-    }
+  if (xSelect) {
+    xSelect.addEventListener('change', () => {
+      if (suppressFilterChange) return;
+      currentFilters.x = xSelect.value;
+      loadAnnouncements({ useCurrentFilters: true });
+    });
+  }
+
+  if (timeSelect) {
+    timeSelect.addEventListener('change', () => {
+      if (suppressFilterChange) return;
+      currentFilters.time = timeSelect.value;
+      loadAnnouncements({ useCurrentFilters: true });
+    });
+  }
 }
+
+function performAnnouncementSearch() {
+  const searchInput = document.getElementById('announcement-pilot-search');
+  if (!searchInput) return;
+  const keyword = (searchInput.value || '').trim().toLowerCase();
+
+  if (!keyword) {
+    renderAnnouncementList(allAnnouncements, { isFiltered: true });
+    return;
+  }
+
+  const filtered = allAnnouncements.filter(item => {
+    const nickname = (item.pilot.nickname || '').toLowerCase();
+    const realName = (item.pilot.real_name || '').toLowerCase();
+    return nickname.includes(keyword) || realName.includes(keyword);
+  });
+
+  renderAnnouncementList(filtered, { isFiltered: true });
+}
+
+function bindSearchEvents() {
+  const searchInput = document.getElementById('announcement-pilot-search');
+  if (!searchInput) return;
+  searchInput.addEventListener('input', performAnnouncementSearch);
+  searchInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      performAnnouncementSearch();
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  if (form && icon) {
+    form.classList.add('is-collapsed');
+    icon.textContent = '▼';
+  }
+
+  bindFilterEvents();
+  bindSearchEvents();
+  loadAnnouncements();
+});
 </script>
 {% endblock %}

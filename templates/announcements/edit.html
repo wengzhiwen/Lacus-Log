@@ -41,25 +41,22 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="x_coord" class="required">基地：</label>
-                        <select name="x_coord" id="x_coord" required>
+                        <select name="x_coord" id="x_coord" required data-current="{{ announcement.x_coord }}">
                             <option value="">请选择基地</option>
-                            {% for x_coord in battle_area_choices.keys()|sort %}
-                            <option value="{{ x_coord }}" {% if announcement.x_coord == x_coord %}selected{% endif %}>{{ x_coord }}</option>
-                            {% endfor %}
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="y_coord" class="required">场地：</label>
-                        <select name="y_coord" id="y_coord" required>
-                            <option value="">请选择场地</option>
+                        <select name="y_coord" id="y_coord" required data-current="{{ announcement.y_coord }}" disabled>
+                            <option value="">请先选择基地</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="z_coord" class="required">坐席：</label>
-                        <select name="z_coord" id="z_coord" required>
-                            <option value="">请选择坐席</option>
+                        <select name="z_coord" id="z_coord" required data-current="{{ announcement.battle_area.id if announcement.battle_area else '' }}" disabled>
+                            <option value="">请先选择场地</option>
                         </select>
                         <input type="hidden" name="battle_area" id="battle_area" value="{{ announcement.battle_area.id if announcement.battle_area else '' }}">
                     </div>
@@ -484,220 +481,296 @@
 </style>
 
 <script>
-const currentX = '{{ announcement.x_coord }}';
-const currentY = '{{ announcement.y_coord }}';
-const currentBattleAreaId = '{{ announcement.battle_area.id }}';
-const currentPilotId = '{{ announcement.pilot.id }}';
-const EDIT_SCOPE = '{{ request.args.get("edit_scope", "this_only") }}';
+const announcementId = '{{ announcement.id }}';
+const editScope = '{{ edit_scope }}';
+const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+const announcementForm = document.getElementById('announcementForm');
+const submitBtn = document.getElementById('submit_btn');
+const conflictResults = document.getElementById('conflict_results');
+const conflictContent = document.getElementById('conflict_content');
+const xSelect = document.getElementById('x_coord');
+const ySelect = document.getElementById('y_coord');
+const zSelect = document.getElementById('z_coord');
+const hiddenBattleArea = document.getElementById('battle_area');
 
-document.getElementById('x_coord').addEventListener('change', function() {
-    const x = this.value;
-    const ySelect = document.getElementById('y_coord');
-    const zSelect = document.getElementById('z_coord');
-    
-    ySelect.innerHTML = '<option value="">请选择场地</option>';
-    zSelect.innerHTML = '<option value="">请先选择场地</option>';
-    ySelect.disabled = !x;
-    zSelect.disabled = true;
-    
-    if (x) {
-        fetch(`/announcements/api/areas/${x}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    data.y_coords.forEach(y => {
-                        const option = document.createElement('option');
-                        option.value = y;
-                        option.textContent = y;
-                        if (y === currentY) {
-                            option.selected = true;
-                        }
-                        ySelect.appendChild(option);
-                    });
-                    
-                    if (ySelect.value) {
-                        ySelect.dispatchEvent(new Event('change'));
-                    }
-                }
-            })
-            .catch(error => console.error('Error:', error));
-    }
-});
+function showLoading(isLoading) {
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
+  overlay.style.display = isLoading ? 'flex' : 'none';
+}
 
-document.getElementById('y_coord').addEventListener('change', function() {
-    const x = document.getElementById('x_coord').value;
-    const y = this.value;
-    const zSelect = document.getElementById('z_coord');
-    
-    zSelect.innerHTML = '<option value="">请选择坐席</option>';
-    zSelect.disabled = !y;
-    
-    if (x && y) {
-        fetch(`/announcements/api/areas/${x}/${y}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    data.areas.forEach(area => {
-                        const option = document.createElement('option');
-                        option.value = area.id;
-                        option.textContent = area.z_coord;
-                        if (area.id === currentBattleAreaId) {
-                            option.selected = true;
-                        }
-                        zSelect.appendChild(option);
-                    });
-                }
-            })
-            .catch(error => console.error('Error:', error));
-    }
-});
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const result = await response.json();
+  if (!result.success) {
+    const error = new Error(result.error?.message || '请求失败');
+    error.response = result;
+    error.status = response.status;
+    throw error;
+  }
+  return result;
+}
 
-document.getElementById('z_coord').addEventListener('change', function() {
-    const battleAreaInput = document.getElementById('battle_area');
-    battleAreaInput.value = this.value;
-});
+function resetSubmitButton() {
+  if (submitBtn) submitBtn.disabled = true;
+}
 
-window.addEventListener('load', function() {
-    if (currentX) {
-        document.getElementById('x_coord').dispatchEvent(new Event('change'));
-    }
-});
+function clearConflicts() {
+  if (conflictResults) conflictResults.style.display = 'none';
+  if (conflictContent) conflictContent.innerHTML = '';
+  resetSubmitButton();
+}
 
+function renderConflicts(conflicts) {
+  if (!conflictResults || !conflictContent) return;
+  conflictResults.style.display = 'block';
+  if (!Array.isArray(conflicts) || conflicts.length === 0) {
+    conflictContent.innerHTML = '';
+    return;
+  }
+  let html = '<h3>冲突检查结果</h3>';
+  conflicts.forEach(conflict => {
+    html += `<div class="conflict-item ${conflict.type === '开播地点冲突' ? 'area-conflict' : 'pilot-conflict'}">`;
+    html += `<div class="conflict-type">${conflict.type}</div>`;
+    html += '<div class="conflict-details">';
+    html += `${conflict.pilot_name || ''}<br>`;
+    html += `${conflict.start_time || ''} 起 ${conflict.duration || ''}<br>`;
+    html += `${conflict.coords || ''}`;
+    html += '</div></div>';
+  });
+  conflictContent.innerHTML = html;
+}
 
-document.getElementById('check_btn').addEventListener('click', function() {
-    const form = document.getElementById('announcementForm');
-    const formData = new FormData(form);
-
-    const pilot = formData.get('pilot');
-    const battleArea = formData.get('battle_area');
-    const duration = formData.get('duration_hours');
-
-    let startTime;
-    if (EDIT_SCOPE === 'future_all') {
-        const startDate = formData.get('start_date');
-        const startHour = formData.get('start_hour');
-        const startMinute = formData.get('start_minute');
-        if (!startDate || !startHour || !startMinute) {
-            alert('请填写所有必填字段');
-            return;
-        }
-        startTime = startDate + 'T' + startHour + ':' + startMinute;
+function renderPlannedInstances(plannedInstances) {
+  if (!conflictResults || !conflictContent) return;
+  conflictResults.style.display = 'block';
+  let html = '<div class="no-conflicts">✓ 检查通过，无冲突</div>';
+  html += '<h3>计划详情</h3>';
+  if (Array.isArray(plannedInstances) && plannedInstances.length > 0) {
+    if (plannedInstances.length === 1) {
+      const instance = plannedInstances[0];
+      html += `<div class="plan-content">${instance.pilot_name || ''}<br>${instance.start_time || ''} 起 ${instance.duration || ''}<br>${instance.coords || ''}</div>`;
     } else {
-        startTime = formData.get('start_time');
-        if (!startTime) {
-            alert('请填写所有必填字段');
-            return;
-        }
+      html += `<div class="plan-content"><div class="plan-summary">共 ${plannedInstances.length} 个事件：</div>`;
+      plannedInstances.forEach((instance, index) => {
+        html += `<div class="plan-instance">${index + 1}. ${instance.pilot_name || ''}<br>${instance.start_time || ''} 起 ${instance.duration || ''}<br>${instance.coords || ''}</div>`;
+      });
+      html += '</div>';
     }
+  }
+  conflictContent.innerHTML = html;
+  if (submitBtn) submitBtn.disabled = false;
+}
 
-    if (!pilot || !battleArea || !duration) {
-        alert('请填写所有必填字段');
-        return;
-    }
-
-    const checkData = {
-        pilot_id: pilot,
-        battle_area_id: battleArea,
-        start_time: startTime,
-        duration_hours: parseFloat(duration),
-        exclude_id: '{{ announcement.id }}',
-        edit_scope: EDIT_SCOPE
-    };
-
-    fetch('/announcements/check-conflicts', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
-        },
-        body: JSON.stringify(checkData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        const resultsDiv = document.getElementById('conflict_results');
-        const contentDiv = document.getElementById('conflict_content');
-
-        if (data.success) {
-            resultsDiv.style.display = 'block';
-
-            if (data.has_conflicts) {
-                let html = '<h3>冲突检查结果</h3>';
-                data.conflicts.forEach(conflict => {
-                    html += `<div class="conflict-item ${conflict.type === '区域冲突' ? 'area-conflict' : 'pilot-conflict'}">`;
-                    html += `<div class="conflict-type">${conflict.type}</div>`;
-                    html += `<div class="conflict-details">`;
-                    html += `${conflict.pilot_name}<br>`;
-                    html += `${conflict.start_time} 起 ${conflict.duration}<br>`;
-                    html += `${conflict.coords}`;
-                    html += `</div></div>`;
-                });
-                contentDiv.innerHTML = html;
-                document.getElementById('submit_btn').disabled = true;
-            } else {
-                let html = '<div class="no-conflicts">✓ 检查通过，无冲突</div>';
-                html += '<h3>计划详情</h3>';
-
-                if (data.planned_instances && data.planned_instances.length > 0) {
-                    html += '<div class="plan-content">';
-
-                    if (data.planned_instances.length === 1) {
-                        const instance = data.planned_instances[0];
-                        html += `${instance.pilot_name}<br>`;
-                        html += `${instance.start_time} 起 ${instance.duration}<br>`;
-                        html += `${instance.coords}`;
-                    } else {
-                        html += `<div class="plan-summary">共 ${data.planned_instances.length} 个事件：</div>`;
-                        data.planned_instances.forEach((instance, index) => {
-                            html += `<div class="plan-instance">`;
-                            html += `${index + 1}. ${instance.pilot_name}<br>`;
-                            html += `${instance.start_time} 起 ${instance.duration}<br>`;
-                            html += `${instance.coords}`;
-                            html += `</div>`;
-                        });
-                    }
-
-                    html += '</div>';
-                }
-
-                contentDiv.innerHTML = html;
-                document.getElementById('submit_btn').disabled = false;
-            }
-        } else {
-            alert('检查失败：' + data.error);
-        }
-    })
-    .catch(error => {
-        alert('检查失败：网络错误');
-        console.error('Error:', error);
+async function loadAreaOptions() {
+  try {
+    const currentX = xSelect.dataset.current || '';
+    const { data } = await fetchJson('/announcements/api/areas/options');
+    const xCoords = data?.x_coords || [];
+    xSelect.innerHTML = '<option value="">请选择基地</option>';
+    xCoords.forEach(x => {
+      const option = document.createElement('option');
+      option.value = x;
+      option.textContent = x;
+      xSelect.appendChild(option);
     });
+    if (currentX && xCoords.includes(currentX)) {
+      xSelect.value = currentX;
+      await loadYOptions(currentX, true);
+    }
+  } catch (error) {
+    console.error('加载基地选项失败:', error);
+    showMessage(error.message || '加载基地选项失败', 'error');
+  }
+}
+
+async function loadYOptions(xCoord, preselect = false) {
+  ySelect.innerHTML = '<option value="">请选择场地</option>';
+  zSelect.innerHTML = '<option value="">请先选择场地</option>';
+  ySelect.disabled = !xCoord;
+  zSelect.disabled = true;
+  if (!xCoord) return;
+  try {
+    const { data } = await fetchJson(`/announcements/api/areas/${xCoord}`);
+    const yCoords = data?.y_coords || [];
+    const currentY = ySelect.dataset.current || '';
+    yCoords.forEach(y => {
+      const option = document.createElement('option');
+      option.value = y;
+      option.textContent = y;
+      if (preselect && y === currentY) option.selected = true;
+      ySelect.appendChild(option);
+    });
+    if (preselect && currentY && yCoords.includes(currentY)) {
+      await loadZOptions(xCoord, currentY, true);
+    }
+  } catch (error) {
+    console.error('加载场地失败:', error);
+    showMessage(error.message || '加载场地选项失败', 'error');
+  }
+}
+
+async function loadZOptions(xCoord, yCoord, preselect = false) {
+  zSelect.innerHTML = '<option value="">请选择坐席</option>';
+  zSelect.disabled = !(xCoord && yCoord);
+  if (!xCoord || !yCoord) {
+    hiddenBattleArea.value = '';
+    return;
+  }
+  try {
+    const { data } = await fetchJson(`/announcements/api/areas/${xCoord}/${yCoord}`);
+    const areas = data?.areas || [];
+    const currentBattleAreaId = zSelect.dataset.current || '';
+    areas.forEach(area => {
+      const option = document.createElement('option');
+      option.value = area.id;
+      option.textContent = area.z_coord;
+      if (preselect && area.id === currentBattleAreaId) option.selected = true;
+      zSelect.appendChild(option);
+    });
+    if (preselect && currentBattleAreaId) {
+      hiddenBattleArea.value = currentBattleAreaId;
+    }
+  } catch (error) {
+    console.error('加载坐席失败:', error);
+    showMessage(error.message || '加载坐席选项失败', 'error');
+  }
+}
+
+function collectFormPayload() {
+  const formData = new FormData(announcementForm);
+  const payload = {
+    battle_area_id: formData.get('battle_area'),
+    duration_hours: parseFloat(formData.get('duration_hours')),
+    edit_scope: editScope,
+  };
+  if (editScope === 'future_all') {
+    payload.start_date = formData.get('start_date');
+    payload.start_hour = formData.get('start_hour');
+    payload.start_minute = formData.get('start_minute');
+    payload.start_time = `${payload.start_date}T${payload.start_hour}:${payload.start_minute}`;
+  } else {
+    payload.start_time = formData.get('start_time');
+  }
+  return payload;
+}
+
+function validatePayload(payload) {
+  if (!payload.battle_area_id || !payload.start_time || !payload.duration_hours) {
+    showMessage('请填写所有必填字段', 'error');
+    return false;
+  }
+  if (editScope === 'future_all') {
+    if (!payload.start_date || !payload.start_hour || !payload.start_minute) {
+      showMessage('请填写完整的时间信息', 'error');
+      return false;
+    }
+    const originalDate = '{{ announcement.start_time | local_date_for_input }}';
+    if (payload.start_date !== originalDate) {
+      showMessage('编辑未来所有循环时，日期不可修改', 'warning');
+      return false;
+    }
+  }
+  return true;
+}
+
+async function handleConflictCheck() {
+  const payload = collectFormPayload();
+  payload.pilot_id = '{{ announcement.pilot.id }}';
+  payload.exclude_id = announcementId;
+  if (!validatePayload(payload)) return;
+  try {
+    showLoading(true);
+    const result = await fetchJson('/announcements/api/check-conflicts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = result.data || {};
+    if (data.has_conflicts) {
+      renderConflicts(data.conflicts || []);
+      resetSubmitButton();
+    } else {
+      renderPlannedInstances(data.planned_instances || []);
+    }
+  } catch (error) {
+    console.error('冲突检查失败:', error);
+    showMessage(error.message || '冲突检查失败', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function handleFormSubmit(event) {
+  event.preventDefault();
+  if (submitBtn.disabled) {
+    showMessage('请先通过冲突检查', 'warning');
+    return;
+  }
+  const payload = collectFormPayload();
+  if (!validatePayload(payload)) return;
+  try {
+    showLoading(true);
+    submitBtn.disabled = true;
+    submitBtn.textContent = '保存中...';
+    const result = await fetchJson(`/announcements/api/announcements/${announcementId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+      },
+      body: JSON.stringify(payload),
+    });
+    const meta = result.meta || {};
+    showMessage(meta.message || '更新通告成功', 'success');
+    window.location.href = meta.redirect_url || `/announcements/${announcementId}`;
+  } catch (error) {
+    console.error('更新通告失败:', error);
+    const conflicts = error.response?.meta?.conflicts;
+    if (conflicts) renderConflicts(conflicts);
+    showMessage(error.message || '更新通告失败', 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = '保存修改';
+  } finally {
+    showLoading(false);
+  }
+}
+
+function bindFieldChangeReset() {
+  ['battle_area', 'start_time', 'duration_hours', 'start_date', 'start_hour', 'start_minute'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', clearConflicts);
+      el.addEventListener('input', clearConflicts);
+    }
+  });
+}
+
+xSelect.addEventListener('change', async () => {
+  await loadYOptions(xSelect.value);
+  clearConflicts();
 });
 
-document.getElementById('announcementForm').addEventListener('submit', function(e) {
-    const submitBtn = document.getElementById('submit_btn');
-    if (submitBtn.disabled) {
-        e.preventDefault();
-        alert('请先通过冲突检查');
-        return;
-    }
+ySelect.addEventListener('change', async () => {
+  await loadZOptions(xSelect.value, ySelect.value);
+  clearConflicts();
+});
 
-    if (EDIT_SCOPE === 'future_all') {
-        const startDateInput = document.getElementById('start_date');
-        const startHourInput = document.getElementById('start_hour');
-        const startMinuteInput = document.getElementById('start_minute');
-        
-        if (!startDateInput.value || !startHourInput.value || !startMinuteInput.value) {
-            e.preventDefault();
-            alert('请填写完整的日期和时间信息');
-            return;
-        }
-        
-        const originalDate = '{{ announcement.start_time | local_date_for_input }}';
-        if (startDateInput.value !== originalDate) {
-            e.preventDefault();
-            alert('编辑未来所有循环时，日期不可修改');
-            return;
-        }
-    }
+zSelect.addEventListener('change', () => {
+  hiddenBattleArea.value = zSelect.value;
+  clearConflicts();
+});
+
+document.getElementById('check_btn').addEventListener('click', handleConflictCheck);
+announcementForm.addEventListener('submit', handleFormSubmit);
+
+document.addEventListener('DOMContentLoaded', async () => {
+  resetSubmitButton();
+  await loadAreaOptions();
+  bindFieldChangeReset();
 });
 </script>
 {% endblock %}
