@@ -134,9 +134,10 @@ def list_battle_records():
     elif time_filter == 'seven_days':
         now_local = utc_to_local(now_utc)
         today_local_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        seven_days_later_local_start = today_local_start + timedelta(days=7)
-        range_start_utc = local_to_utc(today_local_start)
-        range_end_utc = local_to_utc(seven_days_later_local_start)
+        seven_days_ago_local_start = today_local_start - timedelta(days=7)
+        tomorrow_local_start = today_local_start + timedelta(days=1)
+        range_start_utc = local_to_utc(seven_days_ago_local_start)
+        range_end_utc = local_to_utc(tomorrow_local_start)
         query = query.filter(start_time__gte=range_start_utc, start_time__lt=range_end_utc)
 
     query = query.order_by('-start_time', '-revenue_amount')
@@ -544,8 +545,6 @@ def view_battle_record_changes(record_id):
     except Exception as e:
         logger.error(f"获取开播记录变更记录失败: {e}")
         return jsonify({'success': False, 'error': '获取变更记录失败'}), 500
-
-
 
 
 @battle_record_bp.route('/api/pilot-filters')
