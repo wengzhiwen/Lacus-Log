@@ -4,18 +4,16 @@
 
 {% block content %}
 <div class="container">
-    <div class="header">
-        <div class="breadcrumb">
-            <a href="{{ url_for('battle_record.list_battle_records') }}">开播记录</a>
-            <span class="separator">></span>
-            <a href="{{ url_for('battle_record.detail_battle_record', record_id=battle_record.id|string) }}">记录详情</a>
-            <span class="separator">></span>
-            <span>编辑</span>
-        </div>
+    <div class="back-nav">
+        <a class="btn btn-secondary" href="{{ url_for('battle_record.detail_battle_record', record_id=battle_record.id|string) }}">
+            <span>←</span>
+            返回开播记录详情
+        </a>
+        <a class="btn btn-outline" href="{{ url_for('battle_record.list_battle_records') }}">返回列表</a>
     </div>
 
     <div class="form-container">
-        <form method="POST" action="{{ url_for('battle_record.update_battle_record', record_id=battle_record.id|string) }}" id="battleRecordForm">
+        <form method="POST" id="battleRecordForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             
             <div class="form-section">
@@ -203,6 +201,24 @@
 </div>
 
 <style>
+
+.back-nav {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.back-nav .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+}
+
+.back-nav .btn span {
+    font-size: 16px;
+}
 
 .readonly-value {
     font-size: 14px;
@@ -434,6 +450,9 @@ let currentData = {
     y_coord: '{{ battle_record.y_coord }}',
     z_coord: '{{ battle_record.z_coord }}'
 };
+const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+const updateRecordUrl = '{{ url_for('battle_records_api.update_record', record_id=battle_record.id) }}';
+const detailPageUrl = '{{ url_for('battle_record.detail_battle_record', record_id=battle_record.id) }}';
 
 document.addEventListener('DOMContentLoaded', function() {
     initializePage();
@@ -458,29 +477,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    document.getElementById('battleRecordForm').addEventListener('submit', function(e) {
-        if (!validateFormSubmission()) {
+    const form = document.getElementById('battleRecordForm');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
-        }
-    });
+            if (!validateFormSubmission()) {
+                return;
+            }
+            await submitBattleRecordUpdate();
+        });
+    }
     
     updateSubmitButtonState();
     const pilotId = currentData.pilot;
     if (pilotId) {
-        fetch(`{{ url_for('battle_record.api_related_announcements') }}?pilot_id=${pilotId}`)
+        fetch(`{{ url_for('battle_records_api.related_announcements') }}?pilot_id=${pilotId}`)
             .then(resp => resp.json())
-            .then(data => {
+            .then(result => {
                 const select = document.getElementById('related_announcement');
                 if (!select) return;
                 select.innerHTML = '<option value="">无关联通告</option>';
-                if (data.success) {
-                    data.announcements.forEach(item => {
-                        const opt = document.createElement('option');
-                        opt.value = item.id;
-                        opt.textContent = item.label;
-                        select.appendChild(opt);
-                    });
-                }
+                if (!result.success) return;
+                const announcements = (result.data && result.data.announcements) || [];
+                announcements.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = item.label;
+                    select.appendChild(opt);
+                });
             })
             .catch(err => console.error('获取关联通告失败:', err));
     }
@@ -515,13 +539,12 @@ function initializePage() {
 }
 
 function loadBattleAreaData() {
-    fetch('{{ url_for("battle_record.api_battle_areas") }}')
+    fetch('{{ url_for("battle_records_api.battle_areas") }}')
         .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                battleAreaData = data.areas;
-                initializeBattleAreaSelects();
-            }
+        .then(result => {
+            if (!result.success) return;
+            battleAreaData = (result.data && result.data.areas) || {};
+            initializeBattleAreaSelects();
         })
         .catch(error => console.error('加载开播地点数据失败:', error));
 }
@@ -764,6 +787,71 @@ function validateNotesRequired() {
     } else {
         validationMessage.style.display = 'none';
         return false;
+    }
+}
+
+function collectBattleRecordPayload() {
+    const startInput = document.getElementById('start_time');
+    const endInput = document.getElementById('end_time');
+    const revenueInput = document.getElementById('revenue_amount');
+    const baseSalaryInput = document.getElementById('base_salary');
+    const workModeSelect = document.getElementById('work_mode');
+    const xSelect = document.getElementById('x_coord');
+    const ySelect = document.getElementById('y_coord');
+    const zSelect = document.getElementById('z_coord');
+    const notesInput = document.getElementById('notes');
+
+    return {
+        start_time: startInput ? startInput.value : '',
+        end_time: endInput ? endInput.value : '',
+        revenue_amount: revenueInput ? revenueInput.value : '',
+        base_salary: baseSalaryInput ? baseSalaryInput.value : '',
+        work_mode: workModeSelect ? workModeSelect.value : '',
+        x_coord: xSelect ? xSelect.value : '',
+        y_coord: ySelect ? ySelect.value : '',
+        z_coord: zSelect ? zSelect.value : '',
+        notes: notesInput ? notesInput.value : '',
+    };
+}
+
+async function submitBattleRecordUpdate() {
+    const submitBtn = document.getElementById('submit-btn');
+    if (!submitBtn) return;
+
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.classList.add('disabled');
+    submitBtn.innerHTML = '<span class="btn-icon">⏳</span>提交中...';
+
+    try {
+        const payload = collectBattleRecordPayload();
+        const response = await fetch(updateRecordUrl, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error?.message || '保存修改失败');
+        }
+
+        const meta = result.meta || {};
+        showMessage(meta.message || '开播记录更新成功', 'success');
+        setTimeout(() => {
+            window.location.href = detailPageUrl;
+        }, 600);
+    } catch (error) {
+        console.error('更新开播记录失败:', error);
+        showMessage(error.message || '更新开播记录失败', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('disabled');
+        submitBtn.innerHTML = originalText;
+        updateSubmitButtonState();
     }
 }
 

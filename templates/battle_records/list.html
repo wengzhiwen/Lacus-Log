@@ -7,58 +7,25 @@
   </div>
 
   <div class="filter-bar">
-    {% set selected_items = [] %}
-    {% if current_filters.owner and current_filters.owner != 'all' %}
-      {% if current_filters.owner == 'self' %}
-        {% set _ = selected_items.append('直属运营:自己') %}
-      {% else %}
-        {% for owner in owners %}
-          {% if owner.id|string == current_filters.owner %}{% set _ = selected_items.append('直属运营:' + (owner.nickname or owner.username)) %}{% endif %}
-        {% endfor %}
-      {% endif %}
-    {% endif %}
-    {% if current_filters.x %}{% set _ = selected_items.append('基地:' + current_filters.x) %}{% endif %}
-    {% if current_filters.time %}
-      {% if current_filters.time == 'today' %}{% set _ = selected_items.append('今天') %}
-      {% elif current_filters.time == 'two_days' %}{% set _ = selected_items.append('这两天') %}
-      {% elif current_filters.time == 'seven_days' %}{% set _ = selected_items.append('近7天') %}
-      {% endif %}
-    {% endif %}
-    {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
-    
     <button type="button" class="filter-toggle" onclick="toggleFilters()">
-      <span id="filter-summary">{{ filter_summary }}</span>
+      <span id="filter-summary">全部显示</span>
       <span class="toggle-icon" id="filter-toggle-icon">▼</span>
     </button>
-    
-    <form class="filter-form is-collapsed" id="filter-form" method="get">
+
+    <form class="filter-form is-collapsed" id="filter-form" onsubmit="return false;">
       <div class="filter-group">
         <label class="filter-label">直属运营</label>
-        <select class="filter-select" name="owner" onchange="this.form.submit()">
-          <option value="all" {% if current_filters.owner == 'all' %}selected{% endif %}>全部</option>
-          <option value="self" {% if current_filters.owner == 'self' %}selected{% endif %}>自己</option>
-          {% for owner in owners %}
-          <option value="{{ owner.id }}" {% if current_filters.owner == owner.id|string %}selected{% endif %}>{{ owner.nickname or owner.username }}</option>
-          {% endfor %}
-        </select>
+        <select class="filter-select" id="filter-owner"></select>
       </div>
 
       <div class="filter-group">
         <label class="filter-label">基地</label>
-        <select class="filter-select" name="x" onchange="this.form.submit()">
-          {% for value, label in x_choices %}
-          <option value="{{ value }}" {% if current_filters.x == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
+        <select class="filter-select" id="filter-x"></select>
       </div>
 
       <div class="filter-group">
         <label class="filter-label">时间</label>
-        <select class="filter-select" name="time" onchange="this.form.submit()">
-          <option value="two_days" {% if current_filters.time == 'two_days' %}selected{% endif %}>这两天</option>
-          <option value="seven_days" {% if current_filters.time == 'seven_days' %}selected{% endif %}>近7天</option>
-          <option value="today" {% if current_filters.time == 'today' %}selected{% endif %}>今天</option>
-        </select>
+        <select class="filter-select" id="filter-time"></select>
       </div>
     </form>
   </div>
@@ -73,50 +40,15 @@
   </div>
 
   <div class="battle-record-list">
-    {% if battle_records %}
-      <div class="record-cards">
-        {% for record in battle_records %}
-        <a href="{{ url_for('battle_record.detail_battle_record', record_id=record.id|string) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              <div class="start-time">{{ record.start_time|local_datetime('%m月%d日 %H:%M') }}</div>
-              <div class="duration">{{ record.duration_hours }}小时</div>
-            </div>
-            <div class="record-info">
-              {% set age_str = '(' ~ record.pilot.age ~ ')' if record.pilot.age else '' %}
-              {% set gender_icon = '♂' if record.pilot.gender.value == 0 else ('♀' if record.pilot.gender.value == 1 else '?') %}
-              <div class="pilot-name">{{ record.pilot.nickname }}{{ age_str }}[{{ record.pilot.status.value }}]{{ gender_icon }}</div>
-              {% if record.pilot.real_name %}
-              <span class="real-name" style="display:none;">{{ record.pilot.real_name }}</span>
-              {% endif %}
-              <div class="meta-line">[{{ (record.owner_snapshot.nickname or record.owner_snapshot.username) if record.owner_snapshot else '无' }}][{{ record.pilot.rank.value }}]</div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div class="revenue">
-              <span class="amount">¥{{ record.revenue_amount }}</span>
-              {% if record.base_salary and record.base_salary > 0 %}
-              <span class="base-salary">底薪¥{{ record.base_salary }}</span>
-              {% endif %}
-            </div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-
-      {% if has_more %}
-      <div class="load-more">
-        <a href="{{ url_for('battle_record.list_battle_records', page=(current_page + 1), **current_filters) }}" class="btn btn-secondary">加载更多</a>
-      </div>
-      {% endif %}
-    {% else %}
-      <div class="empty-state">
-        <div class="empty-icon">📊</div>
-        <div class="empty-title">暂无开播记录</div>
-        <div class="empty-description">点击下方"登记开播记录"按钮创建第一条记录</div>
-      </div>
-    {% endif %}
+    <div id="recordCardsContainer" class="record-cards"></div>
+    <div id="empty-state" class="empty-state" style="display:none;">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">暂无开播记录</div>
+      <div class="empty-description">点击下方"登记开播记录"按钮创建第一条记录</div>
+    </div>
+    <div id="load-more-container" class="load-more" style="display:none;">
+      <button type="button" id="load-more-btn" class="btn btn-secondary">加载更多</button>
+    </div>
   </div>
 </section>
 
@@ -130,11 +62,9 @@
 </div>
 
 <style>
-
 .record-cards {
   display: block;
 }
-
 
 .filter-toggle {
   width: 100%;
@@ -148,11 +78,41 @@
   padding: 12px 14px;
   margin-bottom: 10px;
   font-size: 14px;
+  cursor: pointer;
 }
 
 .filter-form.is-collapsed { display: none; }
-.filter-form { margin-bottom: 12px; }
+.filter-form {
+  margin-bottom: 12px;
+  background: var(--table-header);
+  padding: 16px;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  align-items: end;
+}
 
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-label {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+  width: 100%;
+}
 
 .search-bar { margin-bottom: 16px; }
 .search-input-group {
@@ -198,113 +158,113 @@
 }
 
 .record-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transform: translateY(-2px);
-  border-color: var(--brand);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 }
 
 .record-card .card-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start; 
+  gap: 12px;
   margin-bottom: 8px;
 }
 
 .record-time {
-  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
-.start-time {
-  font-size: 16px;
+.record-time .start-time {
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 2px;
 }
 
-.duration {
+.record-time .duration {
   font-size: 12px;
   color: var(--muted);
 }
 
 .record-info {
   flex: 1;
-  text-align: right;
   display: flex;
   flex-direction: column;
-  align-items: flex-end; 
+  gap: 4px;
 }
 
 .pilot-name {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text);
-  line-height: 1.2;
-  margin-bottom: 2px;
 }
 
-.meta-line {
+.record-info .meta-line {
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.1;
 }
 
 .record-card .card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--table-header);
-  padding-top: 12px;
 }
 
 .revenue {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  align-items: center;
 }
 
-.amount {
-  font-size: 16px;
+.revenue .amount {
+  font-size: 18px;
   font-weight: 600;
   color: var(--hud-green);
 }
 
-.base-salary {
+.revenue .base-salary {
   font-size: 12px;
   color: var(--muted);
+  background: var(--table-header);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.card-arrow {
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: bold;
+  transition: color 0.2s ease;
 }
 
 .record-card:hover .card-arrow {
   color: var(--brand);
 }
 
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.empty-state .empty-title {
+  font-size: 20px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.empty-state .empty-description {
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .load-more {
   text-align: center;
-  margin: 20px 0;
+  margin-top: 12px;
 }
-
-
-@media (max-width: 768px) {
-  .filter-form {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-  
-  
-  .record-card .card-header {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .record-info {
-    text-align: right;
-    align-items: flex-end;
-  }
-}
-</style>
-
-<style>
 
 .footbar {
   position: fixed;
@@ -317,131 +277,286 @@
   padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
   z-index: 100;
 }
-.footbar .inner { display: flex; justify-content: center; }
-.container { padding-bottom: 88px; }
+
+.footbar .inner {
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  padding-bottom: 88px;
+}
+
+@media (max-width: 768px) {
+  .filter-form { grid-template-columns: repeat(2, 1fr); }
+  .record-card .card-header { flex-direction: column; align-items: flex-start; }
+  .record-time { align-items: flex-start; }
+  .footbar .inner { flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+  .filter-form { grid-template-columns: 1fr; }
+  .filter-group { width: 100%; }
+}
 </style>
 
 <script>
+const filtersFromServer = {{ filters | tojson }} || {};
+let currentFilters = {
+  owner: filtersFromServer.owner || 'all',
+  x: filtersFromServer.x || '',
+  time: filtersFromServer.time || 'two_days',
+};
+let filterOptions = { owners: [], x_coords: [], time_ranges: [] };
+let allBattleRecords = [];
+let currentPage = 1;
+let hasMore = false;
+let isLoading = false;
+
 function toggleFilters() {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
+  if (!form || !icon) return;
   const collapsed = form.classList.toggle('is-collapsed');
   icon.textContent = collapsed ? '▼' : '▲';
 }
 
-function updatePilotFilter() {
-  const ownerSelect = document.querySelector('select[name="owner"]');
-  const rankSelect = document.querySelector('select[name="rank"]');
-  const pilotSelect = document.getElementById('pilot-filter');
-  
-  const owner = ownerSelect.value === 'self' ? '{{ current_user.id }}' : ownerSelect.value;
-  const rank = rankSelect.value;
-  
-  fetch(`{{ url_for('battle_record.api_pilots_filtered') }}?owner=${owner}&rank=${rank}`)
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        pilotSelect.innerHTML = '<option value="">全部主播</option>';
-        data.pilots.forEach(pilot => {
-          const option = document.createElement('option');
-          option.value = pilot.id;
-          option.textContent = pilot.name;
-          option.selected = pilot.id === '{{ current_filters.pilot }}';
-          pilotSelect.appendChild(option);
-        });
-      }
-    })
-    .catch(error => console.error('获取主播列表失败:', error));
+function showLoading(state) {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) {
+    overlay.style.display = state ? 'flex' : 'none';
+  }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('filter-form');
-  const icon = document.getElementById('filter-toggle-icon');
-  const hasQuery = window.location.search.length > 1;
-  
-  if (!hasQuery) {
-    if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
-    icon.textContent = '▼';
-  } else {
-    form.classList.remove('is-collapsed');
-    icon.textContent = '▲';
+function updateFilterSummary() {
+  const summary = document.getElementById('filter-summary');
+  if (!summary) return;
+  const parts = [];
+  if (currentFilters.owner && currentFilters.owner !== 'all') {
+    const ownerOption = filterOptions.owners.find(item => item.value === currentFilters.owner);
+    if (ownerOption) parts.push(`直属运营:${ownerOption.label}`);
   }
-  
-  initBattleRecordSearch();
-});
+  if (currentFilters.x) {
+    parts.push(`基地:${currentFilters.x}`);
+  }
+  if (currentFilters.time) {
+    const timeOption = filterOptions.time_ranges.find(item => item.value === currentFilters.time);
+    if (timeOption) parts.push(timeOption.label);
+  }
+  summary.textContent = parts.length > 0 ? parts.join(' + ') : '全部显示';
+}
 
-let allBattleRecords = [];
+function populateFilterSelect(selectId, options, currentValue) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const prior = select.value;
+  select.innerHTML = '';
+  options.forEach(option => {
+    const opt = document.createElement('option');
+    opt.value = option.value;
+    opt.textContent = option.label;
+    select.appendChild(opt);
+  });
+  select.value = currentValue || prior || options[0]?.value || '';
+}
+
+function applyFilterOptions(options) {
+  filterOptions = options;
+  populateFilterSelect('filter-owner', options.owners || [], currentFilters.owner);
+  populateFilterSelect('filter-x', options.x_coords || [], currentFilters.x);
+  populateFilterSelect('filter-time', options.time_ranges || [], currentFilters.time);
+  updateFilterSummary();
+}
+
+function buildRecordCard(record) {
+  const genderIcon = record.pilot.gender === 0 ? '♂' : (record.pilot.gender === 1 ? '♀' : '?');
+  const agePart = record.pilot.age ? `(${record.pilot.age})` : '';
+  const status = record.pilot.status || '';
+  const rank = record.pilot.rank || '';
+  const baseSalary = parseFloat(record.base_salary || '0');
+  const revenue = record.revenue_amount || '0';
+  const duration = record.duration_display || (record.duration_hours ? `${record.duration_hours}小时` : '');
+  const startDisplay = record.start_time?.display || '';
+  const detailUrl = record.links?.detail || `/battle-records/${record.id}`;
+
+  const card = document.createElement('a');
+  card.className = 'record-card';
+  card.href = detailUrl;
+  card.dataset.recordId = record.id;
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="record-time">
+        <div class="start-time">${startDisplay}</div>
+        <div class="duration">${duration}</div>
+      </div>
+      <div class="record-info">
+        <div class="pilot-name">${record.pilot.nickname || ''}${agePart}[${status}]${genderIcon}</div>
+        <span class="real-name" style="display:none;">${record.pilot.real_name || ''}</span>
+        <div class="meta-line">[${record.owner_display || '无'}][${rank}]</div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <div class="revenue">
+        <span class="amount">¥${revenue}</span>
+        ${baseSalary > 0 ? `<span class="base-salary">底薪¥${record.base_salary}</span>` : ''}
+      </div>
+      <div class="card-arrow">→</div>
+    </div>
+  `;
+
+  return card;
+}
+
+function renderRecords(items, append = false) {
+  const container = document.getElementById('recordCardsContainer');
+  if (!container) return;
+  if (!append) {
+    container.innerHTML = '';
+    allBattleRecords = [];
+  }
+
+  items.forEach(item => {
+    container.appendChild(buildRecordCard(item));
+    allBattleRecords.push({
+      id: item.id,
+      nickname: (item.pilot.nickname || '').toLowerCase(),
+      realName: (item.pilot.real_name || '').toLowerCase()
+    });
+  });
+
+  updateEmptyState();
+}
+
+function updateEmptyState() {
+  const emptyState = document.getElementById('empty-state');
+  const container = document.getElementById('recordCardsContainer');
+  if (!emptyState || !container) return;
+  emptyState.style.display = container.children.length > 0 ? 'none' : 'block';
+}
+
+async function fetchBattleRecords(append = false) {
+  if (isLoading) return;
+  isLoading = true;
+  showLoading(true);
+
+  try {
+    const params = new URLSearchParams();
+    if (currentFilters.owner) params.append('owner', currentFilters.owner);
+    if (currentFilters.x) params.append('x', currentFilters.x);
+    if (currentFilters.time) params.append('time', currentFilters.time);
+    params.append('page', currentPage);
+
+    const response = await fetch(`/battle-records/api/battle-records?${params.toString()}`);
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载失败');
+    }
+
+    const data = result.data || {};
+    const meta = result.meta || {};
+    applyFilterOptions(meta.options || filterOptions);
+    renderRecords(data.items || [], append);
+
+    hasMore = Boolean(meta.has_more);
+    updateLoadMoreVisibility();
+  } catch (error) {
+    console.error('加载开播记录失败:', error);
+    showMessage(error.message || '加载开播记录失败', 'error');
+  } finally {
+    showLoading(false);
+    isLoading = false;
+  }
+}
+
+function updateLoadMoreVisibility() {
+  const loadMoreContainer = document.getElementById('load-more-container');
+  if (!loadMoreContainer) return;
+  loadMoreContainer.style.display = hasMore ? 'block' : 'none';
+}
+
+function resetAndFetch() {
+  currentPage = 1;
+  fetchBattleRecords(false);
+}
+
+function handleFilterListeners() {
+  ['filter-owner', 'filter-x', 'filter-time'].forEach(id => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    select.addEventListener('change', () => {
+      currentFilters.owner = document.getElementById('filter-owner')?.value || 'all';
+      currentFilters.x = document.getElementById('filter-x')?.value || '';
+      currentFilters.time = document.getElementById('filter-time')?.value || 'two_days';
+      updateFilterSummary();
+      resetAndFetch();
+    });
+  });
+}
 
 function performBattleRecordSearch() {
   const searchInput = document.getElementById('battle-record-pilot-search');
-  const searchTerm = (searchInput.value || '').trim().toLowerCase();
+  const keyword = (searchInput?.value || '').trim().toLowerCase();
+  const cards = document.querySelectorAll('.record-card');
 
-  if (!searchTerm) {
-    showAllBattleRecords();
+  if (!keyword) {
+    cards.forEach(card => { card.style.display = 'block'; });
+    updateEmptyState();
     return;
   }
 
-  const filtered = allBattleRecords.filter(item => {
-    const nickname = (item.nickname || '').toLowerCase();
-    const realName = (item.realName || '').toLowerCase();
-    return nickname.includes(searchTerm) || realName.includes(searchTerm);
+  const idSet = new Set(
+    allBattleRecords
+      .filter(item => item.nickname.includes(keyword) || item.realName.includes(keyword))
+      .map(item => item.id)
+  );
+
+  cards.forEach(card => {
+    const recordId = card.dataset.recordId;
+    card.style.display = idSet.has(recordId) ? 'block' : 'none';
   });
 
-  showFilteredBattleRecords(filtered);
+  const visibleCount = Array.from(cards).filter(card => card.style.display !== 'none').length;
+  const emptyState = document.getElementById('empty-state');
+  if (emptyState) {
+    emptyState.style.display = visibleCount > 0 ? 'none' : 'block';
+  }
 }
 
-function showAllBattleRecords() {
-  const cards = document.querySelectorAll('.record-card');
-  cards.forEach(card => { card.style.display = 'block'; });
-  updateBattleRecordEmptyState(cards.length > 0);
-}
-
-function showFilteredBattleRecords(filtered) {
-  const idSet = new Set(filtered.map(i => i.id));
-  const cards = document.querySelectorAll('.record-card');
-  cards.forEach(card => {
-    const id = (card.getAttribute('href') || '').split('/').pop();
-    if (idSet.has(id)) {
-      card.style.display = 'block';
-    } else {
-      card.style.display = 'none';
+function initSearch() {
+  const input = document.getElementById('battle-record-pilot-search');
+  if (!input) return;
+  input.addEventListener('input', performBattleRecordSearch);
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      performBattleRecordSearch();
     }
   });
-  updateBattleRecordEmptyState(filtered.length > 0);
 }
 
-function updateBattleRecordEmptyState(hasResults) {
-  const emptyState = document.querySelector('.empty-state');
-  if (emptyState) {
-    emptyState.style.display = hasResults ? 'none' : 'block';
-  }
-}
-
-function initBattleRecordSearch() {
-  const cards = document.querySelectorAll('.record-card');
-  allBattleRecords = Array.from(cards).map(card => {
-    const nicknameEl = card.querySelector('.pilot-name');
-    const realNameEl = card.querySelector('.record-info .real-name');
-    const href = card.getAttribute('href') || '';
-    return {
-      id: href.split('/').pop(),
-      nickname: nicknameEl ? nicknameEl.textContent.trim() : '',
-      realName: realNameEl ? realNameEl.textContent.trim() : ''
-    };
+function setupLoadMore() {
+  const btn = document.getElementById('load-more-btn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!hasMore) return;
+    currentPage += 1;
+    fetchBattleRecords(true);
   });
-
-  const searchInput = document.getElementById('battle-record-pilot-search');
-  if (searchInput) {
-    searchInput.addEventListener('input', performBattleRecordSearch);
-    searchInput.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        performBattleRecordSearch();
-      } else if (event.key === 'Backspace' || event.key === 'Delete') {
-        setTimeout(performBattleRecordSearch, 10);
-      }
-    });
-  }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  if (currentFilters && (currentFilters.owner !== 'all' || currentFilters.x || currentFilters.time !== 'two_days')) {
+    form?.classList.remove('is-collapsed');
+    if (icon) icon.textContent = '▲';
+  }
+
+  handleFilterListeners();
+  initSearch();
+  setupLoadMore();
+  resetAndFetch();
+});
 </script>
 {% endblock %}

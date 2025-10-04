@@ -12,6 +12,7 @@ from routes.announcements_api import announcements_api_bp
 from routes.battle_area import battle_area_bp
 from routes.battle_areas_api import battle_areas_api_bp
 from routes.battle_record import battle_record_bp
+from routes.battle_records_api import battle_records_api_bp
 from routes.calendar import calendar_bp
 from routes.calendar_api import calendar_api_bp
 from routes.commissions_api import commissions_api_bp
@@ -100,6 +101,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(recruit_bp, url_prefix='/recruits')
     flask_app.register_blueprint(battle_area_bp, url_prefix='/areas')
     flask_app.register_blueprint(announcement_bp, url_prefix='/announcements')
+    flask_app.register_blueprint(battle_records_api_bp, url_prefix='/battle-records/api')
     flask_app.register_blueprint(battle_record_bp, url_prefix='/battle-records')
     flask_app.register_blueprint(calendar_api_bp, url_prefix='/calendar/api')
     flask_app.register_blueprint(calendar_bp, url_prefix='/calendar')
