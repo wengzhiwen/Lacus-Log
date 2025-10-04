@@ -7,7 +7,7 @@
   <div class="back-nav">
     <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">
       <span>←</span>
-      返回征召详情
+      返回招募详情
     </a>
   </div>
 
@@ -15,65 +15,45 @@
 
   <div class="pilot-info-card">
     <div class="card-header">
-      <div class="pilot-avatar">
-        <span class="avatar-icon">
-          {% if recruit.pilot.gender.value == 0 %}♂{% elif recruit.pilot.gender.value == 1 %}♀{% else %}?{% endif %}
-        </span>
-      </div>
-      <div class="pilot-main-info">
-        <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-        <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
-        <div class="pilot-badges">
-          <span class="rank-badge rank-{{ (recruit.pilot.rank.value | normalize_rank).replace(' ', '') }}">{{ recruit.pilot.rank.value | normalize_rank }}</span>
-          <span class="status-badge status-{{ (recruit.pilot.status.value | normalize_status).replace(' ', '') }}">{{ recruit.pilot.status.value | normalize_status }}</span>
+        <div class="pilot-main-info">
+            <div class="pilot-name"><a href="{{ url_for('pilot.pilot_detail', pilot_id=recruit.pilot.id) }}">{{ recruit.pilot.nickname }}</a></div>
+            <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
+            <div class="pilot-badges">
+                <span class="rank-badge">{{ recruit.pilot.rank.value }}</span>
+                <span class="status-badge">{{ recruit.pilot.status.value }}</span>
+            </div>
         </div>
-      </div>
-    </div>
-    <div class="pilot-basic-info">
-      <div class="info-item">
-        <span class="info-label">性别/年龄：</span>
-        <span class="info-value">{{ recruit.pilot.gender_display }}{% if recruit.pilot.age %}/{{ recruit.pilot.age }}岁{% endif %}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">直属运营：</span>
-        <span class="info-value">{% if recruit.pilot.owner %}{{ recruit.pilot.owner.nickname or recruit.pilot.owner.username }}{% else %}未分配{% endif %}</span>
-      </div>
     </div>
   </div>
 
-  <form method="POST" action="{{ url_for('recruit.schedule_broadcast', recruit_id=recruit.id) }}" class="recruit-form" id="schedule-broadcast-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <form id="schedule-broadcast-form" class="recruit-form">
+    <input type="hidden" name="recruit_id" value="{{ recruit.id }}"/>
     
     <div class="form-section">
       <h3 class="section-title">预约信息</h3>
-      
       <div class="form-row">
         <div class="form-group">
-          <label for="scheduled_broadcast_decision_maker">预约开播决策人</label>
-          <input type="text" name="scheduled_broadcast_decision_maker" id="scheduled_broadcast_decision_maker" 
-                 value="{{ current_user.nickname or current_user.username }}" readonly>
+          <label>预约开播决策人</label>
+          <input type="text" value="{{ current_user.nickname or current_user.username }}" readonly>
         </div>
         <div class="form-group">
           <label for="scheduled_broadcast_time">预约开播时间 <span class="required">*</span></label>
           <input type="datetime-local" name="scheduled_broadcast_time" id="scheduled_broadcast_time" 
-                 value="{{ default_time }}" required>
+                 value="{{ default_time.strftime('%Y-%m-%dT%H:%M') }}" required>
         </div>
       </div>
     </div>
 
     <div class="form-section">
       <h3 class="section-title">其他信息</h3>
-      
       <div class="form-row">
         <div class="form-group">
           <label for="introduction_fee">介绍费（元）</label>
-          <input type="number" name="introduction_fee" id="introduction_fee" 
-                 step="0.01" min="0" value="{{ recruit.introduction_fee }}" placeholder="0.00">
+          <input type="number" name="introduction_fee" id="introduction_fee" step="0.01" min="0" value="{{ recruit.introduction_fee }}">
         </div>
         <div class="form-group">
           <label for="remarks">备注</label>
-          <textarea name="remarks" id="remarks" rows="3" 
-                    maxlength="200" placeholder="请输入备注信息">{{ recruit.remarks }}</textarea>
+          <textarea name="remarks" id="remarks" rows="3" maxlength="200">{{ recruit.remarks or '' }}</textarea>
         </div>
       </div>
     </div>
@@ -86,203 +66,61 @@
 </div>
 
 <style>
-.schedule-broadcast {
-  padding: 20px;
-}
-
-.back-nav {
-  margin-bottom: 20px;
-}
-
-.title {
-  margin-bottom: 20px;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.pilot-info-card {
-  background: white;
-  border: 1px solid var(--gray);
-  border-radius: 8px;
-  margin-bottom: 20px;
-  overflow: hidden;
-}
-
-.pilot-info-card .card-header {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  background: var(--table-header);
-  border-bottom: 1px solid var(--gray);
-}
-
-.pilot-avatar {
-  margin-right: 12px;
-}
-
-.avatar-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: var(--muted);
-  color: white;
-  border-radius: 50%;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.pilot-main-info {
-  flex: 1;
-}
-
-.pilot-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 4px;
-}
-
-.pilot-real-name {
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.pilot-badges {
-  display: flex;
-  gap: 8px;
-}
-
-.rank-badge, .status-badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.rank-候补机师 { background: var(--muted); color: white; }
-.rank-训练机师 { background: var(--brand); color: white; }
-.rank-实习机师 { background: var(--hud-green); color: white; }
-.rank-正式机师 { background: var(--danger); color: white; }
-
-.status-未征召 { background: var(--muted); color: white; }
-.status-已征召 { background: var(--hud-green); color: white; }
-.status-已签约 { background: var(--brand); color: white; }
-
-.pilot-basic-info {
-  padding: 16px;
-  display: flex;
-  gap: 24px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-}
-
-.info-label {
-  font-weight: 500;
-  color: var(--text);
-  margin-right: 8px;
-}
-
-.info-value {
-  color: var(--muted);
-}
-
-.recruit-form {
-  background: white;
-  border: 1px solid var(--gray);
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.form-section {
-  margin-bottom: 24px;
-}
-
-.form-section:last-child {
-  margin-bottom: 0;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--table-header);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.form-group label {
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 4px;
-}
-
-.required {
-  color: var(--danger);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 8px 12px;
-  border: 1px solid var(--gray);
-  border-radius: 4px;
-  font-size: 14px;
-  font-family: inherit;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.form-group input[readonly] {
-  background: var(--table-header);
-  color: var(--muted);
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 80px;
-  font-family: inherit;
-}
-
-@media (min-width: 768px) {
-  .form-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  
-  .pilot-basic-info {
-    flex-direction: row;
-  }
-}
-
-@media (max-width: 767px) {
-  .pilot-basic-info {
-    flex-direction: column;
-    gap: 12px;
-  }
-}
+.schedule-broadcast { padding: 20px; }
+.back-nav { margin-bottom: 20px; }
+.title { margin-bottom: 20px; font-size: 24px; }
+.pilot-info-card { background: white; border: 1px solid var(--gray); border-radius: 8px; margin-bottom: 20px; padding: 20px; }
+.card-header { display: flex; align-items: center; gap: 16px; }
+.pilot-main-info { flex: 1; }
+.pilot-name { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.pilot-name a { color: var(--brand); text-decoration: none; }
+.pilot-name a:hover { text-decoration: underline; }
+.pilot-real-name { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+.pilot-badges { display: flex; gap: 8px; }
+.rank-badge, .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; background: var(--table-header); }
+.recruit-form { background: white; border: 1px solid var(--gray); border-radius: 8px; padding: 20px; margin-bottom: 80px; }
+.form-section { margin-bottom: 24px; }
+.section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--table-header); }
+.form-row { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px; }
+.form-group { display: flex; flex-direction: column; }
+label { font-weight: 500; margin-bottom: 4px; }
+.required { color: var(--error); }
+input, select, textarea { padding: 8px 12px; border: 1px solid var(--gray); border-radius: 4px; }
+input[readonly] { background: var(--table-header); }
+@media (min-width: 768px) { .form-row { grid-template-columns: 1fr 1fr; } }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('schedule-broadcast-form');
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const formData = new FormData(form);
+        const recruitId = formData.get('recruit_id');
+        const payload = {
+            scheduled_broadcast_time: formData.get('scheduled_broadcast_time'),
+            introduction_fee: formData.get('introduction_fee'),
+            remarks: formData.get('remarks')
+        };
+
+        if (!payload.scheduled_broadcast_time) {
+            showMessage('请填写预约开播时间', 'error');
+            return;
+        }
+
+        try {
+            const response = await RecruitAPI.scheduleBroadcast(recruitId, payload);
+            if (response.success) {
+                showMessage(response.meta.message || '操作成功！正在跳转...', 'success');
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}";
+                }, 1500);
+            }
+        } catch (error) {
+            console.error('Schedule broadcast failed:', error);
+        }
+    });
+});
+</script>
 {% endblock %}

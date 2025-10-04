@@ -1532,3 +1532,20 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   border: 1px solid var(--brand);
 }
 
+.footbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--table-header);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  z-index: 10;
+}
+

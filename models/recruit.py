@@ -244,12 +244,10 @@ class Recruit(Document):
 
     @classmethod
     def get_default_appointment_time(cls):
-        """获取默认预约时间：次日16:00（GMT+8）"""
-        from utils.timezone_helper import get_current_local_time, local_to_utc
+        """获取默认预约时间：下一个14:00（GMT+8）"""
+        from utils.timezone_helper import get_next_14_oclock_local, local_to_utc
 
-        current_local = get_current_local_time()
-        tomorrow = current_local.date() + timedelta(days=1)
-        local_appointment = datetime.combine(tomorrow, datetime.min.time().replace(hour=16))
+        local_appointment = get_next_14_oclock_local()
         return local_to_utc(local_appointment)
 
     def get_effective_status(self):

@@ -1,4 +1,3 @@
-
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -191,3 +190,23 @@ def parse_local_date_to_end_datetime(date_str: str) -> Optional[datetime]:
         return local_to_utc(local_dt)
     except (ValueError, TypeError):
         return None
+
+
+def get_next_14_oclock_local() -> datetime:
+    """获取下一个14:00（GMT+8本地时间）。
+    
+    如果当前时间早于今天14:00，返回今天14:00；
+    否则返回明天14:00。
+    
+    Returns:
+        datetime: 下一个14:00的本地时间（naive datetime）
+    """
+    current_local = get_current_local_time()
+    today_14 = current_local.replace(hour=14, minute=0, second=0, microsecond=0)
+
+    if current_local < today_14:
+        return today_14
+    else:
+        # 返回明天14:00
+        tomorrow = current_local.date() + timedelta(days=1)
+        return datetime.combine(tomorrow, datetime.min.time().replace(hour=14, minute=0))

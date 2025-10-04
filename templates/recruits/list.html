@@ -7,322 +7,57 @@
   </div>
 
   <div class="filter-bar">
-    {% set selected_items = [] %}
-    {% if current_status %}{% set _ = selected_items.append('状态:' + current_status) %}{% endif %}
-    {% set filter_summary = ' + '.join(selected_items) if selected_items else '全部显示' %}
-
     <button type="button" class="filter-toggle" onclick="toggleFilters()">
-      <span id="filter-summary">{{ filter_summary }}</span>
+      <span id="filter-summary">全部显示</span>
       <span class="toggle-icon" id="filter-toggle-icon">▼</span>
     </button>
 
-    <form class="filter-form is-collapsed" id="filter-form" method="get" action="{{ url_for('recruit.list_recruits') }}">
+    <div class="filter-form is-collapsed" id="filter-form">
       <div class="filter-row">
         <div class="filter-group">
-          <label class="filter-label" for="status">招募状态</label>
-          <select class="filter-select" name="status" id="status" onchange="this.form.submit()">
-            {% for value, text in status_choices %}
-            <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ text }}</option>
-            {% endfor %}
+          <label class="filter-label" for="status-filter">招募状态</label>
+          <select class="filter-select" id="status-filter">
+            <!-- Options will be loaded dynamically -->
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label" for="recruiter-filter">招募负责人</label>
+          <select class="filter-select" id="recruiter-filter">
+            <!-- Options will be loaded dynamically -->
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label" for="channel-filter">渠道</label>
+          <select class="filter-select" id="channel-filter">
+            <!-- Options will be loaded dynamically -->
           </select>
         </div>
       </div>
-    </form>
+    </div>
   </div>
 
   <div class="search-bar">
     <div class="search-input-group">
-      <input type="text" id="recruit-pilot-search" class="search-input" placeholder="搜索主播昵称或真实姓名..." />
-      <button type="button" class="search-button" onclick="performRecruitSearch()">
-        <span class="search-icon">🔍</span>
-      </button>
+      <input type="text" id="search-input" class="search-input" placeholder="搜索主播昵称或真实姓名...">
     </div>
   </div>
 
   <div class="quick-nav" id="quick-nav">
-    {% if grouped_recruits.pending_interview %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('pending-interview')">待面试</button>
-    {% endif %}
-    {% if grouped_recruits.pending_training_schedule %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training-schedule')">待预约试播</button>
-    {% endif %}
-    {% if grouped_recruits.pending_training %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('pending-training')">待试播</button>
-    {% endif %}
-    {% if grouped_recruits.pending_broadcast_schedule %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('pending-broadcast-schedule')">待预约开播</button>
-    {% endif %}
-    {% if grouped_recruits.pending_broadcast %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('pending-broadcast')">待开播</button>
-    {% endif %}
-    {% if grouped_recruits.overdue %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('overdue')">鸽</button>
-    {% endif %}
-    {% if grouped_recruits.ended %}
-    <button class="quick-nav-btn" onclick="scrollToGroup('ended')">已结束</button>
-    {% endif %}
+    <!-- Quick nav buttons will be generated dynamically -->
   </div>
 
-  <div class="recruit-groups">
-    {% if grouped_recruits.pending_interview %}
-    <div class="recruit-group" id="pending-interview">
-      <h3 class="group-title">待面试</h3>
-      <div class="record-cards">
-        {% for recruit in grouped_recruits.pending_interview %}
-        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              <div class="start-time {% if recruit.appointment_time and recruit.appointment_time < current_utc - timedelta(hours=24) %}overdue{% endif %}">
-                预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}
-              </div>
-            </div>
-            <div class="record-info">
-              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-              {% if recruit.pilot.real_name %}
-              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
-              {% endif %}
-              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-              <div class="status-line">
-                <span class="status-badge status-待面试">待面试</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div></div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-
-    {% if grouped_recruits.pending_training_schedule %}
-    <div class="recruit-group" id="pending-training-schedule">
-      <h3 class="group-title">待预约试播</h3>
-      <div class="record-cards">
-        {% for recruit in grouped_recruits.pending_training_schedule %}
-        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              <div class="start-time">
-                面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}
-              </div>
-            </div>
-            <div class="record-info">
-              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-              {% if recruit.pilot.real_name %}
-              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
-              {% endif %}
-              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-              <div class="status-line">
-                <span class="status-badge status-待预约试播">待预约试播</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div></div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-
-    {% if grouped_recruits.pending_training %}
-    <div class="recruit-group" id="pending-training">
-      <h3 class="group-title">待试播</h3>
-      <div class="record-cards">
-        {% for recruit in grouped_recruits.pending_training %}
-        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              <div class="start-time {% if recruit.get_effective_scheduled_training_time() and recruit.get_effective_scheduled_training_time() < current_utc - timedelta(hours=24) %}overdue{% endif %}">
-                试播：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}
-              </div>
-            </div>
-            <div class="record-info">
-              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-              {% if recruit.pilot.real_name %}
-              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
-              {% endif %}
-              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-              <div class="status-line">
-                <span class="status-badge status-待试播">待试播</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div></div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-
-    {% if grouped_recruits.pending_broadcast_schedule %}
-    <div class="recruit-group" id="pending-broadcast-schedule">
-      <h3 class="group-title">待预约开播</h3>
-      <div class="record-cards">
-        {% for recruit in grouped_recruits.pending_broadcast_schedule %}
-        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              <div class="start-time">
-                试播决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}
-              </div>
-            </div>
-            <div class="record-info">
-              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-              {% if recruit.pilot.real_name %}
-              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
-              {% endif %}
-              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-              <div class="status-line">
-                <span class="status-badge status-待预约开播">待预约开播</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div></div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-
-    {% if grouped_recruits.pending_broadcast %}
-    <div class="recruit-group" id="pending-broadcast">
-      <h3 class="group-title">待开播</h3>
-      <div class="record-cards">
-        {% for recruit in grouped_recruits.pending_broadcast %}
-        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              <div class="start-time {% if recruit.get_effective_scheduled_broadcast_time() and recruit.get_effective_scheduled_broadcast_time() < current_utc - timedelta(hours=24) %}overdue{% endif %}">
-                开播：{{ recruit.get_effective_scheduled_broadcast_time() | local_datetime('%m月%d日 %H:%M') }}
-              </div>
-            </div>
-            <div class="record-info">
-              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-              {% if recruit.pilot.real_name %}
-              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
-              {% endif %}
-              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-              <div class="status-line">
-                <span class="status-badge status-待开播">待开播</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div></div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-
-    {% if grouped_recruits.overdue %}
-    <div class="recruit-group" id="overdue">
-      <h3 class="group-title">鸽</h3>
-      <div class="record-cards">
-        {% for recruit in grouped_recruits.overdue %}
-        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              {% set effective_status = recruit.get_effective_status() %}
-              {% if effective_status.value == '待面试' %}
-              <div class="start-time overdue">预约：{{ recruit.appointment_time | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待预约试播' %}
-              <div class="start-time overdue">面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待试播' %}
-              <div class="start-time overdue">试播：{{ recruit.get_effective_scheduled_training_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待预约开播' %}
-              <div class="start-time overdue">试播决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% elif effective_status.value == '待开播' %}
-              <div class="start-time overdue">开播：{{ recruit.get_effective_scheduled_broadcast_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-              {% endif %}
-            </div>
-            <div class="record-info">
-              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-              {% if recruit.pilot.real_name %}
-              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
-              {% endif %}
-              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-              <div class="status-line">
-                <span class="status-badge status-鸽">鸽</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div></div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-                {% endif %}
-
-    {% if grouped_recruits.ended %}
-    <div class="recruit-group" id="ended">
-      <h3 class="group-title">已结束</h3>
-      <div class="record-cards">
-        {% for recruit in grouped_recruits.ended %}
-        <a href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}" class="record-card">
-          <div class="card-header">
-            <div class="record-time">
-              <div class="start-time">最后修改：{{ recruit.updated_at | local_datetime('%m月%d日 %H:%M') }}</div>
-            </div>
-            <div class="record-info">
-              <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-              {% if recruit.pilot.real_name %}
-              <div class="pilot-real-name">{{ recruit.pilot.real_name }}</div>
-              {% endif %}
-              <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-              <div class="status-line">
-                <span class="status-badge status-已结束">已结束</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <div></div>
-            <div class="card-arrow">→</div>
-          </div>
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
+  <div class="recruit-groups" id="recruit-groups-container">
+    <!-- Recruit groups will be loaded here -->
   </div>
 
-  {% if not grouped_recruits.pending_interview and not grouped_recruits.pending_training_schedule and not grouped_recruits.pending_training and not grouped_recruits.pending_broadcast_schedule and not grouped_recruits.pending_broadcast and not grouped_recruits.overdue and not grouped_recruits.ended %}
-      <div class="empty-state">
-        <div class="empty-icon">📋</div>
-        <div class="empty-title">暂无招募记录</div>
-        <div class="empty-description">
-          {% if current_status == '进行中' %}
-          当前没有进行中的招募，可以从主播详情页启动新的招募。
-      {% elif current_status == '鸽' %}
-      当前没有超时的招募记录。
-      {% elif current_status == '已结束' %}
-      当前没有已结束的招募记录。
-          {% else %}
-          当前筛选条件下没有招募记录。
-          {% endif %}
-        </div>
-        <div class="empty-actions">
-          <a class="btn btn-primary" href="{{ url_for('pilot.list_pilots') }}">前往主播管理</a>
-        </div>
-      </div>
-    {% endif %}
+  <div class="empty-state" id="empty-state" style="display: none;">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">暂无招募记录</div>
+    <div class="empty-description">当前筛选条件下没有招募记录。</div>
+    <div class="empty-actions">
+      <a class="btn btn-primary" href="{{ url_for('pilot.list_pilots') }}">前往主播管理</a>
+    </div>
+  </div>
 
   <button class="floating-back-to-top" id="floating-back-to-top" onclick="scrollToTop()" style="display: none;">
     ↑
@@ -330,87 +65,277 @@
 </section>
 
 <script>
-let allRecruits = [];
+// --- UTILITY FUNCTIONS ---
+function toggleFilters() {
+  const form = document.getElementById('filter-form');
+  const icon = document.getElementById('filter-toggle-icon');
+  const collapsed = form.classList.toggle('is-collapsed');
+  icon.textContent = collapsed ? '▼' : '▲';
+}
 
-function performRecruitSearch() {
-  const searchInput = document.getElementById('recruit-pilot-search');
-  const searchTerm = (searchInput.value || '').trim().toLowerCase();
-
-  if (!searchTerm) {
-    showAllRecruits();
-    return;
+function scrollToGroup(groupId) {
+  const element = document.getElementById(groupId);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-
-  const filtered = allRecruits.filter(item => {
-    const nickname = (item.nickname || '').toLowerCase();
-    const realName = (item.realName || '').toLowerCase();
-    return nickname.includes(searchTerm) || realName.includes(searchTerm);
-  });
-
-  showFilteredRecruits(filtered);
 }
 
-function showAllRecruits() {
-  const cards = document.querySelectorAll('.record-card');
-  cards.forEach(card => { card.style.display = 'block'; });
-  updateRecruitEmptyState(cards.length > 0);
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function showFilteredRecruits(filtered) {
-  const idSet = new Set(filtered.map(i => i.id));
-  const cards = document.querySelectorAll('.record-card');
-  cards.forEach(card => {
-    const id = (card.getAttribute('href') || '').split('/').pop();
-    if (idSet.has(id)) {
-      card.style.display = 'block';
-    } else {
-      card.style.display = 'none';
+function formatDateTime(isoString) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${month}月${day}日 ${hours}:${minutes}`;
+}
+
+// --- CARD & GROUP CREATION ---
+function createRecruitCard(recruit) {
+    const isOverdue = (time) => time && new Date(time) < new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    let timeHtml = '';
+    let statusText = recruit.effective_status || '未知';
+    let timeToCompare;
+
+    switch (statusText) {
+        case '待面试':
+            timeToCompare = recruit.appointment_time;
+            timeHtml = `预约：${formatDateTime(recruit.appointment_time)}`;
+            break;
+        case '待预约试播':
+            timeHtml = `面试决策：${formatDateTime(recruit.effective_interview_decision_time)}`;
+            break;
+        case '待试播':
+            timeToCompare = recruit.effective_scheduled_training_time;
+            timeHtml = `试播：${formatDateTime(recruit.effective_scheduled_training_time)}`;
+            break;
+        case '待预约开播':
+            timeHtml = `试播决策：${formatDateTime(recruit.effective_training_decision_time)}`;
+            break;
+        case '待开播':
+            timeToCompare = recruit.effective_scheduled_broadcast_time;
+            timeHtml = `开播：${formatDateTime(recruit.effective_scheduled_broadcast_time)}`;
+            break;
+        case '已结束':
+            timeHtml = `最后修改：${formatDateTime(recruit.updated_at)}`;
+            break;
+        default:
+            timeHtml = `创建于：${formatDateTime(recruit.created_at)}`;
     }
-  });
-  updateRecruitEmptyState(filtered.length > 0);
+
+    const card = document.createElement('a');
+    card.href = `/recruits/${recruit.id}`;
+    card.className = 'record-card';
+    card.innerHTML = `
+        <div class="card-header">
+            <div class="record-time">
+                <div class="start-time ${isOverdue(timeToCompare) ? 'overdue' : ''}">${timeHtml}</div>
+            </div>
+            <div class="record-info">
+                <div class="pilot-name">${recruit.pilot.nickname}</div>
+                ${recruit.pilot.real_name ? `<div class="pilot-real-name">${recruit.pilot.real_name}</div>` : ''}
+                <div class="meta-line">[${recruit.recruiter.nickname || recruit.recruiter.username}][${recruit.channel}]</div>
+                <div class="status-line">
+                    <span class="status-badge status-${statusText}">${statusText}</span>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <div></div>
+            <div class="card-arrow">→</div>
+        </div>
+    `;
+    return card;
 }
 
-function updateRecruitEmptyState(hasResults) {
-  const emptyState = document.querySelector('.empty-state');
-  if (emptyState) {
-    emptyState.style.display = hasResults ? 'none' : 'block';
-  }
-}
+function createGroup(title, groupId, recruits) {
+    if (recruits.length === 0) return null;
 
-function initRecruitSearch() {
-  const cards = document.querySelectorAll('.record-card');
-  allRecruits = Array.from(cards).map(card => {
-    const nicknameEl = card.querySelector('.pilot-name');
-    const realNameEl = card.querySelector('.pilot-real-name');
-    const href = card.getAttribute('href') || '';
-    return {
-      id: href.split('/').pop(),
-      nickname: nicknameEl ? nicknameEl.textContent.trim() : '',
-      realName: realNameEl ? realNameEl.textContent.trim() : ''
-    };
-  });
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'recruit-group';
+    groupDiv.id = groupId;
 
-  const searchInput = document.getElementById('recruit-pilot-search');
-  if (searchInput) {
-    searchInput.addEventListener('input', performRecruitSearch);
-    searchInput.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        performRecruitSearch();
-      } else if (event.key === 'Backspace' || event.key === 'Delete') {
-        setTimeout(performRecruitSearch, 10);
-      }
+    const titleEl = document.createElement('h3');
+    titleEl.className = 'group-title';
+    titleEl.textContent = title;
+    groupDiv.appendChild(titleEl);
+
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'record-cards';
+    recruits.forEach(recruit => {
+        cardsContainer.appendChild(createRecruitCard(recruit));
     });
-  }
+    groupDiv.appendChild(cardsContainer);
+
+    return groupDiv;
 }
 
+// --- DATA RENDERING & FILTERING ---
+let allRecruitsData = [];
+
+function renderRecruits(recruits) {
+    const container = document.getElementById('recruit-groups-container');
+    const quickNav = document.getElementById('quick-nav');
+    const emptyState = document.getElementById('empty-state');
+    container.innerHTML = '';
+    quickNav.innerHTML = '';
+
+    const groupMapping = {
+        pending_interview: '待面试',
+        pending_training_schedule: '待预约试播',
+        pending_training: '待试播',
+        pending_broadcast_schedule: '待预约开播',
+        pending_broadcast: '待开播',
+        overdue: '鸽',
+        ended: '已结束'
+    };
+
+    let totalRecruits = 0;
+    for (const key in groupMapping) {
+        const groupData = recruits[key] || [];
+        totalRecruits += groupData.length;
+        const groupElement = createGroup(groupMapping[key], key, groupData);
+        if (groupElement) {
+            container.appendChild(groupElement);
+            const navButton = document.createElement('button');
+            navButton.className = 'quick-nav-btn';
+            navButton.textContent = groupMapping[key];
+            navButton.onclick = () => scrollToGroup(key);
+            quickNav.appendChild(navButton);
+        }
+    }
+
+    if (totalRecruits === 0) {
+        emptyState.style.display = 'block';
+    } else {
+        emptyState.style.display = 'none';
+    }
+}
+
+async function fetchAndRenderRecruits() {
+    try {
+        const status = document.getElementById('status-filter').value;
+        const recruiterId = document.getElementById('recruiter-filter').value;
+        const channel = document.getElementById('channel-filter').value;
+        const searchTerm = document.getElementById('search-input').value;
+
+        const payload = await RecruitAPI.getRecruits({
+            status: status,
+            recruiter_id: recruiterId,
+            channel: channel,
+            q: searchTerm,
+            page_size: 500 // Fetch a large number for client-side grouping
+        });
+        
+        const recruits = payload.data.items;
+
+        if (status === '鸽') {
+            renderRecruits({ overdue: recruits });
+        } else if (status === '已结束') {
+            renderRecruits({ ended: recruits });
+        } else { // "进行中"
+            groupAndRender(recruits);
+        }
+
+    } catch (error) {
+        console.error('Failed to load recruits:', error);
+        document.getElementById('empty-state').style.display = 'block';
+    }
+}
+
+function groupAndRender(recruits) {
+    const grouped = {
+        pending_interview: [],
+        pending_training_schedule: [],
+        pending_training: [],
+        pending_broadcast_schedule: [],
+        pending_broadcast: [],
+        overdue: [], // This needs to be calculated based on time, API doesn't provide it directly
+        ended: []
+    };
+
+    recruits.forEach(r => {
+        const status = r.effective_status;
+        switch(status) {
+            case '待面试': grouped.pending_interview.push(r); break;
+            case '待预约试播': grouped.pending_training_schedule.push(r); break;
+            case '待试播': grouped.pending_training.push(r); break;
+            case '待预约开播': grouped.pending_broadcast_schedule.push(r); break;
+            case '待开播': grouped.pending_broadcast.push(r); break;
+            case '已结束': grouped.ended.push(r); break;
+        }
+    });
+
+    renderRecruits(grouped);
+}
+
+
+async function populateFilters() {
+    try {
+        const payload = await RecruitAPI.getOptions();
+        const { enums, recruiter_choices } = payload.data;
+
+        const statusFilter = document.getElementById('status-filter');
+        statusFilter.innerHTML = `
+            <option value="进行中">进行中</option>
+            <option value="鸽">鸽</option>
+            <option value="已结束">已结束</option>
+        `;
+        statusFilter.value = '进行中'; // Set default
+
+        const recruiterFilter = document.getElementById('recruiter-filter');
+        recruiterFilter.innerHTML = '<option value="">全部负责人</option>';
+        recruiter_choices.forEach(choice => {
+            const option = new Option(choice.label, choice.value);
+            recruiterFilter.add(option);
+        });
+
+        const channelFilter = document.getElementById('channel-filter');
+        channelFilter.innerHTML = '<option value="">全部渠道</option>';
+        Object.keys(enums.channel).forEach(key => {
+            const option = new Option(enums.channel[key], key);
+            channelFilter.add(option);
+        });
+
+    } catch (error) {
+        console.error('Failed to populate filters:', error);
+    }
+}
+
+
+// --- EVENT LISTENERS & INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', function () {
-  initRecruitSearch();
+    populateFilters().then(() => {
+        fetchAndRenderRecruits();
+    });
+
+    document.getElementById('status-filter').addEventListener('change', fetchAndRenderRecruits);
+    document.getElementById('recruiter-filter').addEventListener('change', fetchAndRenderRecruits);
+    document.getElementById('channel-filter').addEventListener('change', fetchAndRenderRecruits);
+    
+    let searchTimeout;
+    document.getElementById('search-input').addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(fetchAndRenderRecruits, 300); // Debounce search
+    });
+
+    const floatingBtn = document.getElementById('floating-back-to-top');
+    window.addEventListener('scroll', () => {
+        if (window.pageYOffset > 300) {
+            floatingBtn.style.display = 'block';
+        } else {
+            floatingBtn.style.display = 'none';
+        }
+    });
 });
 </script>
 
 <style>
-
 .filter-toggle {
   width: 100%;
   display: flex;
@@ -431,43 +356,17 @@ document.addEventListener('DOMContentLoaded', function () {
 .filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .filter-group { margin-bottom: 8px; }
 .filter-label { font-size: 14px; color: var(--text); display: block; margin-bottom: 4px; }
-.filter-select { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--table-header); background: #fff; }
+.filter-select { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--table-header); background: #fff; }
 
-.search-bar {
-  margin-bottom: 16px;
-}
-
-.search-input-group {
-  display: flex;
-  align-items: center;
-  background: #fff;
-  border: 1px solid var(--table-header);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
+.search-bar { margin-bottom: 16px; }
+.search-input-group { display: flex; }
 .search-input {
-  flex: 1;
-  border: none;
+  width: 100%;
+  border: 1px solid var(--table-header);
   padding: 10px 12px;
   font-size: 14px;
+  border-radius: 8px;
   outline: none;
-}
-
-.search-button {
-  background: var(--brand);
-  color: #fff;
-  border: none;
-  padding: 10px 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-icon {
-  font-size: 16px;
 }
 
 .quick-nav {
@@ -489,33 +388,18 @@ document.addEventListener('DOMContentLoaded', function () {
   font-size: 12px;
   color: var(--text);
   cursor: pointer;
-  transition: all 0.2s ease;
 }
+.quick-nav-btn:hover { background: var(--brand); color: #fff; }
 
-.quick-nav-btn:hover {
-  background: var(--brand);
-  color: #fff;
-  border-color: var(--brand);
-}
-
-
-.recruit-groups {
-  margin-bottom: 20px;
-}
-
-.recruit-group {
-  margin-bottom: 24px;
-}
-
+.recruit-groups { margin-bottom: 20px; }
+.recruit-group { margin-bottom: 24px; }
 .group-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text);
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 2px solid var(--brand);
 }
-
 
 .record-cards { display: block; }
 .record-card {
@@ -529,159 +413,45 @@ document.addEventListener('DOMContentLoaded', function () {
   text-decoration: none;
   color: inherit;
   transition: all 0.2s ease;
-  cursor: pointer;
 }
 .record-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transform: translateY(-2px);
   border-color: var(--brand);
 }
-.record-card .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
-}
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
 .record-time { flex: 0 0 auto; }
-.start-time { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.start-time { font-size: 16px; font-weight: 600; }
 .start-time.overdue { color: #d32f2f; }
-.training-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.broadcast-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.record-info { flex: 1; text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-.pilot-name { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.2; margin-bottom: 2px; }
-.pilot-real-name { font-size: 12px; color: var(--muted); line-height: 1.1; margin-bottom: 2px; }
-.meta-line { font-size: 12px; color: var(--muted); line-height: 1.1; }
-.status-line { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.record-info { flex: 1; text-align: right; }
+.pilot-name { font-size: 14px; font-weight: 500; }
+.pilot-real-name { font-size: 12px; color: var(--muted); }
+.meta-line { font-size: 12px; color: var(--muted); }
+.status-line { margin-top: 4px; }
 .status-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500; }
-.status-已启动 { background: var(--hud-green); color: white; }
-.status-训练征召中 { background: var(--brand); color: white; }
-.status-已结束 { background: var(--muted); color: white; }
 .status-待面试 { background: #e3f2fd; color: #1565c0; }
-.status-待预约训练 { background: #f3e5f5; color: #7b1fa2; }
-.status-待训练 { background: #fff3e0; color: #ef6c00; }
+.status-待预约试播 { background: #f3e5f5; color: #7b1fa2; }
+.status-待试播 { background: #fff3e0; color: #ef6c00; }
 .status-待预约开播 { background: #e8f5e8; color: #2e7d32; }
 .status-待开播 { background: #fff8e1; color: #f57c00; }
 .status-鸽 { background: #ffebee; color: #d32f2f; }
-.decision-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500; background: var(--table-header); color: var(--text); }
-.record-card .card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 12px; }
+.status-已结束 { background: #eceff1; color: #546e7a; }
+.card-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--table-header); padding-top: 8px; margin-top: 8px; }
+.card-arrow { color: var(--muted); }
 .record-card:hover .card-arrow { color: var(--brand); }
 
-
 .floating-back-to-top {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 48px;
-  height: 48px;
-  background: var(--brand);
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  font-size: 20px;
-  font-weight: bold;
-  cursor: pointer;
+  position: fixed; bottom: 20px; right: 20px;
+  width: 48px; height: 48px;
+  background: var(--brand); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 20px; cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  transition: all 0.3s ease;
-  z-index: 1000;
-}
-
-.floating-back-to-top:hover {
-  background: #c62828;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
 }
 
 .empty-state { text-align: center; padding: 60px 20px; }
 .empty-icon { font-size: 48px; margin-bottom: 16px; }
-.empty-title { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-.empty-description { color: var(--muted); line-height: 1.5; margin-bottom: 24px; }
-.empty-actions { display: flex; justify-content: center; gap: 12px; }
-
-
-@media (max-width: 768px) {
-  .filter-form {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-  .record-card .card-header {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .record-info { text-align: right; align-items: flex-end; }
-  .quick-nav {
-    padding: 8px;
-  }
-  .quick-nav-btn {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-  .floating-back-to-top {
-    bottom: 15px;
-    right: 15px;
-    width: 44px;
-    height: 44px;
-    font-size: 18px;
-  }
-}
+.empty-title { font-size: 18px; font-weight: 600; }
+.empty-description { color: var(--muted); margin-bottom: 24px; }
 </style>
-
-<script>
-function toggleFilters() {
-  const form = document.getElementById('filter-form');
-  const icon = document.getElementById('filter-toggle-icon');
-  const collapsed = form.classList.toggle('is-collapsed');
-  icon.textContent = collapsed ? '▼' : '▲';
-}
-
-function scrollToGroup(groupId) {
-  const element = document.getElementById(groupId);
-  if (element) {
-    element.scrollIntoView({ 
-      behavior: 'smooth',
-      block: 'start'
-    });
-  }
-}
-
-function scrollToTop() {
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  });
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('filter-form');
-  const icon = document.getElementById('filter-toggle-icon');
-  const hasQuery = window.location.search.length > 1;
-  const floatingBtn = document.getElementById('floating-back-to-top');
-  const quickNav = document.getElementById('quick-nav');
-
-  if (!hasQuery) {
-    if (!form.classList.contains('is-collapsed')) form.classList.add('is-collapsed');
-    icon.textContent = '▼';
-  } else {
-    form.classList.remove('is-collapsed');
-    icon.textContent = '▲';
-  }
-
-  function handleScroll() {
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const quickNavRect = quickNav.getBoundingClientRect();
-    const quickNavBottom = quickNavRect.bottom + scrollTop;
-    
-    if (scrollTop > quickNavBottom) {
-      floatingBtn.style.display = 'block';
-    } else {
-      floatingBtn.style.display = 'none';
-    }
-  }
-
-  window.addEventListener('scroll', handleScroll);
-  
-  handleScroll();
-});
-</script>
 {% endblock %}
