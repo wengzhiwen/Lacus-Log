@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}预约试播 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}预约试播 - Lacus-Log{% endblock %}
 
 {% block content %}
-<section class="schedule-training">
+<section class="schedule-training" data-recruit-id="{{ recruit_id }}">
   <div class="back-nav">
-    <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">
+    <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">
       <span>←</span>
       返回招募详情
     </a>
@@ -16,18 +16,18 @@
   <div class="pilot-info-card">
     <div class="card-header">
         <div class="pilot-main-info">
-            <div class="pilot-name"><a href="{{ url_for('pilot.pilot_detail', pilot_id=recruit.pilot.id) }}">{{ recruit.pilot.nickname }}</a></div>
-            <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
+            <div class="pilot-name" id="pilot-name">加载中...</div>
+            <div class="pilot-real-name" id="pilot-real-name">-</div>
             <div class="pilot-badges">
-                <span class="rank-badge">{{ recruit.pilot.rank.value }}</span>
-                <span class="status-badge">{{ recruit.pilot.status.value }}</span>
+                <span class="rank-badge" id="pilot-rank">-</span>
+                <span class="status-badge" id="pilot-status">-</span>
             </div>
         </div>
     </div>
   </div>
 
   <form id="schedule-training-form" class="recruit-form">
-    <input type="hidden" name="recruit_id" value="{{ recruit.id }}"/>
+    <input type="hidden" name="recruit_id" value="{{ recruit_id }}"/>
     
     <div class="form-section">
       <h3 class="section-title">预约信息</h3>
@@ -38,8 +38,7 @@
         </div>
         <div class="form-group">
           <label for="scheduled_training_time">预约试播时间 <span class="required">*</span></label>
-          <input type="datetime-local" name="scheduled_training_time" id="scheduled_training_time" 
-                 value="{{ default_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+          <input type="datetime-local" name="scheduled_training_time" id="scheduled_training_time" required>
         </div>
       </div>
     </div>
@@ -50,10 +49,7 @@
         <div class="form-group">
           <label for="work_mode">开播方式 <span class="required">*</span></label>
           <select name="work_mode" id="work_mode" required>
-            <option value="">-- 请选择开播方式 --</option>
-            {% for value, label in work_mode_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
+            <option value="">加载中...</option>
           </select>
         </div>
       </div>
@@ -64,11 +60,11 @@
       <div class="form-row">
         <div class="form-group">
           <label for="introduction_fee">介绍费（元）</label>
-          <input type="number" name="introduction_fee" id="introduction_fee" step="0.01" min="0" value="{{ recruit.introduction_fee }}">
+          <input type="number" name="introduction_fee" id="introduction_fee" step="0.01" min="0">
         </div>
         <div class="form-group">
           <label for="remarks">备注</label>
-          <textarea name="remarks" id="remarks" rows="3" maxlength="200">{{ recruit.remarks or '' }}</textarea>
+          <textarea name="remarks" id="remarks" rows="3" maxlength="200"></textarea>
         </div>
       </div>
     </div>
@@ -76,7 +72,7 @@
 </section>
 
 <div class="footbar">
-  <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
+  <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">返回</a>
   <button type="submit" form="schedule-training-form" class="btn btn-primary">确认预约</button>
 </div>
 
@@ -106,13 +102,113 @@ input[readonly] { background: var(--table-header); }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    const section = document.querySelector('.schedule-training');
+    const recruitId = section.dataset.recruitId;
+    const workModeSelect = document.getElementById('work_mode');
+    const scheduledTimeInput = document.getElementById('scheduled_training_time');
+    const introductionFeeInput = document.getElementById('introduction_fee');
+    const remarksInput = document.getElementById('remarks');
+
+    const rankMapping = {
+        '候补机师': '候选人',
+        '训练机师': '试播主播',
+        '实习机师': '实习主播',
+        '正式机师': '正式主播'
+    };
+    const statusMapping = {
+        '未征召': '未招募',
+        '不征召': '不招募',
+        '已征召': '已招募',
+        '已阵亡': '流失'
+    };
+
+    const toDatetimeLocal = (isoString) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        const pad = (value) => String(value).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const getNext14Clock = () => {
+        const now = new Date();
+        const next = new Date(now);
+        next.setHours(14, 0, 0, 0);
+        if (now >= next) {
+            next.setDate(next.getDate() + 1);
+        }
+        const pad = (value) => String(value).padStart(2, '0');
+        return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`;
+    };
+
+    const renderPilotInfo = (pilot) => {
+        const rank = pilot.rank ? (rankMapping[pilot.rank] || pilot.rank) : '-';
+        const status = pilot.status ? (statusMapping[pilot.status] || pilot.status) : '-';
+        const nickname = pilot.nickname || '-';
+        const nameEl = document.getElementById('pilot-name');
+        if (pilot.id) {
+            nameEl.innerHTML = `<a href="/pilots/${pilot.id}">${nickname}</a>`;
+        } else {
+            nameEl.textContent = nickname;
+        }
+        document.getElementById('pilot-real-name').textContent = pilot.real_name || '未填写姓名';
+        document.getElementById('pilot-rank').textContent = rank;
+        document.getElementById('pilot-rank').className = `rank-badge rank-${rank}`;
+        document.getElementById('pilot-status').textContent = status;
+        document.getElementById('pilot-status').className = `status-badge status-${status}`;
+        document.title = `预约试播 - ${nickname} - Lacus-Log`;
+    };
+
+    const populateWorkModes = (workModeEnums) => {
+        workModeSelect.innerHTML = '<option value="">-- 请选择开播方式 --</option>';
+        Object.keys(workModeEnums || {}).forEach((key) => {
+            if (workModeEnums[key] === '未知') {
+                return;
+            }
+            const option = new Option(workModeEnums[key], key);
+            workModeSelect.add(option);
+        });
+    };
+
+    const populateFormValues = (recruit) => {
+        introductionFeeInput.value = recruit.introduction_fee || 0;
+        remarksInput.value = recruit.remarks || '';
+
+        const scheduledTime = recruit.effective_scheduled_training_time || recruit.scheduled_training_time;
+        const datetimeValue = toDatetimeLocal(scheduledTime) || getNext14Clock();
+        scheduledTimeInput.value = datetimeValue;
+    };
+
+    try {
+        const [detailPayload, pilotOptionsResponse] = await Promise.all([
+            RecruitAPI.getRecruitDetail(recruitId),
+            fetch('/api/pilots/options')
+        ]);
+
+        if (!detailPayload.success) {
+            throw new Error(detailPayload.error?.message || '加载招募详情失败');
+        }
+
+        const pilotOptionsPayload = await pilotOptionsResponse.json();
+        if (!pilotOptionsResponse.ok || !pilotOptionsPayload.success) {
+            throw new Error(pilotOptionsPayload.error?.message || '加载开播方式选项失败');
+        }
+
+        const recruit = detailPayload.data;
+        renderPilotInfo(recruit.pilot || {});
+        populateWorkModes(pilotOptionsPayload.data.enums?.work_mode || {});
+        populateFormValues(recruit);
+
+    } catch (error) {
+        console.error('加载预约试播页面数据失败:', error);
+        showMessage(error.message || '加载预约试播页面数据失败', 'error');
+    }
+
     const form = document.getElementById('schedule-training-form');
     form.addEventListener('submit', async function(event) {
         event.preventDefault();
 
         const formData = new FormData(form);
-        const recruitId = formData.get('recruit_id');
         const payload = {
             scheduled_training_time: formData.get('scheduled_training_time'),
             work_mode: formData.get('work_mode'),
@@ -130,7 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.success) {
                 showMessage(response.meta.message || '操作成功！正在跳转...', 'success');
                 setTimeout(() => {
-                    window.location.href = "{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}";
+                    window.location.href = "{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}";
                 }, 1500);
             }
         } catch (error) {

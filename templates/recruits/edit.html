@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}编辑招募 - {{ recruit.pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}编辑招募 - Lacus-Log{% endblock %}
 {% block content %}
-<section class="edit-recruit">
+<section class="edit-recruit" data-recruit-id="{{ recruit_id }}">
   <div class="back-nav">
-    <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">
+    <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">
       <span>←</span>
       返回招募详情
     </a>
@@ -12,22 +12,21 @@
   <h1 class="title">编辑招募</h1>
 
   <div class="pilot-info-card">
-    <!-- Pilot info card remains the same -->
     <div class="card-header">
-      <div class="pilot-avatar"><span class="avatar-icon">{% if recruit.pilot.gender.value == 0 %}♂{% elif recruit.pilot.gender.value == 1 %}♀{% else %}?{% endif %}</span></div>
+      <div class="pilot-avatar"><span class="avatar-icon" id="pilot-gender-icon">?</span></div>
       <div class="pilot-main-info">
-        <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-        <div class="pilot-real-name">{{ recruit.pilot.real_name or '未填写姓名' }}</div>
+        <div class="pilot-name" id="pilot-name">加载中...</div>
+        <div class="pilot-real-name" id="pilot-real-name">-</div>
         <div class="pilot-badges">
-          <span class="rank-badge">{{ recruit.pilot.rank.value | normalize_rank }}</span>
-          <span class="status-badge">{{ recruit.pilot.status.value | normalize_status }}</span>
+          <span class="rank-badge" id="pilot-rank">-</span>
+          <span class="status-badge" id="pilot-status">-</span>
         </div>
       </div>
     </div>
   </div>
 
   <form id="edit-recruit-form" class="recruit-form">
-    <input type="hidden" name="recruit_id" value="{{ recruit.id }}">
+    <input type="hidden" name="recruit_id" value="{{ recruit_id }}">
     
     <div class="form-section">
       <h3 class="section-title">招募信息</h3>
@@ -36,9 +35,7 @@
         <div class="form-group">
           <label for="recruiter_id">招募负责人 <span class="required">*</span></label>
           <select name="recruiter_id" id="recruiter_id" required>
-            {% for value, label in recruiter_choices %}
-            <option value="{{ value }}" {% if value == recruit.recruiter.id|string %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
+            <option value="">加载中...</option>
           </select>
         </div>
       </div>
@@ -46,8 +43,7 @@
       <div class="form-row">
         <div class="form-group">
           <label for="appointment_time">预约时间 <span class="required">*</span></label>
-          <input type="datetime-local" name="appointment_time" id="appointment_time" 
-                 value="{{ recruit.appointment_time | local_datetime_for_input }}" required>
+          <input type="datetime-local" name="appointment_time" id="appointment_time" required>
         </div>
       </div>
 
@@ -55,9 +51,7 @@
         <div class="form-group">
           <label for="channel">招募渠道 <span class="required">*</span></label>
           <select name="channel" id="channel" required>
-            {% for value, label in channel_choices %}
-            <option value="{{ value }}" {% if value == recruit.channel.value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
+            <option value="">加载中...</option>
           </select>
         </div>
       </div>
@@ -65,8 +59,7 @@
       <div class="form-row">
         <div class="form-group">
           <label for="introduction_fee">介绍费（元）</label>
-          <input type="number" name="introduction_fee" id="introduction_fee" 
-                 min="0" step="0.01" value="{{ recruit.introduction_fee }}">
+          <input type="number" name="introduction_fee" id="introduction_fee" min="0" step="0.01">
         </div>
       </div>
 
@@ -74,36 +67,29 @@
         <div class="form-group">
           <label>招募状态</label>
           <div class="readonly-field">
-            <span class="status-badge status-{{ recruit.get_effective_status().value.replace(' ', '') }}">{{ recruit.get_effective_status().value }}</span>
+            <span class="status-badge" id="recruit-status">-</span>
           </div>
         </div>
       </div>
 
-      {% set effective_status = recruit.get_effective_status().value %}
-      {% if effective_status in ['待试播', '待预约开播', '待开播'] %}
-      <div class="form-row">
+      <div class="form-row" id="scheduled-training-row" style="display: none;">
         <div class="form-group">
           <label for="scheduled_training_time">预约试播时间</label>
-          <input type="datetime-local" name="scheduled_training_time" id="scheduled_training_time"
-                 value="{{ recruit.get_effective_scheduled_training_time() | local_datetime_for_input }}">
+          <input type="datetime-local" name="scheduled_training_time" id="scheduled_training_time">
         </div>
       </div>
-      {% endif %}
 
-      {% if effective_status in ['待开播'] %}
-      <div class="form-row">
+      <div class="form-row" id="scheduled-broadcast-row" style="display: none;">
         <div class="form-group">
           <label for="scheduled_broadcast_time">预约开播时间</label>
-          <input type="datetime-local" name="scheduled_broadcast_time" id="scheduled_broadcast_time"
-                 value="{{ recruit.get_effective_scheduled_broadcast_time() | local_datetime_for_input }}">
+          <input type="datetime-local" name="scheduled_broadcast_time" id="scheduled_broadcast_time">
         </div>
       </div>
-      {% endif %}
 
       <div class="form-row">
         <div class="form-group">
           <label for="remarks">备注</label>
-          <textarea name="remarks" id="remarks" maxlength="200">{{ recruit.remarks or '' }}</textarea>
+          <textarea name="remarks" id="remarks" maxlength="200"></textarea>
         </div>
       </div>
     </div>
@@ -111,16 +97,12 @@
 </section>
 
 <div class="footbar">
-  <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}">返回</a>
-  {% if recruit.get_effective_status().value == '已结束' %}
-  <button type="button" class="btn btn-primary" disabled>已结束（仅查看）</button>
-  {% else %}
-  <button type="submit" form="edit-recruit-form" class="btn btn-primary">保存修改</button>
-  {% endif %}
+  <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">返回</a>
+  <button type="submit" form="edit-recruit-form" class="btn btn-primary" id="save-button">保存修改</button>
 </div>
 
 <style>
-/* Styles are identical to the previous version */
+/* Styles are与之前一致 */
 .edit-recruit { padding: 20px; }
 .back-nav { margin-bottom: 20px; }
 .title { margin-bottom: 20px; font-size: 24px; }
@@ -145,14 +127,138 @@ input, select, textarea { padding: 8px 12px; border: 1px solid var(--gray); bord
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  const section = document.querySelector('.edit-recruit');
+  const recruitId = section.dataset.recruitId;
+  const rankMapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+  const statusMapping = {
+    '未征召': '未招募',
+    '不征召': '不招募',
+    '已征召': '已招募',
+    '已阵亡': '流失'
+  };
+  const genderIcon = { 0: '♂', 1: '♀', 2: '?' };
+
+  const toDatetimeLocal = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const renderPilotInfo = (pilot) => {
+    const nickname = pilot.nickname || '-';
+    const nameEl = document.getElementById('pilot-name');
+    if (pilot.id) {
+      nameEl.innerHTML = `<a href="/pilots/${pilot.id}">${nickname}</a>`;
+    } else {
+      nameEl.textContent = nickname;
+    }
+    document.getElementById('pilot-real-name').textContent = pilot.real_name || '未填写姓名';
+    const rank = pilot.rank ? (rankMapping[pilot.rank] || pilot.rank) : '-';
+    const status = pilot.status ? (statusMapping[pilot.status] || pilot.status) : '-';
+    document.getElementById('pilot-rank').textContent = rank;
+    document.getElementById('pilot-rank').className = `rank-badge rank-${rank}`;
+    document.getElementById('pilot-status').textContent = status;
+    document.getElementById('pilot-status').className = `status-badge status-${status}`;
+    document.getElementById('pilot-gender-icon').textContent = genderIcon[pilot.gender] ?? '?';
+    document.title = `编辑招募 - ${nickname} - Lacus-Log`;
+  };
+
+  const populateRecruiterChoices = (choices, selectedId) => {
+    const select = document.getElementById('recruiter_id');
+    select.innerHTML = '<option value="">请选择负责人</option>';
+    choices.forEach((choice) => {
+      const option = new Option(choice.label, choice.value);
+      if (choice.value === selectedId) {
+        option.selected = true;
+      }
+      select.add(option);
+    });
+  };
+
+  const populateChannelOptions = (channels, selected) => {
+    const select = document.getElementById('channel');
+    select.innerHTML = '<option value="">请选择渠道</option>';
+    Object.keys(channels || {}).forEach((key) => {
+      const option = new Option(channels[key], key);
+      if (key === selected) {
+        option.selected = true;
+      }
+      select.add(option);
+    });
+  };
+
+  const populateFormValues = (recruit) => {
+    document.getElementById('appointment_time').value = toDatetimeLocal(recruit.appointment_time);
+    document.getElementById('introduction_fee').value = recruit.introduction_fee || 0;
+    document.getElementById('remarks').value = recruit.remarks || '';
+
+    const status = recruit.effective_status || '-';
+    const statusBadge = document.getElementById('recruit-status');
+    statusBadge.textContent = status;
+    statusBadge.className = `status-badge status-${status}`;
+
+    const trainingRow = document.getElementById('scheduled-training-row');
+    const broadcastRow = document.getElementById('scheduled-broadcast-row');
+
+    if (['待试播', '待预约开播', '待开播'].includes(status)) {
+      trainingRow.style.display = 'grid';
+      document.getElementById('scheduled_training_time').value = toDatetimeLocal(recruit.effective_scheduled_training_time || recruit.scheduled_training_time);
+    } else {
+      trainingRow.style.display = 'none';
+      document.getElementById('scheduled_training_time').value = '';
+    }
+
+    if (status === '待开播') {
+      broadcastRow.style.display = 'grid';
+      document.getElementById('scheduled_broadcast_time').value = toDatetimeLocal(recruit.effective_scheduled_broadcast_time || recruit.scheduled_broadcast_time);
+    } else {
+      broadcastRow.style.display = 'none';
+      document.getElementById('scheduled_broadcast_time').value = '';
+    }
+
+    const saveButton = document.getElementById('save-button');
+    if (status === '已结束') {
+      saveButton.disabled = true;
+      saveButton.textContent = '已结束（仅查看）';
+    }
+  };
+
+  try {
+    const [detailPayload, optionsPayload] = await Promise.all([
+      RecruitAPI.getRecruitDetail(recruitId),
+      RecruitAPI.getOptions()
+    ]);
+
+    if (!detailPayload.success) {
+      throw new Error(detailPayload.error?.message || '加载招募详情失败');
+    }
+    if (!optionsPayload.success) {
+      throw new Error(optionsPayload.error?.message || '加载招募选项失败');
+    }
+
+    const recruit = detailPayload.data;
+    renderPilotInfo(recruit.pilot || {});
+    populateRecruiterChoices(optionsPayload.data.recruiter_choices || [], recruit.recruiter?.id);
+    populateChannelOptions(optionsPayload.data.enums?.channel || {}, recruit.channel);
+    populateFormValues(recruit);
+
+  } catch (error) {
+    console.error('加载编辑招募页面数据失败:', error);
+    showMessage(error.message || '加载编辑招募页面数据失败', 'error');
+  }
+
   const form = document.getElementById('edit-recruit-form');
   form.addEventListener('submit', async function(event) {
     event.preventDefault();
 
     const formData = new FormData(form);
-    const recruitId = formData.get('recruit_id');
-    
     const payload = {
       recruiter_id: formData.get('recruiter_id'),
       appointment_time: formData.get('appointment_time'),
@@ -168,7 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (response.success) {
         showMessage('招募信息已成功更新！正在跳转回详情页...', 'success');
         setTimeout(() => {
-          window.location.href = "{{ url_for('recruit.detail_recruit', recruit_id=recruit.id) }}";
+          window.location.href = "{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}";
         }, 1500);
       }
     } catch (error) {

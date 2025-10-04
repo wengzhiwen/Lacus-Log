@@ -11,10 +11,10 @@ from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist
 
 from models.pilot import Pilot
-from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChannel, RecruitStatus, TrainingDecision)
+from models.recruit import Recruit, RecruitStatus
 from models.user import Role, User
 from utils.logging_setup import get_logger
-from utils.timezone_helper import get_current_utc_time, utc_to_local
+from utils.timezone_helper import get_current_utc_time
 
 logger = get_logger('recruit')
 
@@ -164,22 +164,9 @@ def start_recruit_page(pilot_id):
     if pilot.status.value != '未招募':
         abort(400, '只有未招募状态的主播才能启动招募')
 
-    # 获取选项数据
-    recruiter_choices = _get_recruiter_choices()
-    channel_choices = [(option.value, option.value) for option in RecruitChannel]
-
-    # 默认预约时间（下一个14:00 GMT+8）
-    from utils.timezone_helper import get_next_14_oclock_local, local_to_utc
-    default_appointment_time_local = get_next_14_oclock_local()
-    default_appointment_time = local_to_utc(default_appointment_time_local)
-
     logger.debug('打开启动招募页面：主播=%s', pilot.nickname)
 
-    return render_template('recruits/start.html',
-                           pilot=pilot,
-                           recruiter_choices=recruiter_choices,
-                           channel_choices=channel_choices,
-                           default_appointment_time=default_appointment_time)
+    return render_template('recruits/start.html', pilot_id=pilot_id)
 
 
 @recruit_bp.route('/<recruit_id>')
@@ -200,13 +187,9 @@ def edit_recruit_page(recruit_id):
     except DoesNotExist:
         abort(404)
 
-    # 获取选项数据
-    recruiter_choices = _get_recruiter_choices()
-    channel_choices = [(option.value, option.value) for option in RecruitChannel]
-
     logger.debug('打开编辑招募页面：ID=%s，主播=%s', recruit_id, recruit.pilot.nickname)
 
-    return render_template('recruits/edit.html', recruit=recruit, recruiter_choices=recruiter_choices, channel_choices=channel_choices)
+    return render_template('recruits/edit.html', recruit_id=recruit_id)
 
 
 @recruit_bp.route('/<recruit_id>/interview')
@@ -222,13 +205,9 @@ def interview_recruit_page(recruit_id):
     if effective_status != RecruitStatus.PENDING_INTERVIEW:
         abort(400, '只能对待面试状态的招募执行面试决策')
 
-    # 获取选项数据
-    interview_decision_choices = [(option.value, option.value) for option in InterviewDecision if not option.name.endswith('_OLD')]
-    current_year = get_current_utc_time().year
-
     logger.debug('打开面试决策页面：ID=%s，主播=%s', recruit_id, recruit.pilot.nickname)
 
-    return render_template('recruits/interview.html', recruit=recruit, interview_decision_choices=interview_decision_choices, current_year=current_year)
+    return render_template('recruits/interview.html', recruit_id=recruit_id)
 
 
 @recruit_bp.route('/<recruit_id>/schedule-training')
@@ -244,17 +223,7 @@ def schedule_training_page(recruit_id):
     if effective_status != RecruitStatus.PENDING_TRAINING_SCHEDULE:
         abort(400, '只能对待预约试播状态的招募执行预约试播')
 
-    # 获取选项数据
-    from models.pilot import WorkMode
-    work_mode_choices = [(w.value, w.value) for w in WorkMode if w != WorkMode.UNKNOWN]
-
-    # 默认时间为下一个14:00 (GMT+8)
-    now_local = utc_to_local(get_current_utc_time())
-    default_time = now_local.replace(hour=14, minute=0, second=0, microsecond=0)
-    if now_local >= default_time:
-        default_time += timedelta(days=1)
-
-    return render_template('recruits/schedule_training.html', recruit=recruit, work_mode_choices=work_mode_choices, default_time=default_time)
+    return render_template('recruits/schedule_training.html', recruit_id=recruit_id)
 
 
 @recruit_bp.route('/<recruit_id>/training-decision')
@@ -270,12 +239,9 @@ def training_decision_page(recruit_id):
     if effective_status != RecruitStatus.PENDING_TRAINING:
         abort(400, '只能对待试播状态的招募执行试播决策')
 
-    # 获取选项数据
-    training_decision_choices = [(option.value, option.value) for option in TrainingDecision if not option.name.endswith('_OLD')]
-
     logger.debug('打开试播决策页面：ID=%s，主播=%s', recruit_id, recruit.pilot.nickname)
 
-    return render_template('recruits/training_decision.html', recruit=recruit, training_decision_choices=training_decision_choices)
+    return render_template('recruits/training_decision.html', recruit_id=recruit_id)
 
 
 @recruit_bp.route('/<recruit_id>/schedule-broadcast')
@@ -291,24 +257,9 @@ def schedule_broadcast_page(recruit_id):
     if effective_status != RecruitStatus.PENDING_BROADCAST_SCHEDULE:
         abort(400, '只能对待预约开播状态的招募执行预约开播')
 
-    # 获取选项数据
-    recruiter_choices = _get_recruiter_choices()
-    from models.pilot import Platform
-    platform_choices = [(p.value, p.value) for p in Platform if p != Platform.UNKNOWN]
-
-    # 默认时间为下一个14:00 (GMT+8)
-    now_local = utc_to_local(get_current_utc_time())
-    default_time = now_local.replace(hour=14, minute=0, second=0, microsecond=0)
-    if now_local >= default_time:
-        default_time += timedelta(days=1)
-
     logger.debug('打开预约开播页面：ID=%s，主播=%s', recruit_id, recruit.pilot.nickname)
 
-    return render_template('recruits/schedule_broadcast.html',
-                           recruit=recruit,
-                           recruiter_choices=recruiter_choices,
-                           platform_choices=platform_choices,
-                           default_time=default_time)
+    return render_template('recruits/schedule_broadcast.html', recruit_id=recruit_id)
 
 
 @recruit_bp.route('/<recruit_id>/broadcast-decision')
@@ -324,19 +275,9 @@ def broadcast_decision_page(recruit_id):
     if effective_status != RecruitStatus.PENDING_BROADCAST:
         abort(400, '只能对待开播状态的招募执行开播决策')
 
-    # 获取选项数据
-    broadcast_decision_choices = [(option.value, option.value) for option in BroadcastDecision if not option.name.endswith('_OLD')]
-    recruiter_choices = _get_recruiter_choices()
-    from models.pilot import Platform
-    platform_choices = [(p.value, p.value) for p in Platform if p != Platform.UNKNOWN]
-
     logger.debug('打开开播决策页面：ID=%s，主播=%s', recruit_id, recruit.pilot.nickname)
 
-    return render_template('recruits/broadcast_decision.html',
-                           recruit=recruit,
-                           broadcast_decision_choices=broadcast_decision_choices,
-                           recruiter_choices=recruiter_choices,
-                           platform_choices=platform_choices)
+    return render_template('recruits/broadcast_decision.html', recruit_id=recruit_id)
 
 
 @recruit_bp.route('/<recruit_id>/changes')

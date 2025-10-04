@@ -15,19 +15,12 @@ from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import Pilot, Platform, Rank, Status, WorkMode
-from models.recruit import (BroadcastDecision, InterviewDecision, Recruit,
-                            RecruitChangeLog, RecruitChannel, RecruitStatus,
-                            TrainingDecision)
+from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision)
 from models.user import Role, User
 from utils.logging_setup import get_logger
-from utils.recruit_serializers import (create_error_response,
-                                       create_success_response,
-                                       serialize_change_log_list,
-                                       serialize_recruit,
-                                       serialize_recruit_grouped,
+from utils.recruit_serializers import (create_error_response, create_success_response, serialize_change_log_list, serialize_recruit, serialize_recruit_grouped,
                                        serialize_recruit_list)
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('recruit')
 recruits_api_bp = Blueprint('recruits_api', __name__)
@@ -57,7 +50,7 @@ def _get_overdue_recruits_query():
     # 5. 待开播，但预约的开播时间已过24小时
     q5 = Q(status=RecruitStatus.PENDING_BROADCAST) & Q(scheduled_broadcast_time__lt=overdue_24h)
 
-    overdue_query = (q1 | q2 | q3 | q4 | q5)
+    overdue_query = q1 | q2 | q3 | q4 | q5
 
     return Recruit.objects.filter(overdue_query)
 
