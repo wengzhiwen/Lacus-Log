@@ -9,13 +9,12 @@
     </div>
 
     <div class="alert alert-warning" style="margin-bottom:12px;">
-        <div><strong>注意：</strong></div>
+        <div><strong>注意:</strong></div>
         <div>1、只会清理明天开始（GMT+8）的通告</div>
         <div>2、不论通告是否已经关联了开播记录都会被清理</div>
         <div>3、该操作无法恢复</div>
     </div>
 
-    {% if items %}
     <table class="table">
         <thead>
             <tr>
@@ -25,28 +24,13 @@
                 <th style="width:160px;">操作</th>
             </tr>
         </thead>
-        <tbody>
-            {% for item in items %}
-            <tr>
-                <td>{{ item.nickname }}{% if item.real_name %}（{{ item.real_name }}）{% endif %}</td>
-                <td>[{{ item.owner_name }}]</td>
-                <td>{{ item.future_count }}</td>
-                <td>
-                    <form method="POST" action="{{ url_for('announcement.cleanup_delete_future') }}" onsubmit="return confirm('确定删除该主播明天开始的所有通告吗？此操作不可恢复。');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="pilot_id" value="{{ item.id }}"/>
-                        <button type="submit" class="btn btn-danger">删除所有通告</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
+        <tbody id="cleanup-table-body">
+            <!-- 内容将由JS动态加载 -->
         </tbody>
     </table>
-    {% else %}
-    <div class="empty-state" style="text-align:center; color: var(--muted); padding:40px 10px;">
+    <div id="empty-state" class="empty-state" style="text-align:center; color: var(--muted); padding:40px 10px; display:none;">
         暂无需要清理的通告。
     </div>
-    {% endif %}
 
     <div class="footbar" style="position:static; box-shadow:none; border-top:none; padding:0; margin-top:16px;">
         <div class="inner" style="justify-content:flex-start;">
@@ -63,4 +47,93 @@
 </style>
 {% endblock %}
 
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tableBody = document.getElementById('cleanup-table-body');
+    const emptyState = document.getElementById('empty-state');
+    const csrfToken = '{{ csrf_token() }}';
 
+    function renderTable(items) {
+        tableBody.innerHTML = '';
+        if (items.length === 0) {
+            emptyState.style.display = 'block';
+            return;
+        }
+        emptyState.style.display = 'none';
+
+        items.forEach(item => {
+            const row = document.createElement('tr');
+            row.setAttribute('data-pilot-id', item.id);
+            row.innerHTML = `
+                <td>${item.nickname}${item.real_name ? '（' + item.real_name + '）' : ''}</td>
+                <td>[${item.owner_name}]</td>
+                <td>${item.future_count}</td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-delete" data-pilot-id="${item.id}">删除所有通告</button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    function handleDelete(pilotId) {
+        if (!confirm('确定删除该主播明天开始的所有通告吗？此操作不可恢复。')) {
+            return;
+        }
+
+        fetch(`/announcements/api/cleanup/by-pilot/${pilotId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.meta.message || '删除成功', 'success');
+                const row = document.querySelector(`tr[data-pilot-id="${pilotId}"]`);
+                if (row) {
+                    row.remove();
+                }
+                if (tableBody.rows.length === 0) {
+                    emptyState.style.display = 'block';
+                }
+            } else {
+                const errorMsg = data.error?.message || '删除失败';
+                showMessage(errorMsg, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('请求失败，请查看控制台', 'error');
+        });
+    }
+
+    tableBody.addEventListener('click', function(event) {
+        if (event.target.classList.contains('btn-delete')) {
+            const pilotId = event.target.getAttribute('data-pilot-id');
+            handleDelete(pilotId);
+        }
+    });
+
+    fetch('/announcements/api/cleanup/fallen-pilots')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderTable(data.data.items);
+            } else {
+                const errorMsg = data.error?.message || '加载数据失败';
+                showMessage(errorMsg, 'error');
+                emptyState.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('加载数据时出错，请查看控制台', 'error');
+            emptyState.style.display = 'block';
+        });
+});
+</script>
+{% endblock %}

@@ -1,17 +1,13 @@
 # pylint: disable=no-member
-import calendar
-from datetime import datetime, timedelta
-
 from flask import (Blueprint, abort, flash, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist
 
 from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
-from models.pilot import Pilot, Status
+from models.pilot import Pilot
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_local_datetime_for_input, get_current_local_time, get_current_month_last_day_for_input, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_local_datetime_for_input, get_current_month_last_day_for_input)
 
 logger = get_logger('announcement')
 
@@ -105,6 +101,20 @@ def list_announcements():
     return render_template('announcements/list.html', filters=filters)
 
 
+@announcement_bp.route('/cleanup')
+@roles_accepted('gicho', 'kancho')
+def cleanup_page():
+    """渲染通告清理页面。"""
+    return render_template('announcements/cleanup.html')
+
+
+@announcement_bp.route('/export')
+@roles_accepted('gicho', 'kancho')
+def export_page():
+    """渲染通告导出页面。"""
+    return render_template('announcements/export.html')
+
+
 @announcement_bp.route('/<announcement_id>')
 @roles_accepted('gicho', 'kancho')
 def announcement_detail(announcement_id):
@@ -186,8 +196,7 @@ def delete_announcement(announcement_id):
 
         if from_param == 'calendar' and date_param:
             return redirect(url_for('calendar.day_view', date=date_param))
-        else:
-            return redirect(url_for('announcement.list_announcements'))
+        return redirect(url_for('announcement.list_announcements'))
 
     except DoesNotExist:
         abort(404)
@@ -197,206 +206,8 @@ def delete_announcement(announcement_id):
         return redirect(url_for('announcement.list_announcements'))
 
 
-@announcement_bp.route('/export', methods=['GET', 'POST'])
+@announcement_bp.route('/export/view')
 @roles_accepted('gicho', 'kancho')
-def export_page():
-    """通告导出页面"""
-    if request.method == 'POST':
-        try:
-            pilot_id = request.form.get('pilot_id')
-            year = request.form.get('year', type=int)
-            month = request.form.get('month', type=int)
-
-            if not pilot_id:
-                flash('请选择机师', 'error')
-                return render_template('announcements/export.html')
-
-            if not year or not month:
-                flash('请选择年月', 'error')
-                return render_template('announcements/export.html')
-
-            try:
-                pilot = Pilot.objects.get(id=pilot_id)
-            except DoesNotExist:
-                flash('机师不存在', 'error')
-                return render_template('announcements/export.html')
-
-            table_data, venue_info = generate_export_table(pilot, year, month)
-
-            return render_template('announcements/export_table.html', pilot=pilot, year=year, month=month, table_data=table_data, venue_info=venue_info)
-
-        except Exception as e:
-            logger.error('生成导出表格失败：%s', str(e))
-            flash(f'生成失败：{str(e)}', 'error')
-            return render_template('announcements/export.html')
-
-    return render_template('announcements/export.html')
-
-
-def get_pilot_choices():
-    """获取机师选择列表（用于导出页面）"""
-    pilots = Pilot.objects(status__in=['已征召', '已签约']).order_by('owner', 'rank', 'nickname')
-
-    owner_groups = {}
-    no_owner_pilots = []
-
-    for pilot in pilots:
-        if pilot.owner:
-            owner_key = pilot.owner.nickname or pilot.owner.username
-            if owner_key not in owner_groups:
-                owner_groups[owner_key] = []
-            owner_groups[owner_key].append(pilot)
-        else:
-            no_owner_pilots.append(pilot)
-
-    choices = []
-
-    for owner_name in sorted(owner_groups.keys()):
-        pilots_in_group = owner_groups[owner_name]
-        pilots_in_group.sort(key=lambda p: (p.rank.value, p.nickname))
-        for pilot in pilots_in_group:
-            choices.append({'id': str(pilot.id), 'nickname': pilot.nickname, 'real_name': pilot.real_name or '', 'owner': owner_name, 'rank': pilot.rank.value})
-
-    if no_owner_pilots:
-        no_owner_pilots.sort(key=lambda p: (p.rank.value, p.nickname))
-        for pilot in no_owner_pilots:
-            choices.append({'id': str(pilot.id), 'nickname': pilot.nickname, 'real_name': pilot.real_name or '', 'owner': '无所属', 'rank': pilot.rank.value})
-
-    return choices
-
-
-def get_monthly_announcements(pilot_id, year, month):
-    """获取指定机师在指定月份的通告数据"""
-    start_date = datetime(year, month, 1)
-    if month == 12:
-        end_date = datetime(year + 1, 1, 1)
-    else:
-        end_date = datetime(year, month + 1, 1)
-
-    start_utc = local_to_utc(start_date)
-    end_utc = local_to_utc(end_date)
-
-    announcements = Announcement.objects(pilot=pilot_id, start_time__gte=start_utc, start_time__lt=end_utc).order_by('start_time')
-
-    return list(announcements)
-
-
-def generate_export_table(pilot, year, month):
-    """生成导出表格数据"""
-    announcements = get_monthly_announcements(pilot.id, year, month)
-
-    venue_coords = set()
-
-    announcements_by_date = {}
-    for announcement in announcements:
-        if announcement.x_coord:
-            venue_coords.add(announcement.x_coord)
-
-        local_time = utc_to_local(announcement.start_time)
-        date_key = local_time.date()
-        if date_key not in announcements_by_date:
-            announcements_by_date[date_key] = []
-        announcements_by_date[date_key].append(announcement)
-
-    venue_info = ', '.join(sorted(venue_coords)) if venue_coords else None
-
-    table_data = []
-    days_in_month = calendar.monthrange(year, month)[1]
-
-    for day in range(1, days_in_month + 1):
-        date_obj = datetime(year, month, day).date()
-        weekday_names = ['一', '二', '三', '四', '五', '六', '日']
-        weekday = weekday_names[date_obj.weekday()]
-
-        date_str = f"{month:02d}/{day:02d} 星期{weekday}"
-
-        day_announcements = announcements_by_date.get(date_obj, [])
-
-        if day_announcements:
-            start_times = []
-            durations = []
-            equipments = []
-
-            for ann in day_announcements:
-                local_start = utc_to_local(ann.start_time)
-                start_times.append(local_start.strftime('%H:%M'))
-                durations.append(f"{ann.duration_hours}小时")
-
-                equipment = f"{ann.y_coord}-{ann.z_coord}"
-                if equipment not in equipments:
-                    equipments.append(equipment)
-
-            row_data = {
-                'date': date_str,
-                'time': ', '.join(start_times),  # 通告时间
-                'equipment': ', '.join(equipments),  # 设备（Y-Z坐标）
-                'duration': ', '.join(durations),  # 通告时长
-                'work_content': '弹幕游戏直播'  # 固定工作内容
-            }
-        else:
-            row_data = {'date': date_str, 'time': '', 'equipment': '', 'duration': '', 'work_content': ''}
-
-        table_data.append(row_data)
-
-    return table_data, venue_info
-
-
-@announcement_bp.route('/cleanup')
-@roles_accepted('gicho', 'kancho')
-def cleanup_page():
-    """通告清理页面：列出状态为流失且从明天开始仍有通告的主播"""
-    current_local = get_current_local_time()
-    tomorrow_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-    tomorrow_utc_start = local_to_utc(tomorrow_local_start)
-
-    future_announcements = Announcement.objects(start_time__gte=tomorrow_utc_start).only('pilot')
-    pilot_id_to_count = {}
-    for ann in future_announcements:
-        if ann.pilot:
-            pid = str(ann.pilot.id)
-            pilot_id_to_count[pid] = pilot_id_to_count.get(pid, 0) + 1
-
-    pilots = Pilot.objects(id__in=list(pilot_id_to_count.keys()), status__in=[Status.FALLEN, Status.FALLEN_OLD])
-
-    items = []
-    for p in pilots:
-        owner_name = p.owner.nickname or p.owner.username if p.owner else '无所属'
-        items.append({
-            'id': str(p.id),
-            'nickname': p.nickname,
-            'real_name': p.real_name or '',
-            'owner_name': owner_name,
-            'future_count': pilot_id_to_count.get(str(p.id), 0)
-        })
-
-    items.sort(key=lambda x: x['nickname'])
-
-    return render_template('announcements/cleanup.html', items=items)
-
-
-@announcement_bp.route('/cleanup/delete-future', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
-def cleanup_delete_future():
-    """删除指定主播从明天开始的所有通告（不可恢复）"""
-    try:
-        pilot_id = request.form.get('pilot_id')
-        if not pilot_id:
-            flash('缺少参数：pilot_id', 'error')
-            return redirect(url_for('announcement.cleanup_page'))
-
-        current_local = get_current_local_time()
-        tomorrow_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        tomorrow_utc_start = local_to_utc(tomorrow_local_start)
-
-        anns = Announcement.objects(pilot=pilot_id, start_time__gte=tomorrow_utc_start)
-        count = anns.count()
-        for ann in anns:
-            ann.delete()
-
-        flash(f'已删除该主播明天开始的所有通告，共{count}条', 'success')
-        logger.info('用户%s清理通告：pilot=%s，从明天开始删除共%d条', current_user.username, pilot_id, count)
-        return redirect(url_for('announcement.cleanup_page'))
-    except Exception as e:
-        logger.error('清理通告失败：%s', str(e))
-        flash(f'清理失败：{str(e)}', 'error')
-        return redirect(url_for('announcement.cleanup_page'))
+def export_view_page():
+    """渲染通告导出的打印视图页面。"""
+    return render_template('announcements/export_view.html')

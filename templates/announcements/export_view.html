@@ -1,40 +1,38 @@
 {% extends "base.html" %}
-{% block title %}{{ pilot.nickname }} 通告预定表（{{ month }}月） - Lacus-Log{% endblock %}
+{% block title %}通告预定表 - Lacus-Log{% endblock %}
 
 {% block content %}
 <div class="export-table-container">
   <div class="back-nav no-print" style="margin-bottom: 10px;">
-    <a class="btn btn-secondary" href="{{ url_for('announcement.export_page') }}">
+    <a class="btn btn-secondary" href="#" onclick="window.close(); return false;">
       <span>←</span>
-      返回
+      关闭
     </a>
   </div>
   <div class="table-header">
-    <h1 class="table-title">{{ pilot.nickname }} 通告预定表（{{ month }}月）</h1>
+    <h1 class="table-title" id="table-title"></h1>
     <div class="pilot-info">
       <div class="info-row">
         <span class="label">艺名：</span>
-        <span class="value">{{ pilot.nickname }}</span>
+        <span class="value" id="pilot-nickname"></span>
       </div>
       <div class="info-row">
         <span class="label">姓名：</span>
-        <span class="value">{{ pilot.real_name or '' }}</span>
+        <span class="value" id="pilot-real-name"></span>
       </div>
       <div class="info-row">
         <span class="label">运营：</span>
-        <span class="value">{{ pilot.owner.nickname or pilot.owner.username if pilot.owner else '无所属' }}</span>
+        <span class="value" id="pilot-owner"></span>
       </div>
     </div>
   </div>
 
-  {% if venue_info %}
-  <div class="venue-info">
+  <div class="venue-info" id="venue-info-container" style="display: none;">
     <div class="venue-row">
       <span class="venue-label">场地：</span>
-      <span class="venue-value">{{ venue_info }}</span>
+      <span class="venue-value" id="venue-info"></span>
     </div>
   </div>
-  {% endif %}
 
   <div class="schedule-table-wrapper">
     <table class="schedule-table">
@@ -47,16 +45,8 @@
           <th>工作内容</th>
         </tr>
       </thead>
-      <tbody>
-        {% for row in table_data %}
-        <tr {% if row.time %}class="has-announcement"{% else %}class="empty-day"{% endif %}>
-          <td class="date-cell">{{ row.date }}</td>
-          <td class="time-cell">{{ row.time }}</td>
-          <td class="equipment-cell">{{ row.equipment }}</td>
-          <td class="duration-cell">{{ row.duration }}</td>
-          <td class="content-cell">{{ row.work_content }}</td>
-        </tr>
-        {% endfor %}
+      <tbody id="schedule-table-body">
+        <!-- JS Populated -->
       </tbody>
     </table>
   </div>
@@ -78,12 +68,11 @@
 
   <div class="action-buttons no-print">
     <button onclick="window.print()" class="btn btn-primary">打印表格</button>
-    <a href="{{ url_for('announcement.export_page') }}" class="btn btn-secondary">返回导出页面</a>
+    <a href="#" onclick="window.close(); return false;" class="btn btn-secondary">关闭页面</a>
   </div>
 </div>
 
 <style>
-
 .export-table-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -410,4 +399,70 @@
   }
 }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const pilotId = params.get('pilot_id');
+    const year = params.get('year');
+    const month = params.get('month');
+
+    if (!pilotId || !year || !month) {
+        document.body.innerHTML = '<h1>错误：缺少必要的参数 (pilot_id, year, month)</h1>';
+        return;
+    }
+
+    const apiUrl = `/announcements/api/export-data?pilot_id=${pilotId}&year=${year}&month=${month}`;
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(result => {
+            console.log('[导出视图] API返回数据:', result);
+            if (!result.success) {
+                const errorMsg = result.error?.message || '加载数据失败';
+                document.body.innerHTML = `<h1>错误：${errorMsg}</h1>`;
+                return;
+            }
+
+            const data = result.data;
+            const pilot = data.pilot;
+
+            // Update titles and headers
+            document.title = `${pilot.nickname} 通告预定表（${data.month}月） - Lacus-Log`;
+            document.getElementById('table-title').textContent = `${pilot.nickname} 通告预定表（${data.month}月）`;
+            document.getElementById('pilot-nickname').textContent = pilot.nickname;
+            document.getElementById('pilot-real-name').textContent = pilot.real_name;
+            document.getElementById('pilot-owner').textContent = pilot.owner_name;
+
+            // Update venue info
+            if (data.venue_info) {
+                document.getElementById('venue-info-container').style.display = 'block';
+                document.getElementById('venue-info').textContent = data.venue_info;
+            }
+
+            // Populate table
+            const tableBody = document.getElementById('schedule-table-body');
+            tableBody.innerHTML = ''; // Clear existing content
+            data.table_data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = row.time ? 'has-announcement' : 'empty-day';
+                tr.innerHTML = `
+                    <td class="date-cell">${row.date}</td>
+                    <td class="time-cell">${row.time}</td>
+                    <td class="equipment-cell">${row.equipment}</td>
+                    <td class="duration-cell">${row.duration}</td>
+                    <td class="content-cell">${row.work_content}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            document.body.innerHTML = `<h1>加载数据时发生网络错误</h1>`;
+        });
+});
+</script>
 {% endblock %}

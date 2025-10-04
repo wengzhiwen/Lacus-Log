@@ -1,243 +1,203 @@
 {% extends "base.html" %}
-{% block title %}主播-通告计划导出 - Lacus-Log{% endblock %}
+
+{% block title %}导出通告{% endblock %}
 
 {% block content %}
-<section class="pilot-detail">
-  <div class="back-nav">
-    <a class="btn btn-secondary" href="{{ url_for('announcement.list_announcements') }}">
-      <span>←</span>
-      返回
-    </a>
-  </div>
+<section class="announcement-export">
+    <div class="page-header">
+        <h1 class="page-title">导出通告</h1>
+    </div>
 
-  <div class="pilot-info-card">
-    <form method="POST" id="exportForm">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <form id="export-form" 
+          class="form-card"
+          data-pilots-url="{{ url_for('announcements_api.get_export_pilot_options_api') }}"
+          data-view-url-base="{{ url_for('announcement.export_view_page') }}"
+          data-csv-url-base="{{ url_for('announcements_api.export_announcements_api') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-      <div class="info-section">
-        <h3 class="section-title">主播选择</h3>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
-            <input type="text" id="pilot_search" placeholder="输入主播昵称或真实姓名进行筛选">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="pilot_id" class="required">主播：</label>
-            <select name="pilot_id" id="pilot_id" required>
-              <option value="">请选择主播</option>
+        <div class="form-group">
+            <label for="pilot_id">选择主播</label>
+            <select id="pilot_id" name="pilot_id" class="form-control" required>
+                <option value="">正在加载...</option>
             </select>
-          </div>
         </div>
-      </div>
 
-      <div class="info-section">
-        <h3 class="section-title">时间选择</h3>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="year" class="required">年份：</label>
-            <select name="year" id="year" required></select>
-          </div>
-          <div class="form-group">
-            <label for="month" class="required">月份：</label>
-            <select name="month" id="month" required></select>
-          </div>
+        <div class="form-group">
+            <label for="year">选择年月</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="year" name="year" class="form-control" required>
+                    <!-- 年份将由JS填充 -->
+                </select>
+                <select id="month" name="month" class="form-control" required>
+                    <!-- 月份将由JS填充 -->
+                </select>
+            </div>
         </div>
-      </div>
 
-      <div class="action-buttons">
-        <button type="submit" class="btn btn-primary">导出通告预定表</button>
-      </div>
+        <div class="footbar" style="position:static; box-shadow:none; border-top:none; padding:0; margin-top:16px;">
+            <div class="inner" style="justify-content:flex-start; gap: 10px;">
+                <button type="button" id="export-csv-btn" class="btn btn-primary">导出 CSV</button>
+                <button type="button" id="export-view-btn" class="btn btn-info">生成打印视图</button>
+                <a class="btn btn-outline" href="{{ url_for('announcement.list_announcements') }}">返回</a>
+            </div>
+        </div>
     </form>
-  </div>
+
 </section>
 
 <style>
-.pilot-detail { max-width: 800px; margin: 0 auto; }
-.back-nav { margin-bottom: 10px; }
-.pilot-info-card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--table-header); }
-.info-section { margin-bottom: 24px; }
-.section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: var(--brand); border-bottom: 1px solid var(--table-header); padding-bottom: 8px; }
+.form-card { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid var(--table-header); }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; margin-bottom: 6px; font-weight: 600; }
+.form-control { width: 100%; padding: 8px 10px; border-radius: 4px; border: 1px solid #ccc; }
+.btn-info { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
+</style>
+{% endblock %}
 
-.form-row {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-}
+{% block scripts %}
+<script>
+console.log('[导出页面] 脚本开始加载');
 
-.form-row:last-child {
-    margin-bottom: 0;
-}
-
-.form-group {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.form-group label {
-    margin-bottom: 5px;
-    font-weight: 500;
-    color: #555;
-}
-
-.form-group label.required::after {
-    content: ' *';
-    color: #dc3545;
-}
-
-.form-group input,
-.form-group select {
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    transition: border-color 0.2s ease;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-}
-
-.form-group input:disabled,
-.form-group select:disabled {
-    background-color: #f8f9fa;
-    color: #6c757d;
-    cursor: not-allowed;
-}
-
-.action-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
-
-.btn {
-    display: inline-block;
-    padding: 12px 24px;
-    border: none;
-    border-radius: 4px;
-    text-decoration: none;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-primary {
-    background: #007bff;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #0056b3;
-}
-
-.btn-outline {
-    background: transparent;
-    color: #6c757d;
-    border: 1px solid #6c757d;
-}
-
-.btn-outline:hover {
-    background: #6c757d;
-    color: white;
-}
-
-@media (max-width: 768px) {
-    .form-row {
-        flex-direction: column;
-        gap: 20px;
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[导出页面] DOMContentLoaded 事件触发');
+    
+    const exportForm = document.getElementById('export-form');
+    console.log('[导出页面] exportForm:', exportForm);
+    
+    if (!exportForm) {
+        console.error('[导出页面] 找不到 export-form 元素！');
+        return;
     }
     
-    .form-actions {
-        flex-direction: column;
-    }
-}
-</style>
+    const pilotsUrl = exportForm.dataset.pilotsUrl;
+    const viewUrlBase = exportForm.dataset.viewUrlBase;
+    const csvUrlBase = exportForm.dataset.csvUrlBase;
+    console.log('[导出页面] API URLs:', { pilotsUrl, viewUrlBase, csvUrlBase });
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
     const pilotSelect = document.getElementById('pilot_id');
     const yearSelect = document.getElementById('year');
     const monthSelect = document.getElementById('month');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    const exportViewBtn = document.getElementById('export-view-btn');
+    
+    console.log('[导出页面] DOM元素获取结果:', {
+        pilotSelect: pilotSelect ? '✓' : '✗',
+        yearSelect: yearSelect ? '✓' : '✗',
+        monthSelect: monthSelect ? '✓' : '✗',
+        exportCsvBtn: exportCsvBtn ? '✓' : '✗',
+        exportViewBtn: exportViewBtn ? '✓' : '✗'
+    });
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-
-    for (let year = currentYear - 1; year <= currentYear + 1; year++) {
-        const option = document.createElement('option');
-        option.value = year;
-        option.textContent = year + '年';
-        if (year === currentYear) option.selected = true;
-        yearSelect.appendChild(option);
+    // 填充年份选项
+    console.log('[导出页面] 开始填充年份选项');
+    const currentYear = new Date().getFullYear();
+    const startYear = 2025;
+    const endYear = currentYear + 1;
+    for (let i = startYear; i <= endYear; i++) {
+        const option = new Option(i + '年', i);
+        yearSelect.add(option);
     }
+    yearSelect.value = currentYear;
+    console.log('[导出页面] 年份选项填充完成，从', startYear, '到', endYear, '，默认选中:', currentYear);
 
-    for (let month = 1; month <= 12; month++) {
-        const option = document.createElement('option');
-        option.value = month;
-        option.textContent = month + '月';
-        if (month === currentMonth) option.selected = true;
-        monthSelect.appendChild(option);
+    // 填充月份选项
+    console.log('[导出页面] 开始填充月份选项');
+    const currentMonth = new Date().getMonth() + 1;
+    for (let i = 1; i <= 12; i++) {
+        const option = new Option(i + '月', i);
+        monthSelect.add(option);
     }
+    monthSelect.value = currentMonth;
+    console.log('[导出页面] 月份选项填充完成，共', monthSelect.options.length, '项，当前选中:', currentMonth);
 
-    function buildPilotDisplay(p) {
-        const nickname = p.nickname || '';
-        const agePart = p.age ? `(${p.age})` : '';
-        const realName = p.real_name ? p.real_name : '';
-        const rank = p.rank ? p.rank : '';
-        const genderVal = (p.gender === 0 || p.gender === 1) ? p.gender : null;
-        const genderIcon = genderVal === 0 ? '♂' : (genderVal === 1 ? '♀' : '?');
-        const nameWithReal = realName ? `${nickname}${agePart}${realName}` : `${nickname}${agePart}`;
-        const rankPart = rank ? `[${rank}]` : '';
-        return `${nameWithReal}${rankPart}${genderIcon}`;
-    }
+    // 获取并填充主播选项
+    console.log('[导出页面] 开始获取主播列表，URL:', pilotsUrl);
+    fetch(pilotsUrl)
+        .then(response => {
+            console.log('[导出页面] API响应状态:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('[导出页面] API返回数据:', data);
+            if (data.success) {
+                pilotSelect.innerHTML = '<option value="">请选择主播</option>';
+                const pilots = data.data.pilots;
+                console.log('[导出页面] 主播数量:', pilots.length);
+                
+                const ownerGroups = {};
+                pilots.forEach(pilot => {
+                    if (!ownerGroups[pilot.owner]) {
+                        ownerGroups[pilot.owner] = [];
+                    }
+                    ownerGroups[pilot.owner].push(pilot);
+                });
 
-    function loadExportPilots(callback) {
-        pilotSelect.innerHTML = '<option value="">请选择主播</option>';
-        fetch('/announcements/api/pilots-filtered')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    window.__exportAllPilots = data.pilots || [];
-                    window.__exportAllPilots.forEach(pilot => {
-                        const option = document.createElement('option');
-                        option.value = pilot.id;
-                        option.textContent = buildPilotDisplay(pilot);
-                        option.setAttribute('data-nickname', pilot.nickname || '');
-                        option.setAttribute('data-real-name', pilot.real_name || '');
-                        pilotSelect.appendChild(option);
+                const sortedOwners = Object.keys(ownerGroups).sort();
+                console.log('[导出页面] 运营分组:', sortedOwners);
+
+                sortedOwners.forEach(owner => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = owner;
+                    ownerGroups[owner].forEach(pilot => {
+                        const displayName = `${pilot.nickname}${pilot.real_name ? '(' + pilot.real_name + ')' : ''}`;
+                        const option = new Option(displayName, pilot.id);
+                        optgroup.appendChild(option);
                     });
-                    if (callback) callback();
-                }
-            })
-            .catch(error => console.error('加载主播失败:', error));
-    }
+                    pilotSelect.appendChild(optgroup);
+                });
+                
+                console.log('[导出页面] 主播列表填充完成，总选项数:', pilotSelect.options.length);
 
-    function initExportPilotLocalSearch() {
-        const input = document.getElementById('pilot_search');
-        if (!input || !pilotSelect) return;
-        function applyFilter() {
-            const keyword = (input.value || '').trim().toLowerCase();
-            pilotSelect.innerHTML = '<option value="">请选择主播</option>';
-            const source = (window.__exportAllPilots || []);
-            const filtered = keyword
-                ? source.filter(p => (p.nickname || '').toLowerCase().includes(keyword) || (p.real_name || '').toLowerCase().includes(keyword))
-                : source;
-            filtered.forEach(pilot => {
-                const option = document.createElement('option');
-                option.value = pilot.id;
-                option.textContent = buildPilotDisplay(pilot);
-                option.setAttribute('data-nickname', pilot.nickname || '');
-                option.setAttribute('data-real-name', pilot.real_name || '');
-                pilotSelect.appendChild(option);
-            });
+            } else {
+                console.error('[导出页面] API返回错误状态:', data);
+                pilotSelect.innerHTML = '<option value="">加载失败</option>';
+                const errorMsg = data.error?.message || '加载主播列表失败';
+                showMessage(errorMsg, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('[导出页面] 获取主播列表出错:', error);
+            pilotSelect.innerHTML = '<option value="">加载出错</option>';
+            showMessage('加载主播列表时出错', 'error');
+        });
+
+    function getSelectedValues() {
+        const pilotId = pilotSelect.value;
+        const year = yearSelect.value;
+        const month = monthSelect.value;
+
+        if (!pilotId) {
+            showMessage('请选择一个主播', 'warning');
+            return null;
         }
-        input.addEventListener('input', applyFilter);
+        return { pilotId, year, month };
     }
 
-    loadExportPilots();
-    initExportPilotLocalSearch();
+    // 处理CSV导出
+    exportCsvBtn.addEventListener('click', function() {
+        console.log('[导出页面] CSV导出按钮被点击');
+        const values = getSelectedValues();
+        if (!values) return;
+
+        const exportUrl = `${csvUrlBase}?pilot_id=${values.pilotId}&year=${values.year}&month=${values.month}`;
+        console.log('[导出页面] CSV导出URL:', exportUrl);
+        window.location.href = exportUrl;
+    });
+
+    // 处理打印视图
+    exportViewBtn.addEventListener('click', function() {
+        console.log('[导出页面] 打印视图按钮被点击');
+        const values = getSelectedValues();
+        if (!values) return;
+
+        const viewUrl = `${viewUrlBase}?pilot_id=${values.pilotId}&year=${values.year}&month=${values.month}`;
+        console.log('[导出页面] 打印视图URL:', viewUrl);
+        window.open(viewUrl, '_blank');
+    });
+    
+    console.log('[导出页面] 所有事件监听器已注册');
 });
+
+console.log('[导出页面] 脚本加载完成');
 </script>
 {% endblock %}

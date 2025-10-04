@@ -3,10 +3,13 @@
 """通告管理 REST API 路由集合。"""
 
 import json
+import io
+import csv
+import calendar
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from flask import Blueprint, jsonify, request, url_for
+from flask import Blueprint, jsonify, request, url_for, make_response
 from flask_security import current_user, roles_accepted
 from flask_wtf.csrf import ValidationError as CSRFValidationError, validate_csrf
 from mongoengine import DoesNotExist, ValidationError
@@ -791,3 +794,290 @@ def get_pilots_by_owner_api(owner_id: str):
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('根据所属获取主播失败：%s', str(exc), exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '根据所属获取主播失败')), 500
+
+
+@announcements_api_bp.route('/announcements/api/cleanup/fallen-pilots', methods=['GET'])
+@roles_accepted('gicho', 'kancho')
+def get_cleanup_list_api():
+    """获取有未来通告的流失主播列表 API。"""
+    try:
+        current_local = get_current_local_time()
+        tomorrow_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        tomorrow_utc_start = local_to_utc(tomorrow_local_start)
+
+        future_announcements = Announcement.objects(start_time__gte=tomorrow_utc_start).only('pilot')
+        pilot_id_to_count = {}
+        for ann in future_announcements:
+            if ann.pilot:
+                pid = str(ann.pilot.id)
+                pilot_id_to_count[pid] = pilot_id_to_count.get(pid, 0) + 1
+
+        pilots = Pilot.objects(id__in=list(pilot_id_to_count.keys()), status__in=[Status.FALLEN, Status.FALLEN_OLD])
+
+        items = []
+        for p in pilots:
+            owner_name = p.owner.nickname or p.owner.username if p.owner else '无所属'
+            items.append({
+                'id': str(p.id),
+                'nickname': p.nickname,
+                'real_name': p.real_name or '',
+                'owner_name': owner_name,
+                'future_count': pilot_id_to_count.get(str(p.id), 0)
+            })
+
+        items.sort(key=lambda x: x['nickname'])
+        return jsonify(create_success_response({'items': items}))
+    except Exception as exc:
+        logger.error('获取待清理通告列表失败：%s', str(exc), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '获取待清理通告列表失败')), 500
+
+
+@announcements_api_bp.route('/announcements/api/cleanup/by-pilot/<pilot_id>', methods=['DELETE'])
+@roles_accepted('gicho', 'kancho')
+def cleanup_delete_future_api(pilot_id: str):
+    """删除指定主播从明天开始的所有通告 API。"""
+    is_valid_csrf, csrf_error = _validate_csrf_header()
+    if not is_valid_csrf:
+        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+
+    try:
+        current_local = get_current_local_time()
+        tomorrow_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        tomorrow_utc_start = local_to_utc(tomorrow_local_start)
+
+        anns = Announcement.objects(pilot=pilot_id, start_time__gte=tomorrow_utc_start)
+        count = anns.count()
+        if count > 0:
+            anns.delete()
+
+        logger.info('用户%s清理通告：pilot=%s，从明天开始删除共%d条', current_user.username, pilot_id, count)
+        meta = {'message': f'已删除该主播明天开始的所有通告，共{count}条', 'deleted_count': count}
+        return jsonify(create_success_response({'deleted': True}, meta))
+    except Exception as exc:
+        logger.error('清理通告失败：%s', str(exc), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '清理通告失败')), 500
+
+
+def _get_pilot_choices_for_export():
+    """获取机师选择列表（用于导出页面）"""
+    pilots = Pilot.objects(status__in=['已招募', '已签约']).order_by('owner', 'rank', 'nickname')
+
+    owner_groups = {}
+    no_owner_pilots = []
+
+    for pilot in pilots:
+        if pilot.owner:
+            owner_key = pilot.owner.nickname or pilot.owner.username
+            if owner_key not in owner_groups:
+                owner_groups[owner_key] = []
+            owner_groups[owner_key].append(pilot)
+        else:
+            no_owner_pilots.append(pilot)
+
+    choices = []
+
+    for owner_name in sorted(owner_groups.keys()):
+        pilots_in_group = owner_groups[owner_name]
+        pilots_in_group.sort(key=lambda p: (p.rank.value, p.nickname))
+        for pilot in pilots_in_group:
+            choices.append({'id': str(pilot.id), 'nickname': pilot.nickname, 'real_name': pilot.real_name or '', 'owner': owner_name, 'rank': pilot.rank.value})
+
+    if no_owner_pilots:
+        no_owner_pilots.sort(key=lambda p: (p.rank.value, p.nickname))
+        for pilot in no_owner_pilots:
+            choices.append({'id': str(pilot.id), 'nickname': pilot.nickname, 'real_name': pilot.real_name or '', 'owner': '无所属', 'rank': pilot.rank.value})
+
+    return choices
+
+
+def _get_monthly_announcements_for_export(pilot_id, year, month):
+    """获取指定机师在指定月份的通告数据"""
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+
+    start_utc = local_to_utc(start_date)
+    end_utc = local_to_utc(end_date)
+
+    announcements = Announcement.objects(pilot=pilot_id, start_time__gte=start_utc, start_time__lt=end_utc).order_by('start_time')
+
+    return list(announcements)
+
+
+def _generate_export_table_data(pilot, year, month):
+    """生成导出表格数据"""
+    announcements = _get_monthly_announcements_for_export(pilot.id, year, month)
+
+    venue_coords = set()
+
+    announcements_by_date = {}
+    for announcement in announcements:
+        if announcement.x_coord:
+            venue_coords.add(announcement.x_coord)
+
+        local_time = utc_to_local(announcement.start_time)
+        date_key = local_time.date()
+        if date_key not in announcements_by_date:
+            announcements_by_date[date_key] = []
+        announcements_by_date[date_key].append(announcement)
+
+    venue_info = ', '.join(sorted(venue_coords)) if venue_coords else None
+
+    table_data = []
+    days_in_month = calendar.monthrange(year, month)[1]
+
+    for day in range(1, days_in_month + 1):
+        date_obj = datetime(year, month, day).date()
+        weekday_names = ['一', '二', '三', '四', '五', '六', '日']
+        weekday = weekday_names[date_obj.weekday()]
+
+        date_str = f"{month:02d}/{day:02d} 星期{weekday}"
+
+        day_announcements = announcements_by_date.get(date_obj, [])
+
+        if day_announcements:
+            start_times = []
+            durations = []
+            equipments = []
+
+            for ann in day_announcements:
+                local_start = utc_to_local(ann.start_time)
+                start_times.append(local_start.strftime('%H:%M'))
+                durations.append(f"{ann.duration_hours}小时")
+
+                equipment = f"{ann.y_coord}-{ann.z_coord}"
+                if equipment not in equipments:
+                    equipments.append(equipment)
+
+            row_data = {
+                'date': date_str,
+                'time': ', '.join(start_times),  # 通告时间
+                'equipment': ', '.join(equipments),  # 设备（Y-Z坐标）
+                'duration': ', '.join(durations),  # 通告时长
+                'work_content': '弹幕游戏直播'  # 固定工作内容
+            }
+        else:
+            row_data = {'date': date_str, 'time': '', 'equipment': '', 'duration': '', 'work_content': ''}
+
+        table_data.append(row_data)
+
+    return table_data, venue_info
+
+
+@announcements_api_bp.route('/announcements/api/export/pilots', methods=['GET'])
+@roles_accepted('gicho', 'kancho')
+def get_export_pilot_options_api():
+    """获取导出功能所需的主播选项 API。"""
+    try:
+        pilots = _get_pilot_choices_for_export()
+        return jsonify(create_success_response({'pilots': pilots}))
+    except Exception as exc:
+        logger.error('获取导出主播选项失败：%s', str(exc), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '获取导出主播选项失败')), 500
+
+
+@announcements_api_bp.route('/announcements/api/export', methods=['GET'])
+@roles_accepted('gicho', 'kancho')
+def export_announcements_api():
+    """导出指定月份的通告为 CSV 文件。"""
+    try:
+        pilot_id = request.args.get('pilot_id')
+        year_str = request.args.get('year')
+        month_str = request.args.get('month')
+
+        if not all([pilot_id, year_str, month_str]):
+            return make_response("错误：缺少 pilot_id, year, 或 month 参数", 400)
+
+        year = int(year_str)
+        month = int(month_str)
+
+        pilot = Pilot.objects.get(id=pilot_id)
+
+        table_data, venue_info = _generate_export_table_data(pilot, year, month)
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # 写入文件头和主播信息
+        writer.writerow([f'{year}年{month}月 通告'])
+        writer.writerow(['主播', pilot.nickname])
+        if pilot.real_name:
+            writer.writerow(['姓名', pilot.real_name])
+        if venue_info:
+            writer.writerow(['开播地点', venue_info])
+        writer.writerow([])  # 空行
+
+        # 写入表头
+        headers = ['日期', '通告时间', '设备', '通告时长', '工作内容']
+        writer.writerow(headers)
+
+        # 写入数据行
+        for row in table_data:
+            writer.writerow([row['date'], row['time'], row['equipment'], row['duration'], row['work_content']])
+
+        output.seek(0)
+        csv_content = output.getvalue()
+
+        # 添加UTF-8 BOM，确保Excel正确识别编码
+        csv_bytes = '\ufeff'.encode('utf-8') + csv_content.encode('utf-8')
+
+        response = make_response(csv_bytes)
+
+        # 使用URL编码处理中文文件名，避免HTTP头编码错误
+        from urllib.parse import quote
+        filename = f"announcements_{pilot.nickname}_{year}_{month}.csv"
+        encoded_filename = quote(filename)
+        response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_filename}"
+        response.headers["Content-Type"] = "text/csv; charset=utf-8"
+
+        logger.info('用户 %s 导出了主播 %s (%s年%s月) 的通告', current_user.username, pilot.nickname, year, month)
+
+        return response
+
+    except DoesNotExist:
+        return make_response("错误：指定的主播不存在", 404)
+    except ValueError:
+        return make_response("错误：year 和 month 必须是有效的数字", 400)
+    except Exception as e:
+        logger.error('导出通告CSV失败: %s', str(e), exc_info=True)
+        return make_response(f"服务器内部错误: {str(e)}", 500)
+
+
+@announcements_api_bp.route('/announcements/api/export-data', methods=['GET'])
+@roles_accepted('gicho', 'kancho')
+def get_export_data_api():
+    """为打印视图提供通告导出数据。"""
+    try:
+        pilot_id = request.args.get('pilot_id')
+        year_str = request.args.get('year')
+        month_str = request.args.get('month')
+
+        if not all([pilot_id, year_str, month_str]):
+            return jsonify(create_error_response('INVALID_PARAMS', '缺少 pilot_id, year, 或 month 参数')), 400
+
+        year = int(year_str)
+        month = int(month_str)
+
+        pilot = Pilot.objects.get(id=pilot_id)
+
+        table_data, venue_info = _generate_export_table_data(pilot, year, month)
+
+        pilot_info = {
+            'nickname': pilot.nickname,
+            'real_name': pilot.real_name or '',
+            'owner_name': pilot.owner.nickname or pilot.owner.username if pilot.owner else '无所属'
+        }
+
+        response_data = {'pilot': pilot_info, 'year': year, 'month': month, 'table_data': table_data, 'venue_info': venue_info}
+
+        return jsonify(create_success_response(response_data))
+
+    except DoesNotExist:
+        return jsonify(create_error_response('RESOURCE_NOT_FOUND', '指定的主播不存在')), 404
+    except ValueError:
+        return jsonify(create_error_response('INVALID_PARAMS', 'year 和 month 必须是有效的数字')), 400
+    except Exception as e:
+        logger.error('获取导出数据失败: %s', str(e), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', f'服务器内部错误: {str(e)}')), 500
