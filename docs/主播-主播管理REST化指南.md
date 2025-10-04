@@ -25,6 +25,7 @@
 | --- | --- | --- | --- |
 | 主播列表 | GET | `/api/pilots` | 支持 `owner_id`、`rank`、`status`、`platform`、`work_mode`、`created_from`、`created_to`、`q`、`sort`、分页参数。返回 `items`+统计信息。|
 | 主播详情 | GET | `/api/pilots/<pilot_id>` | 返回完整字段（含所属、枚举值、分成信息）。|
+| 主播业绩 | GET | `/api/pilots/<pilot_id>/performance` | 返回主播业绩统计数据，包括本月统计、近7日统计、近3日统计和最近开播记录。|
 | 创建主播 | POST | `/api/pilots` | 需要 `X-CSRFToken`；请求体允许填写昵称、真实姓名、枚举字段、直属运营等。保存后写入一条 `PilotChangeLog`。|
 | 更新主播 | PUT | `/api/pilots/<pilot_id>` | 需要 `X-CSRFToken`；可一次性覆盖基础信息与枚举字段。会与旧值对比并写入变更记录。|
 | 更新状态 | PATCH | `/api/pilots/<pilot_id>/status` | 单独调整 `status` 字段，写入变更日志。|

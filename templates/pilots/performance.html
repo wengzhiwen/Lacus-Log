@@ -1,102 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}主播业绩 - {{ pilot_info.nickname }} - Lacus-Log{% endblock %}
+{% block title %}主播业绩 - Lacus-Log{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="header-content">
-    <div class="back-nav">
-      {% set from_param = request.args.get('from') %}
-      {% if from_param == 'daily_report' %}
-        {% set date = request.args.get('date') %}
-        {% set owner = request.args.get('owner') %}
-        <a class="btn btn-secondary" href="{{ url_for('report.daily_report', date=date, owner=owner) }}">
-          <span>←</span>
-          返回
-        </a>
-      {% elif from_param == 'monthly_report' %}
-        {% set month = request.args.get('month') %}
-        <a class="btn btn-secondary" href="{{ url_for('report.monthly_report', month=month) }}">
-          <span>←</span>
-          返回
-        </a>
-      {% elif from_param == 'pilot_detail' %}
-        <a class="btn btn-secondary" href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}">
-          <span>←</span>
-          返回
-        </a>
-      {% elif from_param == 'battle_record_detail' %}
-        {% set record_id = request.args.get('record_id') %}
-        <a class="btn btn-secondary" href="{{ url_for('battle_record.detail_battle_record', record_id=record_id) }}">
-          <span>←</span>
-          返回
-        </a>
-      {% else %}
-        <a class="btn btn-secondary" href="{{ url_for('pilot.list_pilots') }}">
-          <span>←</span>
-          返回
-        </a>
-      {% endif %}
+    <div class="back-nav" id="back-nav">
+      <!-- 返回按钮将通过JavaScript动态生成 -->
     </div>
-    <h1 class="page-title">🎤 {{ pilot_info.nickname }} 业绩</h1>
+    <h1 class="page-title">🎤 <span id="pilot-nickname">加载中...</span> 业绩</h1>
   </div>
 </div>
 
 <div class="pilot-header">
   <div class="pilot-basic-info">
     <div class="pilot-name">
-      <a href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id, from='performance') }}">{{ pilot_info.nickname }}</a>
-      {% if pilot_info.real_name %}
-        （{{ pilot_info.real_name }}）
-      {% endif %}
+      <a href="#" id="pilot-detail-link"><span id="pilot-nickname-link">-</span></a>
+      <span id="pilot-real-name" style="display: none;">（<span id="pilot-real-name-value"></span>）</span>
     </div>
     <div class="pilot-details">
-      <span class="age-gender">{{ pilot_info.age }}岁{{ pilot_info.gender_icon }}</span>
-      {% if pilot_info.hometown %}
-        <span class="hometown">{{ pilot_info.hometown }}</span>
-      {% endif %}
-      <span class="owner-rank">直属运营：{{ pilot_info.owner }} <br />
-        主播分类：{{ pilot_info.rank | normalize_rank }} <br />
-        主播状态：{{ pilot_info.status | normalize_status }}</span>
+      <span class="age-gender"><span id="pilot-age">-</span>岁<span id="pilot-gender-icon">-</span></span>
+      <span class="hometown" id="pilot-hometown" style="display: none;"><span id="pilot-hometown-value"></span></span>
+      <span class="owner-rank">直属运营：<span id="pilot-owner">-</span> <br />
+        主播分类：<span id="pilot-rank">-</span> <br />
+        主播状态：<span id="pilot-status">-</span></span>
     </div>
   </div>
 </div>
 
-<div class="stats-section">
+<div class="loading-state" id="loading-state">
+  <div class="loading-icon">⏳</div>
+  <div class="loading-text">正在加载业绩数据...</div>
+</div>
+
+<div class="error-state" id="error-state" style="display: none;">
+  <div class="error-icon">❌</div>
+  <div class="error-text">加载业绩数据失败</div>
+  <button class="btn btn-primary" onclick="loadPerformanceData()">重试</button>
+</div>
+
+<div class="stats-section" id="stats-section" style="display: none;">
   <div class="summary-section">
     <h2 class="section-title">本月统计（全月 / 月初至报表日）</h2>
     <div class="summary-cards">
       <div class="summary-card">
         <div class="card-label">开播记录数</div>
-        <div class="card-value">{{ month_stats.record_count }}</div>
+        <div class="card-value" id="month-record-count">-</div>
       </div>
-      <div class="summary-card{% if month_stats.avg_hours < 7 and month_stats.operating_profit < 0 %} negative-value{% endif %}">
+      <div class="summary-card" id="month-hours-card">
         <div class="card-label">开播时数</div>
-        <div class="card-value">{{ month_stats.total_hours }}h</div>
-        <div class="card-sub">{{ month_stats.avg_hours }}h/记录</div>
+        <div class="card-value" id="month-total-hours">-h</div>
+        <div class="card-sub" id="month-avg-hours">-h/记录</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计流水</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_revenue) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(month_stats.daily_avg_revenue) }}</div>
+        <div class="card-value" id="month-total-revenue">¥-</div>
+        <div class="card-sub" id="month-daily-avg-revenue">日均¥-</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计底薪</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_basepay) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(month_stats.daily_avg_basepay) }}</div>
+        <div class="card-value" id="month-total-basepay">¥-</div>
+        <div class="card-sub" id="month-daily-avg-basepay">日均¥-</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计返点</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_rebate) }}</div>
+        <div class="card-value" id="month-total-rebate">¥-</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计公司分成</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.total_company_share) }}</div>
+        <div class="card-value" id="month-total-company-share">¥-</div>
       </div>
-      <div class="summary-card{% if month_stats.operating_profit < 0 %} negative-value{% endif %}">
+      <div class="summary-card" id="month-operating-profit-card">
         <div class="card-label">运营利润估算</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(month_stats.operating_profit) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(month_stats.daily_avg_operating_profit) }}</div>
+        <div class="card-value" id="month-operating-profit">¥-</div>
+        <div class="card-sub" id="month-daily-avg-operating-profit">日均¥-</div>
       </div>
     </div>
   </div>
@@ -115,31 +92,35 @@
     <div class="summary-cards">
       <div class="summary-card">
         <div class="card-label">开播记录数</div>
-        <div class="card-value">{{ week_stats.record_count }}</div>
+        <div class="card-value" id="week-record-count">-</div>
       </div>
-      <div class="summary-card{% if week_stats.avg_hours < 7 and week_stats.operating_profit < 0 %} negative-value{% endif %}">
+      <div class="summary-card" id="week-hours-card">
         <div class="card-label">开播时数</div>
-        <div class="card-value">{{ week_stats.total_hours }}h</div>
-        <div class="card-sub">{{ week_stats.avg_hours }}h/记录</div>
+        <div class="card-value" id="week-total-hours">-h</div>
+        <div class="card-sub" id="week-avg-hours">-h/记录</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计流水</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_revenue) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(week_stats.daily_avg_revenue) }}</div>
+        <div class="card-value" id="week-total-revenue">¥-</div>
+        <div class="card-sub" id="week-daily-avg-revenue">日均¥-</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计底薪</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_basepay) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(week_stats.daily_avg_basepay) }}</div>
+        <div class="card-value" id="week-total-basepay">¥-</div>
+        <div class="card-sub" id="week-daily-avg-basepay">日均¥-</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计返点</div>
+        <div class="card-value" id="week-total-rebate">¥-</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计公司分成</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.total_company_share) }}</div>
+        <div class="card-value" id="week-total-company-share">¥-</div>
       </div>
-      <div class="summary-card{% if week_stats.operating_profit < 0 %} negative-value{% endif %}">
+      <div class="summary-card" id="week-operating-profit-card">
         <div class="card-label">近日盈亏（不计返点）</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(week_stats.operating_profit) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(week_stats.daily_avg_operating_profit) }}</div>
+        <div class="card-value" id="week-operating-profit">¥-</div>
+        <div class="card-sub" id="week-daily-avg-operating-profit">日均¥-</div>
       </div>
     </div>
   </div>
@@ -149,70 +130,45 @@
     <div class="summary-cards">
       <div class="summary-card">
         <div class="card-label">开播记录数</div>
-        <div class="card-value">{{ three_day_stats.record_count }}</div>
+        <div class="card-value" id="three-day-record-count">-</div>
       </div>
-      <div class="summary-card{% if three_day_stats.avg_hours < 7 and three_day_stats.operating_profit < 0 %} negative-value{% endif %}">
+      <div class="summary-card" id="three-day-hours-card">
         <div class="card-label">开播时数</div>
-        <div class="card-value">{{ three_day_stats.total_hours }}h</div>
-        <div class="card-sub">{{ three_day_stats.avg_hours }}h/记录</div>
+        <div class="card-value" id="three-day-total-hours">-h</div>
+        <div class="card-sub" id="three-day-avg-hours">-h/记录</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计流水</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_revenue) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(three_day_stats.daily_avg_revenue) }}</div>
+        <div class="card-value" id="three-day-total-revenue">¥-</div>
+        <div class="card-sub" id="three-day-daily-avg-revenue">日均¥-</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计底薪</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_basepay) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(three_day_stats.daily_avg_basepay) }}</div>
+        <div class="card-value" id="three-day-total-basepay">¥-</div>
+        <div class="card-sub" id="three-day-daily-avg-basepay">日均¥-</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-label">累计返点</div>
+        <div class="card-value" id="three-day-total-rebate">¥-</div>
       </div>
       <div class="summary-card">
         <div class="card-label">累计公司分成</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.total_company_share) }}</div>
+        <div class="card-value" id="three-day-total-company-share">¥-</div>
       </div>
-      <div class="summary-card{% if three_day_stats.operating_profit < 0 %} negative-value{% endif %}">
+      <div class="summary-card" id="three-day-operating-profit-card">
         <div class="card-label">近日盈亏（不计返点）</div>
-        <div class="card-value">¥{{ "{:,.2f}".format(three_day_stats.operating_profit) }}</div>
-        <div class="card-sub">日均¥{{ "{:,.2f}".format(three_day_stats.daily_avg_operating_profit) }}</div>
+        <div class="card-value" id="three-day-operating-profit">¥-</div>
+        <div class="card-sub" id="three-day-daily-avg-operating-profit">日均¥-</div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="summary-section">
+<div class="summary-section" id="recent-records-section" style="display: none;">
   <h2 class="section-title">最近开播记录</h2>
-  {% if recent_records %}
-    <div class="record-cards">
-      {% for record in recent_records %}
-      <a href="{{ url_for('battle_record.detail_battle_record', record_id=record.id) }}" class="record-card">
-        <div class="card-header">
-          <div class="record-time">
-            <div class="start-time">{{ record.start_time.strftime('%m月%d日 %H:%M') }}</div>
-            <div class="duration">{{ record.duration_hours }}小时</div>
-          </div>
-          <div class="record-info">
-            <div class="pilot-name">{{ pilot_info.nickname }}{% if pilot_info.real_name %}（{{ pilot_info.real_name }}）{% endif %}</div>
-            <div class="meta-line">[{{ pilot_info.owner }}][{{ pilot_info.rank }}]</div>
-          </div>
-        </div>
-        <div class="card-footer">
-          <div class="revenue">
-            <span class="amount">¥{{ "{:,.2f}".format(record.revenue_amount) }}</span>
-            {% if record.base_salary and record.base_salary > 0 %}
-            <span class="base-salary">底薪¥{{ "{:,.2f}".format(record.base_salary) }}</span>
-            {% endif %}
-          </div>
-          <div class="card-arrow">→</div>
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="empty-state">
-      <div class="empty-icon">📊</div>
-      <div class="empty-title">暂无开播记录</div>
-    </div>
-  {% endif %}
+  <div class="record-cards" id="recent-records-container">
+    <!-- 记录将通过JavaScript动态加载 -->
+  </div>
 </div>
 
 <style>
@@ -579,5 +535,271 @@
     align-items: flex-end;
   }
 }
+
+.loading-state, .error-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+.loading-icon, .error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.loading-text, .error-text {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.error-state .btn {
+  margin-top: 16px;
+}
 </style>
+
+<script>
+// 主播业绩页面JavaScript - 完全REST化版本
+// 从URL中获取pilot_id
+const urlParts = window.location.pathname.split('/');
+const pilotId = urlParts[urlParts.indexOf('pilots') + 1];
+
+// 从URL参数获取来源信息
+const urlParams = new URLSearchParams(window.location.search);
+const fromParam = urlParams.get('from');
+const dateParam = urlParams.get('date');
+const ownerParam = urlParams.get('owner');
+const monthParam = urlParams.get('month');
+const recordIdParam = urlParams.get('record_id');
+
+// 格式化金额
+function formatCurrency(amount) {
+  return '¥' + amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// 格式化时间
+function formatDateTime(dateTimeStr) {
+  if (!dateTimeStr) return '未知';
+  const date = new Date(dateTimeStr);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${month}月${day}日 ${hours}:${minutes}`;
+}
+
+// 规范化主播分类显示
+function normalizeRank(value) {
+  const mapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+  return mapping[value] || value;
+}
+
+// 规范化主播状态显示
+function normalizeStatus(value) {
+  const mapping = {
+    '未征召': '未招募',
+    '不征召': '不招募',
+    '已征召': '已招募',
+    '已签约': '已签约',
+    '已阵亡': '流失'
+  };
+  return mapping[value] || value;
+}
+
+// 生成返回按钮
+function generateBackButton() {
+  const backNav = document.getElementById('back-nav');
+  let backHtml = '';
+  
+  if (fromParam === 'daily_report' && dateParam && ownerParam) {
+    backHtml = `<a class="btn btn-secondary" href="/reports/daily?date=${dateParam}&owner=${ownerParam}">
+      <span>←</span> 返回
+    </a>`;
+  } else if (fromParam === 'monthly_report' && monthParam) {
+    backHtml = `<a class="btn btn-secondary" href="/reports/monthly?month=${monthParam}">
+      <span>←</span> 返回
+    </a>`;
+  } else if (fromParam === 'pilot_detail') {
+    backHtml = `<a class="btn btn-secondary" href="/pilots/${pilotId}">
+      <span>←</span> 返回
+    </a>`;
+  } else if (fromParam === 'battle_record_detail' && recordIdParam) {
+    backHtml = `<a class="btn btn-secondary" href="/battle_records/${recordIdParam}">
+      <span>←</span> 返回
+    </a>`;
+  } else {
+    backHtml = `<a class="btn btn-secondary" href="/pilots/">
+      <span>←</span> 返回
+    </a>`;
+  }
+  
+  backNav.innerHTML = backHtml;
+}
+
+// 更新主播基本信息
+function updatePilotInfo(pilotInfo) {
+  // 更新所有昵称显示
+  const nicknameElements = document.querySelectorAll('#pilot-nickname, #pilot-nickname-link');
+  nicknameElements.forEach(el => el.textContent = pilotInfo.nickname);
+  
+  // 更新详情页链接
+  const detailLink = document.getElementById('pilot-detail-link');
+  detailLink.href = `/pilots/${pilotId}?from=performance`;
+  
+  // 更新真实姓名
+  if (pilotInfo.real_name) {
+    document.getElementById('pilot-real-name-value').textContent = pilotInfo.real_name;
+    document.getElementById('pilot-real-name').style.display = 'inline';
+  }
+  
+  // 更新年龄和性别图标
+  document.getElementById('pilot-age').textContent = pilotInfo.age || '-';
+  document.getElementById('pilot-gender-icon').textContent = pilotInfo.gender_icon || '?';
+  
+  // 更新籍贯
+  if (pilotInfo.hometown) {
+    document.getElementById('pilot-hometown-value').textContent = pilotInfo.hometown;
+    document.getElementById('pilot-hometown').style.display = 'inline';
+  }
+  
+  // 更新直属运营
+  document.getElementById('pilot-owner').textContent = pilotInfo.owner || '未知';
+  
+  // 更新主播分类和状态（应用规范化）
+  document.getElementById('pilot-rank').textContent = normalizeRank(pilotInfo.rank || '-');
+  document.getElementById('pilot-status').textContent = normalizeStatus(pilotInfo.status || '-');
+}
+
+// 更新统计卡片
+function updateStatsCard(prefix, stats) {
+  try {
+    document.getElementById(`${prefix}-record-count`).textContent = stats.record_count;
+    document.getElementById(`${prefix}-total-hours`).textContent = stats.total_hours + 'h';
+    document.getElementById(`${prefix}-avg-hours`).textContent = stats.avg_hours + 'h/记录';
+    document.getElementById(`${prefix}-total-revenue`).textContent = formatCurrency(stats.total_revenue);
+    document.getElementById(`${prefix}-daily-avg-revenue`).textContent = '日均' + formatCurrency(stats.daily_avg_revenue);
+    document.getElementById(`${prefix}-total-basepay`).textContent = formatCurrency(stats.total_basepay);
+    document.getElementById(`${prefix}-daily-avg-basepay`).textContent = '日均' + formatCurrency(stats.daily_avg_basepay);
+    document.getElementById(`${prefix}-total-rebate`).textContent = formatCurrency(stats.total_rebate);
+    document.getElementById(`${prefix}-total-company-share`).textContent = formatCurrency(stats.total_company_share);
+    document.getElementById(`${prefix}-operating-profit`).textContent = formatCurrency(stats.operating_profit);
+    document.getElementById(`${prefix}-daily-avg-operating-profit`).textContent = '日均' + formatCurrency(stats.daily_avg_operating_profit);
+    
+    // 设置负值样式
+    const hoursCard = document.getElementById(`${prefix}-hours-card`);
+    const profitCard = document.getElementById(`${prefix}-operating-profit-card`);
+    
+    if (hoursCard && stats.avg_hours < 7 && stats.operating_profit < 0) {
+      hoursCard.classList.add('negative-value');
+    }
+    if (profitCard && stats.operating_profit < 0) {
+      profitCard.classList.add('negative-value');
+    }
+  } catch (error) {
+    console.error(`更新统计卡片失败 (${prefix}):`, error);
+    console.error('stats:', stats);
+  }
+}
+
+// 渲染最近开播记录
+function renderRecentRecords(records, pilotInfo) {
+  const container = document.getElementById('recent-records-container');
+  
+  if (!records || records.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">暂无开播记录</div>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = records.map(record => `
+    <a href="/battle_records/${record.id}" class="record-card">
+      <div class="card-header">
+        <div class="record-time">
+          <div class="start-time">${formatDateTime(record.start_time)}</div>
+          <div class="duration">${record.duration_hours}小时</div>
+        </div>
+        <div class="record-info">
+          <div class="pilot-name">${pilotInfo.nickname}${pilotInfo.real_name ? '（' + pilotInfo.real_name + '）' : ''}</div>
+          <div class="meta-line">[${pilotInfo.owner || '未知'}][${pilotInfo.rank || '未知'}]</div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="revenue">
+          <span class="amount">${formatCurrency(record.revenue_amount)}</span>
+          ${record.base_salary > 0 ? `<span class="base-salary">底薪${formatCurrency(record.base_salary)}</span>` : ''}
+        </div>
+        <div class="card-arrow">→</div>
+      </div>
+    </a>
+  `).join('');
+}
+
+// 加载业绩数据
+async function loadPerformanceData() {
+  try {
+    // 显示加载状态
+    document.getElementById('loading-state').style.display = 'block';
+    document.getElementById('error-state').style.display = 'none';
+    document.getElementById('stats-section').style.display = 'none';
+    document.getElementById('recent-records-section').style.display = 'none';
+    
+    const response = await fetch(`/api/pilots/${pilotId}/performance`);
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '获取数据失败');
+    }
+    
+    const data = result.data;
+    
+    // 更新主播基本信息
+    updatePilotInfo(data.pilot_info);
+    
+    // 先显示内容区域，再更新数据
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('stats-section').style.display = 'block';
+    document.getElementById('recent-records-section').style.display = 'block';
+    
+    // 更新统计数据
+    console.log('开始更新统计数据...');
+    console.log('month_stats:', data.month_stats);
+    console.log('week_stats:', data.week_stats);
+    console.log('three_day_stats:', data.three_day_stats);
+    
+    updateStatsCard('month', data.month_stats);
+    updateStatsCard('week', data.week_stats);
+    updateStatsCard('three-day', data.three_day_stats);
+    
+    // 渲染最近开播记录
+    renderRecentRecords(data.recent_records, data.pilot_info);
+    
+  } catch (error) {
+    console.error('加载业绩数据失败:', error);
+    
+    // 显示错误状态
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('error-state').style.display = 'block';
+    document.getElementById('stats-section').style.display = 'none';
+    document.getElementById('recent-records-section').style.display = 'none';
+  }
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+  // 生成返回按钮
+  generateBackButton();
+  
+  // 加载业绩数据
+  loadPerformanceData();
+});
+</script>
 {% endblock %}

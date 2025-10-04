@@ -573,6 +573,73 @@ def get_pilot_options():
         return jsonify(create_error_response('INTERNAL_ERROR', '获取选项数据失败')), 500
 
 
+@pilots_api_bp.route('/api/pilots/<pilot_id>/performance', methods=['GET'])
+@roles_accepted('gicho', 'kancho')
+def get_pilot_performance(pilot_id):
+    """获取主播业绩数据"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)
+
+        # 计算主播业绩数据
+        from utils.pilot_performance import calculate_pilot_performance_stats
+        performance_data = calculate_pilot_performance_stats(pilot)
+
+        # 序列化主播基本信息
+        pilot_info = {
+            'nickname': pilot.nickname,
+            'real_name': pilot.real_name,
+            'age': pilot.age,
+            'gender_icon': '♂' if pilot.gender.value == 0 else ('♀' if pilot.gender.value == 1 else '?'),
+            'hometown': pilot.hometown,
+            'owner': pilot.owner.nickname if pilot.owner else None,
+            'rank': pilot.rank.value if pilot.rank else None,
+            'status': pilot.status.value if pilot.status else None
+        }
+
+        # 序列化最近开播记录
+        recent_records = []
+        for record in performance_data['recent_records']:
+            recent_records.append({
+                'id': str(record.id),
+                'start_time': utc_to_local(record.start_time).isoformat() if record.start_time else None,
+                'duration_hours': float(record.duration_hours) if record.duration_hours else 0,
+                'revenue_amount': float(record.revenue_amount),
+                'base_salary': float(record.base_salary) if record.base_salary else 0
+            })
+
+        # 转换Decimal为float
+        def convert_decimal_to_float(data):
+            if isinstance(data, dict):
+                return {k: convert_decimal_to_float(v) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [convert_decimal_to_float(item) for item in data]
+            elif hasattr(data, '__class__') and data.__class__.__name__ == 'Decimal':
+                return float(data)
+            else:
+                return data
+
+        month_stats = convert_decimal_to_float(performance_data['month_stats'])
+        week_stats = convert_decimal_to_float(performance_data['week_stats'])
+        three_day_stats = convert_decimal_to_float(performance_data['three_day_stats'])
+
+        response_data = {
+            'pilot_info': pilot_info,
+            'month_stats': month_stats,
+            'week_stats': week_stats,
+            'three_day_stats': three_day_stats,
+            'recent_records': recent_records
+        }
+
+        logger.info('获取主播业绩数据成功：%s', pilot.nickname)
+        return jsonify(create_success_response(response_data))
+
+    except DoesNotExist:
+        return jsonify(create_error_response('PILOT_NOT_FOUND', '主播不存在')), 404
+    except Exception as e:
+        logger.error('获取主播业绩数据失败: %s', str(e), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '获取主播业绩数据失败')), 500
+
+
 @pilots_api_bp.route('/api/pilots/export', methods=['GET'])
 @roles_accepted('gicho', 'kancho')
 def export_pilots():

@@ -109,14 +109,19 @@ def pilot_commission_edit(pilot_id, commission_id):
 @pilot_bp.route('/<pilot_id>/performance')
 @roles_accepted('gicho', 'kancho')
 def pilot_performance(pilot_id):
-    """主播绩效页面"""
+    """主播绩效页面 - 完全REST化版本
+    
+    只渲染HTML框架，所有数据通过API获取
+    """
+    # 验证pilot_id是否有效（可选，用于早期验证）
     try:
-        pilot = Pilot.objects.get(id=pilot_id)
+        Pilot.objects.get(id=pilot_id)
     except DoesNotExist:
         flash('主播不存在', 'error')
         return redirect(url_for('pilot.list_pilots'))
 
-    return render_template('pilots/performance.html', pilot=pilot)
+    # 只返回空模板，数据由前端通过API获取
+    return render_template('pilots/performance.html')
 
 
 @pilot_bp.route('/export')
