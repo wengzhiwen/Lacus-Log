@@ -9,16 +9,169 @@ from urllib.parse import quote
 from flask import Blueprint, Response, render_template, request, url_for
 from flask_security import roles_accepted
 
+from models.announcement import Announcement
 from models.battle_record import BattleRecord
-from models.pilot import WorkMode
+from models.pilot import Pilot, Rank, Status, WorkMode
 from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.recruit_stats import calculate_recruit_today_stats
 from utils.cache_helper import cached_monthly_report
 
 logger = get_logger('report')
 
 report_bp = Blueprint('report', __name__)
+
+
+def _get_dashboard_time_frames():
+    """生成仪表盘相关的本地/UTC时间窗口。"""
+    now_utc = get_current_utc_time()
+    now_local = utc_to_local(now_utc)
+    today_local_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_local_end = today_local_start + timedelta(days=1)
+    yesterday_local_start = today_local_start - timedelta(days=1)
+    yesterday_local_end = today_local_start
+    week_local_start = today_local_start - timedelta(days=7)
+
+    frames = {
+        'now_local': now_local,
+        'today_start_local': today_local_start,
+        'today_end_local': today_local_end,
+        'today_start_utc': local_to_utc(today_local_start),
+        'today_end_utc': local_to_utc(today_local_end),
+        'yesterday_start_utc': local_to_utc(yesterday_local_start),
+        'yesterday_end_utc': local_to_utc(yesterday_local_end),
+        'week_start_utc': local_to_utc(week_local_start),
+    }
+
+    return frames
+
+
+def build_dashboard_feature_banner():
+    """构建仪表盘顶部横幅配置。"""
+    frames = _get_dashboard_time_frames()
+    now_local = frames['now_local']
+    start_local = now_local.replace(year=2025, month=10, day=1, hour=0, minute=0, second=0, microsecond=0)
+    end_local = now_local.replace(year=2025, month=10, day=5, hour=23, minute=59, second=59, microsecond=0)
+
+    is_active = start_local <= now_local <= end_local
+    banner = {
+        'generated_at': now_local.strftime('%Y-%m-%d %H:%M:%S'),
+        'show': bool(is_active),
+        'title': '',
+        'image': '',
+        'icon': '🌕',
+    }
+
+    if is_active:
+        banner.update({
+            'title': '请所有运营同学尽量欢度国庆，中秋佳节陪伴主播',
+            'image': url_for('static', filename='1001.jpeg'),
+        })
+
+    return banner
+
+
+def calculate_dashboard_recruit_metrics():
+    """计算仪表盘招募统计。"""
+    frames = _get_dashboard_time_frames()
+    today_stats = calculate_recruit_today_stats()
+
+    return {
+        'generated_at': frames['now_local'].strftime('%Y-%m-%d %H:%M:%S'),
+        'recruit_today_appointments': int(today_stats.get('appointments', 0) or 0),
+        'recruit_today_interviews': int(today_stats.get('interviews', 0) or 0),
+        'recruit_today_new_recruits': int(today_stats.get('new_recruits', 0) or 0),
+    }
+
+
+def calculate_dashboard_announcement_metrics():
+    """计算仪表盘通告统计。"""
+    frames = _get_dashboard_time_frames()
+    today_start = frames['today_start_utc']
+    today_end = frames['today_end_utc']
+    yesterday_start = frames['yesterday_start_utc']
+    yesterday_end = frames['yesterday_end_utc']
+    week_start = frames['week_start_utc']
+
+    today_count = Announcement.objects(start_time__gte=today_start, start_time__lt=today_end).count()
+    yesterday_count = Announcement.objects(start_time__gte=yesterday_start, start_time__lt=yesterday_end).count()
+
+    if yesterday_count > 0:
+        change_rate = round(((today_count - yesterday_count) / yesterday_count) * 100, 1)
+    else:
+        change_rate = 100.0 if today_count > 0 else 0.0
+
+    week_count = Announcement.objects(start_time__gte=week_start, start_time__lt=today_end).count()
+    week_avg = round(week_count / 7, 1)
+
+    return {
+        'generated_at': frames['now_local'].strftime('%Y-%m-%d %H:%M:%S'),
+        'today_count': int(today_count),
+        'change_rate': float(change_rate),
+        'week_avg': float(week_avg),
+    }
+
+
+def calculate_dashboard_battle_metrics():
+    """计算仪表盘开播记录统计。"""
+    frames = _get_dashboard_time_frames()
+    today_start = frames['today_start_utc']
+    today_end = frames['today_end_utc']
+    yesterday_start = frames['yesterday_start_utc']
+    yesterday_end = frames['yesterday_end_utc']
+    week_start = frames['week_start_utc']
+
+    today_records = BattleRecord.objects(start_time__gte=today_start, start_time__lt=today_end)
+    yesterday_records = BattleRecord.objects(start_time__gte=yesterday_start, start_time__lt=yesterday_end)
+    week_records = BattleRecord.objects(start_time__gte=week_start, start_time__lt=today_end)
+
+    today_revenue = sum(record.revenue_amount or Decimal('0') for record in today_records)
+    yesterday_revenue = sum(record.revenue_amount or Decimal('0') for record in yesterday_records)
+    week_revenue = sum(record.revenue_amount or Decimal('0') for record in week_records)
+
+    battle_today = float(today_revenue)
+    battle_yesterday = float(yesterday_revenue)
+    battle_week_avg = float(week_revenue) / 7 if week_revenue else 0.0
+
+    return {
+        'generated_at': frames['now_local'].strftime('%Y-%m-%d %H:%M:%S'),
+        'battle_today_revenue': battle_today,
+        'battle_yesterday_revenue': battle_yesterday,
+        'battle_week_avg_revenue': battle_week_avg,
+    }
+
+
+def calculate_dashboard_pilot_metrics():
+    """计算仪表盘主播统计。"""
+    frames = _get_dashboard_time_frames()
+    serving_status = [Status.RECRUITED, Status.CONTRACTED]
+
+    pilot_serving = Pilot.objects(status__in=serving_status).count()
+    pilot_intern = Pilot.objects(rank=Rank.INTERN, status__in=serving_status).count()
+    pilot_official = Pilot.objects(rank=Rank.OFFICIAL, status__in=serving_status).count()
+
+    return {
+        'generated_at': frames['now_local'].strftime('%Y-%m-%d %H:%M:%S'),
+        'pilot_serving_count': int(pilot_serving),
+        'pilot_intern_serving_count': int(pilot_intern),
+        'pilot_official_serving_count': int(pilot_official),
+    }
+
+
+def calculate_dashboard_candidate_metrics():
+    """计算仪表盘候选人统计。"""
+    frames = _get_dashboard_time_frames()
+    serving_status = [Status.RECRUITED, Status.CONTRACTED]
+
+    candidate_not_recruited = Pilot.objects(rank=Rank.CANDIDATE, status=Status.NOT_RECRUITED).count()
+    trainee_serving = Pilot.objects(rank=Rank.TRAINEE, status__in=serving_status).count()
+
+    return {
+        'generated_at': frames['now_local'].strftime('%Y-%m-%d %H:%M:%S'),
+        'candidate_not_recruited_count': int(candidate_not_recruited),
+        'trainee_serving_count': int(trainee_serving),
+    }
 
 
 def get_local_date_from_string(date_str):

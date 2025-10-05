@@ -1,0 +1,424 @@
+{% extends 'base.html' %}
+{% block title %}仪表盘 - Lacus-Log{% endblock %}
+{% block content %}
+<section class="dashboard" id="dashboardApp">
+  <h1 class="title">仪表盘</h1>
+  <div class="dashboard-meta" id="dashboardMeta" style="display:none;"></div>
+  <div class="dashboard-error" id="dashboardError" style="display:none;">仪表盘加载失败，请稍后再试。</div>
+  <div class="cards">
+    <div class="card" id="featuredImageCard" style="display:none;">
+      <div class="card-header">
+        <div class="card-title" id="featuredTitle"></div>
+        <div class="card-icon" id="featuredIcon">🌕</div>
+      </div>
+      <div class="card-body">
+        <div class="image-gauge">
+          <img id="featuredImage" src="" alt="featured" class="image-gauge-img" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card" data-card-id="recruit" data-default-link="{{ url_for('report.recruit_daily_report') }}">
+      <div class="card-header">
+        <div class="card-title">招募统计</div>
+        <div class="card-icon">📋</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value" data-field="recruit_today_appointments">--</div>
+          <div class="main-label">今日约面</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value" data-field="recruit_today_interviews">--</div>
+            <div class="sub-label">今日到面</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value" data-field="recruit_today_new_recruits">--</div>
+            <div class="sub-label">今日新开播</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" data-card-id="announcement" data-default-link="{{ url_for('calendar.day_view') }}">
+      <div class="card-header">
+        <div class="card-title">通告计划统计</div>
+        <div class="card-icon">📊</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value" data-field="today_count">--</div>
+          <div class="main-label">今日通告计划</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value" id="changeRateValue" data-field="change_rate">--</div>
+            <div class="sub-label">环比</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value" data-field="week_avg">--</div>
+            <div class="sub-label">7日平均</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" data-card-id="battle" data-default-link="{{ url_for('report.daily_report') }}">
+      <div class="card-header">
+        <div class="card-title">开播记录统计</div>
+        <div class="card-icon">📈</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value" data-field="battle_today_revenue">--</div>
+          <div class="main-label">今日流水（元）</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value" data-field="battle_yesterday_revenue">--</div>
+            <div class="sub-label">昨日流水</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value" data-field="battle_week_avg_revenue">--</div>
+            <div class="sub-label">7日平均流水</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" data-card-id="pilot">
+      <div class="card-header">
+        <div class="card-title">主播统计</div>
+        <div class="card-icon">👩‍✈️</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value" data-field="pilot_serving_count">--</div>
+          <div class="main-label">服役人数</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value" data-field="pilot_intern_serving_count">--</div>
+            <div class="sub-label">实习主播</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value" data-field="pilot_official_serving_count">--</div>
+            <div class="sub-label">正式主播</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" data-card-id="candidate">
+      <div class="card-header">
+        <div class="card-title">候选人统计</div>
+        <div class="card-icon">🧑‍🚀</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value" data-field="candidate_not_recruited_count">--</div>
+          <div class="main-label">候补人数</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value" data-field="trainee_serving_count">--</div>
+            <div class="sub-label">试播主播</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  const app = document.getElementById('dashboardApp');
+  if (!app) {
+    return;
+  }
+
+  const metaEl = document.getElementById('dashboardMeta');
+  const errorEl = document.getElementById('dashboardError');
+  const featureCard = document.getElementById('featuredImageCard');
+  const featureTitle = document.getElementById('featuredTitle');
+  const featureIcon = document.getElementById('featuredIcon');
+  const featureImage = document.getElementById('featuredImage');
+  const changeRateEl = document.getElementById('changeRateValue');
+
+  const fieldMap = {};
+  document.querySelectorAll('[data-field]').forEach(el => {
+    fieldMap[el.dataset.field] = el;
+  });
+
+  const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 });
+  const floatFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  const endpoints = [
+    { url: "{{ url_for('main.dashboard_recruit_data') }}", handler: applyRecruit },
+    { url: "{{ url_for('main.dashboard_announcement_data') }}", handler: applyAnnouncement },
+    { url: "{{ url_for('main.dashboard_battle_data') }}", handler: applyBattle },
+    { url: "{{ url_for('main.dashboard_pilot_data') }}", handler: applyPilot },
+    { url: "{{ url_for('main.dashboard_candidate_data') }}", handler: applyCandidate },
+    { url: "{{ url_for('main.dashboard_feature_data') }}", handler: applyFeature },
+  ];
+
+  let latestTimestamp = '';
+  let announcementLinkBase = '';
+
+  function formatInteger(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return '--';
+    }
+    return String(value);
+  }
+
+  function formatCurrency(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return '--';
+    }
+    return numberFormatter.format(value);
+  }
+
+  function formatAverage(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return '--';
+    }
+    return floatFormatter.format(value);
+  }
+
+  function updateMeta(timestamp) {
+    if (!timestamp || !metaEl) {
+      return;
+    }
+    if (!latestTimestamp || timestamp > latestTimestamp) {
+      latestTimestamp = timestamp;
+      metaEl.textContent = `最后更新：${timestamp}`;
+      metaEl.style.display = 'block';
+    }
+  }
+
+  function setCardLink(cardId, url) {
+    const card = app.querySelector(`.card[data-card-id="${cardId}"]`);
+    if (!card) {
+      return;
+    }
+    if (url) {
+      card.dataset.link = url;
+    }
+  }
+
+  function applyRecruit(data, meta) {
+    updateMeta(data.generated_at);
+    if (fieldMap.recruit_today_appointments) {
+      fieldMap.recruit_today_appointments.textContent = formatInteger(data.recruit_today_appointments);
+    }
+    if (fieldMap.recruit_today_interviews) {
+      fieldMap.recruit_today_interviews.textContent = formatInteger(data.recruit_today_interviews);
+    }
+    if (fieldMap.recruit_today_new_recruits) {
+      fieldMap.recruit_today_new_recruits.textContent = formatInteger(data.recruit_today_new_recruits);
+    }
+    if (meta && meta.link) {
+      setCardLink('recruit', meta.link);
+    }
+  }
+
+  function applyAnnouncement(data, meta) {
+    updateMeta(data.generated_at);
+    if (fieldMap.today_count) {
+      fieldMap.today_count.textContent = formatInteger(data.today_count);
+    }
+    if (fieldMap.week_avg) {
+      fieldMap.week_avg.textContent = formatAverage(data.week_avg);
+    }
+    if (changeRateEl) {
+      const changeRate = Number(data.change_rate || 0);
+      const displayChange = `${changeRate > 0 ? '+' : ''}${changeRate.toFixed(1)}%`;
+      changeRateEl.textContent = displayChange;
+      changeRateEl.classList.remove('positive', 'negative');
+      if (changeRate > 0) {
+        changeRateEl.classList.add('positive');
+      } else if (changeRate < 0) {
+        changeRateEl.classList.add('negative');
+      }
+    }
+    if (meta && meta.link) {
+      announcementLinkBase = meta.link;
+      setCardLink('announcement', meta.link);
+    }
+  }
+
+  function applyBattle(data, meta) {
+    updateMeta(data.generated_at);
+    if (fieldMap.battle_today_revenue) {
+      fieldMap.battle_today_revenue.textContent = formatCurrency(data.battle_today_revenue);
+    }
+    if (fieldMap.battle_yesterday_revenue) {
+      fieldMap.battle_yesterday_revenue.textContent = formatCurrency(data.battle_yesterday_revenue);
+    }
+    if (fieldMap.battle_week_avg_revenue) {
+      fieldMap.battle_week_avg_revenue.textContent = formatCurrency(data.battle_week_avg_revenue);
+    }
+    if (meta && meta.link) {
+      setCardLink('battle', meta.link);
+    }
+  }
+
+  function applyPilot(data, meta) {
+    updateMeta(data.generated_at);
+    if (fieldMap.pilot_serving_count) {
+      fieldMap.pilot_serving_count.textContent = formatInteger(data.pilot_serving_count);
+    }
+    if (fieldMap.pilot_intern_serving_count) {
+      fieldMap.pilot_intern_serving_count.textContent = formatInteger(data.pilot_intern_serving_count);
+    }
+    if (fieldMap.pilot_official_serving_count) {
+      fieldMap.pilot_official_serving_count.textContent = formatInteger(data.pilot_official_serving_count);
+    }
+  }
+
+  function applyCandidate(data, meta) {
+    updateMeta(data.generated_at);
+    if (fieldMap.candidate_not_recruited_count) {
+      fieldMap.candidate_not_recruited_count.textContent = formatInteger(data.candidate_not_recruited_count);
+    }
+    if (fieldMap.trainee_serving_count) {
+      fieldMap.trainee_serving_count.textContent = formatInteger(data.trainee_serving_count);
+    }
+  }
+
+  function applyFeature(data) {
+    updateMeta(data.generated_at);
+    if (!featureCard) {
+      return;
+    }
+    if (!data || !data.show) {
+      featureCard.style.display = 'none';
+      return;
+    }
+    featureCard.style.display = 'block';
+    featureTitle.textContent = data.title || '';
+    featureIcon.textContent = data.icon || '🌕';
+    if (data.image) {
+      featureImage.src = data.image;
+      featureImage.alt = data.title || 'featured';
+    }
+  }
+
+  function runCardAnimation() {
+    const cards = app.querySelectorAll('.cards .card');
+    cards.forEach(card => {
+      card.classList.add('flip-enter');
+    });
+
+    requestAnimationFrame(() => {
+      const baseDelay = 200;
+      cards.forEach((card, idx) => {
+        setTimeout(() => {
+          card.classList.remove('flip-enter');
+          card.classList.add('flip-in');
+          const handler = () => {
+            card.classList.remove('flip-in');
+            card.removeEventListener('animationend', handler);
+          };
+          card.addEventListener('animationend', handler);
+        }, idx * baseDelay);
+      });
+    });
+  }
+
+  function showError(message) {
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+    }
+  }
+
+  function hideError() {
+    if (errorEl) {
+      errorEl.style.display = 'none';
+    }
+  }
+
+  function setupCardNavigation() {
+    const recruitCard = app.querySelector('.card[data-card-id="recruit"]');
+    if (recruitCard) {
+      const link = recruitCard.dataset.link || recruitCard.dataset.defaultLink;
+      if (link) {
+        recruitCard.classList.add('is-clickable');
+        recruitCard.style.cursor = 'pointer';
+        if (!recruitCard.dataset.navBound) {
+          recruitCard.addEventListener('click', () => {
+            window.location.href = link;
+          });
+          recruitCard.dataset.navBound = 'true';
+        }
+      }
+    }
+
+    const announcementCard = app.querySelector('.card[data-card-id="announcement"]');
+    if (announcementCard) {
+      const baseLink = announcementLinkBase || announcementCard.dataset.link || announcementCard.dataset.defaultLink;
+      if (baseLink) {
+        announcementCard.classList.add('is-clickable');
+        announcementCard.style.cursor = 'pointer';
+        if (!announcementCard.dataset.navBound) {
+          announcementCard.addEventListener('click', () => {
+            const today = new Date().toISOString().split('T')[0];
+            const separator = baseLink.includes('?') ? '&' : '?';
+            window.location.href = `${baseLink}${separator}date=${today}`;
+          });
+          announcementCard.dataset.navBound = 'true';
+        }
+      }
+    }
+
+    const battleCard = app.querySelector('.card[data-card-id="battle"]');
+    if (battleCard) {
+      const link = battleCard.dataset.link || battleCard.dataset.defaultLink;
+      if (link) {
+        battleCard.classList.add('is-clickable');
+        battleCard.style.cursor = 'pointer';
+        if (!battleCard.dataset.navBound) {
+          battleCard.addEventListener('click', () => {
+            window.location.href = link;
+          });
+          battleCard.dataset.navBound = 'true';
+        }
+      }
+    }
+  }
+
+  function fetchEndpoint(endpoint) {
+    return fetch(endpoint.url, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error('接口返回异常');
+      }
+      return response.json();
+    }).then(payload => {
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '接口返回失败');
+      }
+      const data = payload.data || {};
+      const meta = payload.meta || {};
+      endpoint.handler(data, meta);
+    });
+  }
+
+  Promise.all(endpoints.map(fetchEndpoint))
+    .then(() => {
+      hideError();
+      setupCardNavigation();
+      runCardAnimation();
+    })
+    .catch(error => {
+      console.error('加载仪表盘失败：', error);
+      showError(error.message || '仪表盘加载失败，请稍后再试。');
+    });
+})();
+</script>
+{% endblock %}

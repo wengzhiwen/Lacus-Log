@@ -1,96 +1,25 @@
 # pylint: disable=no-member
-from datetime import timedelta
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 from flask_security import current_user
 from flask_security.utils import hash_password
 
-from models.announcement import Announcement
-from models.battle_record import BattleRecord
-from models.pilot import Pilot, Rank, Status
+from utils.dashboard_serializers import create_success_response
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (
-    get_current_local_time,
-    get_current_utc_time,
-    local_to_utc,
-    utc_to_local,
+
+from routes.report import (
+    build_dashboard_feature_banner,
+    calculate_dashboard_announcement_metrics,
+    calculate_dashboard_battle_metrics,
+    calculate_dashboard_candidate_metrics,
+    calculate_dashboard_pilot_metrics,
+    calculate_dashboard_recruit_metrics,
 )
 
 logger = get_logger('main')
 
 main_bp = Blueprint('main', __name__)
-
-
-def _calculate_dashboard_data():
-    """计算仪表板数据"""
-    now = get_current_utc_time()
-
-    current_local = utc_to_local(now)
-    today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_local_end = today_local_start + timedelta(days=1)
-    yesterday_local_start = today_local_start - timedelta(days=1)
-    yesterday_local_end = today_local_start
-    week_local_start = today_local_start - timedelta(days=7)
-
-    today_start_utc = local_to_utc(today_local_start)
-    today_end_utc = local_to_utc(today_local_end)
-    yesterday_start_utc = local_to_utc(yesterday_local_start)
-    yesterday_end_utc = local_to_utc(yesterday_local_end)
-    week_start_utc = local_to_utc(week_local_start)
-
-    today_count = Announcement.objects(start_time__gte=today_start_utc, start_time__lt=today_end_utc).count()
-
-    yesterday_count = Announcement.objects(start_time__gte=yesterday_start_utc, start_time__lt=yesterday_end_utc).count()
-
-    if yesterday_count > 0:
-        change_rate = round(((today_count - yesterday_count) / yesterday_count) * 100, 1)
-    else:
-        change_rate = 100.0 if today_count > 0 else 0.0
-
-    week_count = Announcement.objects(start_time__gte=week_start_utc, start_time__lt=today_end_utc).count()
-    week_avg = round(week_count / 7, 1)
-
-    br_today_records = BattleRecord.objects(start_time__gte=today_start_utc, start_time__lt=today_end_utc)
-    br_today_revenue = sum(record.revenue_amount for record in br_today_records)
-
-    br_yesterday_records = BattleRecord.objects(start_time__gte=yesterday_start_utc, start_time__lt=yesterday_end_utc)
-    br_yesterday_revenue = sum(record.revenue_amount for record in br_yesterday_records)
-
-    br_week_records = BattleRecord.objects(start_time__gte=week_start_utc, start_time__lt=today_end_utc)
-    br_week_revenue = sum(record.revenue_amount for record in br_week_records)
-    br_week_avg_revenue = br_week_revenue / 7
-
-    serving_status = [Status.RECRUITED, Status.CONTRACTED]
-    pilot_serving = Pilot.objects(status__in=serving_status).count()
-    pilot_intern_serving = Pilot.objects(rank=Rank.INTERN, status__in=serving_status).count()
-    pilot_official_serving = Pilot.objects(rank=Rank.OFFICIAL, status__in=serving_status).count()
-
-    candidate_not_recruited = Pilot.objects(rank=Rank.CANDIDATE, status=Status.NOT_RECRUITED).count()
-    trainee_serving = Pilot.objects(rank=Rank.TRAINEE, status__in=serving_status).count()
-
-    from utils.recruit_stats import calculate_recruit_today_stats
-    today_recruit_stats = calculate_recruit_today_stats()
-    recruit_today_appointments = today_recruit_stats['appointments']
-    recruit_today_interviews = today_recruit_stats['interviews']
-    recruit_today_new_recruits = today_recruit_stats['new_recruits']
-
-    return {
-        'today_count': today_count,
-        'change_rate': change_rate,
-        'week_avg': week_avg,
-        'battle_today_revenue': br_today_revenue,
-        'battle_yesterday_revenue': br_yesterday_revenue,
-        'battle_week_avg_revenue': br_week_avg_revenue,
-        'pilot_serving_count': pilot_serving,
-        'pilot_intern_serving_count': pilot_intern_serving,
-        'pilot_official_serving_count': pilot_official_serving,
-        'candidate_not_recruited_count': candidate_not_recruited,
-        'trainee_serving_count': trainee_serving,
-        'recruit_today_appointments': recruit_today_appointments,
-        'recruit_today_interviews': recruit_today_interviews,
-        'recruit_today_new_recruits': recruit_today_new_recruits,
-    }
 
 
 @main_bp.route('/')
@@ -99,14 +28,61 @@ def home():
     """用户首页（移动端优先）。"""
     logger.debug('用户进入首页：%s', getattr(current_user, 'username', 'anonymous'))
 
-    dashboard_data = _calculate_dashboard_data()
+    return render_template('dashboard/index.html')
 
-    now_local = get_current_local_time()
-    start_local = now_local.replace(year=2025, month=10, day=1, hour=0, minute=0, second=0, microsecond=0)
-    end_local = now_local.replace(year=2025, month=10, day=5, hour=23, minute=59, second=59, microsecond=0)
-    show_featured_image = start_local <= now_local <= end_local
 
-    return render_template('index.html', dashboard_data=dashboard_data, show_featured_image=show_featured_image)
+@main_bp.route('/api/dashboard/recruit', methods=['GET'])
+@login_required
+def dashboard_recruit_data():
+    """仪表盘招募统计接口。"""
+    data = calculate_dashboard_recruit_metrics()
+    meta = {'segment': 'recruit', 'link': url_for('report.recruit_daily_report')}
+    return jsonify(create_success_response(data, meta))
+
+
+@main_bp.route('/api/dashboard/announcements', methods=['GET'])
+@login_required
+def dashboard_announcement_data():
+    """仪表盘通告统计接口。"""
+    data = calculate_dashboard_announcement_metrics()
+    meta = {'segment': 'announcement', 'link': url_for('calendar.day_view')}
+    return jsonify(create_success_response(data, meta))
+
+
+@main_bp.route('/api/dashboard/battle-records', methods=['GET'])
+@login_required
+def dashboard_battle_data():
+    """仪表盘开播记录统计接口。"""
+    data = calculate_dashboard_battle_metrics()
+    meta = {'segment': 'battle', 'link': url_for('report.daily_report')}
+    return jsonify(create_success_response(data, meta))
+
+
+@main_bp.route('/api/dashboard/pilots', methods=['GET'])
+@login_required
+def dashboard_pilot_data():
+    """仪表盘主播统计接口。"""
+    data = calculate_dashboard_pilot_metrics()
+    meta = {'segment': 'pilot'}
+    return jsonify(create_success_response(data, meta))
+
+
+@main_bp.route('/api/dashboard/candidates', methods=['GET'])
+@login_required
+def dashboard_candidate_data():
+    """仪表盘候选人统计接口。"""
+    data = calculate_dashboard_candidate_metrics()
+    meta = {'segment': 'candidate'}
+    return jsonify(create_success_response(data, meta))
+
+
+@main_bp.route('/api/dashboard/feature', methods=['GET'])
+@login_required
+def dashboard_feature_data():
+    """仪表盘横幅展示接口。"""
+    data = build_dashboard_feature_banner()
+    meta = {'segment': 'feature'}
+    return jsonify(create_success_response(data, meta))
 
 
 @main_bp.route('/change-password', methods=['GET', 'POST'])

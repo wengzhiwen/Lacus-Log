@@ -10,6 +10,7 @@
 
 ## 2025-10-05 重构：
 - 主播招募日报 REST 化：新增 `/api/recruit-reports/daily` 汇总/详情接口，招募日报与详情页面改为前端 fetch 数据，保持原有统计口径与权限校验
+- 首页仪表盘 REST 化：将计算逻辑迁入 `routes/report.py`，拆分 `/api/dashboard/recruit|announcements|battle-records|pilots|candidates|feature` 接口，并调整首页模板动态加载
 
 # 历史的更新内容
 
