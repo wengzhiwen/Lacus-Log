@@ -22,6 +22,7 @@ from routes.pilots_api import pilots_api_bp
 from routes.recruit import recruit_bp
 from routes.recruits_api import recruits_api_bp
 from routes.report import report_bp
+from routes.reports_api import reports_api_bp
 from routes.report_mail import report_mail_bp
 from routes.users_api import users_api_bp
 from utils.bootstrap import (ensure_database_indexes, ensure_initial_roles_and_admin)
@@ -105,6 +106,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(battle_record_bp, url_prefix='/battle-records')
     flask_app.register_blueprint(calendar_api_bp, url_prefix='/calendar/api')
     flask_app.register_blueprint(calendar_bp, url_prefix='/calendar')
+    flask_app.register_blueprint(reports_api_bp, url_prefix='/reports/api')
     flask_app.register_blueprint(report_bp, url_prefix='/reports')
     flask_app.register_blueprint(report_mail_bp, url_prefix='/reports')
 
