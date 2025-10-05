@@ -153,7 +153,7 @@ def list_announcements_api():
 
         query = _apply_time_filter(query, time_scope)
 
-        announcements = list(query.limit(100))
+        announcements = list(query.limit(500))
         announcements.sort(key=lambda a: (
             utc_to_local(a.start_time).date() if a.start_time else datetime.min.date(),
             (a.pilot.nickname or '') if a.pilot else '',
@@ -625,7 +625,7 @@ def get_announcement_changes_api(announcement_id: str):
     """获取通告变更记录。"""
     try:
         announcement = Announcement.objects.get(id=announcement_id)
-        changes = AnnouncementChangeLog.objects(announcement_id=announcement).order_by('-change_time').limit(100)
+        changes = AnnouncementChangeLog.objects(announcement_id=announcement).order_by('-change_time').limit(500)
         data = {'items': serialize_change_logs(changes)}
         return jsonify(create_success_response(data))
     except DoesNotExist:

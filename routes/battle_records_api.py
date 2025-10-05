@@ -333,7 +333,7 @@ def list_records():
         time_filter = filters.get('time', 'two_days')
 
         page = max(int(request.args.get('page', 1) or 1), 1)
-        per_page = 100
+        per_page = 500
         skip = (page - 1) * per_page
 
         base_query = BattleRecord.objects.order_by('-start_time', '-revenue_amount')
