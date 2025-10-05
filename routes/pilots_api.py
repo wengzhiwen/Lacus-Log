@@ -118,7 +118,7 @@ def get_pilots():
 
         # 分页参数
         page = int(request.args.get('page', 1))
-        page_size = int(request.args.get('page_size', 20))
+        page_size = int(request.args.get('page_size', 500))
 
         # 排序参数
         sort_param = request.args.get('sort', '-created_at')
@@ -509,7 +509,7 @@ def get_pilot_changes(pilot_id):
 
         # 分页参数
         page = int(request.args.get('page', 1))
-        page_size = int(request.args.get('page_size', 20))
+        page_size = int(request.args.get('page_size', 500))
 
         # 获取变更记录
         changes_query = PilotChangeLog.objects(pilot_id=pilot).order_by('-change_time')
