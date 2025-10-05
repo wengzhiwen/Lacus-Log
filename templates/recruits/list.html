@@ -73,6 +73,9 @@ function toggleFilters() {
   icon.textContent = collapsed ? '▼' : '▲';
 }
 
+// 确保函数在全局作用域中可用
+window.toggleFilters = toggleFilters;
+
 function scrollToGroup(groupId) {
   const element = document.getElementById(groupId);
   if (element) {
@@ -83,6 +86,9 @@ function scrollToGroup(groupId) {
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// 确保函数在全局作用域中可用
+window.scrollToTop = scrollToTop;
 
 function formatDateTime(isoString) {
     if (!isoString) return '';
@@ -176,7 +182,6 @@ function createGroup(title, groupId, recruits) {
 }
 
 // --- DATA RENDERING & FILTERING ---
-let allRecruitsData = [];
 
 function renderRecruits(recruits) {
     const container = document.getElementById('recruit-groups-container');
@@ -217,34 +222,70 @@ function renderRecruits(recruits) {
     }
 }
 
+// 存储所有招募数据，用于前端搜索
+let allRecruitsData = [];
+
 async function fetchAndRenderRecruits() {
     try {
         const status = document.getElementById('status-filter').value;
         const recruiterId = document.getElementById('recruiter-filter').value;
         const channel = document.getElementById('channel-filter').value;
-        const searchTerm = document.getElementById('search-input').value;
 
         const payload = await RecruitAPI.getRecruits({
             status: status,
             recruiter_id: recruiterId,
             channel: channel,
-            q: searchTerm,
             page_size: 500 // Fetch a large number for client-side grouping
         });
         
-        const recruits = payload.data.items;
+        allRecruitsData = payload.data.items;
+        
+        // 应用前端搜索过滤
+        const searchTerm = document.getElementById('search-input').value;
+        const filteredRecruits = applySearchFilter(allRecruitsData, searchTerm);
 
         if (status === '鸽') {
-            renderRecruits({ overdue: recruits });
+            renderRecruits({ overdue: filteredRecruits });
         } else if (status === '已结束') {
-            renderRecruits({ ended: recruits });
+            renderRecruits({ ended: filteredRecruits });
         } else { // "进行中"
-            groupAndRender(recruits);
+            groupAndRender(filteredRecruits);
         }
 
     } catch (error) {
         console.error('Failed to load recruits:', error);
         document.getElementById('empty-state').style.display = 'block';
+    }
+}
+
+function applySearchFilter(recruits, searchTerm) {
+    if (!searchTerm || searchTerm.trim() === '') {
+        return recruits;
+    }
+    
+    const keyword = searchTerm.trim().toLowerCase();
+    return recruits.filter(recruit => {
+        const nickname = (recruit.pilot?.nickname || '').toLowerCase();
+        const realName = (recruit.pilot?.real_name || '').toLowerCase();
+        return nickname.includes(keyword) || realName.includes(keyword);
+    });
+}
+
+function performClientSideSearch() {
+    if (allRecruitsData.length === 0) {
+        return; // 如果没有数据，不执行搜索
+    }
+    
+    const status = document.getElementById('status-filter').value;
+    const searchTerm = document.getElementById('search-input').value;
+    const filteredRecruits = applySearchFilter(allRecruitsData, searchTerm);
+
+    if (status === '鸽') {
+        renderRecruits({ overdue: filteredRecruits });
+    } else if (status === '已结束') {
+        renderRecruits({ ended: filteredRecruits });
+    } else { // "进行中"
+        groupAndRender(filteredRecruits);
     }
 }
 
@@ -321,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let searchTimeout;
     document.getElementById('search-input').addEventListener('input', () => {
         clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(fetchAndRenderRecruits, 300); // Debounce search
+        searchTimeout = setTimeout(performClientSideSearch, 300); // Debounce search
     });
 
     const floatingBtn = document.getElementById('floating-back-to-top');

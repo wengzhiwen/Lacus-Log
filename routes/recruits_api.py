@@ -146,7 +146,7 @@ def get_recruits():
         channel_filters = request.args.getlist('channel')
         created_from = request.args.get('created_from')
         created_to = request.args.get('created_to')
-        q = request.args.get('q', '').strip()
+        # q参数已移至前端处理，不再在后端使用
 
         # 分页参数
         page = int(request.args.get('page', 1))
@@ -205,9 +205,7 @@ def get_recruits():
             except ValueError:
                 logger.warning('无效的创建结束时间: %s', created_to)
 
-        # 搜索功能（主播昵称和真实姓名的模糊搜索）
-        if q:
-            query = query.filter(Q(pilot__nickname__icontains=q) | Q(pilot__real_name__icontains=q))
+        # 搜索功能已移至前端实现，后端不再处理q参数
 
         # 排序处理
         if sort_param.startswith('-'):
