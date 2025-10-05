@@ -3,142 +3,76 @@
 {% block title %}开播日报 - {{ pagination.date }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">📒 开播日报</h1>
-</div>
-
-<div class="date-navigation">
-  <div class="date-controls">
-    <a href="{{ url_for('report.daily_report', date=pagination.prev_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 前一日</a>
-    <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
-    <a href="{{ url_for('report.daily_report', date=pagination.next_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+<div id="dailyReportApp" data-report-date="{{ pagination.date }}" data-selected-owner="{{ selected_owner }}" data-selected-mode="{{ selected_mode }}">
+  <div class="page-header">
+    <h1 class="page-title">📒 开播日报</h1>
   </div>
-  <div class="export-actions">
-    <a href="{{ url_for('report.export_daily_csv', date=pagination.date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
-  </div>
-</div>
 
-<div class="filter-section">
-  <div class="filter-controls">
-    <label for="ownerSelector" class="filter-label">直属运营：</label>
-    <select id="ownerSelector" class="filter-select">
-      <option value="all" {% if selected_owner == 'all' %}selected{% endif %}>全部</option>
-      {% for owner in owners %}
-      <option value="{{ owner.id }}" {% if selected_owner == owner.id|string %}selected{% endif %}>
-        {{ owner.nickname or owner.username }}
-      </option>
-      {% endfor %}
-    </select>
-
-    <label for="modeSelector" class="filter-label">开播方式：</label>
-    <select id="modeSelector" class="filter-select">
-      <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
-      <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
-      <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
-    </select>
-  </div>
-</div>
-
-<!-- 月度数据已从日报页面移除，聚焦日维度展示 -->
-
-<div class="summary-section">
-  <h2 class="section-title">{{ pagination.date }} 日报汇总</h2>
-  <div class="summary-cards epic-intro" data-animate-group="day">
-    <div class="summary-card">
-      <div class="card-label">总主播数量</div>
-      <div class="card-value">{{ day_summary.pilot_count }}</div>
+  <div class="date-navigation">
+    <div class="date-controls">
+      <a href="{{ url_for('report.daily_report', date=pagination.prev_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+      <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
+      <a href="{{ url_for('report.daily_report', date=pagination.next_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">后一日 →</a>
     </div>
-    <div class="summary-card">
-      <div class="card-label">有效主播数量</div>
-      <div class="card-value">{{ day_summary.effective_pilot_count }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计流水</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.revenue_sum) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计底薪支出</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.basepay_sum) }}</div>
-      {% if day_summary.conversion_rate is not none %}
-      <div class="card-sub">转换率{{ day_summary.conversion_rate }}%</div>
-      {% endif %}
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计主播分成</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.pilot_share_sum) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计公司分成</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(day_summary.company_share_sum) }}</div>
-    </div>
-    {% set today_profit_no_rebate = (day_summary.company_share_sum or 0) - (day_summary.basepay_sum or 0) %}
-    <div class="summary-card {% if today_profit_no_rebate < 0 %}danger-outline{% endif %}">
-      <div class="card-label">今日盈亏（不计返点）</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(today_profit_no_rebate) }}</div>
+    <div class="export-actions">
+      <a href="{{ url_for('report.export_daily_csv', date=pagination.date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
     </div>
   </div>
-</div>
 
-<div class="details-section">
-  <h2 class="section-title">日报明细</h2>
-  {% if details %}
-  <div class="table-container">
-    <table class="report-table">
-      <thead>
-        <tr>
-          <th class="fixed-col">主播</th>
-          <th>性别年龄</th>
-          <th>直属运营</th>
-          <th>主播分类</th>
-          <th>开播地点</th>
-          <th>播时</th>
-          <th>流水</th>
-          <th>当前分成比例</th>
-          <th>主播分成</th>
-          <th>公司分成</th>
-          <th>返点比例</th>
-          <th>产生返点</th>
-          <th>底薪</th>
-          <th>当日毛利</th>
-          <th>3日平均流水</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for detail in details %}
-        <tr>
-          <td class="fixed-col">
-            <a href="{{ url_for('pilot.pilot_performance', pilot_id=detail.pilot_id, from='daily_report', date=pagination.date, owner=selected_owner) }}" class="pilot-link">
-              {{ detail.pilot_display }}
-            </a>
-          </td>
-          <td>{{ detail.gender_age }}</td>
-          <td>{{ detail.owner }}</td>
-          <td>{{ detail.rank | normalize_rank }}</td>
-          <td>{{ detail.battle_area }}</td>
-          <td>{{ "%.1f"|format(detail.duration) if detail.duration else "0.0" }}小时</td>
-          <td>¥{{ "{:,.2f}".format(detail.revenue) }}</td>
-          <td>{{ "%.0f"|format(detail.commission_rate) }}%</td>
-          <td>¥{{ "{:,.2f}".format(detail.pilot_share) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.company_share) }}</td>
-          <td>{{ "%.0f"|format(detail.rebate_rate * 100) }}%</td>
-          <td>¥{{ "{:,.2f}".format(detail.rebate_amount) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.base_salary) }}</td>
-          <td class="{% if detail.daily_profit < 0 %}text-danger{% endif %}">¥{{ "{:,.2f}".format(detail.daily_profit) }}</td>
-          <td>{% if detail.three_day_avg_revenue %}¥{{ "{:,.2f}".format(detail.three_day_avg_revenue) }}{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="filter-section">
+    <div class="filter-controls">
+      <label for="ownerSelector" class="filter-label">直属运营：</label>
+      <select id="ownerSelector" class="filter-select" data-selected-owner="{{ selected_owner }}">
+        <option value="all">全部</option>
+      </select>
+
+      <label for="modeSelector" class="filter-label">开播方式：</label>
+      <select id="modeSelector" class="filter-select">
+        <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
+        <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
+        <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
+      </select>
+    </div>
   </div>
-  {% else %}
-  <div class="empty-state">
-    <p>今日暂无开播记录</p>
+
+  <div class="summary-section">
+    <h2 class="section-title" id="daily-summary-title">加载中…</h2>
+    <div class="summary-cards epic-intro" data-animate-group="day" id="daily-summary-cards"></div>
   </div>
-  {% endif %}
+
+  <div class="details-section">
+    <h2 class="section-title">日报明细</h2>
+    <div class="table-container" id="daily-table-container" style="display: none;">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="fixed-col">主播</th>
+            <th>性别年龄</th>
+            <th>直属运营</th>
+            <th>主播分类</th>
+            <th>开播地点</th>
+            <th>播时</th>
+            <th>流水</th>
+            <th>当前分成比例</th>
+            <th>主播分成</th>
+            <th>公司分成</th>
+            <th>返点比例</th>
+            <th>产生返点</th>
+            <th>底薪</th>
+            <th>当日毛利</th>
+            <th>3日平均流水</th>
+          </tr>
+        </thead>
+        <tbody id="daily-details-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="daily-empty-state" style="display: none;">
+      <p>今日暂无开播记录</p>
+    </div>
+  </div>
 </div>
 
 <style>
-
 .date-navigation {
   display: flex;
   justify-content: space-between;
@@ -166,7 +100,6 @@
   display: flex;
   gap: 8px;
 }
-
 
 .filter-section {
   margin: 16px 0;
@@ -198,7 +131,6 @@
   min-width: 120px;
 }
 
-
 .summary-section {
   margin: 24px 0;
 }
@@ -217,7 +149,6 @@
   margin-bottom: 20px;
 }
 
-/* —— 戏剧化“前方飞入”动画 —— */
 .epic-intro {
   perspective: 1000px;
   perspective-origin: 50% 40%;
@@ -262,7 +193,6 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-/* 负数警示边框 */
 .summary-card.danger-outline {
   border-color: #dc3545;
 }
@@ -284,7 +214,6 @@
   color: var(--muted);
   margin-top: 4px;
 }
-
 
 .details-section {
   margin: 24px 0;
@@ -323,7 +252,7 @@
 .report-table td.fixed-col {
   position: sticky;
   left: 0;
-  background: #fff; 
+  background: #fff;
   background-clip: padding-box;
   min-width: 120px;
   max-width: 120px;
@@ -332,13 +261,8 @@
   white-space: nowrap;
 }
 
-
-.report-table td.fixed-col { z-index: 4; }
-.report-table th.fixed-col { z-index: 5; }
-
-
-.report-table td.fixed-col { box-shadow: 2px 0 0 #eee; }
-.report-table th.fixed-col { box-shadow: 2px 0 0 #ddd; }
+.report-table td.fixed-col { z-index: 4; box-shadow: 2px 0 0 #eee; }
+.report-table th.fixed-col { z-index: 5; box-shadow: 2px 0 0 #ddd; }
 
 .report-table tbody tr:hover {
   background: #f8f9fa;
@@ -349,7 +273,6 @@
   padding: 40px;
   color: var(--muted);
 }
-
 
 .pilot-link {
   color: var(--brand);
@@ -362,12 +285,10 @@
   text-decoration: underline;
 }
 
-
 .text-danger {
   color: #dc3545 !important;
   font-weight: 600;
 }
-
 
 @media (max-width: 768px) {
   .date-navigation {
@@ -411,57 +332,266 @@
 </style>
 
 <script>
-document.getElementById('dateSelector').addEventListener('change', function() {
-  const selectedDate = this.value;
-  const selectedOwner = document.getElementById('ownerSelector').value;
-  const selectedMode = document.getElementById('modeSelector').value;
-  if (selectedDate) {
-    let url = '{{ url_for("report.daily_report") }}?date=' + selectedDate;
-    if (selectedOwner && selectedOwner !== 'all') {
-      url += '&owner=' + selectedOwner;
+(function() {
+  const app = document.getElementById('dailyReportApp');
+  if (!app) {
+    return;
+  }
+
+  const ownerSelector = document.getElementById('ownerSelector');
+  const modeSelector = document.getElementById('modeSelector');
+  const dateSelector = document.getElementById('dateSelector');
+  const summaryTitle = document.getElementById('daily-summary-title');
+  const summaryCards = document.getElementById('daily-summary-cards');
+  const tableContainer = document.getElementById('daily-table-container');
+  const detailsBody = document.getElementById('daily-details-body');
+  const emptyState = document.getElementById('daily-empty-state');
+  const emptyStateText = emptyState.querySelector('p');
+  const operatorsApi = '{{ url_for('users_api.get_operators') }}';
+  const dailyApi = '{{ url_for('reports_api.daily_report_data') }}';
+  const reportPageUrl = '{{ url_for('report.daily_report') }}';
+  const pilotPerformanceTemplate = '{{ url_for('pilot.pilot_performance', pilot_id='__PID__') }}';
+
+  const rankMapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+
+  let currentDate = app.dataset.reportDate;
+  let currentOwner = app.dataset.selectedOwner || 'all';
+  let currentMode = app.dataset.selectedMode || 'all';
+  const emptyFallbackText = emptyStateText ? emptyStateText.textContent : '';
+
+  function formatMoney(value) {
+    if (value === null || value === undefined) {
+      return '¥0.00';
     }
-    if (selectedMode && selectedMode !== 'all') {
-      url += '&mode=' + selectedMode;
+    return '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatHours(value) {
+    if (value === null || value === undefined) {
+      return '0.0小时';
     }
-    window.location.href = url;
+    return Number(value).toFixed(1) + '小时';
   }
-});
 
-document.getElementById('ownerSelector').addEventListener('change', function() {
-  const selectedOwner = this.value;
-  const selectedDate = document.getElementById('dateSelector').value;
-  const selectedMode = document.getElementById('modeSelector').value;
-  let url = '{{ url_for("report.daily_report") }}?date=' + selectedDate;
-  if (selectedOwner && selectedOwner !== 'all') {
-    url += '&owner=' + selectedOwner;
+  function formatPercent(value) {
+    if (value === null || value === undefined) {
+      return '--';
+    }
+    return Math.round(Number(value)) + '%';
   }
-  if (selectedMode && selectedMode !== 'all') {
-    url += '&mode=' + selectedMode;
-  }
-  window.location.href = url;
-});
 
-document.getElementById('modeSelector').addEventListener('change', function() {
-  const selectedMode = this.value;
-  const selectedOwner = document.getElementById('ownerSelector').value;
-  const selectedDate = document.getElementById('dateSelector').value;
-  let url = '{{ url_for("report.daily_report") }}?date=' + selectedDate;
-  if (selectedOwner && selectedOwner !== 'all') {
-    url += '&owner=' + selectedOwner;
+  function formatRate(value) {
+    if (value === null || value === undefined) {
+      return '--';
+    }
+    return Math.round(Number(value) * 100) + '%';
   }
-  if (selectedMode && selectedMode !== 'all') {
-    url += '&mode=' + selectedMode;
-  }
-  window.location.href = url;
-});
 
-// 页面加载后触发史诗入场动画
-window.addEventListener('load', function() {
-  var groups = document.querySelectorAll('.epic-intro');
-  groups.forEach(function(g) {
-    // 使用微小延时保证渲染完成后再加class，避免初始状态闪烁
-    setTimeout(function(){ g.classList.add('play'); }, 50);
+  function normalizeRank(value) {
+    if (!value) {
+      return '';
+    }
+    return rankMapping[value] || value;
+  }
+
+  function buildSummaryCards(summary) {
+    const pilotCount = summary.pilot_count || 0;
+    const effectiveCount = summary.effective_pilot_count || 0;
+    const revenueSum = summary.revenue_sum || 0;
+    const basepaySum = summary.basepay_sum || 0;
+    const pilotShare = summary.pilot_share_sum || 0;
+    const companyShare = summary.company_share_sum || 0;
+    const profit = companyShare - basepaySum;
+
+    const items = [
+      { label: '总主播数量', value: pilotCount.toLocaleString('zh-CN') },
+      { label: '有效主播数量', value: effectiveCount.toLocaleString('zh-CN') },
+      { label: '累计流水', value: formatMoney(revenueSum) },
+      {
+        label: '累计底薪支出',
+        value: formatMoney(basepaySum),
+        sub: summary.conversion_rate !== null && summary.conversion_rate !== undefined ? `转换率${summary.conversion_rate}%` : ''
+      },
+      { label: '累计主播分成', value: formatMoney(pilotShare) },
+      { label: '累计公司分成', value: formatMoney(companyShare) },
+      { label: '今日盈亏（不计返点）', value: formatMoney(profit), danger: profit < 0 }
+    ];
+
+    const html = items.map(item => {
+      const dangerClass = item.danger ? ' danger-outline' : '';
+      const subHtml = item.sub ? `<div class="card-sub">${item.sub}</div>` : '';
+      return `<div class="summary-card${dangerClass}">
+        <div class="card-label">${item.label}</div>
+        <div class="card-value">${item.value}</div>
+        ${subHtml}
+      </div>`;
+    }).join('');
+
+    summaryCards.innerHTML = html;
+    summaryCards.classList.remove('play');
+    void summaryCards.offsetWidth;
+    summaryCards.classList.add('play');
+  }
+
+  function renderDetails(details, filters, dateStr) {
+    if (!details || details.length == 0) {
+      detailsBody.innerHTML = '';
+      tableContainer.style.display = 'none';
+      if (emptyStateText) {
+        emptyStateText.textContent = emptyFallbackText;
+      }
+      emptyState.style.display = 'block';
+      return;
+    }
+
+    const ownerParam = filters && filters.owner ? filters.owner : 'all';
+    const rows = details.map(detail => {
+      const pilotId = detail.pilot_id;
+      const profitClass = detail.daily_profit !== null && detail.daily_profit < 0 ? 'text-danger' : '';
+      const avgRevenue = detail.three_day_avg_revenue !== null && detail.three_day_avg_revenue !== undefined ? formatMoney(detail.three_day_avg_revenue) : '';
+      const commissionRate = formatPercent(detail.commission_rate);
+      const rebateRate = formatRate(detail.rebate_rate);
+      const pilotUrl = pilotPerformanceTemplate.replace('__PID__', pilotId) + `?from=daily_report&date=${encodeURIComponent(dateStr)}&owner=${encodeURIComponent(ownerParam)}`;
+      return `<tr>
+        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td>${detail.gender_age || ''}</td>
+        <td>${detail.owner || ''}</td>
+        <td>${normalizeRank(detail.rank)}</td>
+        <td>${detail.battle_area || ''}</td>
+        <td>${formatHours(detail.duration)}</td>
+        <td>${formatMoney(detail.revenue)}</td>
+        <td>${commissionRate}</td>
+        <td>${formatMoney(detail.pilot_share)}</td>
+        <td>${formatMoney(detail.company_share)}</td>
+        <td>${rebateRate}</td>
+        <td>${formatMoney(detail.rebate_amount)}</td>
+        <td>${formatMoney(detail.base_salary)}</td>
+        <td class="${profitClass}">${formatMoney(detail.daily_profit)}</td>
+        <td>${avgRevenue}</td>
+      </tr>`;
+    }).join('');
+
+    detailsBody.innerHTML = rows;
+    emptyState.style.display = 'none';
+    tableContainer.style.display = 'block';
+  }
+
+  function showLoading() {
+    summaryTitle.textContent = '加载中…';
+    summaryCards.innerHTML = '';
+    tableContainer.style.display = 'none';
+    emptyState.style.display = 'none';
+  }
+
+  function showError(message) {
+    summaryTitle.textContent = '加载失败';
+    summaryCards.innerHTML = '';
+    detailsBody.innerHTML = '';
+    tableContainer.style.display = 'none';
+    if (emptyStateText) {
+      emptyStateText.textContent = message;
+    }
+    emptyState.style.display = 'block';
+  }
+
+  async function loadOwnerOptions() {
+    try {
+      const response = await fetch(operatorsApi);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载运营失败');
+      }
+      const operators = payload.data || [];
+      operators.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.nickname || user.username || user.id;
+        ownerSelector.appendChild(option);
+      });
+      ownerSelector.value = currentOwner;
+    } catch (error) {
+      console.error('加载直属运营列表失败：', error);
+      ownerSelector.value = currentOwner;
+    }
+  }
+
+  function buildDailyApiUrl() {
+    const params = new URLSearchParams();
+    if (currentDate) {
+      params.set('date', currentDate);
+    }
+    if (currentOwner && currentOwner !== 'all') {
+      params.set('owner', currentOwner);
+    }
+    if (currentMode && currentMode !== 'all') {
+      params.set('mode', currentMode);
+    }
+    return `${dailyApi}?${params.toString()}`;
+  }
+
+  async function loadDailyReport() {
+    showLoading();
+    try {
+      const response = await fetch(buildDailyApiUrl());
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data;
+      const filters = payload.meta ? payload.meta.filters : null;
+      currentDate = data.date;
+      if (filters) {
+        currentOwner = filters.owner || 'all';
+        currentMode = filters.mode || 'all';
+      }
+      dateSelector.value = data.date;
+      ownerSelector.value = currentOwner;
+      modeSelector.value = currentMode;
+      summaryTitle.textContent = `${data.date} 日报汇总`;
+      buildSummaryCards(data.summary || {});
+      renderDetails(data.details || [], filters || {}, data.date);
+    } catch (error) {
+      console.error('加载开播日报失败：', error);
+      showError('报表加载失败，请稍后再试');
+    }
+  }
+
+  function navigate(params) {
+    const url = new URL(reportPageUrl, window.location.origin);
+    const targetDate = params.date || currentDate;
+    const targetOwner = params.owner !== undefined ? params.owner : currentOwner;
+    const targetMode = params.mode !== undefined ? params.mode : currentMode;
+    if (targetDate) {
+      url.searchParams.set('date', targetDate);
+    }
+    url.searchParams.set('owner', targetOwner || 'all');
+    url.searchParams.set('mode', targetMode || 'all');
+    window.location.href = url.toString();
+  }
+
+  dateSelector.addEventListener('change', function() {
+    if (this.value) {
+      navigate({ date: this.value });
+    }
   });
-});
+
+  ownerSelector.addEventListener('change', function() {
+    navigate({ owner: this.value || 'all' });
+  });
+
+  modeSelector.addEventListener('change', function() {
+    navigate({ mode: this.value || 'all' });
+  });
+
+  (async function init() {
+    await loadOwnerOptions();
+    await loadDailyReport();
+  })();
+})();
 </script>
 {% endblock %}

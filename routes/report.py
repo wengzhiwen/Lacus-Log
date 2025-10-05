@@ -450,25 +450,13 @@ def daily_report():
 
     logger.info('生成开播日报，报表日期：%s，直属运营：%s，开播方式：%s', report_date.strftime('%Y-%m-%d'), owner_id, mode)
 
-    day_summary = _calculate_day_summary(report_date, owner_id, mode)
-
-    details = _calculate_daily_details(report_date, owner_id, mode)
-
-    owners = _get_recruit_users()
-
     pagination = {
         'date': report_date.strftime('%Y-%m-%d'),
         'prev_date': (report_date - timedelta(days=1)).strftime('%Y-%m-%d'),
         'next_date': (report_date + timedelta(days=1)).strftime('%Y-%m-%d')
     }
 
-    return render_template('reports/daily.html',
-                           day_summary=day_summary,
-                           details=details,
-                           pagination=pagination,
-                           owners=owners,
-                           selected_owner=owner_id,
-                           selected_mode=mode)
+    return render_template('reports/daily.html', pagination=pagination, selected_owner=owner_id, selected_mode=mode)
 
 
 @report_bp.route('/daily/export.csv')
@@ -794,8 +782,6 @@ def _calculate_monthly_details(year, month, owner_id=None, mode: str = 'all'):
     return details
 
 
-
-
 @report_bp.route('/recruits/daily-report')
 @roles_accepted('gicho', 'kancho')
 def recruit_daily_report():
@@ -920,19 +906,13 @@ def monthly_report():
 
     logger.info('生成开播月报，报表月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
 
-    month_summary = _calculate_monthly_summary(report_month.year, report_month.month, owner_id, mode)
-
-    details = _calculate_monthly_details(report_month.year, report_month.month, owner_id, mode)
-
     pagination = {
         'month': report_month.strftime('%Y-%m'),
         'prev_month': (report_month.replace(day=1) - timedelta(days=1)).strftime('%Y-%m'),
         'next_month': (report_month.replace(day=28) + timedelta(days=4)).replace(day=1).strftime('%Y-%m')
     }
 
-    owners = _get_recruit_users()
-
-    return render_template('reports/monthly.html', month_summary=month_summary, details=details, pagination=pagination, report_month=report_month, owners=owners, selected_owner=owner_id, selected_mode=mode)
+    return render_template('reports/monthly.html', pagination=pagination, selected_owner=owner_id, selected_mode=mode)
 
 
 @report_bp.route('/monthly/export.csv')
@@ -991,6 +971,7 @@ def export_monthly_csv():
 
 
 # —— 开播周报 ——
+
 
 @cached_monthly_report()
 def _calculate_weekly_summary(week_start_local: datetime, owner_id: str = None, mode: str = 'all'):
@@ -1125,18 +1106,13 @@ def weekly_report():
 
     logger.info('生成开播周报，起始周二：%s，直属运营：%s，开播方式：%s', week_start_local.strftime('%Y-%m-%d'), owner_id, mode)
 
-    week_summary = _calculate_weekly_summary(week_start_local, owner_id, mode)
-    details = _calculate_weekly_details(week_start_local, owner_id, mode)
-
-    owners = _get_recruit_users()
-
     pagination = {
         'week_start': week_start_local.strftime('%Y-%m-%d'),
         'prev_week_start': (week_start_local - timedelta(days=7)).strftime('%Y-%m-%d'),
         'next_week_start': (week_start_local + timedelta(days=7)).strftime('%Y-%m-%d')
     }
 
-    return render_template('reports/weekly.html', week_summary=week_summary, details=details, pagination=pagination, owners=owners, selected_owner=owner_id, selected_mode=mode)
+    return render_template('reports/weekly.html', pagination=pagination, selected_owner=owner_id, selected_mode=mode)
 
 
 @report_bp.route('/weekly/export.csv')
@@ -1171,8 +1147,9 @@ def export_weekly_csv():
 
     for detail in details:
         row = [
-            detail['pilot_display'], detail['gender_age'], detail['owner'], detail['rank'], detail['records_count'], f"{detail['avg_duration']:.1f}", f"{detail['total_revenue']:.2f}",
-            f"{detail['total_pilot_share']:.2f}", f"{detail['total_company_share']:.2f}", f"{detail['total_base_salary']:.2f}", f"{detail['total_profit']:.2f}"
+            detail['pilot_display'], detail['gender_age'], detail['owner'], detail['rank'], detail['records_count'], f"{detail['avg_duration']:.1f}",
+            f"{detail['total_revenue']:.2f}", f"{detail['total_pilot_share']:.2f}", f"{detail['total_company_share']:.2f}",
+            f"{detail['total_base_salary']:.2f}", f"{detail['total_profit']:.2f}"
         ]
         writer.writerow(row)
 

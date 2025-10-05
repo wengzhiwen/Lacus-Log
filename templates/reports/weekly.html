@@ -3,126 +3,71 @@
 {% block title %}开播周报 - {{ pagination.week_start }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">📒 开播周报</h1>
-  <div class="page-subtitle">周定义：周二至次周一（7天）</div>
-</div>
+<div id="weeklyReportApp" data-week-start="{{ pagination.week_start }}" data-selected-owner="{{ selected_owner }}" data-selected-mode="{{ selected_mode }}">
+  <div class="page-header">
+    <h1 class="page-title">📒 开播周报</h1>
+    <div class="page-subtitle">周定义：周二至次周一（7天）</div>
+  </div>
 
-<div class="date-navigation">
-  <div class="date-controls">
-    <a href="{{ url_for('report.weekly_report', week_start=pagination.prev_week_start, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 上一周</a>
-    <span class="date-display">{{ pagination.week_start }}（周二起）</span>
-    <a href="{{ url_for('report.weekly_report', week_start=pagination.next_week_start, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">下一周 →</a>
+  <div class="date-navigation">
+    <div class="date-controls">
+      <a href="{{ url_for('report.weekly_report', week_start=pagination.prev_week_start, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 上一周</a>
+      <span class="date-display" id="weekly-date-display">{{ pagination.week_start }}（周二起）</span>
+      <a href="{{ url_for('report.weekly_report', week_start=pagination.next_week_start, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">下一周 →</a>
+    </div>
+    <div class="export-actions">
+      <a href="{{ url_for('report.export_weekly_csv', week_start=pagination.week_start, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+    </div>
   </div>
-  <div class="export-actions">
-    <a href="{{ url_for('report.export_weekly_csv', week_start=pagination.week_start, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
-  </div>
-</div>
 
-<div class="filter-section">
-  <div class="filter-controls">
-    <label for="ownerSelector" class="filter-label">直属运营：</label>
-    <select id="ownerSelector" class="filter-select">
-      <option value="all" {% if selected_owner == 'all' %}selected{% endif %}>全部</option>
-      {% for owner in owners %}
-      <option value="{{ owner.id }}" {% if selected_owner == owner.id|string %}selected{% endif %}>
-        {{ owner.nickname or owner.username }}
-      </option>
-      {% endfor %}
-    </select>
+  <div class="filter-section">
+    <div class="filter-controls">
+      <label for="ownerSelector" class="filter-label">直属运营：</label>
+      <select id="ownerSelector" class="filter-select" data-selected-owner="{{ selected_owner }}">
+        <option value="all">全部</option>
+      </select>
 
-    <label for="modeSelector" class="filter-label">开播方式：</label>
-    <select id="modeSelector" class="filter-select">
-      <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
-      <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
-      <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
-    </select>
+      <label for="modeSelector" class="filter-label">开播方式：</label>
+      <select id="modeSelector" class="filter-select">
+        <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
+        <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
+        <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
+      </select>
+    </div>
   </div>
-</div>
 
-<div class="summary-section">
-  <h2 class="section-title">周度汇总（周二-次周一）</h2>
-  <div class="summary-cards">
-    <div class="summary-card">
-      <div class="card-label">总主播数量</div>
-      <div class="card-value">{{ week_summary.pilot_count }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计流水</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(week_summary.revenue_sum) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计底薪支出</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(week_summary.basepay_sum) }}</div>
-      {% if week_summary.conversion_rate is not none %}
-      <div class="card-sub">转换率{{ week_summary.conversion_rate }}%</div>
-      {% endif %}
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计主播分成</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(week_summary.pilot_share_sum) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="card-label">累计公司分成</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(week_summary.company_share_sum) }}</div>
-    </div>
-    <div class="summary-card {% if (week_summary.profit_7d or 0) < 0 %}danger-outline{% endif %}">
-      <div class="card-label">7天盈利（不计返点）</div>
-      <div class="card-value">¥{{ "{:,.2f}".format(week_summary.profit_7d) }}</div>
-    </div>
+  <div class="summary-section">
+    <h2 class="section-title">周度汇总（周二-次周一）</h2>
+    <div class="summary-cards" id="weekly-summary-cards"></div>
+    <div class="summary-hint">注：周定义为周二至次周一；盈利口径不计返点</div>
   </div>
-  <div class="summary-hint">注：周定义为周二至次周一；盈利口径不计返点</div>
-  
-</div>
 
-<div class="details-section">
-  <h2 class="section-title">周报明细</h2>
-  {% if details %}
-  <div class="table-container">
-    <table class="report-table">
-      <thead>
-        <tr>
-          <th class="fixed-col">主播</th>
-          <th>性别年龄</th>
-          <th>直属运营</th>
-          <th>主播分类</th>
-          <th>周累计开播记录数</th>
-          <th>周均播时(小时)</th>
-          <th>周累计流水(元)</th>
-          <th>周累计主播分成(元)</th>
-          <th>周累计公司分成(元)</th>
-          <th>周累计底薪(元)</th>
-          <th>周累计毛利(元)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for detail in details %}
-        <tr>
-          <td class="fixed-col">
-            <a href="{{ url_for('pilot.pilot_performance', pilot_id=detail.pilot_id, from='weekly_report', week_start=pagination.week_start) }}" class="pilot-link">
-              {{ detail.pilot_display }}
-            </a>
-          </td>
-          <td>{{ detail.gender_age }}</td>
-          <td>{{ detail.owner }}</td>
-          <td>{{ detail.rank | normalize_rank }}</td>
-          <td>{{ detail.records_count }}</td>
-          <td>{{ "{:.1f}".format(detail.avg_duration) }}小时</td>
-          <td>¥{{ "{:,.2f}".format(detail.total_revenue) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.total_pilot_share) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.total_company_share) }}</td>
-          <td>¥{{ "{:,.2f}".format(detail.total_base_salary) }}</td>
-          <td class="{% if detail.total_profit < 0 %}text-danger{% endif %}">¥{{ "{:,.2f}".format(detail.total_profit) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="details-section">
+    <h2 class="section-title">周报明细</h2>
+    <div class="table-container" id="weekly-table-container" style="display: none;">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="fixed-col">主播</th>
+            <th>性别年龄</th>
+            <th>直属运营</th>
+            <th>主播分类</th>
+            <th>周累计开播记录数</th>
+            <th>周均播时(小时)</th>
+            <th>周累计流水(元)</th>
+            <th>周累计主播分成(元)</th>
+            <th>周累计公司分成(元)</th>
+            <th>周累计底薪(元)</th>
+            <th>周累计毛利(元)</th>
+          </tr>
+        </thead>
+        <tbody id="weekly-details-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="weekly-empty-state" style="display: none;">
+      <p>本周暂无开播记录</p>
+    </div>
   </div>
-  {% else %}
-  <div class="empty-state">
-    <p>本周暂无开播记录</p>
-  </div>
-  {% endif %}
 </div>
 
 <style>
@@ -154,6 +99,7 @@
 .card-label { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
 .card-value { font-size: 24px; font-weight: 700; color: var(--brand); }
 .card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.summary-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
 .details-section { margin: 24px 0; }
 .table-container { overflow-x: auto; border: 1px solid var(--gray); border-radius: 8px; background: #fff; }
@@ -182,26 +128,227 @@
 </style>
 
 <script>
-document.getElementById('ownerSelector').addEventListener('change', function() {
-  const selectedOwner = this.value;
-  const selectedMode = document.getElementById('modeSelector').value;
-  const weekStart = '{{ pagination.week_start }}';
-  let url = '{{ url_for("report.weekly_report") }}?week_start=' + weekStart;
-  if (selectedOwner && selectedOwner !== 'all') { url += '&owner=' + selectedOwner; }
-  if (selectedMode && selectedMode !== 'all') { url += '&mode=' + selectedMode; }
-  window.location.href = url;
-});
+(function() {
+  const app = document.getElementById('weeklyReportApp');
+  if (!app) {
+    return;
+  }
 
-document.getElementById('modeSelector').addEventListener('change', function() {
-  const selectedMode = this.value;
-  const selectedOwner = document.getElementById('ownerSelector').value;
-  const weekStart = '{{ pagination.week_start }}';
-  let url = '{{ url_for("report.weekly_report") }}?week_start=' + weekStart;
-  if (selectedOwner && selectedOwner !== 'all') { url += '&owner=' + selectedOwner; }
-  if (selectedMode && selectedMode !== 'all') { url += '&mode=' + selectedMode; }
-  window.location.href = url;
-});
+  const ownerSelector = document.getElementById('ownerSelector');
+  const modeSelector = document.getElementById('modeSelector');
+  const weekDisplay = document.getElementById('weekly-date-display');
+  const summaryCards = document.getElementById('weekly-summary-cards');
+  const tableContainer = document.getElementById('weekly-table-container');
+  const detailsBody = document.getElementById('weekly-details-body');
+  const emptyState = document.getElementById('weekly-empty-state');
+  const emptyStateText = emptyState.querySelector('p');
+  const operatorsApi = "{{ url_for('users_api.get_operators') }}";
+  const weeklyApi = "{{ url_for('reports_api.weekly_report_data') }}";
+  const reportPageUrl = "{{ url_for('report.weekly_report') }}";
+  const pilotPerformanceTemplate = "{{ url_for('pilot.pilot_performance', pilot_id='__PID__') }}";
+
+  const rankMapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+
+  let currentWeekStart = app.dataset.weekStart;
+  let currentOwner = app.dataset.selectedOwner || 'all';
+  let currentMode = app.dataset.selectedMode || 'all';
+  const emptyFallbackText = emptyStateText ? emptyStateText.textContent : '';
+
+  function formatMoney(value) {
+    if (value === null || value === undefined) {
+      return '¥0.00';
+    }
+    return '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatHours(value) {
+    if (value === null || value === undefined) {
+      return '0.0小时';
+    }
+    return Number(value).toFixed(1) + '小时';
+  }
+
+  function normalizeRank(value) {
+    if (!value) {
+      return '';
+    }
+    return rankMapping[value] || value;
+  }
+
+  function renderSummary(summary) {
+    const revenueSum = summary.revenue_sum || 0;
+    const basepaySum = summary.basepay_sum || 0;
+    const pilotShare = summary.pilot_share_sum || 0;
+    const companyShare = summary.company_share_sum || 0;
+    const profit = summary.profit_7d || (companyShare - basepaySum);
+
+    const items = [
+      { label: '总主播数量', value: (summary.pilot_count || 0).toLocaleString('zh-CN') },
+      { label: '累计流水', value: formatMoney(revenueSum) },
+      {
+        label: '累计底薪支出',
+        value: formatMoney(basepaySum),
+        sub: summary.conversion_rate !== null && summary.conversion_rate !== undefined ? `转换率${summary.conversion_rate}%` : ''
+      },
+      { label: '累计主播分成', value: formatMoney(pilotShare) },
+      { label: '累计公司分成', value: formatMoney(companyShare) },
+      { label: '7天盈利（不计返点）', value: formatMoney(profit), danger: profit < 0 }
+    ];
+
+    summaryCards.innerHTML = items.map(item => {
+      const dangerClass = item.danger ? ' danger-outline' : '';
+      const subHtml = item.sub ? `<div class="card-sub">${item.sub}</div>` : '';
+      return `<div class="summary-card${dangerClass}">
+        <div class="card-label">${item.label}</div>
+        <div class="card-value">${item.value}</div>
+        ${subHtml}
+      </div>`;
+    }).join('');
+  }
+
+  function renderDetails(details, dateStr) {
+    if (!details || details.length === 0) {
+      detailsBody.innerHTML = '';
+      tableContainer.style.display = 'none';
+      if (emptyStateText) {
+        emptyStateText.textContent = emptyFallbackText;
+      }
+      emptyState.style.display = 'block';
+      return;
+    }
+
+    const rows = details.map(detail => {
+      const profitClass = detail.total_profit !== null && detail.total_profit < 0 ? 'text-danger' : '';
+      const pilotUrl = pilotPerformanceTemplate.replace('__PID__', detail.pilot_id) + `?from=weekly_report&week_start=${encodeURIComponent(dateStr)}`;
+      return `<tr>
+        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td>${detail.gender_age || ''}</td>
+        <td>${detail.owner || ''}</td>
+        <td>${normalizeRank(detail.rank)}</td>
+        <td>${detail.records_count || 0}</td>
+        <td>${formatHours(detail.avg_duration)}</td>
+        <td>${formatMoney(detail.total_revenue)}</td>
+        <td>${formatMoney(detail.total_pilot_share)}</td>
+        <td>${formatMoney(detail.total_company_share)}</td>
+        <td>${formatMoney(detail.total_base_salary)}</td>
+        <td class="${profitClass}">${formatMoney(detail.total_profit)}</td>
+      </tr>`;
+    }).join('');
+
+    detailsBody.innerHTML = rows;
+    emptyState.style.display = 'none';
+    tableContainer.style.display = 'block';
+  }
+
+  function showLoading() {
+    summaryCards.innerHTML = '';
+    tableContainer.style.display = 'none';
+    emptyState.style.display = 'none';
+  }
+
+  function showError(message) {
+    summaryCards.innerHTML = '';
+    detailsBody.innerHTML = '';
+    tableContainer.style.display = 'none';
+    if (emptyStateText) {
+      emptyStateText.textContent = message;
+    }
+    emptyState.style.display = 'block';
+  }
+
+  async function loadOwnerOptions() {
+    try {
+      const response = await fetch(operatorsApi);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载运营失败');
+      }
+      const operators = payload.data || [];
+      operators.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.nickname || user.username || user.id;
+        ownerSelector.appendChild(option);
+      });
+      ownerSelector.value = currentOwner;
+    } catch (error) {
+      console.error('加载直属运营列表失败：', error);
+      ownerSelector.value = currentOwner;
+    }
+  }
+
+  function buildWeeklyApiUrl() {
+    const params = new URLSearchParams();
+    if (currentWeekStart) {
+      params.set('week_start', currentWeekStart);
+    }
+    if (currentOwner && currentOwner !== 'all') {
+      params.set('owner', currentOwner);
+    }
+    if (currentMode && currentMode !== 'all') {
+      params.set('mode', currentMode);
+    }
+    return `${weeklyApi}?${params.toString()}`;
+  }
+
+  async function loadWeeklyReport() {
+    showLoading();
+    try {
+      const response = await fetch(buildWeeklyApiUrl());
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data;
+      const filters = payload.meta ? payload.meta.filters : null;
+      currentWeekStart = data.week_start;
+      if (filters) {
+        currentOwner = filters.owner || 'all';
+        currentMode = filters.mode || 'all';
+      }
+      if (weekDisplay) {
+        weekDisplay.textContent = `${data.week_start}（周二起）`;
+      }
+      ownerSelector.value = currentOwner;
+      modeSelector.value = currentMode;
+      renderSummary(data.summary || {});
+      renderDetails(data.details || [], data.week_start);
+    } catch (error) {
+      console.error('加载开播周报失败：', error);
+      showError('报表加载失败，请稍后再试');
+    }
+  }
+
+  function navigate(params) {
+    const url = new URL(reportPageUrl, window.location.origin);
+    const targetWeek = params.week_start || currentWeekStart;
+    const targetOwner = params.owner !== undefined ? params.owner : currentOwner;
+    const targetMode = params.mode !== undefined ? params.mode : currentMode;
+    if (targetWeek) {
+      url.searchParams.set('week_start', targetWeek);
+    }
+    url.searchParams.set('owner', targetOwner || 'all');
+    url.searchParams.set('mode', targetMode || 'all');
+    window.location.href = url.toString();
+  }
+
+  ownerSelector.addEventListener('change', function() {
+    navigate({ owner: this.value || 'all' });
+  });
+
+  modeSelector.addEventListener('change', function() {
+    navigate({ mode: this.value || 'all' });
+  });
+
+  (async function init() {
+    await loadOwnerOptions();
+    await loadWeeklyReport();
+  })();
+})();
 </script>
 {% endblock %}
-
-
