@@ -3,131 +3,138 @@
 {% block title %}主播招募日报 - {{ pagination.date }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">📊 主播招募日报</h1>
-  <p class="text-muted">{{ pagination.date }}</p>
-</div>
-
-<div class="date-navigation">
-  <div class="date-controls">
-    <a href="{{ url_for('report.recruit_daily_report', date=pagination.prev_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">← 前一日</a>
-    <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
-    <a href="{{ url_for('report.recruit_daily_report', date=pagination.next_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+<div id="recruitDailyApp" data-report-date="{{ pagination.date }}" data-selected-recruiter="{{ selected_recruiter }}">
+  <div class="page-header">
+    <h1 class="page-title">📊 主播招募日报</h1>
+    <p class="text-muted" id="dailyDateLabel">{{ pagination.date }}</p>
   </div>
-  
-  <div class="recruiter-filter">
-    <label for="recruiterSelector" class="filter-label">招募负责人：</label>
-    <select id="recruiterSelector" class="recruiter-select">
-      <option value="all" {% if selected_recruiter == 'all' %}selected{% endif %}>全部</option>
-      {% for user in users %}
-        <option value="{{ user.id }}" {% if selected_recruiter == user.id|string %}selected{% endif %}>
-          {{ user.nickname or user.username }}
-        </option>
-      {% endfor %}
-    </select>
-  </div>
-</div>
 
-<div class="statistics-section">
-  <h2 class="section-title">招募统计</h2>
-  <div class="table-container">
-    <table class="statistics-table">
-      <thead>
-        <tr>
-          <th>统计范围</th>
-          <th>约面</th>
-          <th>到面</th>
-          <th>试播</th>
-          <th>新开播</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="range-label">报表日</td>
-          <td class="stat-value clickable" onclick="goToDetail('report_day', 'appointments')">
-            {{ statistics.report_day.appointments }}
-            <div class="percentage">{{ statistics.percentages.report_day.appointments }}%</div>
-          </td>
-          <td class="stat-value clickable" onclick="goToDetail('report_day', 'interviews')">
-            {{ statistics.report_day.interviews }}
-            <div class="percentage">{{ statistics.percentages.report_day.interviews }}%</div>
-          </td>
-          <td class="stat-value clickable" onclick="goToDetail('report_day', 'trials')">
-            {{ statistics.report_day.trials }}
-            <div class="percentage">{{ statistics.percentages.report_day.trials }}%</div>
-          </td>
-          <td class="stat-value clickable" onclick="goToDetail('report_day', 'new_recruits')">
-            {{ statistics.report_day.new_recruits }}
-            <div class="percentage">{{ statistics.percentages.report_day.new_recruits }}%</div>
-          </td>
-        </tr>
-        <tr>
-          <td class="range-label">近7日</td>
-          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'appointments')">
-            {{ statistics.last_7_days.appointments }}
-            <div class="percentage">{{ statistics.percentages.last_7_days.appointments }}%</div>
-          </td>
-          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'interviews')">
-            {{ statistics.last_7_days.interviews }}
-            <div class="percentage">{{ statistics.percentages.last_7_days.interviews }}%</div>
-          </td>
-          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'trials')">
-            {{ statistics.last_7_days.trials }}
-            <div class="percentage">{{ statistics.percentages.last_7_days.trials }}%</div>
-          </td>
-          <td class="stat-value clickable" onclick="goToDetail('last_7_days', 'new_recruits')">
-            {{ statistics.last_7_days.new_recruits }}
-            <div class="percentage">{{ statistics.percentages.last_7_days.new_recruits }}%</div>
-          </td>
-        </tr>
-        <tr>
-          <td class="range-label">近14日</td>
-          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'appointments')">{{ statistics.last_14_days.appointments }}</td>
-          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'interviews')">{{ statistics.last_14_days.interviews }}</td>
-          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'trials')">{{ statistics.last_14_days.trials }}</td>
-          <td class="stat-value clickable" onclick="goToDetail('last_14_days', 'new_recruits')">{{ statistics.last_14_days.new_recruits }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+  <div class="date-navigation">
+    <div class="date-controls">
+      <a id="prevDateLink" href="{{ url_for('report.recruit_daily_report', date=pagination.prev_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+      <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
+      <a id="nextDateLink" href="{{ url_for('report.recruit_daily_report', date=pagination.next_date, recruiter=selected_recruiter) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+    </div>
 
-<div class="explanation-section">
-  <h2 class="section-title">指标说明</h2>
-  <div class="explanation-cards">
-    <div class="explanation-card">
-      <div class="card-icon">📅</div>
-      <div class="card-content">
-        <h3>约面</h3>
-        <p>当天创建的招募数量</p>
-      </div>
+    <div class="recruiter-filter">
+      <label for="recruiterSelector" class="filter-label">招募负责人：</label>
+      <select id="recruiterSelector" class="recruiter-select">
+        <option value="all">全部</option>
+      </select>
     </div>
-    <div class="explanation-card">
-      <div class="card-icon">👥</div>
-      <div class="card-content">
-        <h3>到面</h3>
-        <p>当天发生的面试决策数量（完成面试决策的数量，不论决策结果）</p>
-      </div>
+  </div>
+
+  <div class="statistics-section">
+    <h2 class="section-title" id="summaryTitle">招募统计加载中…</h2>
+    <div class="table-container">
+      <table class="statistics-table" id="recruitSummaryTable">
+        <thead>
+          <tr>
+            <th>统计范围</th>
+            <th>约面</th>
+            <th>到面</th>
+            <th>试播</th>
+            <th>新开播</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="range-label">报表日</td>
+            <td class="stat-value clickable" data-range="report_day" data-metric="appointments">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+            <td class="stat-value clickable" data-range="report_day" data-metric="interviews">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+            <td class="stat-value clickable" data-range="report_day" data-metric="trials">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+            <td class="stat-value clickable" data-range="report_day" data-metric="new_recruits">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+          </tr>
+          <tr>
+            <td class="range-label">近7日</td>
+            <td class="stat-value clickable" data-range="last_7_days" data-metric="appointments">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+            <td class="stat-value clickable" data-range="last_7_days" data-metric="interviews">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+            <td class="stat-value clickable" data-range="last_7_days" data-metric="trials">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+            <td class="stat-value clickable" data-range="last_7_days" data-metric="new_recruits">
+              <span class="stat-count">--</span>
+              <div class="percentage">--%</div>
+            </td>
+          </tr>
+          <tr>
+            <td class="range-label">近14日</td>
+            <td class="stat-value clickable" data-range="last_14_days" data-metric="appointments">
+              <span class="stat-count">--</span>
+            </td>
+            <td class="stat-value clickable" data-range="last_14_days" data-metric="interviews">
+              <span class="stat-count">--</span>
+            </td>
+            <td class="stat-value clickable" data-range="last_14_days" data-metric="trials">
+              <span class="stat-count">--</span>
+            </td>
+            <td class="stat-value clickable" data-range="last_14_days" data-metric="new_recruits">
+              <span class="stat-count">--</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <div class="explanation-card">
-      <div class="card-icon">🎯</div>
-      <div class="card-content">
-        <h3>试播</h3>
-        <p>当天发生的试播决策数量（完成试播决策的数量，不论决策结果）</p>
-      </div>
+    <div class="empty-state" id="summaryError" style="display: none;">
+      <p>报表加载失败，请稍后再试。</p>
     </div>
-    <div class="explanation-card">
-      <div class="card-icon">🚀</div>
-      <div class="card-content">
-        <h3>新开播</h3>
-        <p>当天在开播决策中决定招募的数量（不招募不算）</p>
+  </div>
+
+  <div class="explanation-section">
+    <h2 class="section-title">指标说明</h2>
+    <div class="explanation-cards">
+      <div class="explanation-card">
+        <div class="card-icon">📅</div>
+        <div class="card-content">
+          <h3>约面</h3>
+          <p>当天创建的招募数量</p>
+        </div>
+      </div>
+      <div class="explanation-card">
+        <div class="card-icon">👥</div>
+        <div class="card-content">
+          <h3>到面</h3>
+          <p>当天完成的面试决策数量（无论结果）</p>
+        </div>
+      </div>
+      <div class="explanation-card">
+        <div class="card-icon">🎯</div>
+        <div class="card-content">
+          <h3>试播</h3>
+          <p>当天完成的试播决策数量（无论结果）</p>
+        </div>
+      </div>
+      <div class="explanation-card">
+        <div class="card-icon">🚀</div>
+        <div class="card-content">
+          <h3>新开播</h3>
+          <p>当天决定招募为正式/实习主播的数量</p>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <style>
-
 .date-navigation {
   display: flex;
   justify-content: space-between;
@@ -151,7 +158,6 @@
   font-size: 14px;
 }
 
-
 .recruiter-filter {
   display: flex;
   align-items: center;
@@ -170,9 +176,8 @@
   border-radius: 6px;
   font-size: 14px;
   background: #fff;
-  min-width: 120px;
+  min-width: 150px;
 }
-
 
 .statistics-section {
   margin: 24px 0;
@@ -200,7 +205,7 @@
 
 .statistics-table th,
 .statistics-table td {
-  padding: 16px 12px;
+  padding: 12px 8px;
   text-align: center;
   border-bottom: 1px solid #eee;
   font-size: 14px;
@@ -209,135 +214,30 @@
 .statistics-table th {
   background: var(--table-header);
   font-weight: 600;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-.statistics-table th:first-child,
-.statistics-table td:first-child {
-  text-align: left;
-  background: #f8f9fa;
-  font-weight: 600;
-}
-
-.statistics-table td:first-child {
-  background: #f8f9fa;
-}
-
-.statistics-table tbody tr:hover {
-  background: #f8f9fa;
 }
 
 .range-label {
   font-weight: 600;
-  color: var(--text);
+  text-align: left;
 }
 
 .stat-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--brand);
   position: relative;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.stat-value .stat-count {
+  display: inline-block;
+  min-width: 32px;
 }
 
 .percentage {
   font-size: 12px;
-  color: #999;
-  font-weight: 400;
-  margin-top: 2px;
-}
-
-
-.explanation-section {
-  margin: 24px 0;
-}
-
-.explanation-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.explanation-card {
-  background: #fff;
-  border: 1px solid var(--gray);
-  border-radius: 8px;
-  padding: 16px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  transition: box-shadow 0.2s ease;
-}
-
-.explanation-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.card-icon {
-  font-size: 24px;
-  flex-shrink: 0;
-}
-
-.card-content h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-  color: var(--text);
-}
-
-.card-content p {
-  font-size: 14px;
   color: var(--muted);
-  margin: 0;
-  line-height: 1.4;
+  margin-top: 4px;
 }
-
-
-@media (max-width: 768px) {
-  .date-navigation {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .recruiter-filter {
-    justify-content: center;
-    width: 100%;
-  }
-
-  .recruiter-select {
-    flex: 1;
-    max-width: 200px;
-  }
-
-  .statistics-table {
-    font-size: 12px;
-  }
-
-  .statistics-table th,
-  .statistics-table td {
-    padding: 12px 8px;
-  }
-
-  .stat-value {
-    font-size: 16px;
-  }
-
-  .explanation-cards {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .explanation-card {
-    padding: 12px;
-  }
-
-  .card-icon {
-    font-size: 20px;
-  }
-}
-
 
 .stat-value.clickable {
   cursor: pointer;
@@ -351,28 +251,288 @@
 .stat-value.clickable:active {
   background-color: var(--active-bg);
 }
+
+.empty-state {
+  margin-top: 12px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.explanation-section {
+  margin: 24px 0;
+}
+
+.explanation-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.explanation-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-icon {
+  font-size: 24px;
+}
+
+.card-content h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card-content p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .date-navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .recruiter-filter {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .recruiter-select {
+    width: 100%;
+  }
+
+  .statistics-table {
+    font-size: 12px;
+  }
+
+  .statistics-table th,
+  .statistics-table td {
+    padding: 10px 6px;
+  }
+}
 </style>
 
 <script>
-document.getElementById('dateSelector').addEventListener('change', function() {
-  const selectedDate = this.value;
-  const selectedRecruiter = document.getElementById('recruiterSelector').value;
-  if (selectedDate) {
-    window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + selectedDate + '&recruiter=' + selectedRecruiter;
+(function() {
+  const app = document.getElementById('recruitDailyApp');
+  if (!app) {
+    return;
   }
-});
 
-document.getElementById('recruiterSelector').addEventListener('change', function() {
-  const selectedRecruiter = this.value;
-  const currentDate = '{{ pagination.date }}';
-  window.location.href = '{{ url_for("report.recruit_daily_report") }}?date=' + currentDate + '&recruiter=' + selectedRecruiter;
-});
+  const dateSelector = document.getElementById('dateSelector');
+  const recruiterSelector = document.getElementById('recruiterSelector');
+  const summaryTitle = document.getElementById('summaryTitle');
+  const summaryTable = document.getElementById('recruitSummaryTable');
+  const summaryCells = summaryTable.querySelectorAll('[data-range][data-metric]');
+  const summaryError = document.getElementById('summaryError');
+  const dateLabel = document.getElementById('dailyDateLabel');
+  const prevDateLink = document.getElementById('prevDateLink');
+  const nextDateLink = document.getElementById('nextDateLink');
 
-function goToDetail(range, metric) {
-  const currentDate = '{{ pagination.date }}';
-  const selectedRecruiter = document.getElementById('recruiterSelector').value;
-  const detailUrl = '{{ url_for("report.recruit_report_detail") }}?date=' + currentDate + '&range=' + range + '&metric=' + metric + '&recruiter=' + selectedRecruiter;
-  window.location.href = detailUrl;
-}
+  const operatorsApi = '{{ url_for('users_api.get_operators') }}';
+  const dailyApi = '{{ url_for('recruit_reports_api.get_recruit_daily_report') }}';
+  const detailPageUrl = '{{ url_for('report.recruit_report_detail') }}';
+  const reportPageUrl = '{{ url_for('report.recruit_daily_report') }}';
+
+  let currentDate = app.dataset.reportDate;
+  let currentRecruiter = app.dataset.selectedRecruiter || 'all';
+
+  function resetSummaryPlaceholders() {
+    summaryCells.forEach(cell => {
+      const countEl = cell.querySelector('.stat-count');
+      if (countEl) {
+        countEl.textContent = '--';
+      }
+      const percentEl = cell.querySelector('.percentage');
+      if (percentEl) {
+        percentEl.textContent = '--%';
+      }
+    });
+  }
+
+  function showLoading() {
+    summaryTitle.textContent = '招募统计加载中…';
+    summaryError.style.display = 'none';
+    resetSummaryPlaceholders();
+  }
+
+  function showError(message) {
+    summaryTitle.textContent = '招募统计加载失败';
+    summaryError.style.display = 'block';
+    summaryError.querySelector('p').textContent = message;
+  }
+
+  function updatePaginationLinks(pagination) {
+    if (!pagination) {
+      return;
+    }
+    const baseUrl = new URL(reportPageUrl, window.location.origin);
+    if (currentRecruiter && currentRecruiter !== 'all') {
+      baseUrl.searchParams.set('recruiter', currentRecruiter);
+    } else {
+      baseUrl.searchParams.set('recruiter', 'all');
+    }
+
+    if (pagination.prev_date && prevDateLink) {
+      const prevUrl = new URL(baseUrl.toString());
+      prevUrl.searchParams.set('date', pagination.prev_date);
+      prevDateLink.href = prevUrl.toString();
+    }
+
+    if (pagination.next_date && nextDateLink) {
+      const nextUrl = new URL(baseUrl.toString());
+      nextUrl.searchParams.set('date', pagination.next_date);
+      nextDateLink.href = nextUrl.toString();
+    }
+  }
+
+  function formatPercentage(value) {
+    if (value === undefined || value === null) {
+      return '--%';
+    }
+    const num = Number(value);
+    if (Number.isNaN(num)) {
+      return '--%';
+    }
+    return `${num.toString()}%`;
+  }
+
+  function updateSummary(summary, percentages) {
+    summaryTitle.textContent = `${currentDate} 招募统计`;
+    summaryError.style.display = 'none';
+    summaryCells.forEach(cell => {
+      const range = cell.dataset.range;
+      const metric = cell.dataset.metric;
+      const countEl = cell.querySelector('.stat-count');
+      const percentEl = cell.querySelector('.percentage');
+      const rangeData = summary && summary[range] ? summary[range] : null;
+      const percentageData = percentages && percentages[range] ? percentages[range] : null;
+      const countValue = rangeData && rangeData[metric] !== undefined ? rangeData[metric] : 0;
+      if (countEl) {
+        countEl.textContent = countValue;
+      }
+      if (percentEl) {
+        const percentValue = percentageData && percentageData[metric] !== undefined ? percentageData[metric] : null;
+        percentEl.textContent = formatPercentage(percentValue);
+      }
+    });
+  }
+
+  function buildSummaryParams() {
+    const params = new URLSearchParams();
+    params.set('view', 'summary');
+    if (currentDate) {
+      params.set('date', currentDate);
+    }
+    if (currentRecruiter && currentRecruiter !== 'all') {
+      params.set('recruiter', currentRecruiter);
+    }
+    return params;
+  }
+
+  async function loadDailySummary() {
+    showLoading();
+    try {
+      const response = await fetch(`${dailyApi}?${buildSummaryParams().toString()}`);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data || {};
+
+      currentDate = data.date || currentDate;
+      dateSelector.value = currentDate;
+      dateLabel.textContent = currentDate;
+      recruiterSelector.value = currentRecruiter;
+      updatePaginationLinks(data.pagination);
+      updateSummary(data.summary, data.percentages);
+    } catch (error) {
+      console.error('加载招募日报汇总失败：', error);
+      showError('报表加载失败，请稍后再试');
+    }
+  }
+
+  async function loadRecruiterOptions() {
+    try {
+      const response = await fetch(operatorsApi);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const options = payload.data || [];
+      recruiterSelector.innerHTML = '';
+      const allOption = document.createElement('option');
+      allOption.value = 'all';
+      allOption.textContent = '全部';
+      recruiterSelector.appendChild(allOption);
+      options.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.nickname || user.username || user.id;
+        recruiterSelector.appendChild(option);
+      });
+      recruiterSelector.value = currentRecruiter;
+    } catch (error) {
+      console.error('加载招募负责人列表失败：', error);
+      recruiterSelector.value = currentRecruiter;
+    }
+  }
+
+  function navigate(params) {
+    const url = new URL(reportPageUrl, window.location.origin);
+    const targetDate = params.date || currentDate;
+    const targetRecruiter = params.recruiter !== undefined ? params.recruiter : currentRecruiter;
+    if (targetDate) {
+      url.searchParams.set('date', targetDate);
+    }
+    url.searchParams.set('recruiter', targetRecruiter || 'all');
+    window.location.href = url.toString();
+  }
+
+  function goToDetail(range, metric) {
+    const url = new URL(detailPageUrl, window.location.origin);
+    if (currentDate) {
+      url.searchParams.set('date', currentDate);
+    }
+    url.searchParams.set('range', range);
+    url.searchParams.set('metric', metric);
+    url.searchParams.set('recruiter', currentRecruiter || 'all');
+    window.location.href = url.toString();
+  }
+
+  dateSelector.addEventListener('change', function() {
+    if (this.value) {
+      navigate({ date: this.value });
+    }
+  });
+
+  recruiterSelector.addEventListener('change', function() {
+    navigate({ recruiter: this.value || 'all' });
+  });
+
+  summaryCells.forEach(cell => {
+    cell.addEventListener('click', function() {
+      const range = this.dataset.range;
+      const metric = this.dataset.metric;
+      if (!range || !metric) {
+        return;
+      }
+      goToDetail(range, metric);
+    });
+  });
+
+  (async function init() {
+    await loadRecruiterOptions();
+    await loadDailySummary();
+  })();
+})();
 </script>
 {% endblock %}

@@ -20,6 +20,7 @@ from routes.main import main_bp
 from routes.pilot import pilot_bp
 from routes.pilots_api import pilots_api_bp
 from routes.recruit import recruit_bp
+from routes.recruit_reports_api import recruit_reports_api_bp
 from routes.recruits_api import recruits_api_bp
 from routes.report import report_bp
 from routes.reports_api import reports_api_bp
@@ -96,6 +97,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(pilots_api_bp)
     flask_app.register_blueprint(commissions_api_bp)
     flask_app.register_blueprint(recruits_api_bp)
+    flask_app.register_blueprint(recruit_reports_api_bp)
     flask_app.register_blueprint(announcements_api_bp)
     flask_app.register_blueprint(battle_areas_api_bp)
     flask_app.register_blueprint(pilot_bp, url_prefix='/pilots')

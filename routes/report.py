@@ -528,27 +528,6 @@ def _calculate_recruit_statistics(report_date, recruiter_id=None):
     return calculate_recruit_daily_stats(report_date, recruiter_id)
 
 
-def _get_recruit_users():
-    """获取招募负责人用户列表（管理员与运营）。"""
-    from models.user import Role, User
-
-    gicho_role = Role.objects(name='gicho').first()
-    kancho_role = Role.objects(name='kancho').first()
-
-    users = []
-    if gicho_role:
-        users.extend(User.objects(roles=gicho_role, active=True))
-    if kancho_role:
-        users.extend(User.objects(roles=kancho_role, active=True))
-
-    unique_users = {}
-    for user in users:
-        if user.id not in unique_users:
-            unique_users[user.id] = user
-
-    return sorted(unique_users.values(), key=lambda u: u.nickname or u.username)
-
-
 def _get_recruit_records_for_detail(report_date, range_param, metric, recruiter_id=None):
     """获取招募详情记录列表。"""
     from utils.recruit_stats import get_recruit_records_for_detail
@@ -802,11 +781,7 @@ def recruit_daily_report():
     if recruiter_id == '':
         recruiter_id = 'all'
 
-    logger.info('生成征召日报，报表日期：%s，招募负责人：%s', report_date.strftime('%Y-%m-%d'), recruiter_id)
-
-    statistics = _calculate_recruit_statistics(report_date, recruiter_id)
-
-    users = _get_recruit_users()
+    logger.info('访问招募日报页面，报表日期：%s，招募负责人：%s', report_date.strftime('%Y-%m-%d'), recruiter_id)
 
     pagination = {
         'date': report_date.strftime('%Y-%m-%d'),
@@ -814,7 +789,7 @@ def recruit_daily_report():
         'next_date': (report_date + timedelta(days=1)).strftime('%Y-%m-%d')
     }
 
-    return render_template('recruit_reports/daily.html', statistics=statistics, pagination=pagination, users=users, selected_recruiter=recruiter_id)
+    return render_template('recruit_reports/daily.html', pagination=pagination, selected_recruiter=recruiter_id)
 
 
 @report_bp.route('/recruits/daily-report/detail')
@@ -846,27 +821,9 @@ def recruit_report_detail():
         logger.error('无效的指标参数：%s', metric)
         return '无效的指标参数', 400
 
-    logger.info('生成招募日报详情：日期=%s，范围=%s，指标=%s，招募负责人=%s', date_str, range_param, metric, recruiter_id)
+    logger.info('访问招募日报详情页面：日期=%s，范围=%s，指标=%s，招募负责人=%s', date_str, range_param, metric, recruiter_id)
 
-    recruits = _get_recruit_records_for_detail(report_date, range_param, metric, recruiter_id)
-
-    range_names = {'report_day': '报表日', 'last_7_days': '近7日', 'last_14_days': '近14日'}
-    metric_names = {'appointments': '约面', 'interviews': '到面', 'trials': '试播', 'new_recruits': '新开播'}
-
-    recruiter_name = ''
-    if recruiter_id and recruiter_id != 'all':
-        from models.user import User
-        try:
-            recruiter = User.objects.get(id=recruiter_id)
-            recruiter_name = recruiter.nickname or recruiter.username
-        except Exception:
-            recruiter_name = '未知'
-
-    if recruiter_name:
-        page_title = f"{report_date.strftime('%Y年%m月%d日')} {range_names[range_param]} {metric_names[metric]}（{recruiter_name}）：{len(recruits)}"
-    else:
-        page_title = f"{report_date.strftime('%Y年%m月%d日')} {range_names[range_param]} {metric_names[metric]}：{len(recruits)}"
-
+    page_title = '招募日报详情加载中…'
     return_url = url_for('report.recruit_daily_report', date=date_str, recruiter=recruiter_id)
 
     return render_template('recruit_reports/detail.html',
@@ -875,8 +832,6 @@ def recruit_report_detail():
                            range_param=range_param,
                            metric=metric,
                            recruiter_id=recruiter_id,
-                           recruiter_name=recruiter_name,
-                           recruits=recruits,
                            return_url=return_url)
 
 

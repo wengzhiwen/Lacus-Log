@@ -1,70 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}{{ page_title }}{% endblock %}
+{% block title %}招募日报详情{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div class="header-content">
-    <div class="header-left">
-      <a href="{{ return_url }}" class="btn btn-secondary btn-sm">← 返回日报</a>
+<div id="recruitDailyDetailApp"
+     data-report-date="{{ report_date }}"
+     data-range="{{ range_param }}"
+     data-metric="{{ metric }}"
+     data-recruiter="{{ recruiter_id }}"
+     data-return-url="{{ return_url }}">
+  <div class="page-header">
+    <div class="header-content">
+      <div class="header-left">
+        <a href="{{ return_url }}" class="btn btn-secondary btn-sm">← 返回日报</a>
+      </div>
+      <div class="header-center">
+        <h1 class="page-title" id="detailTitle">{{ page_title }}</h1>
+      </div>
+      <div class="header-right"></div>
     </div>
-    <div class="header-center">
-      <h1 class="page-title">{{ page_title }}</h1>
-    </div>
-    <div class="header-right">
+  </div>
+
+  <div class="recruits-section" id="detailContent">
+    <div class="recruit-group" id="recordsContainer"></div>
+    <div class="empty-state" id="detailEmptyState" style="display: none;">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">暂无数据</div>
+      <div class="empty-description">该时间范围内没有符合条件的招募记录</div>
+      <a href="{{ return_url }}" class="btn btn-primary">返回日报</a>
     </div>
   </div>
 </div>
 
-<div class="recruits-section">
-  {% if recruits %}
-    <div class="recruit-groups">
-      <div class="recruit-group">
-        <h3 class="group-title">招募记录列表</h3>
-        <div class="record-cards">
-          {% for recruit in recruits %}
-            <a href="#" class="record-card" onclick="goToRecruitDetail('{{ recruit.id }}')">
-              <div class="card-header">
-                <div class="record-time">
-                  {% if metric == 'appointments' %}
-                    <div class="start-time">创建：{{ recruit.created_at | local_datetime('%m月%d日 %H:%M') }}</div>
-                  {% elif metric == 'interviews' %}
-                    <div class="start-time">面试决策：{{ recruit.get_effective_interview_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-                  {% elif metric == 'trials' %}
-                    <div class="start-time">试播决策：{{ recruit.get_effective_training_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-                  {% elif metric == 'new_recruits' %}
-                    <div class="start-time">开播决策：{{ recruit.get_effective_broadcast_decision_time() | local_datetime('%m月%d日 %H:%M') }}</div>
-                  {% endif %}
-                </div>
-                <div class="record-info">
-                  <div class="pilot-name">{{ recruit.pilot.nickname }}</div>
-                  <div class="meta-line">[{{ recruit.recruiter.nickname or recruit.recruiter.username }}][{{ recruit.channel.value }}]</div>
-                  <div class="status-line">
-                    <span class="status-badge status-{{ recruit.get_effective_status().value.replace(' ', '') }}">{{ recruit.get_effective_status().value }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="card-footer">
-                <div></div>
-                <div class="card-arrow">→</div>
-              </div>
-            </a>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  {% else %}
-    <div class="empty-state">
-      <div class="empty-icon">📊</div>
-      <div class="empty-title">暂无数据</div>
-      <div class="empty-description">该时间段内没有相关的招募记录</div>
-      <a href="{{ return_url }}" class="btn btn-primary">返回日报</a>
-    </div>
-  {% endif %}
-</div>
-
 <style>
-
 .page-header {
   margin-bottom: 24px;
 }
@@ -86,7 +54,6 @@
 
 .header-right {
   flex: 0 0 auto;
-  width: 100px; 
 }
 
 .page-title {
@@ -96,39 +63,21 @@
   color: var(--text);
 }
 
-
 .recruits-section {
   margin-top: 24px;
 }
 
-.recruit-groups {
-  margin-bottom: 20px;
-}
-
 .recruit-group {
-  margin-bottom: 24px;
-}
-
-.group-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid var(--brand);
-}
-
-
-.record-cards { 
-  display: block; 
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .record-card {
   display: block;
   background: #fff;
   border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
+  padding: 12px 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   border: 1px solid var(--table-header);
   text-decoration: none;
@@ -143,97 +92,83 @@
   border-color: var(--brand);
 }
 
-.record-card .card-header {
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 8px;
 }
 
-.record-time { 
-  flex: 0 0 auto; 
+.record-time {
+  flex: 0 0 auto;
 }
 
-.start-time { 
-  font-size: 16px; 
-  font-weight: 600; 
-  color: var(--text); 
-  margin-bottom: 2px; 
+.record-time .start-time {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
 }
 
-.record-info { 
-  flex: 1; 
-  text-align: right; 
-  display: flex; 
-  flex-direction: column; 
-  align-items: flex-end; 
+.record-time .time-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
 }
 
-.pilot-name { 
-  font-size: 14px; 
-  font-weight: 500; 
-  color: var(--text); 
-  line-height: 1.2; 
-  margin-bottom: 2px; 
+.record-info {
+  flex: 1;
+  text-align: right;
 }
 
-.meta-line { 
-  font-size: 12px; 
-  color: var(--muted); 
-  line-height: 1.1; 
+.pilot-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
 }
 
-.status-line { 
-  display: flex; 
-  gap: 4px; 
-  margin-top: 4px; 
-  flex-wrap: wrap; 
-  justify-content: flex-end; 
+.meta-line {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
 }
 
-.status-badge { 
-  padding: 2px 6px; 
-  border-radius: 3px; 
-  font-size: 10px; 
-  font-weight: 500; 
+.status-line {
+  margin-top: 6px;
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
+.status-badge {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: var(--table-header);
+  color: var(--text);
+}
 
-.status-待面试 { background: #e3f2fd; color: #1565c0; }
-.status-待预约试播 { background: #f3e5f5; color: #7b1fa2; }
-.status-待试播 { background: #fff3e0; color: #ef6c00; }
-.status-待预约开播 { background: #e8f5e8; color: #2e7d32; }
-.status-待开播 { background: #fff8e1; color: #f57c00; }
-.status-已结束 { background: var(--muted); color: white; }
-
-.record-card .card-footer { 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
-  border-top: 1px solid var(--table-header); 
-  padding-top: 12px; 
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .card-arrow {
   font-size: 16px;
-  color: var(--muted);
-  transition: color 0.2s ease;
 }
-
-.record-card:hover .card-arrow { 
-  color: var(--brand); 
-}
-
 
 .empty-state {
+  margin-top: 40px;
   text-align: center;
-  padding: 60px 20px;
   color: var(--muted);
 }
 
 .empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+  font-size: 36px;
+  margin-bottom: 12px;
 }
 
 .empty-title {
@@ -244,46 +179,153 @@
 }
 
 .empty-description {
-  font-size: 14px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
-
 @media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .header-left,
-  .header-center,
-  .header-right {
-    flex: none;
-    width: auto;
-  }
-  
   .page-title {
     font-size: 20px;
   }
-  
-  .record-card .card-header {
-    flex-direction: row;
+
+  .card-header {
+    flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
   }
-  
-  .record-info { 
-    text-align: right; 
-    align-items: flex-end; 
+
+  .record-info {
+    text-align: left;
+  }
+
+  .status-line {
+    justify-content: flex-start;
   }
 }
 </style>
 
 <script>
-function goToRecruitDetail(recruitId) {
-  const detailUrl = '{{ url_for("recruit.detail_recruit", recruit_id="PLACEHOLDER") }}'.replace('PLACEHOLDER', recruitId);
-  const urlWithParams = detailUrl + '?from=recruit_report_detail&report_date={{ report_date }}&report_range={{ range_param }}&report_metric={{ metric }}&report_recruiter={{ recruiter_id }}';
-  window.location.href = urlWithParams;
-}
+(function() {
+  const app = document.getElementById('recruitDailyDetailApp');
+  if (!app) {
+    return;
+  }
+
+  const detailTitle = document.getElementById('detailTitle');
+  const recordsContainer = document.getElementById('recordsContainer');
+  const emptyState = document.getElementById('detailEmptyState');
+
+  const dailyApi = '{{ url_for('recruit_reports_api.get_recruit_daily_report') }}';
+  const recruitDetailTemplate = '{{ url_for('recruit.detail_recruit', recruit_id="PLACEHOLDER") }}';
+
+  const reportDate = app.dataset.reportDate;
+  const rangeParam = app.dataset.range;
+  const metricParam = app.dataset.metric;
+  const recruiterId = app.dataset.recruiter || 'all';
+
+  detailTitle.textContent = '招募日报详情加载中…';
+
+  function buildDetailParams() {
+    const params = new URLSearchParams();
+    params.set('view', 'detail');
+    if (reportDate) {
+      params.set('date', reportDate);
+    }
+    params.set('range', rangeParam);
+    params.set('metric', metricParam);
+    if (recruiterId && recruiterId !== 'all') {
+      params.set('recruiter', recruiterId);
+    }
+    return params;
+  }
+
+  function buildRecordCard(record) {
+    const card = document.createElement('a');
+    card.className = 'record-card';
+    card.href = '#';
+    card.dataset.recruitId = record.id;
+
+    const pilotDisplay = record.pilot && record.pilot.nickname ? record.pilot.nickname : '未知主播';
+    const recruiterDisplay = record.recruiter && (record.recruiter.nickname || record.recruiter.username);
+    const recruiterText = recruiterDisplay || '未知运营';
+    const channel = record.channel || '未知渠道';
+    const status = record.effective_status || '未知状态';
+    const highlightLabel = record.highlight && record.highlight.label ? record.highlight.label : '相关时间';
+    const highlightTime = record.highlight && record.highlight.display ? record.highlight.display : '未知';
+
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="record-time">
+          <div class="start-time">${highlightTime}</div>
+          <div class="time-label">${highlightLabel}</div>
+        </div>
+        <div class="record-info">
+          <div class="pilot-name">${pilotDisplay}</div>
+          <div class="meta-line">[${recruiterText}][${channel}]</div>
+          <div class="status-line">
+            <span class="status-badge">${status}</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div>${record.remarks ? record.remarks : ''}</div>
+        <div class="card-arrow">→</div>
+      </div>
+    `;
+
+    card.addEventListener('click', event => {
+      event.preventDefault();
+      if (!record.id) {
+        return;
+      }
+      const baseUrl = recruitDetailTemplate.replace('PLACEHOLDER', record.id);
+      const url = new URL(baseUrl, window.location.origin);
+      url.searchParams.set('from', 'recruit_report_detail');
+      if (reportDate) {
+        url.searchParams.set('report_date', reportDate);
+      }
+      url.searchParams.set('report_range', rangeParam);
+      url.searchParams.set('report_metric', metricParam);
+      url.searchParams.set('report_recruiter', recruiterId || 'all');
+      window.location.href = url.toString();
+    });
+
+    return card;
+  }
+
+  function renderRecords(records) {
+    recordsContainer.innerHTML = '';
+    if (!records || records.length === 0) {
+      emptyState.style.display = 'block';
+      return;
+    }
+    emptyState.style.display = 'none';
+    const fragment = document.createDocumentFragment();
+    records.forEach(record => {
+      fragment.appendChild(buildRecordCard(record));
+    });
+    recordsContainer.appendChild(fragment);
+  }
+
+  async function loadDetail() {
+    try {
+      const response = await fetch(`${dailyApi}?${buildDetailParams().toString()}`);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data || {};
+      detailTitle.textContent = `${data.date || reportDate} ${data.range_label || ''} ${data.metric_label || ''}：${data.count || 0}`;
+      renderRecords(data.recruits || []);
+    } catch (error) {
+      console.error('加载招募日报详情失败：', error);
+      detailTitle.textContent = '招募日报详情加载失败';
+      recordsContainer.innerHTML = '';
+      emptyState.style.display = 'block';
+      emptyState.querySelector('.empty-description').textContent = '加载失败，请返回重试。';
+    }
+  }
+
+  loadDetail();
+})();
 </script>
 {% endblock %}
