@@ -212,6 +212,7 @@
 <style>
 .announcement-detail {
   padding: 20px;
+  padding-bottom: 100px;
 }
 
 .back-nav {
@@ -437,12 +438,16 @@
 
 
 .footbar .btn {
-  display: flex;
+  display: flex !important;
   justify-content: center;
   align-items: center;
   text-align: center;
   line-height: 1.2;
   min-height: 56px;
+  flex: 1 1 auto;
+  min-width: 100px;
+  max-width: 240px;
+  box-sizing: border-box;
 }
 
 .modal {
@@ -662,6 +667,7 @@
 @media (max-width: 768px) {
   .announcement-detail {
     padding: 16px;
+    padding-bottom: 100px;
   }
   
   .info-grid {
@@ -685,7 +691,9 @@
   }
   
   .footbar .btn {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 70px;
+    max-width: none;
     font-size: 14px;
     padding: 12px 8px;
   }
@@ -697,8 +705,8 @@ const announcementId = '{{ announcement.id }}';
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 const fromParam = '{{ from_param or "" }}';
 const dateParam = '{{ date_param or "" }}';
-const calendarDayUrl = '{{ url_for('calendar.day_view') }}';
-const listUrl = '{{ url_for('announcement.list_announcements') }}';
+const calendarDayUrl = "{{ url_for('calendar.day_view') }}";
+const listUrl = "{{ url_for('announcement.list_announcements') }}";
 
 function showLoading(isLoading) {
     const overlay = document.getElementById('loading-overlay');

@@ -5,9 +5,9 @@
   <div class="back-nav" id="backNav"></div>
 
   <div class="pilot-info-card" id="pilotInfoCard"></div>
-
-  <div class="action-section" id="actionSection"></div>
 </section>
+
+<div id="footbarContainer"></div>
 
 <div id="loadingState" class="loading-state">
   <div class="loading-spinner"></div>
@@ -130,6 +130,7 @@
 .pilot-detail {
   max-width: 800px;
   margin: 0 auto;
+  padding-bottom: 100px;
 }
 
 .pilot-info-card {
@@ -240,18 +241,54 @@
   color: var(--text);
 }
 
-.action-section {
+.footbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  border: 1px solid var(--table-header);
+  border-top: 1px solid var(--table-header, #ddd);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
+  z-index: 100;
 }
 
-.action-buttons {
+.footbar .inner {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.footbar .btn {
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  line-height: 1.2;
+  min-height: 56px;
+  flex: 1 1 auto;
+  min-width: 80px;
+  max-width: 200px;
+  box-sizing: border-box;
+}
+
+.btn-hud {
+  background: var(--hud-green);
+  color: #fff;
+}
+.btn-hud:hover { 
+  background: #00a16e; 
+}
+
+.btn-outline {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--gray);
+}
+.btn-outline:hover {
+  background: var(--table-header);
 }
 
 
@@ -364,6 +401,10 @@
 
 
 @media (max-width: 768px) {
+  .pilot-detail {
+    padding-bottom: 100px;
+  }
+
   .pilot-info-card .card-header {
     flex-direction: column;
     align-items: center;
@@ -378,12 +419,17 @@
     grid-template-columns: 1fr;
   }
 
-  .action-buttons {
-    flex-direction: column;
+  .footbar .inner {
+    flex-direction: row;
+    gap: 8px;
   }
-
-  .action-buttons .btn {
-    width: 100%;
+  
+  .footbar .btn {
+    flex: 1 1 auto;
+    min-width: 60px;
+    max-width: none;
+    font-size: 14px;
+    padding: 12px 8px;
   }
 
   .modal-content {
@@ -645,34 +691,20 @@ function renderPilotInfo(pilot, commission = null) {
 
 // 渲染操作按钮
 function renderActionButtons(pilot) {
-  const actionSection = document.getElementById('actionSection');
+  const footbarContainer = document.getElementById('footbarContainer');
   const normalizedStatus = normalizeStatus(pilot.status || '');
   
-  actionSection.innerHTML = `
-    <h3 class="section-title">操作</h3>
-    <div class="action-buttons">
-      <a class="btn btn-primary" href="/pilots/${pilot.id}/edit">
-        <span class="btn-icon">✏️</span>
-        编辑
-      </a>
-      ${normalizedStatus === '未招募' ? `
-      <a class="btn btn-primary" href="/recruits/start/${pilot.id}">
-        <span class="btn-icon">🎯</span>
-        启动招募
-      </a>
-      ` : ''}
-      <a class="btn btn-secondary" href="/pilots/${pilot.id}/commission/">
-        <span class="btn-icon">💰</span>
-        分成管理
-      </a>
-      <a class="btn btn-primary" href="/pilots/${pilot.id}/performance?from=pilot_detail">
-        <span class="btn-icon">📊</span>
-        业绩查看
-      </a>
-      <button class="btn btn-secondary" onclick="showChanges()">
-        <span class="btn-icon">📜</span>
-        变更记录
-      </button>
+  footbarContainer.innerHTML = `
+    <div class="footbar">
+      <div class="inner">
+        <a class="btn btn-primary" href="/pilots/${pilot.id}/edit">编辑</a>
+        ${normalizedStatus === '未招募' ? `
+        <a class="btn btn-hud" href="/recruits/start/${pilot.id}">启动招募</a>
+        ` : ''}
+        <a class="btn btn-outline" href="/pilots/${pilot.id}/commission/">分成管理</a>
+        <a class="btn btn-primary" href="/pilots/${pilot.id}/performance?from=pilot_detail">业绩查看</a>
+        <button class="btn btn-outline" onclick="showChanges()">变更记录</button>
+      </div>
     </div>
   `;
 }
