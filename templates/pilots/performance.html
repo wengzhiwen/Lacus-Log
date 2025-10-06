@@ -574,13 +574,20 @@ const recordIdParam = urlParams.get('record_id');
 
 // 格式化金额
 function formatCurrency(amount) {
-  return '¥' + amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) {
+    return '¥0.00';
+  }
+  const numeric = Number(amount);
+  return '¥' + numeric.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // 格式化时间
 function formatDateTime(dateTimeStr) {
   if (!dateTimeStr) return '未知';
   const date = new Date(dateTimeStr);
+  if (Number.isNaN(date.getTime())) {
+    return '未知';
+  }
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const hours = String(date.getHours()).padStart(2, '0');
@@ -677,6 +684,10 @@ function updatePilotInfo(pilotInfo) {
 
 // 更新统计卡片
 function updateStatsCard(prefix, stats) {
+  if (!stats) {
+    console.error(`统计数据缺失: ${prefix}`);
+    return;
+  }
   try {
     document.getElementById(`${prefix}-record-count`).textContent = stats.record_count;
     document.getElementById(`${prefix}-total-hours`).textContent = stats.total_hours + 'h';
@@ -753,6 +764,9 @@ async function loadPerformanceData() {
     document.getElementById('recent-records-section').style.display = 'none';
     
     const response = await fetch(`/api/pilots/${pilotId}/performance`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
     const result = await response.json();
     
     if (!result.success) {

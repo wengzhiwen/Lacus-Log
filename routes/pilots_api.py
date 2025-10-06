@@ -9,6 +9,8 @@ from datetime import datetime
 import io
 import csv
 
+from decimal import Decimal
+
 from flask import Blueprint, jsonify, request, Response
 from flask_security import roles_accepted, current_user
 from flask_wtf.csrf import validate_csrf, ValidationError as CSRFValidationError
@@ -585,11 +587,18 @@ def get_pilot_performance(pilot_id):
         performance_data = calculate_pilot_performance_stats(pilot)
 
         # 序列化主播基本信息
+        if pilot.gender == Gender.MALE:
+            gender_icon = '♂'
+        elif pilot.gender == Gender.FEMALE:
+            gender_icon = '♀'
+        else:
+            gender_icon = '?'
+
         pilot_info = {
             'nickname': pilot.nickname,
             'real_name': pilot.real_name,
             'age': pilot.age,
-            'gender_icon': '♂' if pilot.gender.value == 0 else ('♀' if pilot.gender.value == 1 else '?'),
+            'gender_icon': gender_icon,
             'hometown': pilot.hometown,
             'owner': pilot.owner.nickname if pilot.owner else None,
             'rank': pilot.rank.value if pilot.rank else None,
@@ -611,12 +620,11 @@ def get_pilot_performance(pilot_id):
         def convert_decimal_to_float(data):
             if isinstance(data, dict):
                 return {k: convert_decimal_to_float(v) for k, v in data.items()}
-            elif isinstance(data, list):
+            if isinstance(data, list):
                 return [convert_decimal_to_float(item) for item in data]
-            elif hasattr(data, '__class__') and data.__class__.__name__ == 'Decimal':
+            if isinstance(data, Decimal):
                 return float(data)
-            else:
-                return data
+            return data
 
         month_stats = convert_decimal_to_float(performance_data['month_stats'])
         week_stats = convert_decimal_to_float(performance_data['week_stats'])
