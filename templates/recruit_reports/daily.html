@@ -57,19 +57,19 @@
             <td class="range-label">近7日</td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="appointments">
               <span class="stat-count">--</span>
-              <div class="average">7日均: --</div>
+              <div class="average">7日均: -- <span class="trend-indicator"></span></div>
             </td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="interviews">
               <span class="stat-count">--</span>
-              <div class="average">7日均: --</div>
+              <div class="average">7日均: -- <span class="trend-indicator"></span></div>
             </td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="trials">
               <span class="stat-count">--</span>
-              <div class="average">7日均: --</div>
+              <div class="average">7日均: -- <span class="trend-indicator"></span></div>
             </td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="new_recruits">
               <span class="stat-count">--</span>
-              <div class="average">7日均: --</div>
+              <div class="average">7日均: -- <span class="trend-indicator"></span></div>
             </td>
           </tr>
           <tr>
@@ -237,6 +237,44 @@
   font-size: 12px;
   color: var(--muted);
   margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.trend-indicator {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+.trend-indicator.up {
+  color: #dc3545;
+}
+
+.trend-indicator.down {
+  color: #28a745;
+  animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(40, 167, 69, 0.8),
+                 0 0 16px rgba(40, 167, 69, 0.6),
+                 0 0 24px rgba(40, 167, 69, 0.4),
+                 0 0 32px rgba(40, 167, 69, 0.3);
+    filter: brightness(1);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(40, 167, 69, 1),
+                 0 0 24px rgba(40, 167, 69, 0.9),
+                 0 0 36px rgba(40, 167, 69, 0.7),
+                 0 0 48px rgba(40, 167, 69, 0.5),
+                 0 0 60px rgba(40, 167, 69, 0.3);
+    filter: brightness(1.3);
+  }
 }
 
 .stat-value.clickable {
@@ -355,7 +393,7 @@
       if (averageEl) {
         const range = cell.dataset.range;
         if (range === 'last_7_days') {
-          averageEl.textContent = '7日均: --';
+          averageEl.innerHTML = '7日均: -- <span class="trend-indicator"></span>';
         } else if (range === 'last_14_days') {
           averageEl.textContent = '14日均: --';
         }
@@ -427,12 +465,31 @@
       if (averageEl) {
         const averageValue = averageData && averageData[metric] !== undefined ? averageData[metric] : null;
         if (range === 'last_7_days') {
-          averageEl.textContent = `7日均: ${formatAverage(averageValue)}`;
+          const avg7 = averages && averages.last_7_days && averages.last_7_days[metric] !== undefined ? averages.last_7_days[metric] : null;
+          const avg14 = averages && averages.last_14_days && averages.last_14_days[metric] !== undefined ? averages.last_14_days[metric] : null;
+          const trendIndicator = getTrendIndicator(avg7, avg14);
+          averageEl.innerHTML = `7日均: ${formatAverage(averageValue)} ${trendIndicator}`;
         } else if (range === 'last_14_days') {
           averageEl.textContent = `14日均: ${formatAverage(averageValue)}`;
         }
       }
     });
+  }
+
+  function getTrendIndicator(avg7, avg14) {
+    if (avg7 === null || avg14 === null || avg7 === undefined || avg14 === undefined) {
+      return '<span class="trend-indicator"></span>';
+    }
+    const val7 = Number(avg7);
+    const val14 = Number(avg14);
+    if (Number.isNaN(val7) || Number.isNaN(val14)) {
+      return '<span class="trend-indicator"></span>';
+    }
+    if (val7 > val14) {
+      return '<span class="trend-indicator up">↑</span>';
+    } else {
+      return '<span class="trend-indicator down">↓</span>';
+    }
   }
 
   function buildSummaryParams() {
