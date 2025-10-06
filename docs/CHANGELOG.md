@@ -1,6 +1,12 @@
 # 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+## 2025-10-06 重构：
+- 通告编辑页与开播记录新建/编辑页改为运行时调用 REST 接口初始化表单，移除模板级预填并保持原有校验/冲突检查体验
+- `utils/announcement_serializers.py` 新增坐席 ID、时长及 ISO 开始时间字段，支撑前端 REST 初始化逻辑
+
+# 历史的更新内容
+
 ## 2025-10-05 修复：
 - 主播管理列表分页问题：将单次数据量上限从20条提升至500条
 - 通告管理列表分页问题：将数据量上限从100条提升至500条
@@ -12,8 +18,6 @@
 - 主播招募日报 REST 化：新增 `/api/recruit-reports/daily` 汇总/详情接口，招募日报与详情页面改为前端 fetch 数据，保持原有统计口径与权限校验
 - 首页仪表盘 REST 化：将计算逻辑迁入 `routes/report.py`，拆分 `/api/dashboard/recruit|announcements|battle-records|pilots|candidates|feature` 接口，并调整首页模板动态加载
 - 主播业绩页 REST 化：新增 `GET /api/pilots/<id>/performance` 接口并改造 `templates/pilots/performance.html` 纯前端加载数据，保留既有统计口径与返回导航体验
-
-# 历史的更新内容
 
 ## 2025-10-04 重构：
 - 主播开播日报/周报/月报 REST 化：新增 `/reports/api/daily|weekly|monthly` 接口并改造对应模板为前端 fetch 数据，沿用既有计算逻辑与筛选体验，CSV 导出保持原路径

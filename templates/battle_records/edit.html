@@ -13,8 +13,14 @@
     </div>
 
     <div class="form-container">
-        <form method="POST" id="battleRecordForm">
+        <form method="POST" id="battleRecordForm"
+              data-record-id="{{ battle_record.id }}"
+              data-detail-url="{{ url_for('battle_records_api.get_record', record_id=battle_record.id) }}"
+              data-update-url="{{ url_for('battle_records_api.update_record', record_id=battle_record.id) }}"
+              data-detail-page-url="{{ url_for('battle_record.detail_battle_record', record_id=battle_record.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="pilot" id="pilot_id" value="">
+            <input type="hidden" name="related_announcement" id="related_announcement_value" value="">
             
             <div class="form-section">
                 <h3>基础信息</h3>
@@ -22,39 +28,21 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>主播</label>
-                        <div class="readonly-value" id="pilot_display">
-                            {% set age_str = '(' ~ battle_record.pilot.age ~ ')' if battle_record.pilot.age else '' %}
-                            {% set gender_icon = '♂' if battle_record.pilot.gender.value == 0 else ('♀' if battle_record.pilot.gender.value == 1 else '?') %}
-                            {{ battle_record.pilot.nickname }}{{ age_str }}[{{ battle_record.pilot.status.value }}]{{ gender_icon }}
-                        </div>
+                        <div class="readonly-value" id="pilot_display">加载中...</div>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label>所属</label>
-                        <div class="readonly-value" id="owner_display">
-                            {{ (battle_record.owner_snapshot.nickname or battle_record.owner_snapshot.username) if battle_record.owner_snapshot else '无' }}
-                        </div>
+                        <div class="readonly-value" id="owner_display">-</div>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label>关联通告：</label>
-                        <div class="readonly-value">
-                            {% if related_announcement_deleted %}
-                                关联通告计划已被删除
-                            {% elif related_announcement %}
-                                {% set weekday_map = {'0':'日','1':'一','2':'二','3':'三','4':'四','5':'五','6':'六'} %}
-                                {% set weekday_idx = related_announcement.start_time|local_datetime('%w') %}
-                                {% set date_str = related_announcement.start_time|local_datetime('%Y-%m-%d') %}
-                                {% set duration_str = related_announcement.duration_hours ~ '小时' %}
-                                {{ date_str }} 星期{{ weekday_map[weekday_idx] }} {{ duration_str }} @{{ related_announcement.x_coord }}-{{ related_announcement.y_coord }}-{{ related_announcement.z_coord }}
-                            {% else %}
-                                无关联通告
-                            {% endif %}
-                        </div>
+                        <div class="readonly-value" id="related_announcement_display">加载中...</div>
                     </div>
                 </div>
             </div>
@@ -65,8 +53,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="start_time" class="required">开始时间：</label>
-                        <input type="datetime-local" name="start_time" id="start_time" required
-                               value="{{ battle_record.start_time|local_datetime_for_input }}">
+                        <input type="datetime-local" name="start_time" id="start_time" required value="">
                         <div class="time-quick-buttons">
                             <button type="button" class="time-btn" data-target="start_time" data-minutes="5">+5</button>
                             <button type="button" class="time-btn" data-target="start_time" data-minutes="15">+15</button>
@@ -83,8 +70,7 @@
 
                     <div class="form-group">
                         <label for="end_time" class="required">结束时间：</label>
-                        <input type="datetime-local" name="end_time" id="end_time" required
-                               value="{{ battle_record.end_time|local_datetime_for_input }}">
+                        <input type="datetime-local" name="end_time" id="end_time" required value="">
                         <div class="time-quick-buttons">
                             <button type="button" class="time-btn" data-target="end_time" data-minutes="5">+5</button>
                             <button type="button" class="time-btn" data-target="end_time" data-minutes="15">+15</button>
@@ -141,15 +127,13 @@
                     <div class="form-group">
                         <label for="revenue_amount" class="required">流水金额（元）：</label>
                         <input type="number" name="revenue_amount" id="revenue_amount" 
-                               step="0.01" min="0" required
-                               value="{{ battle_record.revenue_amount }}">
+                               step="0.01" min="0" required value="0">
                     </div>
 
                     <div class="form-group">
                         <label for="base_salary" class="required">底薪金额（元）：</label>
                         <input type="number" name="base_salary" id="base_salary" 
-                               step="0.01" min="0" required
-                               value="{{ battle_record.base_salary }}">
+                               step="0.01" min="0" required value="0">
                     </div>
                 </div>
             </div>
@@ -161,7 +145,7 @@
                     <div class="form-group">
                         <label for="notes">备注（最多200字）：</label>
                         <textarea name="notes" id="notes" rows="3" maxlength="200" 
-                                  placeholder="可选择填写相关备注信息...">{{ battle_record.notes or '' }}</textarea>
+                                  placeholder="可选择填写相关备注信息..."></textarea>
                         <div class="char-count">
                             <span id="notes-count">0</span>/200
                         </div>
@@ -176,15 +160,11 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>登记人：</label>
-                        <div class="readonly-value">
-                            {{ (battle_record.registered_by.nickname or battle_record.registered_by.username) if battle_record.registered_by else '未知' }}
-                        </div>
+                        <div class="readonly-value" id="registered_by_display">-</div>
                     </div>
                     <div class="form-group">
                         <label>创建时间：</label>
-                        <div class="readonly-value">
-                            {{ battle_record.created_at|local_datetime('%Y年%m月%d日 %H:%M') }}
-                        </div>
+                        <div class="readonly-value" id="created_at_display">-</div>
                     </div>
                 </div>
             </div>
@@ -441,444 +421,547 @@
     }
 }
 </style>
-
 <script>
-let battleAreaData = {};
-let currentData = {
-    pilot: '{{ battle_record.pilot.id }}',
-    x_coord: '{{ battle_record.x_coord }}',
-    y_coord: '{{ battle_record.y_coord }}',
-    z_coord: '{{ battle_record.z_coord }}'
-};
+const battleRecordForm = document.getElementById('battleRecordForm');
+const recordDetailUrl = battleRecordForm?.dataset.detailUrl || '';
+const updateRecordUrl = battleRecordForm?.dataset.updateUrl || '';
+const detailPageUrl = battleRecordForm?.dataset.detailPageUrl || '';
 const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-const updateRecordUrl = '{{ url_for('battle_records_api.update_record', record_id=battle_record.id) }}';
-const detailPageUrl = '{{ url_for('battle_record.detail_battle_record', record_id=battle_record.id) }}';
 
-document.addEventListener('DOMContentLoaded', function() {
-    initializePage();
-    updateCharacterCount();
+const elements = {
+  pilotDisplay: document.getElementById('pilot_display'),
+  ownerDisplay: document.getElementById('owner_display'),
+  relatedDisplay: document.getElementById('related_announcement_display'),
+  startTimeInput: document.getElementById('start_time'),
+  endTimeInput: document.getElementById('end_time'),
+  workModeSelect: document.getElementById('work_mode'),
+  revenueInput: document.getElementById('revenue_amount'),
+  baseSalaryInput: document.getElementById('base_salary'),
+  notesInput: document.getElementById('notes'),
+  pilotHiddenInput: document.getElementById('pilot_id'),
+  relatedHiddenInput: document.getElementById('related_announcement_value'),
+  xSelect: document.getElementById('x_coord'),
+  ySelect: document.getElementById('y_coord'),
+  zSelect: document.getElementById('z_coord'),
+  registeredByDisplay: document.getElementById('registered_by_display'),
+  createdAtDisplay: document.getElementById('created_at_display'),
+  submitBtn: document.getElementById('submit-btn'),
+  notesCounter: document.getElementById('notes-count'),
+  notesValidationMessage: document.getElementById('notes-validation-message'),
+};
+
+const pageState = {
+  battleAreaData: {},
+  defaults: {
+    pilotId: '',
+    pilotDisplay: '',
+    ownerName: '',
+    workMode: '',
+    xCoord: '',
+    yCoord: '',
+    zCoord: '',
+    startTime: '',
+    endTime: '',
+    revenueAmount: '0',
+    baseSalary: '0',
+    notes: '',
+    relatedAnnouncementId: '',
+    relatedAnnouncementText: '无关联通告',
+    relatedAnnouncementDeleted: false,
+    registeredBy: '未知',
+    createdAt: '',
+  },
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await fetchRecordDetail();
+    applyDefaultsToForm();
+    await loadBattleAreaData();
+    attachFieldWatchers();
+    attachFormSubmit();
     initializeTimeButtons();
     initializeDurationHelper();
-    
-    document.getElementById('notes').addEventListener('input', updateCharacterCount);
-    
-    const fieldsToWatch = ['start_time', 'end_time', 'revenue_amount', 'base_salary', 'notes'];
-    fieldsToWatch.forEach(fieldName => {
-        const field = document.getElementById(fieldName);
-        if (field) {
-            field.addEventListener('input', function() {
-                validateNotesRequired();
-                updateSubmitButtonState();
-            });
-            field.addEventListener('change', function() {
-                validateNotesRequired();
-                updateSubmitButtonState();
-            });
-        }
-    });
-    
-    const form = document.getElementById('battleRecordForm');
-    if (form) {
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateFormSubmission()) {
-                return;
-            }
-            await submitBattleRecordUpdate();
-        });
+    if (elements.notesInput) {
+      elements.notesInput.addEventListener('input', updateCharacterCount);
     }
-    
-    updateSubmitButtonState();
-    const pilotId = currentData.pilot;
-    if (pilotId) {
-        fetch(`{{ url_for('battle_records_api.related_announcements') }}?pilot_id=${pilotId}`)
-            .then(resp => resp.json())
-            .then(result => {
-                const select = document.getElementById('related_announcement');
-                if (!select) return;
-                select.innerHTML = '<option value="">无关联通告</option>';
-                if (!result.success) return;
-                const announcements = (result.data && result.data.announcements) || [];
-                announcements.forEach(item => {
-                    const opt = document.createElement('option');
-                    opt.value = item.id;
-                    opt.textContent = item.label;
-                    select.appendChild(opt);
-                });
-            })
-            .catch(err => console.error('获取关联通告失败:', err));
-    }
-    const wm = document.getElementById('work_mode');
-    wm.addEventListener('change', handleWorkModeChange);
+    updateCharacterCount();
     handleWorkModeChange();
+    validateNotesRequired();
+    updateSubmitButtonState();
+  } catch (error) {
+    console.error('初始化开播记录编辑页失败:', error);
+    showMessage(error.message || '加载开播记录详情失败', 'error');
+    if (elements.submitBtn) {
+      elements.submitBtn.disabled = true;
+      elements.submitBtn.classList.add('disabled');
+    }
+  }
 });
 
-function handleWorkModeChange() {
-    const wm = document.getElementById('work_mode').value;
-    const xSelect = document.getElementById('x_coord');
-    const ySelect = document.getElementById('y_coord');
-    const zSelect = document.getElementById('z_coord');
-    const isOnline = wm === '线上';
-
-    [xSelect, ySelect, zSelect].forEach(sel => {
-        sel.disabled = isOnline || (sel.id !== 'x_coord' && !xSelect.value);
-        sel.required = !isOnline;
-    });
-
-    if (isOnline) {
-        xSelect.value = '';
-        ySelect.innerHTML = '<option value="">请先选择基地</option>';
-        zSelect.innerHTML = '<option value="">请先选择场地</option>';
-        ySelect.value = '';
-        zSelect.value = '';
-    }
+function buildPilotDisplay(pilot) {
+  if (!pilot) return '';
+  const nickname = pilot.nickname || '';
+  const age = pilot.age ? `(${pilot.age})` : '';
+  const status = pilot.status ? `[${pilot.status}]` : '';
+  const genderIcon = pilot.gender === 0 ? '♂' : (pilot.gender === 1 ? '♀' : '?');
+  return `${nickname}${age}${status}${genderIcon}`;
 }
 
-function initializePage() {
-    loadBattleAreaData();
+async function fetchRecordDetail() {
+  if (!recordDetailUrl) throw new Error('缺少详情接口');
+  const response = await fetch(recordDetailUrl);
+  const payload = await response.json();
+  if (!payload.success) {
+    throw new Error(payload.error?.message || '加载开播记录详情失败');
+  }
+  const data = payload.data || {};
+  pageState.defaults.pilotId = data.pilot?.id || '';
+  pageState.defaults.pilotDisplay = buildPilotDisplay(data.pilot);
+  pageState.defaults.ownerName = data.owner_display || '无';
+  pageState.defaults.workMode = data.work_mode || '';
+  pageState.defaults.xCoord = data.location?.x || '';
+  pageState.defaults.yCoord = data.location?.y || '';
+  pageState.defaults.zCoord = data.location?.z || '';
+  pageState.defaults.startTime = data.time?.start_iso ? data.time.start_iso.slice(0, 16) : '';
+  pageState.defaults.endTime = data.time?.end_iso ? data.time.end_iso.slice(0, 16) : '';
+  pageState.defaults.revenueAmount = data.financial?.revenue_amount || '0';
+  pageState.defaults.baseSalary = data.financial?.base_salary || '0';
+  pageState.defaults.notes = data.notes || '';
+  pageState.defaults.relatedAnnouncementId = data.related_announcement?.id || '';
+  pageState.defaults.relatedAnnouncementDeleted = Boolean(data.related_announcement_deleted);
+  if (data.related_announcement_deleted) {
+    pageState.defaults.relatedAnnouncementText = '关联通告计划已被删除';
+  } else if (data.related_announcement?.label) {
+    pageState.defaults.relatedAnnouncementText = data.related_announcement.label;
+  } else {
+    pageState.defaults.relatedAnnouncementText = '无关联通告';
+  }
+  pageState.defaults.registeredBy = data.system?.registered_by || '未知';
+  pageState.defaults.createdAt = data.system?.created_at || '';
+
+  if (elements.relatedHiddenInput) {
+    elements.relatedHiddenInput.value = pageState.defaults.relatedAnnouncementDeleted ? '' : pageState.defaults.relatedAnnouncementId;
+  }
+  if (elements.pilotHiddenInput) {
+    elements.pilotHiddenInput.value = pageState.defaults.pilotId;
+  }
+}
+
+function applyDefaultsToForm() {
+  if (elements.pilotDisplay) {
+    elements.pilotDisplay.textContent = pageState.defaults.pilotDisplay || '-';
+  }
+  if (elements.ownerDisplay) {
+    elements.ownerDisplay.textContent = pageState.defaults.ownerName || '无';
+  }
+  if (elements.relatedDisplay) {
+    elements.relatedDisplay.textContent = pageState.defaults.relatedAnnouncementText || '无关联通告';
+  }
+  if (elements.startTimeInput) {
+    elements.startTimeInput.value = pageState.defaults.startTime || '';
+  }
+  if (elements.endTimeInput) {
+    elements.endTimeInput.value = pageState.defaults.endTime || '';
+  }
+  if (elements.workModeSelect) {
+    elements.workModeSelect.value = pageState.defaults.workMode || '';
+    handleWorkModeChange();
+  }
+  if (elements.revenueInput) {
+    elements.revenueInput.value = pageState.defaults.revenueAmount || '0';
+  }
+  if (elements.baseSalaryInput) {
+    elements.baseSalaryInput.value = pageState.defaults.baseSalary || '0';
+  }
+  if (elements.notesInput) {
+    elements.notesInput.value = pageState.defaults.notes || '';
+  }
+  if (elements.registeredByDisplay) {
+    elements.registeredByDisplay.textContent = pageState.defaults.registeredBy || '未知';
+  }
+  if (elements.createdAtDisplay) {
+    elements.createdAtDisplay.textContent = pageState.defaults.createdAt || '';
+  }
 }
 
 function loadBattleAreaData() {
-    fetch('{{ url_for("battle_records_api.battle_areas") }}')
-        .then(response => response.json())
-        .then(result => {
-            if (!result.success) return;
-            battleAreaData = (result.data && result.data.areas) || {};
-            initializeBattleAreaSelects();
-        })
-        .catch(error => console.error('加载开播地点数据失败:', error));
+  return fetch('{{ url_for("battle_records_api.battle_areas") }}')
+    .then(response => response.json())
+    .then(result => {
+      if (!result.success) return;
+      pageState.battleAreaData = (result.data && result.data.areas) || {};
+      initializeBattleAreaSelects();
+    })
+    .catch(error => {
+      console.error('加载开播地点数据失败:', error);
+    });
 }
 
 function initializeBattleAreaSelects() {
-    const xSelect = document.getElementById('x_coord');
-    const ySelect = document.getElementById('y_coord');
-    const zSelect = document.getElementById('z_coord');
-    
-    xSelect.innerHTML = '<option value="">请选择基地</option>';
-    Object.keys(battleAreaData).sort().forEach(x => {
-        const option = document.createElement('option');
-        option.value = x;
-        option.textContent = x;
-        if (x === currentData.x_coord) {
-            option.selected = true;
-        }
-        xSelect.appendChild(option);
-    });
-    
-    xSelect.addEventListener('change', function() {
-        updateYCoords(this.value);
-    });
-    
-    ySelect.addEventListener('change', function() {
-        const xCoord = xSelect.value;
-        updateZCoords(xCoord, this.value);
-    });
-    
-    if (currentData.x_coord) {
-        updateYCoords(currentData.x_coord);
+  const xSelect = elements.xSelect;
+  const ySelect = elements.ySelect;
+  const zSelect = elements.zSelect;
+  if (!xSelect || !ySelect || !zSelect) return;
+
+  xSelect.innerHTML = '<option value="">请选择基地</option>';
+  Object.keys(pageState.battleAreaData || {}).sort().forEach(x => {
+    const option = document.createElement('option');
+    option.value = x;
+    option.textContent = x;
+    if (x === pageState.defaults.xCoord) {
+      option.selected = true;
     }
+    xSelect.appendChild(option);
+  });
+
+  xSelect.addEventListener('change', () => {
+    pageState.defaults.xCoord = xSelect.value;
+    pageState.defaults.yCoord = '';
+    pageState.defaults.zCoord = '';
+    updateYCoords(xSelect.value);
+  });
+
+  ySelect.addEventListener('change', () => {
+    pageState.defaults.yCoord = ySelect.value;
+    pageState.defaults.zCoord = '';
+    updateZCoords(xSelect.value, ySelect.value);
+  });
+
+  zSelect.addEventListener('change', () => {
+    pageState.defaults.zCoord = zSelect.value;
+  });
+
+  if (pageState.defaults.xCoord) {
+    updateYCoords(pageState.defaults.xCoord);
+  } else {
+    ySelect.disabled = true;
+    zSelect.disabled = true;
+  }
 }
 
 function updateYCoords(xCoord) {
-    const ySelect = document.getElementById('y_coord');
-    const zSelect = document.getElementById('z_coord');
-    
-    ySelect.innerHTML = '<option value="">请选择场地</option>';
-    zSelect.innerHTML = '<option value="">请先选择场地</option>';
-    zSelect.disabled = true;
-    
-    if (xCoord && battleAreaData[xCoord]) {
-        ySelect.disabled = false;
-        Object.keys(battleAreaData[xCoord]).sort().forEach(y => {
-            const option = document.createElement('option');
-            option.value = y;
-            option.textContent = y;
-            if (y === currentData.y_coord) {
-                option.selected = true;
-            }
-            ySelect.appendChild(option);
-        });
-        
-        if (currentData.y_coord) {
-            updateZCoords(xCoord, currentData.y_coord);
-        }
-    } else {
-        ySelect.disabled = true;
+  const ySelect = elements.ySelect;
+  const zSelect = elements.zSelect;
+  if (!ySelect || !zSelect) return;
+
+  ySelect.innerHTML = '<option value="">请选择场地</option>';
+  zSelect.innerHTML = '<option value="">请先选择场地</option>';
+  zSelect.disabled = true;
+
+  if (!xCoord || !pageState.battleAreaData[xCoord]) {
+    ySelect.disabled = true;
+    return;
+  }
+
+  ySelect.disabled = false;
+  Object.keys(pageState.battleAreaData[xCoord]).sort().forEach(y => {
+    const option = document.createElement('option');
+    option.value = y;
+    option.textContent = y;
+    if (y === pageState.defaults.yCoord) {
+      option.selected = true;
     }
+    ySelect.appendChild(option);
+  });
+
+  if (pageState.defaults.yCoord) {
+    updateZCoords(xCoord, pageState.defaults.yCoord);
+  }
 }
 
 function updateZCoords(xCoord, yCoord) {
-    const zSelect = document.getElementById('z_coord');
-    
-    zSelect.innerHTML = '<option value="">请选择坐席</option>';
-    
-    if (xCoord && yCoord && battleAreaData[xCoord] && battleAreaData[xCoord][yCoord]) {
-        zSelect.disabled = false;
-        battleAreaData[xCoord][yCoord].forEach(z => {
-            const option = document.createElement('option');
-            option.value = z;
-            option.textContent = z;
-            if (z === currentData.z_coord) {
-                option.selected = true;
-            }
-            zSelect.appendChild(option);
-        });
-    } else {
-        zSelect.disabled = true;
+  const zSelect = elements.zSelect;
+  if (!zSelect) return;
+
+  zSelect.innerHTML = '<option value="">请选择坐席</option>';
+
+  if (!xCoord || !yCoord || !pageState.battleAreaData[xCoord] || !pageState.battleAreaData[xCoord][yCoord]) {
+    zSelect.disabled = true;
+    return;
+  }
+
+  zSelect.disabled = false;
+  pageState.battleAreaData[xCoord][yCoord].forEach(z => {
+    const option = document.createElement('option');
+    option.value = z;
+    option.textContent = z;
+    if (z === pageState.defaults.zCoord) {
+      option.selected = true;
     }
+    zSelect.appendChild(option);
+  });
 }
 
-function updateCharacterCount() {
-    const textarea = document.getElementById('notes');
-    const counter = document.getElementById('notes-count');
-    counter.textContent = textarea.value.length;
-    
-    if (textarea.value.length > 180) {
-        counter.style.color = 'var(--error)';
-    } else if (textarea.value.length > 150) {
-        counter.style.color = 'var(--warn)';
-    } else {
-        counter.style.color = 'var(--muted)';
-    }
-}
-
-function initializeTimeButtons() {
-    const timeButtons = document.querySelectorAll('.time-btn');
-    timeButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const targetId = this.getAttribute('data-target');
-            const minutes = parseInt(this.getAttribute('data-minutes'));
-            const targetInput = document.getElementById(targetId);
-            
-            if (targetInput && targetInput.value) {
-                const currentTime = new Date(targetInput.value);
-                currentTime.setMinutes(currentTime.getMinutes() + minutes);
-                const year = currentTime.getFullYear();
-                const month = String(currentTime.getMonth() + 1).padStart(2, '0');
-                const day = String(currentTime.getDate()).padStart(2, '0');
-                const hours = String(currentTime.getHours()).padStart(2, '0');
-                const mins = String(currentTime.getMinutes()).padStart(2, '0');
-                targetInput.value = `${year}-${month}-${day}T${hours}:${mins}`;
-                targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-                
-                validateNotesRequired();
-                updateSubmitButtonState();
-                
-                this.classList.add('clicked');
-                setTimeout(() => {
-                    this.classList.remove('clicked');
-                }, 300);
-            }
-        });
-    });
-}
-
-function initializeDurationHelper() {
-    const startInput = document.getElementById('start_time');
-    const endInput = document.getElementById('end_time');
-    const durationInput = document.getElementById('duration_hours');
-    if (!startInput || !endInput || !durationInput) return;
-
-    function parseLocalDate(val) {
-        if (!val) return null;
-        try { return new Date(val); } catch (e) { return null; }
-    }
-
-    function formatLocalInput(dt) {
-        if (!dt) return '';
-        const y = dt.getFullYear();
-        const m = String(dt.getMonth() + 1).padStart(2, '0');
-        const d = String(dt.getDate()).padStart(2, '0');
-        const H = String(dt.getHours()).padStart(2, '0');
-        const M = String(dt.getMinutes()).padStart(2, '0');
-        return `${y}-${m}-${d}T${H}:${M}`;
-    }
-
-    function roundTo1Decimal(hours) {
-        return Math.round(hours * 10) / 10;
-    }
-
-    function recomputeDurationFromTimes() {
-        const s = parseLocalDate(startInput.value);
-        const e = parseLocalDate(endInput.value);
-        if (!s || !e) { durationInput.value = ''; return; }
-        const ms = e - s;
-        if (isNaN(ms)) { durationInput.value = ''; return; }
-        const hours = ms / (1000 * 60 * 60);
-        durationInput.value = roundTo1Decimal(hours).toFixed(1);
-    }
-
-    function applyDurationToEndTime() {
-        const s = parseLocalDate(startInput.value);
-        if (!s) return;
-        let hours = parseFloat(durationInput.value);
-        if (isNaN(hours) || hours < 0) return;
-        const minsTotal = Math.floor(hours * 60);
-        const newEnd = new Date(s.getTime());
-        newEnd.setMinutes(newEnd.getMinutes() + minsTotal);
-        endInput.value = formatLocalInput(newEnd);
+function attachFieldWatchers() {
+  const ids = ['start_time', 'end_time', 'revenue_amount', 'base_salary', 'notes', 'work_mode'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    ['input', 'change'].forEach(evt => {
+      el.addEventListener(evt, () => {
+        if (id === 'work_mode') {
+          handleWorkModeChange();
+        }
         validateNotesRequired();
         updateSubmitButtonState();
-    }
-
-    ['input', 'change'].forEach(evt => {
-        startInput.addEventListener(evt, recomputeDurationFromTimes);
-        endInput.addEventListener(evt, recomputeDurationFromTimes);
+      });
     });
-
-    durationInput.addEventListener('input', applyDurationToEndTime);
-    durationInput.addEventListener('change', applyDurationToEndTime);
-
-    recomputeDurationFromTimes();
+  });
 }
 
-function validateNotesRequired() {
-    const notes = document.getElementById('notes');
-    const startTimeField = document.getElementById('start_time');
-    const endTimeField = document.getElementById('end_time');
-    const revenueField = document.getElementById('revenue_amount');
-    const baseSalaryField = document.getElementById('base_salary');
-    const validationMessage = document.getElementById('notes-validation-message');
-    
-    if (!notes || !validationMessage) return false;
-    
-    const notesValue = notes.value.trim();
-    const startTime = startTimeField ? startTimeField.value : '';
-    const endTime = endTimeField ? endTimeField.value : '';
-    const revenue = parseFloat(revenueField ? revenueField.value : 0) || 0;
-    const baseSalary = parseFloat(baseSalaryField ? baseSalaryField.value : 0) || 0;
-    
-    if (notesValue) {
-        validationMessage.style.display = 'none';
-        return false;
+function attachFormSubmit() {
+  if (!battleRecordForm) return;
+  battleRecordForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!validateFormSubmission()) {
+      return;
     }
-    
-    const reasons = [];
-    
-    if (startTime && endTime) {
-        const start = new Date(startTime);
-        const end = new Date(endTime);
-        const duration = (end - start) / (1000 * 60 * 60);
-        
-        if (duration < 6.0) {
-            reasons.push("开播时长小于6.0小时");
-        } else if (duration >= 9.0) {
-            reasons.push("开播时长大于等于9.0小时");
-        }
-    }
-    
-    if (baseSalary !== 0 && baseSalary !== 150) {
-        reasons.push("底薪不等于0也不等于150");
-    }
-    
-    if (revenue !== 0 && revenue < 100) {
-        reasons.push("流水不等于0且小于100");
-    }
-    
-    if (revenue >= 5000) {
-        reasons.push("流水大于等于5000");
-    }
-    
-    
-    if (reasons.length > 0) {
-        validationMessage.textContent = "因为" + reasons.join("或") + "原因，必须填写备注";
-        validationMessage.style.display = 'block';
-        return true;
-    } else {
-        validationMessage.style.display = 'none';
-        return false;
-    }
+    await submitBattleRecordUpdate();
+  });
 }
 
 function collectBattleRecordPayload() {
-    const startInput = document.getElementById('start_time');
-    const endInput = document.getElementById('end_time');
-    const revenueInput = document.getElementById('revenue_amount');
-    const baseSalaryInput = document.getElementById('base_salary');
-    const workModeSelect = document.getElementById('work_mode');
-    const xSelect = document.getElementById('x_coord');
-    const ySelect = document.getElementById('y_coord');
-    const zSelect = document.getElementById('z_coord');
-    const notesInput = document.getElementById('notes');
-
-    return {
-        start_time: startInput ? startInput.value : '',
-        end_time: endInput ? endInput.value : '',
-        revenue_amount: revenueInput ? revenueInput.value : '',
-        base_salary: baseSalaryInput ? baseSalaryInput.value : '',
-        work_mode: workModeSelect ? workModeSelect.value : '',
-        x_coord: xSelect ? xSelect.value : '',
-        y_coord: ySelect ? ySelect.value : '',
-        z_coord: zSelect ? zSelect.value : '',
-        notes: notesInput ? notesInput.value : '',
-    };
+  return {
+    pilot: elements.pilotHiddenInput ? elements.pilotHiddenInput.value : pageState.defaults.pilotId,
+    related_announcement: elements.relatedHiddenInput ? elements.relatedHiddenInput.value : pageState.defaults.relatedAnnouncementId,
+    start_time: elements.startTimeInput ? elements.startTimeInput.value : '',
+    end_time: elements.endTimeInput ? elements.endTimeInput.value : '',
+    revenue_amount: elements.revenueInput ? elements.revenueInput.value : '',
+    base_salary: elements.baseSalaryInput ? elements.baseSalaryInput.value : '',
+    work_mode: elements.workModeSelect ? elements.workModeSelect.value : '',
+    x_coord: elements.xSelect ? elements.xSelect.value : '',
+    y_coord: elements.ySelect ? elements.ySelect.value : '',
+    z_coord: elements.zSelect ? elements.zSelect.value : '',
+    notes: elements.notesInput ? elements.notesInput.value : '',
+  };
 }
 
 async function submitBattleRecordUpdate() {
-    const submitBtn = document.getElementById('submit-btn');
-    if (!submitBtn) return;
+  if (!elements.submitBtn) return;
 
-    const originalText = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.classList.add('disabled');
-    submitBtn.innerHTML = '<span class="btn-icon">⏳</span>提交中...';
+  const originalText = elements.submitBtn.innerHTML;
+  elements.submitBtn.disabled = true;
+  elements.submitBtn.classList.add('disabled');
+  elements.submitBtn.innerHTML = '<span class="btn-icon">⏳</span>提交中...';
 
-    try {
-        const payload = collectBattleRecordPayload();
-        const response = await fetch(updateRecordUrl, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
-            },
-            body: JSON.stringify(payload),
-        });
-
-        const result = await response.json();
-        if (!result.success) {
-            throw new Error(result.error?.message || '保存修改失败');
-        }
-
-        const meta = result.meta || {};
-        showMessage(meta.message || '开播记录更新成功', 'success');
-        setTimeout(() => {
-            window.location.href = detailPageUrl;
-        }, 600);
-    } catch (error) {
-        console.error('更新开播记录失败:', error);
-        showMessage(error.message || '更新开播记录失败', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('disabled');
-        submitBtn.innerHTML = originalText;
-        updateSubmitButtonState();
+  try {
+    const payload = collectBattleRecordPayload();
+    const response = await fetch(updateRecordUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+      },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error?.message || '保存修改失败');
     }
+    const metaMessage = result.meta?.message || '保存修改成功';
+    showMessage(metaMessage, 'success');
+    setTimeout(() => {
+      window.location.href = detailPageUrl;
+    }, 600);
+  } catch (error) {
+    console.error('更新开播记录失败:', error);
+    showMessage(error.message || '更新开播记录失败', 'error');
+    elements.submitBtn.disabled = false;
+    elements.submitBtn.classList.remove('disabled');
+    elements.submitBtn.innerHTML = originalText;
+  }
+}
+
+function updateCharacterCount() {
+  if (!elements.notesInput || !elements.notesCounter) return;
+  const length = elements.notesInput.value.length;
+  elements.notesCounter.textContent = length;
+  if (length > 180) {
+    elements.notesCounter.style.color = 'var(--error)';
+  } else if (length > 150) {
+    elements.notesCounter.style.color = 'var(--warn)';
+  } else {
+    elements.notesCounter.style.color = 'var(--muted)';
+  }
+}
+
+function initializeTimeButtons() {
+  const buttons = document.querySelectorAll('.time-btn');
+  buttons.forEach(button => {
+    button.addEventListener('click', () => {
+      const targetId = button.getAttribute('data-target');
+      const minutes = parseInt(button.getAttribute('data-minutes'), 10);
+      const target = document.getElementById(targetId);
+      if (!target || !target.value) return;
+      const current = new Date(target.value);
+      if (Number.isNaN(current.getTime())) return;
+      current.setMinutes(current.getMinutes() + minutes);
+      const formatted = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}T${String(current.getHours()).padStart(2, '0')}:${String(current.getMinutes()).padStart(2, '0')}`;
+      target.value = formatted;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      validateNotesRequired();
+      updateSubmitButtonState();
+      button.classList.add('clicked');
+      setTimeout(() => button.classList.remove('clicked'), 300);
+    });
+  });
+}
+
+function initializeDurationHelper() {
+  if (!elements.startTimeInput || !elements.endTimeInput) return;
+  const durationInput = document.getElementById('duration_hours');
+  if (!durationInput) return;
+
+  const parseLocalDate = (val) => {
+    if (!val) return null;
+    const dt = new Date(val);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  };
+
+  const formatLocalInput = (dt) => {
+    if (!dt) return '';
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const recomputeDurationFromTimes = () => {
+    const start = parseLocalDate(elements.startTimeInput.value);
+    const end = parseLocalDate(elements.endTimeInput.value);
+    if (!start || !end) {
+      durationInput.value = '';
+      return;
+    }
+    const diffHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    if (Number.isNaN(diffHours)) {
+      durationInput.value = '';
+      return;
+    }
+    durationInput.value = (Math.round(diffHours * 10) / 10).toFixed(1);
+  };
+
+  const applyDurationToEndTime = () => {
+    const start = parseLocalDate(elements.startTimeInput.value);
+    if (!start) return;
+    const hours = parseFloat(durationInput.value);
+    if (Number.isNaN(hours) || hours < 0) return;
+    const newEnd = new Date(start.getTime());
+    newEnd.setMinutes(newEnd.getMinutes() + Math.floor(hours * 60));
+    elements.endTimeInput.value = formatLocalInput(newEnd);
+    validateNotesRequired();
+    updateSubmitButtonState();
+  };
+
+  ['input', 'change'].forEach(evt => {
+    elements.startTimeInput.addEventListener(evt, recomputeDurationFromTimes);
+    elements.endTimeInput.addEventListener(evt, recomputeDurationFromTimes);
+  });
+  durationInput.addEventListener('input', applyDurationToEndTime);
+  durationInput.addEventListener('change', applyDurationToEndTime);
+
+  recomputeDurationFromTimes();
+}
+
+function handleWorkModeChange() {
+  const wm = elements.workModeSelect ? elements.workModeSelect.value : '';
+  const xSelect = elements.xSelect;
+  const ySelect = elements.ySelect;
+  const zSelect = elements.zSelect;
+  const isOnline = wm === '线上';
+
+  [xSelect, ySelect, zSelect].forEach(sel => {
+    if (!sel) return;
+    sel.disabled = isOnline || (sel.id !== 'x_coord' && !xSelect.value);
+    sel.required = !isOnline;
+  });
+
+  if (isOnline) {
+    if (xSelect) xSelect.value = '';
+    if (ySelect) {
+      ySelect.innerHTML = '<option value="">请先选择基地</option>';
+      ySelect.value = '';
+    }
+    if (zSelect) {
+      zSelect.innerHTML = '<option value="">请先选择场地</option>';
+      zSelect.value = '';
+    }
+    pageState.defaults.xCoord = '';
+    pageState.defaults.yCoord = '';
+    pageState.defaults.zCoord = '';
+  }
+}
+
+function validateNotesRequired() {
+  const notes = elements.notesInput;
+  const validationMessage = elements.notesValidationMessage;
+  if (!notes || !validationMessage) return false;
+
+  const notesValue = notes.value.trim();
+  const startTime = elements.startTimeInput ? elements.startTimeInput.value : '';
+  const endTime = elements.endTimeInput ? elements.endTimeInput.value : '';
+  const revenue = parseFloat(elements.revenueInput ? elements.revenueInput.value : 0) || 0;
+  const baseSalary = parseFloat(elements.baseSalaryInput ? elements.baseSalaryInput.value : 0) || 0;
+
+  if (notesValue) {
+    validationMessage.style.display = 'none';
+    return false;
+  }
+
+  const reasons = [];
+
+  if (startTime && endTime) {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const duration = (end - start) / (1000 * 60 * 60);
+    if (duration < 6.0) {
+      reasons.push('开播时长小于6.0小时');
+    } else if (duration >= 9.0) {
+      reasons.push('开播时长大于等于9.0小时');
+    }
+  }
+
+  if (baseSalary !== 0 && baseSalary !== 150) {
+    reasons.push('底薪不等于0也不等于150');
+  }
+
+  if (revenue !== 0 && revenue < 100) {
+    reasons.push('流水不等于0且小于100');
+  }
+
+  if (revenue >= 5000) {
+    reasons.push('流水大于等于5000');
+  }
+
+  if (reasons.length > 0) {
+    validationMessage.textContent = `因为${reasons.join('或')}原因，必须填写备注`;
+    validationMessage.style.display = 'block';
+    return true;
+  }
+
+  validationMessage.style.display = 'none';
+  return false;
 }
 
 function updateSubmitButtonState() {
-    const submitBtn = document.getElementById('submit-btn');
-    const notesValidationFailed = validateNotesRequired();
-    
-    if (notesValidationFailed) {
-        submitBtn.disabled = true;
-        submitBtn.classList.add('disabled');
-        submitBtn.innerHTML = '<span class="btn-icon">⚠️</span>请完成必填信息';
-    } else {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('disabled');
-        submitBtn.innerHTML = '<span class="btn-icon">💾</span>保存修改';
-    }
+  if (!elements.submitBtn) return;
+  const notesValidationFailed = validateNotesRequired();
+  if (notesValidationFailed) {
+    elements.submitBtn.disabled = true;
+    elements.submitBtn.classList.add('disabled');
+    elements.submitBtn.innerHTML = '<span class="btn-icon">⚠️</span>请完成必填信息';
+  } else {
+    elements.submitBtn.disabled = false;
+    elements.submitBtn.classList.remove('disabled');
+    elements.submitBtn.innerHTML = '<span class="btn-icon">💾</span>保存修改';
+  }
 }
 
 function validateFormSubmission() {
-    const notesValidationFailed = validateNotesRequired();
-    
-    if (notesValidationFailed) {
-        alert('请完成必填信息后再提交：\n因为备注字段原因，必须填写备注');
-        return false;
-    }
-    
-    return true;
+  const notesValidationFailed = validateNotesRequired();
+  if (notesValidationFailed) {
+    alert('请完成必填信息后再提交：\n因为备注字段原因，必须填写备注');
+    return false;
+  }
+  return true;
 }
 </script>
 {% endblock %}

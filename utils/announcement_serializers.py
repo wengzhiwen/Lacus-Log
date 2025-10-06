@@ -113,11 +113,14 @@ def serialize_announcement_detail(announcement: Announcement, related: Optional[
             'y': announcement.y_coord,
             'z': announcement.z_coord,
             'display': f"{announcement.x_coord}-{announcement.y_coord}-{announcement.z_coord}",
+            'battle_area_id': str(announcement.battle_area.id) if announcement.battle_area else None,
         },
         'time': {
             'start': local_start,
             'end': local_end,
             'duration': announcement.duration_display,
+            'duration_hours': announcement.duration_hours,
+            'start_iso': _format_datetime(announcement.start_time, '%Y-%m-%dT%H:%M'),
         },
         'recurrence': {
             'type': announcement.recurrence_type.name if announcement.recurrence_type else 'NONE',

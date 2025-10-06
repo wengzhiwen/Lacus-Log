@@ -12,87 +12,60 @@
     </div>
 
     <div class="form-container">
-        <form method="POST" id="battleRecordForm">
+        <form method="POST" id="battleRecordForm" data-announcement-id="{{ related_announcement.id if related_announcement else '' }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            
-            {% if default_data.related_announcement %}
-            <input type="hidden" name="related_announcement" value="{{ default_data.related_announcement.id }}"/>
-            {% endif %}
+            <input type="hidden" name="related_announcement" id="related_announcement_value" value="">
+            <input type="hidden" name="pilot" id="pilot_id" value="">
             
             <div class="form-section">
                 <h3>基础信息</h3>
                 
-                {% if related_announcement %}
-                <div class="info-banner">
-                    <strong>从通告预填：</strong>{{ related_announcement.pilot.nickname }} - 
-                    {{ related_announcement.start_time|local_datetime('%Y年%m月%d日 %H:%M') }} - 
-                    {{ related_announcement.x_coord }}-{{ related_announcement.y_coord }}-{{ related_announcement.z_coord }}
-                </div>
-                {% endif %}
-                
-                {% if related_announcement %}
-                <div class="form-row">
+                <div class="info-banner" id="prefill_banner" style="display:none;"></div>
+
+                <div class="form-row" id="prefilled_pilot" style="display:none;">
                     <div class="form-group">
                         <label>主播</label>
-                        <div class="readonly-value" id="pilot_display">
-                            {% set age_str = '(' ~ related_announcement.pilot.age ~ ')' if related_announcement.pilot.age else '' %}
-                            {% set gender_icon = '♂' if related_announcement.pilot.gender.value == 0 else ('♀' if related_announcement.pilot.gender.value == 1 else '?') %}
-                            {{ related_announcement.pilot.nickname }}{{ age_str }}[{{ related_announcement.pilot.status.value }}]{{ gender_icon }}
-                        </div>
-                        <input type="hidden" name="pilot" value="{{ related_announcement.pilot.id }}"/>
+                        <div class="readonly-value" id="pilot_display">-</div>
                     </div>
                 </div>
-                <div class="form-row">
+                <div class="form-row" id="prefilled_owner" style="display:none;">
                     <div class="form-group">
                         <label>直属运营</label>
-                        <div class="readonly-value" id="owner_display">
-                            {{ (related_announcement.pilot.owner.nickname or related_announcement.pilot.owner.username) if related_announcement.pilot.owner else '无' }}
-                        </div>
+                        <div class="readonly-value" id="owner_display">-</div>
                     </div>
                 </div>
-                {% else %}
-                <div class="form-row">
+
+                <div class="form-row" id="manual_pilot_search">
                     <div class="form-group">
                         <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
                         <input type="text" id="pilot_search" placeholder="输入主播昵称或真实姓名进行筛选">
                     </div>
                 </div>
 
-                <div class="form-row">
+                <div class="form-row" id="manual_pilot_select">
                     <div class="form-group">
                         <label for="pilot" class="required">主播：</label>
-                        <select name="pilot" id="pilot" required>
+                        <select id="pilot" required>
                             <option value="">请选择主播</option>
                         </select>
                     </div>
                 </div>
-                {% endif %}
 
-                
-
-                {% if related_announcement %}
-                <div class="form-row">
+                <div class="form-row" id="prefilled_announcement" style="display:none;">
                     <div class="form-group">
                         <label>关联通告：</label>
-                        <div class="readonly-value">
-                            {% set weekday_map = {'0':'日','1':'一','2':'二','3':'三','4':'四','5':'五','6':'六'} %}
-                            {% set weekday_idx = related_announcement.start_time|local_datetime('%w') %}
-                            {% set date_str = related_announcement.start_time|local_datetime('%Y-%m-%d') %}
-                            {% set duration_str = related_announcement.duration_hours ~ '小时' %}
-                            {{ date_str }} 星期{{ weekday_map[weekday_idx] }} {{ duration_str }} @{{ related_announcement.x_coord }}-{{ related_announcement.y_coord }}-{{ related_announcement.z_coord }}
-                        </div>
+                        <div class="readonly-value" id="prefilled_announcement_text">-</div>
                     </div>
                 </div>
-                {% else %}
-                <div class="form-row">
+
+                <div class="form-row" id="manual_related_section">
                     <div class="form-group">
-                        <label for="related_announcement">关联通告（可选）：</label>
-                        <select name="related_announcement" id="related_announcement">
+                        <label for="related_announcement_select">关联通告（可选）：</label>
+                        <select id="related_announcement_select">
                             <option value="">无关联通告</option>
                         </select>
                     </div>
                 </div>
-                {% endif %}
             </div>
 
             <div class="form-section">
@@ -101,8 +74,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="start_time" class="required">开始时间：</label>
-                        <input type="datetime-local" name="start_time" id="start_time" required
-                               value="{{ default_data.start_time.strftime('%Y-%m-%dT%H:%M') if default_data.start_time else '' }}">
+                        <input type="datetime-local" name="start_time" id="start_time" required value="">
                         <div class="time-quick-buttons">
                             <button type="button" class="time-btn" data-target="start_time" data-minutes="5">+5</button>
                             <button type="button" class="time-btn" data-target="start_time" data-minutes="15">+15</button>
@@ -119,8 +91,7 @@
 
                     <div class="form-group">
                         <label for="end_time" class="required">结束时间：</label>
-                        <input type="datetime-local" name="end_time" id="end_time" required
-                               value="{{ default_data.end_time.strftime('%Y-%m-%dT%H:%M') if default_data.end_time else '' }}">
+                        <input type="datetime-local" name="end_time" id="end_time" required value="">
                         <div class="time-quick-buttons">
                             <button type="button" class="time-btn" data-target="end_time" data-minutes="5">+5</button>
                             <button type="button" class="time-btn" data-target="end_time" data-minutes="15">+15</button>
@@ -139,8 +110,8 @@
                         <label for="work_mode" class="required">开播方式：</label>
                         <select name="work_mode" id="work_mode" required>
                             <option value="">请选择开播方式</option>
-                            <option value="线下" {% if default_data.work_mode and default_data.work_mode.value == '线下' %}selected{% endif %}>线下</option>
-                            <option value="线上" {% if default_data.work_mode and default_data.work_mode.value == '线上' %}selected{% endif %}>线上</option>
+                            <option value="线下">线下</option>
+                            <option value="线上">线上</option>
                         </select>
                     </div>
                 </div>
@@ -176,15 +147,13 @@
                     <div class="form-group">
                         <label for="revenue_amount" class="required">流水金额（元）：</label>
                         <input type="number" name="revenue_amount" id="revenue_amount" 
-                               step="0.01" min="0" required
-                               value="{{ default_data.revenue_amount or '0' }}">
+                               step="0.01" min="0" required value="0">
                     </div>
 
                     <div class="form-group">
                         <label for="base_salary" class="required">底薪金额（元）：</label>
                         <input type="number" name="base_salary" id="base_salary" 
-                               step="0.01" min="0" required
-                               value="{{ default_data.base_salary or '0' }}">
+                               step="0.01" min="0" required value="0">
                     </div>
                 </div>
             </div>
@@ -196,7 +165,7 @@
                     <div class="form-group">
                         <label for="notes">备注（最多200字）：</label>
                         <textarea name="notes" id="notes" rows="3" maxlength="200" 
-                                  placeholder="可选择填写相关备注信息...">{{ default_data.notes or '' }}</textarea>
+                                  placeholder="可选择填写相关备注信息..."></textarea>
                         <div class="char-count">
                             <span id="notes-count">0</span>/200
                         </div>
@@ -463,157 +432,146 @@
 </style>
 
 <script>
-let battleAreaData = {};
-let defaultData = {
-    pilot: '{{ default_data.pilot.id if default_data.pilot else "" }}',
-    x_coord: '{{ default_data.x_coord or "" }}',
-    y_coord: '{{ default_data.y_coord or "" }}',
-    z_coord: '{{ default_data.z_coord or "" }}',
-    work_mode: '{{ default_data.work_mode.value if default_data.work_mode else "" }}'
-};
+const battleRecordForm = document.getElementById('battleRecordForm');
 const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-const createRecordUrl = '{{ url_for('battle_records_api.create_record') }}';
+const createRecordUrl = "{{ url_for('battle_records_api.create_record') }}";
+const pageState = {
+    announcementId: battleRecordForm?.dataset.announcementId || '',
+    battleAreaData: {},
+    defaults: {
+        pilotId: '',
+        ownerName: '',
+        startTime: '',
+        endTime: '',
+        xCoord: '',
+        yCoord: '',
+        zCoord: '',
+        workMode: '',
+        revenueAmount: '0',
+        baseSalary: '0',
+    },
+    prefillLabel: '',
+};
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('[BR] DOMContentLoaded: initialize page');
-    initializePage();
+const prefillBanner = document.getElementById('prefill_banner');
+const prefilledPilotRow = document.getElementById('prefilled_pilot');
+const prefilledOwnerRow = document.getElementById('prefilled_owner');
+const pilotDisplay = document.getElementById('pilot_display');
+const ownerDisplay = document.getElementById('owner_display');
+const manualPilotSearchRow = document.getElementById('manual_pilot_search');
+const manualPilotSelectRow = document.getElementById('manual_pilot_select');
+const pilotSelect = document.getElementById('pilot');
+const pilotSearchInput = document.getElementById('pilot_search');
+const pilotHiddenInput = document.getElementById('pilot_id');
+const prefilledAnnouncementRow = document.getElementById('prefilled_announcement');
+const prefilledAnnouncementText = document.getElementById('prefilled_announcement_text');
+const manualAnnouncementRow = document.getElementById('manual_related_section');
+const relatedAnnouncementSelect = document.getElementById('related_announcement_select');
+const relatedAnnouncementHidden = document.getElementById('related_announcement_value');
+const startTimeInput = document.getElementById('start_time');
+const endTimeInput = document.getElementById('end_time');
+const workModeSelect = document.getElementById('work_mode');
+const revenueInput = document.getElementById('revenue_amount');
+const baseSalaryInput = document.getElementById('base_salary');
+const notesInput = document.getElementById('notes');
+
+function roundToHalfHour(date) {
+    const rounded = new Date(date);
+    if (rounded.getMinutes() === 0 || rounded.getMinutes() === 30) {
+        rounded.setSeconds(0, 0);
+        return rounded;
+    }
+    if (rounded.getMinutes() <= 30) {
+        rounded.setMinutes(0, 0, 0);
+    } else {
+        rounded.setMinutes(30, 0, 0);
+    }
+    return rounded;
+}
+
+function formatDateTimeLocal(date) {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+        `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatAnnouncementLabel(data) {
+    if (!data) return '';
+    const start = data.start_time ? new Date(data.start_time) : null;
+    const end = data.end_time ? new Date(data.end_time) : null;
+    const pad = (value) => String(value).padStart(2, '0');
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const datePart = start ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}` : '';
+    const weekday = start ? `星期${weekdays[start.getDay()]}` : '';
+    let duration = '';
+    if (start && end) {
+        const diffMs = end.getTime() - start.getTime();
+        if (!Number.isNaN(diffMs) && diffMs > 0) {
+            const diffHours = diffMs / (1000 * 60 * 60);
+            duration = `${diffHours}小时`;
+        }
+    }
+    const coords = [data.x_coord, data.y_coord, data.z_coord].filter(Boolean).join('-');
+    const parts = [datePart, weekday, duration];
+    if (coords) {
+        parts.push(`@${coords}`);
+    }
+    return parts.filter(Boolean).join(' ').trim();
+}
+
+function initializeDefaultTimes() {
+    const now = new Date();
+    const defaultEnd = roundToHalfHour(now);
+    const defaultStart = roundToHalfHour(new Date(now.getTime() - 6 * 60 * 60 * 1000));
+    pageState.defaults.startTime = formatDateTimeLocal(defaultStart);
+    pageState.defaults.endTime = formatDateTimeLocal(defaultEnd);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    initializeDefaultTimes();
+    applyDefaultsToForm();
+
+    if (notesInput) {
+        notesInput.addEventListener('input', updateCharacterCount);
+    }
     updateCharacterCount();
     initializeTimeButtons();
     initializeDurationHelper();
-    
-    document.getElementById('notes').addEventListener('input', updateCharacterCount);
-    
-    const fieldsToWatch = ['start_time', 'end_time', 'revenue_amount', 'base_salary', 'related_announcement', 'notes'];
-    fieldsToWatch.forEach(fieldName => {
-        const field = document.getElementById(fieldName);
-        if (field) {
-            field.addEventListener('input', function() {
-                validateNotesRequired();
-                updateSubmitButtonState();
-            });
-            field.addEventListener('change', function() {
-                validateNotesRequired();
-                updateSubmitButtonState();
-            });
+
+    attachFieldWatchers();
+    attachFormSubmit();
+    setupRelatedAnnouncementListener();
+
+    if (pageState.announcementId) {
+        try {
+            await prefillFromAnnouncement();
+            showPrefillUI();
+        } catch (error) {
+            console.error('预填数据失败，将切换为手动模式:', error);
+            showManualUI();
         }
-    });
-    
-    const form = document.getElementById('battleRecordForm');
-    if (form) {
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!validateFormSubmission()) {
-                return;
-            }
-            await submitBattleRecord();
-        });
-    }
-    
-    updateSubmitButtonState();
-    
-    const pilotEl = document.getElementById('pilot');
-    if (pilotEl) pilotEl.addEventListener('change', function() {
-        const pilotId = this.value;
-        if (pilotId) {
-            fetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`)
-                .then(response => response.json())
-                .then(result => {
-                    if (!result.success) {
-                        throw new Error(result.error?.message || '获取主播信息失败');
-                    }
-                    const items = (result.data && result.data.items) || [];
-                    if (items.length > 0 && !defaultData.work_mode) {
-                        const pilot = items[0];
-                        const workModeSelect = document.getElementById('work_mode');
-                        if (workModeSelect) {
-                            workModeSelect.value = pilot.work_mode || '';
-                        }
-                    }
-                })
-                .catch(error => console.error('获取主播信息失败:', error));
-
-            fetch(`{{ url_for('battle_records_api.related_announcements') }}?pilot_id=${pilotId}`)
-                .then(resp => resp.json())
-                .then(result => {
-                    const select = document.getElementById('related_announcement');
-                    if (!select) return;
-                    select.innerHTML = '<option value="">无关联通告</option>';
-                    if (!result.success) return;
-                    const announcements = (result.data && result.data.announcements) || [];
-                    announcements.forEach(item => {
-                        const opt = document.createElement('option');
-                        opt.value = item.id;
-                        opt.textContent = item.label;
-                        select.appendChild(opt);
-                    });
-                })
-                .catch(err => console.error('获取关联通告失败:', err));
-        }
-    });
-    const wmSelect = document.getElementById('work_mode');
-    if (wmSelect) {
-        wmSelect.addEventListener('change', handleWorkModeChange);
-        handleWorkModeChange();
+    } else {
+        showManualUI();
     }
 
-    const relatedSelect = document.getElementById('related_announcement');
-    if (relatedSelect) {
-        relatedSelect.addEventListener('change', function () {
-            const annId = this.value;
-            console.log('[BR] related_announcement changed:', annId);
-            if (!annId) return;
-            const url = `{{ url_for('battle_records_api.announcement_detail', announcement_id='__ANN_ID__') }}`.replace('__ANN_ID__', annId);
-            console.log('[BR] fetching announcement detail:', url);
-            fetch(url)
-                .then(resp => resp.json())
-                .then(result => {
-                    if (!result.success) return;
-                    const a = result.data?.announcement || {};
+    await loadBattleAreaData();
 
-                    const startInput = document.getElementById('start_time');
-                    const endInput = document.getElementById('end_time');
-                    if (startInput && a.start_time) startInput.value = a.start_time.slice(0,16);
-                    if (endInput && a.end_time) endInput.value = a.end_time.slice(0,16);
-
-                    const wmSel = document.getElementById('work_mode');
-                    if (wmSel) {
-                        wmSel.value = '线下';
-                        handleWorkModeChange();
-                    }
-
-                    defaultData.x_coord = a.x_coord || '';
-                    defaultData.y_coord = a.y_coord || '';
-                    defaultData.z_coord = a.z_coord || '';
-                    console.log('[BR] set default coords:', defaultData);
-                    initializeBattleAreaSelects();
-
-                    const baseSalaryInput = document.getElementById('base_salary');
-                    if (baseSalaryInput) {
-                        baseSalaryInput.value = '150';
-                    }
-                    
-                    validateNotesRequired();
-                    updateSubmitButtonState();
-                })
-                .catch(err => console.error('[BR] fetch announcement detail error:', err));
-        });
-    }
-});
-
-function initializePage() {
-    if (document.getElementById('pilot') && !document.getElementById('pilot').hasAttribute('data-prefilled')) {
-        loadAllPilots();
+    await loadAllPilots();
+    if (!pageState.announcementId) {
         initPilotLocalSearch();
     }
-    loadBattleAreaData();
-}
+
+    setupPilotChangeListener();
+    handleWorkModeChange();
+    validateNotesRequired();
+    updateSubmitButtonState();
+});
 
 function loadAllPilots() {
-    fetch(`{{ url_for('battle_records_api.pilots_filtered') }}`)
+    if (!pilotSelect) return Promise.resolve();
+    return fetch(`{{ url_for('battle_records_api.pilots_filtered') }}`)
         .then(response => response.json())
         .then(result => {
-            const pilotSelect = document.getElementById('pilot');
-            if (!pilotSelect) return;
             pilotSelect.innerHTML = '<option value="">请选择主播</option>';
             if (!result.success) return;
             window.__allPilots = (result.data && result.data.items) || [];
@@ -623,7 +581,7 @@ function loadAllPilots() {
                 option.textContent = buildPilotDisplay(pilot);
                 option.setAttribute('data-nickname', pilot.nickname || '');
                 option.setAttribute('data-real-name', pilot.real_name || '');
-                if (pilot.id === defaultData.pilot) {
+                if (pilot.id === pageState.defaults.pilotId) {
                     option.selected = true;
                 }
                 pilotSelect.appendChild(option);
@@ -670,70 +628,80 @@ function buildPilotDisplay(p) {
 }
 
 function loadBattleAreaData() {
-    fetch('{{ url_for("battle_records_api.battle_areas") }}')
+    return fetch('{{ url_for("battle_records_api.battle_areas") }}')
         .then(response => response.json())
         .then(result => {
             if (!result.success) return;
-            battleAreaData = (result.data && result.data.areas) || {};
+            pageState.battleAreaData = (result.data && result.data.areas) || {};
             initializeBattleAreaSelects();
         })
-        .catch(error => console.error('加载开播地点数据失败:', error));
+        .catch(error => {
+            console.error('加载开播地点数据失败:', error);
+        });
 }
 
 function initializeBattleAreaSelects() {
     const xSelect = document.getElementById('x_coord');
     const ySelect = document.getElementById('y_coord');
     const zSelect = document.getElementById('z_coord');
-    console.log('[BR] initializeBattleAreaSelects with defaultData:', defaultData);
-    
+    const defaults = pageState.defaults;
+
     xSelect.innerHTML = '<option value="">请选择基地</option>';
-    Object.keys(battleAreaData).sort().forEach(x => {
+    Object.keys(pageState.battleAreaData || {}).sort().forEach(x => {
         const option = document.createElement('option');
         option.value = x;
         option.textContent = x;
-        if (x === defaultData.x_coord) {
+        if (x === defaults.xCoord) {
             option.selected = true;
         }
         xSelect.appendChild(option);
     });
-    
+
     xSelect.addEventListener('change', function() {
+        pageState.defaults.xCoord = this.value;
+        pageState.defaults.yCoord = '';
+        pageState.defaults.zCoord = '';
         updateYCoords(this.value);
     });
-    
+
     ySelect.addEventListener('change', function() {
         const xCoord = xSelect.value;
+        pageState.defaults.yCoord = this.value;
+        pageState.defaults.zCoord = '';
         updateZCoords(xCoord, this.value);
     });
+
+    zSelect.addEventListener('change', function() {
+        pageState.defaults.zCoord = this.value;
+    });
     
-    if (defaultData.x_coord) {
-        updateYCoords(defaultData.x_coord);
+    if (defaults.xCoord) {
+        updateYCoords(defaults.xCoord);
     }
 }
 
 function updateYCoords(xCoord) {
     const ySelect = document.getElementById('y_coord');
     const zSelect = document.getElementById('z_coord');
-    console.log('[BR] updateYCoords for X=', xCoord);
-    
+    const defaults = pageState.defaults;
+
     ySelect.innerHTML = '<option value="">请选择场地</option>';
     zSelect.innerHTML = '<option value="">请先选择场地</option>';
     zSelect.disabled = true;
-    
-    if (xCoord && battleAreaData[xCoord]) {
+
+    if (xCoord && pageState.battleAreaData[xCoord]) {
         ySelect.disabled = false;
-        Object.keys(battleAreaData[xCoord]).sort().forEach(y => {
+        Object.keys(pageState.battleAreaData[xCoord]).sort().forEach(y => {
             const option = document.createElement('option');
             option.value = y;
             option.textContent = y;
-            if (y === defaultData.y_coord) {
+            if (y === defaults.yCoord) {
                 option.selected = true;
             }
             ySelect.appendChild(option);
         });
-        
-        if (defaultData.y_coord) {
-            updateZCoords(xCoord, defaultData.y_coord);
+        if (defaults.yCoord) {
+            updateZCoords(xCoord, defaults.yCoord);
         }
     } else {
         ySelect.disabled = true;
@@ -742,17 +710,17 @@ function updateYCoords(xCoord) {
 
 function updateZCoords(xCoord, yCoord) {
     const zSelect = document.getElementById('z_coord');
-    console.log('[BR] updateZCoords for X,Y =', xCoord, yCoord);
-    
+    const defaults = pageState.defaults;
+
     zSelect.innerHTML = '<option value="">请选择坐席</option>';
-    
-    if (xCoord && yCoord && battleAreaData[xCoord] && battleAreaData[xCoord][yCoord]) {
+
+    if (xCoord && yCoord && pageState.battleAreaData[xCoord] && pageState.battleAreaData[xCoord][yCoord]) {
         zSelect.disabled = false;
-        battleAreaData[xCoord][yCoord].forEach(z => {
+        pageState.battleAreaData[xCoord][yCoord].forEach(z => {
             const option = document.createElement('option');
             option.value = z;
             option.textContent = z;
-            if (z === defaultData.z_coord) {
+            if (z === defaults.zCoord) {
                 option.selected = true;
             }
             zSelect.appendChild(option);
@@ -762,9 +730,275 @@ function updateZCoords(xCoord, yCoord) {
     }
 }
 
+function applyDefaultsToForm() {
+    if (startTimeInput && pageState.defaults.startTime) {
+        startTimeInput.value = pageState.defaults.startTime;
+    }
+    if (endTimeInput && pageState.defaults.endTime) {
+        endTimeInput.value = pageState.defaults.endTime;
+    }
+    if (workModeSelect) {
+        workModeSelect.value = pageState.defaults.workMode || '';
+        handleWorkModeChange();
+    }
+    if (revenueInput) {
+        revenueInput.value = pageState.defaults.revenueAmount || '0';
+    }
+    if (baseSalaryInput) {
+        baseSalaryInput.value = pageState.defaults.baseSalary || '0';
+    }
+    if (pilotHiddenInput && pageState.defaults.pilotId) {
+        pilotHiddenInput.value = pageState.defaults.pilotId;
+    }
+    if (relatedAnnouncementHidden && pageState.announcementId) {
+        relatedAnnouncementHidden.value = pageState.announcementId;
+    }
+}
+
+function attachFieldWatchers() {
+    const watchIds = ['start_time', 'end_time', 'revenue_amount', 'base_salary', 'notes', 'related_announcement_select', 'work_mode'];
+    watchIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        ['input', 'change'].forEach(evt => {
+            element.addEventListener(evt, () => {
+                if (id === 'related_announcement_select' && relatedAnnouncementHidden) {
+                    relatedAnnouncementHidden.value = relatedAnnouncementSelect ? relatedAnnouncementSelect.value : '';
+                }
+                if (id === 'work_mode') {
+                    handleWorkModeChange();
+                }
+                validateNotesRequired();
+                updateSubmitButtonState();
+            });
+        });
+    });
+}
+
+function attachFormSubmit() {
+    if (!battleRecordForm) return;
+    battleRecordForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!validateFormSubmission()) {
+            return;
+        }
+        await submitBattleRecord();
+    });
+}
+
+async function prefillFromAnnouncement() {
+    if (!pageState.announcementId) return;
+    const url = `{{ url_for('battle_records_api.announcement_detail', announcement_id='__ANN_ID__') }}`.replace('__ANN_ID__', pageState.announcementId);
+    try {
+        const response = await fetch(url);
+        const payload = await response.json();
+        if (!payload.success) {
+            throw new Error(payload.error?.message || '加载通告详情失败');
+        }
+        const announcement = payload.data?.announcement || {};
+        pageState.defaults.pilotId = announcement.pilot_id || pageState.defaults.pilotId;
+        pageState.defaults.ownerName = announcement.owner_name || '无';
+        if (announcement.start_time) {
+            pageState.defaults.startTime = announcement.start_time.slice(0, 16);
+        }
+        if (announcement.end_time) {
+            pageState.defaults.endTime = announcement.end_time.slice(0, 16);
+        }
+        pageState.defaults.xCoord = announcement.x_coord || '';
+        pageState.defaults.yCoord = announcement.y_coord || '';
+        pageState.defaults.zCoord = announcement.z_coord || '';
+        pageState.defaults.workMode = announcement.work_mode || '线下';
+        pageState.defaults.baseSalary = '150';
+        const announcementLabel = formatAnnouncementLabel({
+            start_time: announcement.start_time,
+            end_time: announcement.end_time,
+            x_coord: announcement.x_coord,
+            y_coord: announcement.y_coord,
+            z_coord: announcement.z_coord,
+        });
+        pageState.prefillLabel = [announcement.pilot_name || '', announcementLabel].filter(Boolean).join(' - ');
+        if (relatedAnnouncementHidden) {
+            relatedAnnouncementHidden.value = announcement.id || pageState.announcementId;
+        }
+
+        if (ownerDisplay) {
+            ownerDisplay.textContent = pageState.defaults.ownerName || '无';
+        }
+
+        if (pilotHiddenInput && pageState.defaults.pilotId) {
+            pilotHiddenInput.value = pageState.defaults.pilotId;
+        }
+
+        await populatePilotDisplay(pageState.defaults.pilotId);
+
+        applyDefaultsToForm();
+    } catch (error) {
+        console.error('预填通告详情失败:', error);
+        showMessage(error.message || '预填通告详情失败', 'error');
+        throw error;
+    }
+}
+
+async function populatePilotDisplay(pilotId) {
+    if (!pilotId) return;
+    try {
+        const response = await fetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`);
+        const payload = await response.json();
+        if (!payload.success) return;
+        const pilot = (payload.data?.items || [])[0];
+        if (!pilot) return;
+        const genderIcon = pilot.gender === 0 ? '♂' : (pilot.gender === 1 ? '♀' : '?');
+        const agePart = pilot.age ? `(${pilot.age})` : '';
+        const rankPart = pilot.rank ? `[${pilot.rank}]` : '';
+        const display = `${pilot.nickname || ''}${agePart}${rankPart}${genderIcon}`;
+        if (pilotDisplay) pilotDisplay.textContent = display;
+        if (ownerDisplay) ownerDisplay.textContent = pilot.owner || pageState.defaults.ownerName || '无';
+    } catch (error) {
+        console.error('加载主播信息失败:', error);
+    }
+}
+
+function showPrefillUI() {
+    if (prefillBanner) {
+        prefillBanner.style.display = pageState.prefillLabel ? 'block' : 'none';
+        prefillBanner.textContent = pageState.prefillLabel ? `从通告预填：${pageState.prefillLabel}` : '';
+    }
+    if (prefilledPilotRow) prefilledPilotRow.style.display = '';
+    if (prefilledOwnerRow) prefilledOwnerRow.style.display = '';
+    if (prefilledAnnouncementRow) {
+        prefilledAnnouncementRow.style.display = pageState.prefillLabel ? '' : 'none';
+    }
+    if (prefilledAnnouncementText) {
+        prefilledAnnouncementText.textContent = pageState.prefillLabel || '';
+    }
+    if (manualPilotSearchRow) manualPilotSearchRow.style.display = 'none';
+    if (manualPilotSelectRow) manualPilotSelectRow.style.display = 'none';
+    if (manualAnnouncementRow) manualAnnouncementRow.style.display = 'none';
+}
+
+function showManualUI() {
+    if (prefillBanner) prefillBanner.style.display = 'none';
+    if (prefilledPilotRow) prefilledPilotRow.style.display = 'none';
+    if (prefilledOwnerRow) prefilledOwnerRow.style.display = 'none';
+    if (prefilledAnnouncementRow) prefilledAnnouncementRow.style.display = 'none';
+    if (manualPilotSearchRow) manualPilotSearchRow.style.display = '';
+    if (manualPilotSelectRow) manualPilotSelectRow.style.display = '';
+    if (manualAnnouncementRow) manualAnnouncementRow.style.display = '';
+    if (pilotDisplay) pilotDisplay.textContent = '-';
+    if (ownerDisplay) ownerDisplay.textContent = '无';
+    if (relatedAnnouncementHidden) relatedAnnouncementHidden.value = '';
+    if (pilotHiddenInput) pilotHiddenInput.value = '';
+}
+
+function setupPilotChangeListener() {
+    if (!pilotSelect) return;
+    pilotSelect.addEventListener('change', async function() {
+        const pilotId = this.value;
+        if (pilotHiddenInput) {
+            pilotHiddenInput.value = pilotId || '';
+        }
+        if (pilotId) {
+            await handlePilotChange(pilotId);
+        } else {
+            clearRelatedAnnouncementOptions();
+        }
+        validateNotesRequired();
+        updateSubmitButtonState();
+    });
+
+    if (pageState.defaults.pilotId && pilotSelect) {
+        pilotSelect.value = pageState.defaults.pilotId;
+    }
+}
+
+async function handlePilotChange(pilotId) {
+    try {
+        const response = await fetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`);
+        const payload = await response.json();
+        if (payload.success) {
+            const pilot = (payload.data?.items || [])[0];
+            if (pilot) {
+                if (workModeSelect) {
+                    workModeSelect.value = pilot.work_mode || '';
+                    handleWorkModeChange();
+                }
+                pageState.defaults.workMode = pilot.work_mode || '';
+            }
+        }
+    } catch (error) {
+        console.error('获取主播信息失败:', error);
+    }
+
+    await loadRelatedAnnouncementsForPilot(pilotId);
+}
+
+function clearRelatedAnnouncementOptions() {
+    if (!relatedAnnouncementSelect) return;
+    relatedAnnouncementSelect.innerHTML = '<option value="">无关联通告</option>';
+    if (relatedAnnouncementHidden) relatedAnnouncementHidden.value = '';
+}
+
+async function loadRelatedAnnouncementsForPilot(pilotId) {
+    if (!relatedAnnouncementSelect) return;
+    clearRelatedAnnouncementOptions();
+    if (!pilotId) return;
+    try {
+        const response = await fetch(`{{ url_for('battle_records_api.related_announcements') }}?pilot_id=${pilotId}`);
+        const result = await response.json();
+        if (!result.success) return;
+        const announcements = (result.data && result.data.announcements) || [];
+        announcements.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.label;
+            relatedAnnouncementSelect.appendChild(opt);
+        });
+    } catch (error) {
+        console.error('获取关联通告失败:', error);
+    }
+}
+
+function setupRelatedAnnouncementListener() {
+    if (!relatedAnnouncementSelect) return;
+    relatedAnnouncementSelect.addEventListener('change', async function() {
+        const annId = this.value;
+        relatedAnnouncementHidden.value = annId || '';
+        if (!annId) {
+            validateNotesRequired();
+            updateSubmitButtonState();
+            return;
+        }
+        const url = `{{ url_for('battle_records_api.announcement_detail', announcement_id='__ANN_ID__') }}`.replace('__ANN_ID__', annId);
+        try {
+            const resp = await fetch(url);
+            const result = await resp.json();
+            if (!result.success) return;
+            const a = result.data?.announcement || {};
+            if (startTimeInput && a.start_time) startTimeInput.value = a.start_time.slice(0, 16);
+            if (endTimeInput && a.end_time) endTimeInput.value = a.end_time.slice(0, 16);
+            if (workModeSelect) {
+                workModeSelect.value = '线下';
+                handleWorkModeChange();
+            }
+            pageState.defaults.xCoord = a.x_coord || '';
+            pageState.defaults.yCoord = a.y_coord || '';
+            pageState.defaults.zCoord = a.z_coord || '';
+            initializeBattleAreaSelects();
+            if (baseSalaryInput) {
+                baseSalaryInput.value = '150';
+            }
+        } catch (error) {
+            console.error('获取通告详情失败:', error);
+        }
+        validateNotesRequired();
+        updateSubmitButtonState();
+    });
+}
+
 function updateCharacterCount() {
     const textarea = document.getElementById('notes');
     const counter = document.getElementById('notes-count');
+    if (!textarea || !counter) return;
     counter.textContent = textarea.value.length;
     
     if (textarea.value.length > 180) {
@@ -891,6 +1125,9 @@ function handleWorkModeChange() {
             zSelect.innerHTML = '<option value="">请先选择场地</option>';
             zSelect.value = '';
         }
+        pageState.defaults.xCoord = '';
+        pageState.defaults.yCoord = '';
+        pageState.defaults.zCoord = '';
     }
 }
 
@@ -900,7 +1137,7 @@ function validateNotesRequired() {
     const endTimeField = document.getElementById('end_time');
     const revenueField = document.getElementById('revenue_amount');
     const baseSalaryField = document.getElementById('base_salary');
-    const relatedAnnouncementField = document.getElementById('related_announcement');
+    const relatedAnnouncementField = relatedAnnouncementHidden;
     const validationMessage = document.getElementById('notes-validation-message');
     
     if (!notes || !validationMessage) return false;
@@ -955,25 +1192,15 @@ function validateNotesRequired() {
 }
 
 function collectBattleRecordPayload() {
-    const pilotSelect = document.getElementById('pilot');
-    const pilotHidden = document.querySelector('input[name="pilot"]');
-    const relatedSelect = document.getElementById('related_announcement');
-    const relatedHidden = document.querySelector('input[name="related_announcement"]');
-    const startInput = document.getElementById('start_time');
-    const endInput = document.getElementById('end_time');
-    const revenueInput = document.getElementById('revenue_amount');
-    const baseSalaryInput = document.getElementById('base_salary');
-    const workModeSelect = document.getElementById('work_mode');
     const xSelect = document.getElementById('x_coord');
     const ySelect = document.getElementById('y_coord');
     const zSelect = document.getElementById('z_coord');
-    const notesInput = document.getElementById('notes');
 
     return {
-        pilot: pilotSelect ? pilotSelect.value : (pilotHidden ? pilotHidden.value : ''),
-        related_announcement: relatedSelect ? relatedSelect.value : (relatedHidden ? relatedHidden.value : ''),
-        start_time: startInput ? startInput.value : '',
-        end_time: endInput ? endInput.value : '',
+        pilot: pilotHiddenInput ? pilotHiddenInput.value : (pilotSelect ? pilotSelect.value : ''),
+        related_announcement: relatedAnnouncementHidden ? relatedAnnouncementHidden.value : (relatedAnnouncementSelect ? relatedAnnouncementSelect.value : ''),
+        start_time: startTimeInput ? startTimeInput.value : '',
+        end_time: endTimeInput ? endTimeInput.value : '',
         revenue_amount: revenueInput ? revenueInput.value : '',
         base_salary: baseSalaryInput ? baseSalaryInput.value : '',
         work_mode: workModeSelect ? workModeSelect.value : '',
@@ -1031,6 +1258,7 @@ async function submitBattleRecord() {
 
 function updateSubmitButtonState() {
     const submitBtn = document.getElementById('submit-btn');
+    if (!submitBtn) return;
     const notesValidationFailed = validateNotesRequired();
     
     if (notesValidationFailed) {

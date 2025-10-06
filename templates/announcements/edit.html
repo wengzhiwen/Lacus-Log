@@ -21,7 +21,7 @@
     </div>
 
     <div class="form-container">
-        <form method="POST" id="announcementForm">
+        <form method="POST" id="announcementForm" data-announcement-id="{{ announcement.id }}" data-edit-scope="{{ edit_scope }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="edit_scope" value="{{ request.args.get('edit_scope', 'this_only') }}"/>
             <div class="form-section">
@@ -30,35 +30,32 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>主播：</label>
-                        <div class="readonly-field">
-                            {{ announcement.pilot.nickname }}{% if announcement.pilot.real_name %} [{{ announcement.pilot.real_name }}]{% endif %}
-                            {% if announcement.pilot.owner %} - {{ announcement.pilot.owner.nickname or announcement.pilot.owner.username }}{% else %} - 无所属{% endif %}
-                        </div>
-                        <input type="hidden" name="pilot" value="{{ announcement.pilot.id }}">
+                        <div class="readonly-field" id="pilot_info">加载中...</div>
+                        <input type="hidden" name="pilot" id="pilot_id" value="">
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label for="x_coord" class="required">基地：</label>
-                        <select name="x_coord" id="x_coord" required data-current="{{ announcement.x_coord }}">
+                        <select name="x_coord" id="x_coord" required>
                             <option value="">请选择基地</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="y_coord" class="required">场地：</label>
-                        <select name="y_coord" id="y_coord" required data-current="{{ announcement.y_coord }}" disabled>
+                        <select name="y_coord" id="y_coord" required disabled>
                             <option value="">请先选择基地</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="z_coord" class="required">坐席：</label>
-                        <select name="z_coord" id="z_coord" required data-current="{{ announcement.battle_area.id if announcement.battle_area else '' }}" disabled>
+                        <select name="z_coord" id="z_coord" required disabled>
                             <option value="">请先选择场地</option>
                         </select>
-                        <input type="hidden" name="battle_area" id="battle_area" value="{{ announcement.battle_area.id if announcement.battle_area else '' }}">
+                        <input type="hidden" name="battle_area" id="battle_area" value="">
                     </div>
                 </div>
             </div>
@@ -73,34 +70,27 @@
                         {% if edit_scope == 'future_all' %}
                         <div class="time-input-group">
                             <input type="date" name="start_date" id="start_date" readonly
-                                   value="{{ announcement.start_time | local_date_for_input }}"
+                                   value=""
                                    style="background-color: #f8f9fa; color: #6c757d;">
                             <div class="time-selectors">
                                 <select name="start_hour" id="start_hour" required>
                                     <option value="">时</option>
                                     {% for hour in range(0, 24) %}
-                                    <option value="{{ '%02d'|format(hour) }}" 
-                                            {% if announcement.start_time and (announcement.start_time | utc_to_local).hour == hour %}selected{% endif %}>
-                                        {{ '%02d'|format(hour) }}
-                                    </option>
+                                    <option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}</option>
                                     {% endfor %}
                                 </select>
                                 <span class="time-separator">:</span>
                                 <select name="start_minute" id="start_minute" required>
                                     <option value="">分</option>
                                     {% for minute in range(0, 60, 15) %}
-                                    <option value="{{ '%02d'|format(minute) }}" 
-                                            {% if announcement.start_time and (announcement.start_time | utc_to_local).minute == minute %}selected{% endif %}>
-                                        {{ '%02d'|format(minute) }}
-                                    </option>
+                                    <option value="{{ '%02d'|format(minute) }}">{{ '%02d'|format(minute) }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                         </div>
                         <small class="form-text">编辑未来所有循环时，日期不可修改，只能修改时间</small>
                         {% else %}
-                        <input type="datetime-local" name="start_time" id="start_time" required
-                               value="{{ announcement.start_time | local_datetime_for_input }}">
+                        <input type="datetime-local" name="start_time" id="start_time" required value="">
                         {% endif %}
                     </div>
 
@@ -109,7 +99,7 @@
                         <select name="duration_hours" id="duration_hours" required>
                             <option value="">请选择时长</option>
                             {% for hours in [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0] %}
-                            <option value="{{ hours }}" {% if announcement.duration_hours == hours %}selected{% endif %}>
+                            <option value="{{ hours }}">
                                 {% if hours == hours|int %}{{ hours|int }}{% else %}{{ hours }}{% endif %}小时
                             </option>
                             {% endfor %}
@@ -118,21 +108,13 @@
                 </div>
             </div>
 
-            {% if announcement.is_in_recurrence_group %}
-            <div class="form-section">
+            <div class="form-section" id="recurrence_notice" style="display: none;">
                 <div class="repeat-notice">
                     <h4>⚠️ 循环事件编辑说明</h4>
-                    {% set edit_scope = request.args.get('edit_scope', 'this_only') %}
-                    {% if edit_scope == 'future_all' %}
-                    <p>编辑范围：<strong>未来所有循环</strong></p>
-                    <p>此次修改将影响从当前通告开始的所有未来循环事件。</p>
-                    {% else %}
-                    <p>编辑范围：<strong>仅这一次</strong></p>
-                    <p>此次修改只会影响当前这个通告，不会影响其他循环事件。</p>
-                    {% endif %}
+                    <p id="recurrence_scope"></p>
+                    <p id="recurrence_description"></p>
                 </div>
             </div>
-            {% endif %}
 
             <div class="form-actions">
                 <button type="button" id="check_btn" class="btn btn-secondary">检查冲突</button>
@@ -481,10 +463,10 @@
 </style>
 
 <script>
-const announcementId = '{{ announcement.id }}';
-const editScope = '{{ edit_scope }}';
-const csrfToken = document.querySelector('input[name="csrf_token"]').value;
 const announcementForm = document.getElementById('announcementForm');
+const announcementId = announcementForm?.dataset.announcementId || '';
+const editScope = announcementForm?.dataset.editScope || 'this_only';
+const csrfToken = document.querySelector('input[name="csrf_token"]').value;
 const submitBtn = document.getElementById('submit_btn');
 const conflictResults = document.getElementById('conflict_results');
 const conflictContent = document.getElementById('conflict_content');
@@ -492,6 +474,21 @@ const xSelect = document.getElementById('x_coord');
 const ySelect = document.getElementById('y_coord');
 const zSelect = document.getElementById('z_coord');
 const hiddenBattleArea = document.getElementById('battle_area');
+const durationSelect = document.getElementById('duration_hours');
+const pilotInfoEl = document.getElementById('pilot_info');
+const pilotHiddenInput = document.getElementById('pilot_id');
+const startTimeInput = document.getElementById('start_time');
+const startDateInput = document.getElementById('start_date');
+const startHourSelect = document.getElementById('start_hour');
+const startMinuteSelect = document.getElementById('start_minute');
+const recurrenceNotice = document.getElementById('recurrence_notice');
+const recurrenceScopeText = document.getElementById('recurrence_scope');
+const recurrenceDescriptionText = document.getElementById('recurrence_description');
+
+let announcementDetail = null;
+let pilotId = '';
+let originalDate = '';
+let preselectCoords = { x: '', y: '', battleAreaId: '' };
 
 function showLoading(isLoading) {
   const overlay = document.getElementById('loading-overlay');
@@ -562,9 +559,8 @@ function renderPlannedInstances(plannedInstances) {
   if (submitBtn) submitBtn.disabled = false;
 }
 
-async function loadAreaOptions() {
+async function loadAreaOptions({ preselectX = '', preselectY = '', preselectBattleArea = '' } = {}) {
   try {
-    const currentX = xSelect.dataset.current || '';
     const { data } = await fetchJson('/announcements/api/areas/options');
     const xCoords = data?.x_coords || [];
     xSelect.innerHTML = '<option value="">请选择基地</option>';
@@ -574,9 +570,9 @@ async function loadAreaOptions() {
       option.textContent = x;
       xSelect.appendChild(option);
     });
-    if (currentX && xCoords.includes(currentX)) {
-      xSelect.value = currentX;
-      await loadYOptions(currentX, true);
+    if (preselectX && xCoords.includes(preselectX)) {
+      xSelect.value = preselectX;
+      await loadYOptions(preselectX, { preselectY, preselectBattleArea });
     }
   } catch (error) {
     console.error('加载基地选项失败:', error);
@@ -584,25 +580,25 @@ async function loadAreaOptions() {
   }
 }
 
-async function loadYOptions(xCoord, preselect = false) {
+async function loadYOptions(xCoord, { preselectY = '', preselectBattleArea = '' } = {}) {
   ySelect.innerHTML = '<option value="">请选择场地</option>';
   zSelect.innerHTML = '<option value="">请先选择场地</option>';
   ySelect.disabled = !xCoord;
   zSelect.disabled = true;
+  hiddenBattleArea.value = '';
   if (!xCoord) return;
   try {
     const { data } = await fetchJson(`/announcements/api/areas/${xCoord}`);
     const yCoords = data?.y_coords || [];
-    const currentY = ySelect.dataset.current || '';
     yCoords.forEach(y => {
       const option = document.createElement('option');
       option.value = y;
       option.textContent = y;
-      if (preselect && y === currentY) option.selected = true;
       ySelect.appendChild(option);
     });
-    if (preselect && currentY && yCoords.includes(currentY)) {
-      await loadZOptions(xCoord, currentY, true);
+    if (preselectY && yCoords.includes(preselectY)) {
+      ySelect.value = preselectY;
+      await loadZOptions(xCoord, preselectY, { preselectBattleArea });
     }
   } catch (error) {
     console.error('加载场地失败:', error);
@@ -610,7 +606,7 @@ async function loadYOptions(xCoord, preselect = false) {
   }
 }
 
-async function loadZOptions(xCoord, yCoord, preselect = false) {
+async function loadZOptions(xCoord, yCoord, { preselectBattleArea = '' } = {}) {
   zSelect.innerHTML = '<option value="">请选择坐席</option>';
   zSelect.disabled = !(xCoord && yCoord);
   if (!xCoord || !yCoord) {
@@ -620,16 +616,18 @@ async function loadZOptions(xCoord, yCoord, preselect = false) {
   try {
     const { data } = await fetchJson(`/announcements/api/areas/${xCoord}/${yCoord}`);
     const areas = data?.areas || [];
-    const currentBattleAreaId = zSelect.dataset.current || '';
     areas.forEach(area => {
       const option = document.createElement('option');
       option.value = area.id;
       option.textContent = area.z_coord;
-      if (preselect && area.id === currentBattleAreaId) option.selected = true;
       zSelect.appendChild(option);
     });
-    if (preselect && currentBattleAreaId) {
-      hiddenBattleArea.value = currentBattleAreaId;
+    if (preselectBattleArea) {
+      const match = areas.find(area => area.id === preselectBattleArea);
+      if (match) {
+        zSelect.value = preselectBattleArea;
+        hiddenBattleArea.value = preselectBattleArea;
+      }
     }
   } catch (error) {
     console.error('加载坐席失败:', error);
@@ -665,8 +663,7 @@ function validatePayload(payload) {
       showMessage('请填写完整的时间信息', 'error');
       return false;
     }
-    const originalDate = '{{ announcement.start_time | local_date_for_input }}';
-    if (payload.start_date !== originalDate) {
+    if (originalDate && payload.start_date !== originalDate) {
       showMessage('编辑未来所有循环时，日期不可修改', 'warning');
       return false;
     }
@@ -676,7 +673,7 @@ function validatePayload(payload) {
 
 async function handleConflictCheck() {
   const payload = collectFormPayload();
-  payload.pilot_id = '{{ announcement.pilot.id }}';
+  if (pilotId) payload.pilot_id = pilotId;
   payload.exclude_id = announcementId;
   if (!validatePayload(payload)) return;
   try {
@@ -769,8 +766,96 @@ announcementForm.addEventListener('submit', handleFormSubmit);
 
 document.addEventListener('DOMContentLoaded', async () => {
   resetSubmitButton();
-  await loadAreaOptions();
-  bindFieldChangeReset();
+  try {
+    await loadAnnouncementDetail();
+    await loadAreaOptions({
+      preselectX: preselectCoords.x,
+      preselectY: preselectCoords.y,
+      preselectBattleArea: preselectCoords.battleAreaId,
+    });
+    bindFieldChangeReset();
+  } catch (error) {
+    console.error('初始化通告编辑页面失败:', error);
+    if (submitBtn) submitBtn.disabled = true;
+  }
 });
+
+async function loadAnnouncementDetail() {
+  if (!announcementId) {
+    showMessage('缺少通告ID，无法加载详情', 'error');
+    throw new Error('missing announcement id');
+  }
+  try {
+    showLoading(true);
+    const { data } = await fetchJson(`/announcements/api/announcements/${announcementId}`);
+    announcementDetail = data || {};
+    pilotId = data?.pilot?.id || '';
+    if (pilotInfoEl) {
+      const pilotName = data?.pilot?.nickname || '未知主播';
+      const realName = data?.pilot?.real_name ? ` [${data.pilot.real_name}]` : '';
+      const ownerName = data?.pilot?.owner?.display_name ? ` - ${data.pilot.owner.display_name}` : ' - 无所属';
+      pilotInfoEl.textContent = `${pilotName}${realName}${ownerName}`;
+    }
+    if (pilotHiddenInput && pilotId) {
+      pilotHiddenInput.value = pilotId;
+    }
+
+    const timeInfo = data?.time || {};
+    const startIso = timeInfo.start_iso || (timeInfo.start ? timeInfo.start.replace(' ', 'T') : '');
+    if (editScope === 'future_all') {
+      if (startIso && startDateInput && startHourSelect && startMinuteSelect) {
+        const [datePart, timePart] = startIso.split('T');
+        if (datePart) {
+          originalDate = datePart;
+          startDateInput.value = datePart;
+        }
+        if (timePart) {
+          const [hourStr = '', minuteStr = ''] = timePart.split(':');
+          if (hourStr) startHourSelect.value = hourStr;
+          if (minuteStr) startMinuteSelect.value = minuteStr;
+        }
+      }
+    } else if (startTimeInput) {
+      startTimeInput.value = startIso || '';
+    }
+
+    const durationHours = timeInfo.duration_hours;
+    if (durationHours !== undefined && durationHours !== null && durationSelect) {
+      if (typeof durationHours === 'number' && Number.isFinite(durationHours)) {
+        const durationValue = Number.isInteger(durationHours) ? durationHours.toFixed(1) : String(durationHours);
+        durationSelect.value = durationValue;
+      } else {
+        durationSelect.value = String(durationHours);
+      }
+    }
+
+    const coordinates = data?.coordinates || {};
+    preselectCoords = {
+      x: coordinates.x || '',
+      y: coordinates.y || '',
+      battleAreaId: coordinates.battle_area_id || '',
+    };
+    if (hiddenBattleArea) {
+      hiddenBattleArea.value = preselectCoords.battleAreaId || '';
+    }
+
+    const recurrence = data?.recurrence || {};
+    if (recurrence.is_in_group && recurrenceNotice && recurrenceScopeText && recurrenceDescriptionText) {
+      recurrenceNotice.style.display = 'block';
+      if (editScope === 'future_all') {
+        recurrenceScopeText.innerHTML = '编辑范围：<strong>未来所有循环</strong>';
+        recurrenceDescriptionText.textContent = '此次修改将影响从当前通告开始的所有未来循环事件。';
+      } else {
+        recurrenceScopeText.innerHTML = '编辑范围：<strong>仅这一次</strong>';
+        recurrenceDescriptionText.textContent = '此次修改只会影响当前这个通告，不会影响其他循环事件。';
+      }
+    }
+  } catch (error) {
+    showMessage(error.message || '加载通告详情失败', 'error');
+    throw error;
+  } finally {
+    showLoading(false);
+  }
+}
 </script>
 {% endblock %}
