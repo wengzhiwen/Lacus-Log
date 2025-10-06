@@ -285,7 +285,7 @@ def calculate_dashboard_pilot_ranking_metrics():
         nickname = pilot.nickname or ''
         real_name = pilot.real_name or ''
         owner_name = pilot.owner.nickname if pilot.owner and pilot.owner.nickname else (pilot.owner.username if pilot.owner else '无')
-        
+
         if real_name:
             return f"{nickname}（{real_name}）[{owner_name}]"
         return f"{nickname}[{owner_name}]"
