@@ -5,11 +5,12 @@
 """
 # pylint: disable=no-member
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Any, Dict
 
 from mongoengine import Q
-from models.recruit import Recruit, BroadcastDecision, FinalDecision
-from utils.timezone_helper import local_to_utc, get_current_utc_time, utc_to_local
+
+from models.recruit import BroadcastDecision, FinalDecision, Recruit
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 
 def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recruiter_id: str = None) -> Dict[str, int]:
@@ -30,28 +31,19 @@ def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recru
     appointments_query = {**base_query, 'created_at__gte': start_utc, 'created_at__lt': end_utc}
     appointments = Recruit.objects.filter(**appointments_query).count()
 
-    interviews_query = Q(**base_query) & (
-        Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
-        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
-    )
+    interviews_query = Q(**base_query) & (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+                                          | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     interviews = Recruit.objects.filter(interviews_query).count()
 
-    trials_query = Q(**base_query) & (
-        Q(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc)
-        | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
-    )
+    trials_query = Q(**base_query) & (Q(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc)
+                                      | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     trials = Recruit.objects.filter(trials_query).count()
 
     new_recruits_query = Q(**base_query) & (
         Q(broadcast_decision_time__gte=start_utc,
           broadcast_decision_time__lt=end_utc,
-          broadcast_decision__in=[
-              BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD
-          ])
-        | Q(final_decision_time__gte=start_utc,
-            final_decision_time__lt=end_utc,
-            final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
-    )
+          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
     new_recruits = Recruit.objects.filter(new_recruits_query).count()
 
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
@@ -77,20 +69,20 @@ def calculate_recruit_stats_for_date(target_date: datetime, recruiter_id: str = 
 
 
 def calculate_recruit_daily_stats(report_date: datetime, recruiter_id: str = None) -> Dict[str, Any]:
-    """计算指定日期的招募日报统计数据（包含多时间维度和百分比）
+    """计算指定日期的招募日报统计数据（包含多时间维度和日均数据）
     
     Args:
         report_date: 报表日期（本地时间）
         recruiter_id: 招募负责人ID，为None时统计全部
         
     Returns:
-        dict: 包含报表日、近7日、近14日的统计数据，以及百分比数据
+        dict: 包含报表日、近7日、近14日的统计数据，以及日均数据
     """
     report_day_start = report_date
     report_day_end = report_day_start + timedelta(days=1)
 
-    last_7_days_start = report_date - timedelta(days=6)  # 包含报表日，共7天
-    last_14_days_start = report_date - timedelta(days=13)  # 包含报表日，共14天
+    last_7_days_start = report_date - timedelta(days=6)
+    last_14_days_start = report_date - timedelta(days=13)
 
     report_day_start_utc = local_to_utc(report_day_start)
     report_day_end_utc = local_to_utc(report_day_end)
@@ -103,27 +95,17 @@ def calculate_recruit_daily_stats(report_date: datetime, recruiter_id: str = Non
 
     statistics = {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
 
-    percentages = {'report_day': {}, 'last_7_days': {}}
-
-    for key in ['appointments', 'interviews', 'trials', 'new_recruits']:
-        report_value = statistics['report_day'][key]
-        last_7_value = statistics['last_7_days'][key]
-
-        if last_7_value > 0:
-            percentages['report_day'][key] = round((report_value / last_7_value) * 100, 1)
-        else:
-            percentages['report_day'][key] = 0.0
+    averages = {'last_7_days': {}, 'last_14_days': {}}
 
     for key in ['appointments', 'interviews', 'trials', 'new_recruits']:
         last_7_value = statistics['last_7_days'][key]
+        averages['last_7_days'][key] = round(last_7_value / 7, 1)
+
+    for key in ['appointments', 'interviews', 'trials', 'new_recruits']:
         last_14_value = statistics['last_14_days'][key]
+        averages['last_14_days'][key] = round(last_14_value / 14, 1)
 
-        if last_14_value > 0:
-            percentages['last_7_days'][key] = round((last_7_value / last_14_value) * 100, 1)
-        else:
-            percentages['last_7_days'][key] = 0.0
-
-    statistics['percentages'] = percentages
+    statistics['averages'] = averages
     return statistics
 
 
@@ -162,28 +144,19 @@ def get_recruit_records_for_detail(report_date: datetime, range_param: str, metr
         query = {**base_query, 'created_at__gte': start_utc, 'created_at__lt': end_utc}
         recruits = Recruit.objects.filter(**query).order_by('-created_at')
     elif metric == 'interviews':
-        interviews_query = Q(**base_query) & (
-            Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
-            | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
-        )
+        interviews_query = Q(**base_query) & (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+                                              | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
         recruits = Recruit.objects.filter(interviews_query).order_by('-interview_decision_time', '-training_decision_time_old')
     elif metric == 'trials':
-        trials_query = Q(**base_query) & (
-            Q(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc)
-            | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc)
-        )
+        trials_query = Q(**base_query) & (Q(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc)
+                                          | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
         recruits = Recruit.objects.filter(trials_query).order_by('-training_decision_time', '-training_decision_time_old')
     elif metric == 'new_recruits':
         new_recruits_query = Q(**base_query) & (
             Q(broadcast_decision_time__gte=start_utc,
               broadcast_decision_time__lt=end_utc,
-              broadcast_decision__in=[
-                  BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD
-              ])
-            | Q(final_decision_time__gte=start_utc,
-                final_decision_time__lt=end_utc,
-                final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
-        )
+              broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
+            | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
         recruits = Recruit.objects.filter(new_recruits_query).order_by('-broadcast_decision_time', '-final_decision_time')
     else:
         return []

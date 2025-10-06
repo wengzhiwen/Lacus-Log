@@ -56,13 +56,13 @@ def serialize_summary_block(stats: Dict[str, int]) -> Dict[str, int]:
     }
 
 
-def serialize_percentage_block(percentages: Dict[str, float]) -> Dict[str, float]:
-    """序列化百分比信息。"""
+def serialize_average_block(averages: Dict[str, float]) -> Dict[str, float]:
+    """序列化日均数据信息。"""
     return {
-        'appointments': float(percentages.get('appointments', 0.0)),
-        'interviews': float(percentages.get('interviews', 0.0)),
-        'trials': float(percentages.get('trials', 0.0)),
-        'new_recruits': float(percentages.get('new_recruits', 0.0)),
+        'appointments': float(averages.get('appointments', 0.0)),
+        'interviews': float(averages.get('interviews', 0.0)),
+        'trials': float(averages.get('trials', 0.0)),
+        'new_recruits': float(averages.get('new_recruits', 0.0)),
     }
 
 
@@ -74,16 +74,16 @@ def build_daily_summary_payload(report_date: datetime, raw_stats: Dict[str, Any]
         'last_14_days': serialize_summary_block(raw_stats.get('last_14_days', {})),
     }
 
-    percentages_raw = raw_stats.get('percentages', {})
-    percentages = {
-        'report_day': serialize_percentage_block(percentages_raw.get('report_day', {})),
-        'last_7_days': serialize_percentage_block(percentages_raw.get('last_7_days', {})),
+    averages_raw = raw_stats.get('averages', {})
+    averages = {
+        'last_7_days': serialize_average_block(averages_raw.get('last_7_days', {})),
+        'last_14_days': serialize_average_block(averages_raw.get('last_14_days', {})),
     }
 
     return {
         'date': report_date.strftime('%Y-%m-%d'),
         'summary': summary,
-        'percentages': percentages,
+        'averages': averages,
     }
 
 

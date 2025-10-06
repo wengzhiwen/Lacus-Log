@@ -8,8 +8,7 @@ from datetime import datetime, timedelta
 from math import floor
 from typing import List
 
-from flask import (Blueprint, jsonify, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_required
 
 from models.announcement import Announcement
@@ -18,8 +17,7 @@ from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('report_mail')
 
@@ -35,52 +33,34 @@ def _build_recruit_daily_markdown(statistics: dict) -> str:
     Returns:
         str: Markdown格式的表格内容
     """
-
-    def safe_percentage(numerator, denominator):
-        """安全计算百分比，避免除零错误"""
-        if denominator == 0:
-            return 0
-        return round((numerator / denominator) * 100)
-
     report_day = statistics['report_day']
     last_7_days = statistics['last_7_days']
     last_14_days = statistics['last_14_days']
 
-    percentages = {
-        'report_day': {
-            'appointments': safe_percentage(report_day['appointments'], last_7_days['appointments']),
-            'interviews': safe_percentage(report_day['interviews'], last_7_days['interviews']),
-            'trials': safe_percentage(report_day['trials'], last_7_days['trials']),
-            'new_recruits': safe_percentage(report_day['new_recruits'], last_7_days['new_recruits'])
-        },
-        'last_7_days': {
-            'appointments': safe_percentage(last_7_days['appointments'], last_14_days['appointments']),
-            'interviews': safe_percentage(last_7_days['interviews'], last_14_days['interviews']),
-            'trials': safe_percentage(last_7_days['trials'], last_14_days['trials']),
-            'new_recruits': safe_percentage(last_7_days['new_recruits'], last_14_days['new_recruits'])
-        }
-    }
+    averages = statistics.get('averages', {})
+    avg_7_days = averages.get('last_7_days', {})
+    avg_14_days = averages.get('last_14_days', {})
 
     header = "| 统计范围 | 约面 | 到面 | 试播 | 新开播 |\n| --- | ---: | ---: | ---: | ---: |"
 
     lines = [header]
 
-    report_line = (f"| 报表日 | {report_day['appointments']} ({percentages['report_day']['appointments']}%) | "
-                   f"{report_day['interviews']} ({percentages['report_day']['interviews']}%) | "
-                   f"{report_day['trials']} ({percentages['report_day']['trials']}%) | "
-                   f"{report_day['new_recruits']} ({percentages['report_day']['new_recruits']}%) |")
+    report_line = (f"| 报表日 | {report_day['appointments']} | "
+                   f"{report_day['interviews']} | "
+                   f"{report_day['trials']} | "
+                   f"{report_day['new_recruits']} |")
     lines.append(report_line)
 
-    week_line = (f"| 近7日 | {last_7_days['appointments']} ({percentages['last_7_days']['appointments']}%) | "
-                 f"{last_7_days['interviews']} ({percentages['last_7_days']['interviews']}%) | "
-                 f"{last_7_days['trials']} ({percentages['last_7_days']['trials']}%) | "
-                 f"{last_7_days['new_recruits']} ({percentages['last_7_days']['new_recruits']}%) |")
+    week_line = (f"| 近7日 | {last_7_days['appointments']} (日均{avg_7_days.get('appointments', 0)}) | "
+                 f"{last_7_days['interviews']} (日均{avg_7_days.get('interviews', 0)}) | "
+                 f"{last_7_days['trials']} (日均{avg_7_days.get('trials', 0)}) | "
+                 f"{last_7_days['new_recruits']} (日均{avg_7_days.get('new_recruits', 0)}) |")
     lines.append(week_line)
 
-    fortnight_line = (f"| 近14日 | {last_14_days['appointments']} | "
-                      f"{last_14_days['interviews']} | "
-                      f"{last_14_days['trials']} | "
-                      f"{last_14_days['new_recruits']} |")
+    fortnight_line = (f"| 近14日 | {last_14_days['appointments']} (日均{avg_14_days.get('appointments', 0)}) | "
+                      f"{last_14_days['interviews']} (日均{avg_14_days.get('interviews', 0)}) | "
+                      f"{last_14_days['trials']} (日均{avg_14_days.get('trials', 0)}) | "
+                      f"{last_14_days['new_recruits']} (日均{avg_14_days.get('new_recruits', 0)}) |")
     lines.append(fortnight_line)
 
     return "\n".join(lines)
@@ -325,8 +305,7 @@ def run_monthly_mail_report_job(report_month: str = None, triggered_by: str = 's
             logger.error('月份参数格式错误：%s', report_month)
             return {'sent': False, 'count': 0}
 
-    from routes.report import (_calculate_monthly_details,
-                               _calculate_monthly_summary)
+    from routes.report import (_calculate_monthly_details, _calculate_monthly_summary)
 
     month_summary = _calculate_monthly_summary(year, month)
     details = _calculate_monthly_details(year, month)

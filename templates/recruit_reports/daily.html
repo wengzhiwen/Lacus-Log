@@ -42,53 +42,53 @@
             <td class="range-label">报表日</td>
             <td class="stat-value clickable" data-range="report_day" data-metric="appointments">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
             </td>
             <td class="stat-value clickable" data-range="report_day" data-metric="interviews">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
             </td>
             <td class="stat-value clickable" data-range="report_day" data-metric="trials">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
             </td>
             <td class="stat-value clickable" data-range="report_day" data-metric="new_recruits">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
             </td>
           </tr>
           <tr>
             <td class="range-label">近7日</td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="appointments">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
+              <div class="average">7日均: --</div>
             </td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="interviews">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
+              <div class="average">7日均: --</div>
             </td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="trials">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
+              <div class="average">7日均: --</div>
             </td>
             <td class="stat-value clickable" data-range="last_7_days" data-metric="new_recruits">
               <span class="stat-count">--</span>
-              <div class="percentage">--%</div>
+              <div class="average">7日均: --</div>
             </td>
           </tr>
           <tr>
             <td class="range-label">近14日</td>
             <td class="stat-value clickable" data-range="last_14_days" data-metric="appointments">
               <span class="stat-count">--</span>
+              <div class="average">14日均: --</div>
             </td>
             <td class="stat-value clickable" data-range="last_14_days" data-metric="interviews">
               <span class="stat-count">--</span>
+              <div class="average">14日均: --</div>
             </td>
             <td class="stat-value clickable" data-range="last_14_days" data-metric="trials">
               <span class="stat-count">--</span>
+              <div class="average">14日均: --</div>
             </td>
             <td class="stat-value clickable" data-range="last_14_days" data-metric="new_recruits">
               <span class="stat-count">--</span>
+              <div class="average">14日均: --</div>
             </td>
           </tr>
         </tbody>
@@ -233,7 +233,7 @@
   min-width: 32px;
 }
 
-.percentage {
+.average {
   font-size: 12px;
   color: var(--muted);
   margin-top: 4px;
@@ -351,9 +351,14 @@
       if (countEl) {
         countEl.textContent = '--';
       }
-      const percentEl = cell.querySelector('.percentage');
-      if (percentEl) {
-        percentEl.textContent = '--%';
+      const averageEl = cell.querySelector('.average');
+      if (averageEl) {
+        const range = cell.dataset.range;
+        if (range === 'last_7_days') {
+          averageEl.textContent = '7日均: --';
+        } else if (range === 'last_14_days') {
+          averageEl.textContent = '14日均: --';
+        }
       }
     });
   }
@@ -394,34 +399,38 @@
     }
   }
 
-  function formatPercentage(value) {
+  function formatAverage(value) {
     if (value === undefined || value === null) {
-      return '--%';
+      return '--';
     }
     const num = Number(value);
     if (Number.isNaN(num)) {
-      return '--%';
+      return '--';
     }
-    return `${num.toString()}%`;
+    return num.toString();
   }
 
-  function updateSummary(summary, percentages) {
+  function updateSummary(summary, averages) {
     summaryTitle.textContent = `${currentDate} 招募统计`;
     summaryError.style.display = 'none';
     summaryCells.forEach(cell => {
       const range = cell.dataset.range;
       const metric = cell.dataset.metric;
       const countEl = cell.querySelector('.stat-count');
-      const percentEl = cell.querySelector('.percentage');
+      const averageEl = cell.querySelector('.average');
       const rangeData = summary && summary[range] ? summary[range] : null;
-      const percentageData = percentages && percentages[range] ? percentages[range] : null;
+      const averageData = averages && averages[range] ? averages[range] : null;
       const countValue = rangeData && rangeData[metric] !== undefined ? rangeData[metric] : 0;
       if (countEl) {
         countEl.textContent = countValue;
       }
-      if (percentEl) {
-        const percentValue = percentageData && percentageData[metric] !== undefined ? percentageData[metric] : null;
-        percentEl.textContent = formatPercentage(percentValue);
+      if (averageEl) {
+        const averageValue = averageData && averageData[metric] !== undefined ? averageData[metric] : null;
+        if (range === 'last_7_days') {
+          averageEl.textContent = `7日均: ${formatAverage(averageValue)}`;
+        } else if (range === 'last_14_days') {
+          averageEl.textContent = `14日均: ${formatAverage(averageValue)}`;
+        }
       }
     });
   }
@@ -453,7 +462,7 @@
       dateLabel.textContent = currentDate;
       recruiterSelector.value = currentRecruiter;
       updatePaginationLinks(data.pagination);
-      updateSummary(data.summary, data.percentages);
+      updateSummary(data.summary, data.averages);
     } catch (error) {
       console.error('加载招募日报汇总失败：', error);
       showError('报表加载失败，请稍后再试');
