@@ -42,15 +42,19 @@
             <td class="range-label">报表日</td>
             <td class="stat-value clickable" data-range="report_day" data-metric="appointments">
               <span class="stat-count">--</span>
+              <span class="trend-indicator report-day-trend"></span>
             </td>
             <td class="stat-value clickable" data-range="report_day" data-metric="interviews">
               <span class="stat-count">--</span>
+              <span class="trend-indicator report-day-trend"></span>
             </td>
             <td class="stat-value clickable" data-range="report_day" data-metric="trials">
               <span class="stat-count">--</span>
+              <span class="trend-indicator report-day-trend"></span>
             </td>
             <td class="stat-value clickable" data-range="report_day" data-metric="new_recruits">
               <span class="stat-count">--</span>
+              <span class="trend-indicator report-day-trend"></span>
             </td>
           </tr>
           <tr>
@@ -231,6 +235,12 @@
 .stat-value .stat-count {
   display: inline-block;
   min-width: 32px;
+  margin-right: 4px;
+}
+
+.stat-value .report-day-trend {
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .average {
@@ -389,9 +399,16 @@
       if (countEl) {
         countEl.textContent = '--';
       }
+      const range = cell.dataset.range;
+      if (range === 'report_day') {
+        const trendEl = cell.querySelector('.report-day-trend');
+        if (trendEl) {
+          trendEl.className = 'trend-indicator report-day-trend';
+          trendEl.textContent = '';
+        }
+      }
       const averageEl = cell.querySelector('.average');
       if (averageEl) {
-        const range = cell.dataset.range;
         if (range === 'last_7_days') {
           averageEl.innerHTML = '7日均: -- <span class="trend-indicator"></span>';
         } else if (range === 'last_14_days') {
@@ -462,6 +479,16 @@
       if (countEl) {
         countEl.textContent = countValue;
       }
+      
+      if (range === 'report_day') {
+        const trendEl = cell.querySelector('.report-day-trend');
+        if (trendEl) {
+          const reportDayValue = summary && summary.report_day && summary.report_day[metric] !== undefined ? summary.report_day[metric] : null;
+          const avg7 = averages && averages.last_7_days && averages.last_7_days[metric] !== undefined ? averages.last_7_days[metric] : null;
+          updateReportDayTrend(trendEl, reportDayValue, avg7);
+        }
+      }
+      
       if (averageEl) {
         const averageValue = averageData && averageData[metric] !== undefined ? averageData[metric] : null;
         if (range === 'last_7_days') {
@@ -474,6 +501,28 @@
         }
       }
     });
+  }
+
+  function updateReportDayTrend(trendEl, reportDayValue, avg7) {
+    if (reportDayValue === null || avg7 === null || reportDayValue === undefined || avg7 === undefined) {
+      trendEl.className = 'trend-indicator report-day-trend';
+      trendEl.textContent = '';
+      return;
+    }
+    const valDay = Number(reportDayValue);
+    const val7 = Number(avg7);
+    if (Number.isNaN(valDay) || Number.isNaN(val7)) {
+      trendEl.className = 'trend-indicator report-day-trend';
+      trendEl.textContent = '';
+      return;
+    }
+    if (valDay > val7) {
+      trendEl.className = 'trend-indicator report-day-trend up';
+      trendEl.textContent = '↑';
+    } else {
+      trendEl.className = 'trend-indicator report-day-trend down';
+      trendEl.textContent = '↓';
+    }
   }
 
   function getTrendIndicator(avg7, avg14) {
