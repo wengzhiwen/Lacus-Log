@@ -10,7 +10,8 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from flask import Blueprint, jsonify, request, url_for
 from flask_login import login_required
 from flask_security import current_user, roles_accepted
-from flask_wtf.csrf import ValidationError as CSRFValidationError, validate_csrf
+from flask_wtf.csrf import ValidationError as CSRFValidationError
+from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist
 
 from models.announcement import Announcement
@@ -18,12 +19,15 @@ from models.battle_area import Availability, BattleArea
 from models.battle_record import BattleRecord, BattleRecordChangeLog
 from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
-from routes.battle_record import log_battle_record_change, validate_notes_required
-from utils.announcement_serializers import create_error_response, create_success_response
+from routes.battle_record import (log_battle_record_change,
+                                  validate_notes_required)
+from utils.announcement_serializers import (create_error_response,
+                                            create_success_response)
 from utils.filter_state import persist_and_restore_filters
 from utils.james_alert import trigger_james_alert_if_needed
 from utils.logging_setup import get_logger
-from utils.timezone_helper import get_current_utc_time, local_to_utc, utc_to_local
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 logger = get_logger('battle_records_api')
 
@@ -85,6 +89,20 @@ def _apply_time_filter(queryset, time_filter: str):
     elif time_filter == 'seven_days':
         start_utc = local_to_utc(start_local - timedelta(days=7))
         end_utc = local_to_utc(start_local + timedelta(days=1))
+    elif time_filter == 'month_to_date':
+        month_start_local = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_local_start = start_local + timedelta(days=1)
+        start_utc = local_to_utc(month_start_local)
+        end_utc = local_to_utc(tomorrow_local_start)
+    elif time_filter == 'last_month':
+        if now_local.month == 1:
+            last_month_start = now_local.replace(year=now_local.year - 1, month=12, day=1, hour=0, minute=0, second=0, microsecond=0)
+            this_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            last_month_start = now_local.replace(month=now_local.month - 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            this_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_utc = local_to_utc(last_month_start)
+        end_utc = local_to_utc(this_month_start)
     else:  # 默认两天窗口：昨天-明天
         start_utc = local_to_utc(start_local - timedelta(days=1))
         end_utc = local_to_utc(start_local + timedelta(days=2))
@@ -105,7 +123,22 @@ def _build_filter_options() -> Dict[str, List[Dict[str, str]]]:
     x_options = [{'value': '', 'label': '全部基地'}]
     x_options.extend([{'value': coord, 'label': coord} for coord in sorted(x_coords or [])])
 
-    time_options = [{'value': 'two_days', 'label': '这两天'}, {'value': 'seven_days', 'label': '近7天'}, {'value': 'today', 'label': '今天'}]
+    time_options = [{
+        'value': 'two_days',
+        'label': '这两天'
+    }, {
+        'value': 'seven_days',
+        'label': '近7天'
+    }, {
+        'value': 'today',
+        'label': '今天'
+    }, {
+        'value': 'month_to_date',
+        'label': '月初以来'
+    }, {
+        'value': 'last_month',
+        'label': '前月'
+    }]
 
     return {'owners': owner_options, 'x_coords': x_options, 'time_ranges': time_options}
 

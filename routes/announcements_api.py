@@ -86,6 +86,14 @@ def _build_filter_options() -> Dict[str, List[Dict[str, str]]]:
             'value': 'today',
             'label': '今天'
         },
+        {
+            'value': 'month_end',
+            'label': '月底为止'
+        },
+        {
+            'value': 'next_month',
+            'label': '次月'
+        },
     ]
 
     return {
@@ -136,6 +144,24 @@ def _apply_time_filter(query, time_scope: str):
         seven_days_later_local_start = today_local_start + timedelta(days=7)
         range_start_utc = local_to_utc(today_local_start)
         range_end_utc = local_to_utc(seven_days_later_local_start)
+    elif time_scope == 'month_end':
+        last_day = calendar.monthrange(current_local.year, current_local.month)[1]
+        month_end_local = current_local.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+        next_day_local_start = month_end_local + timedelta(microseconds=1)
+        range_start_utc = local_to_utc(today_local_start)
+        range_end_utc = local_to_utc(next_day_local_start)
+    elif time_scope == 'next_month':
+        if current_local.month == 12:
+            next_month_start = current_local.replace(year=current_local.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            next_month_end = next_month_start.replace(month=2, day=1)
+        else:
+            next_month_start = current_local.replace(month=current_local.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            if current_local.month == 11:
+                next_month_end = next_month_start.replace(year=current_local.year + 1, month=1, day=1)
+            else:
+                next_month_end = next_month_start.replace(month=current_local.month + 2, day=1)
+        range_start_utc = local_to_utc(next_month_start)
+        range_end_utc = local_to_utc(next_month_end)
     else:
         return query
 
