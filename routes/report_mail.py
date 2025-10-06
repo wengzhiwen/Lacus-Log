@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from math import floor
 from typing import List
 
-from flask import (Blueprint, jsonify, redirect, render_template, request, url_for)
+from flask import (Blueprint, jsonify, redirect, render_template, request,
+                   url_for)
 from flask_security import current_user, roles_required
 
 from models.announcement import Announcement
@@ -17,7 +18,8 @@ from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
-from utils.timezone_helper import get_current_utc_time, utc_to_local
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 logger = get_logger('report_mail')
 
@@ -225,7 +227,7 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
         logger.error('报表日期格式错误：%s', report_date)
         return {'sent': False, 'count': 0}
 
-    from routes.report import _calculate_day_summary, _calculate_daily_details
+    from routes.report import _calculate_daily_details, _calculate_day_summary
 
     day_summary = _calculate_day_summary(report_date_obj)
     details = _calculate_daily_details(report_date_obj)
@@ -261,8 +263,6 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
 
     logger.error('开播日报邮件发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
     return {'sent': False, 'count': len(recipients)}
-
-
 
 
 def _build_monthly_mail_markdown(month_summary, details):
@@ -325,7 +325,8 @@ def run_monthly_mail_report_job(report_month: str = None, triggered_by: str = 's
             logger.error('月份参数格式错误：%s', report_month)
             return {'sent': False, 'count': 0}
 
-    from routes.report import _calculate_monthly_summary, _calculate_monthly_details
+    from routes.report import (_calculate_monthly_details,
+                               _calculate_monthly_summary)
 
     month_summary = _calculate_monthly_summary(year, month)
     details = _calculate_monthly_details(year, month)
@@ -361,6 +362,7 @@ def run_monthly_mail_report_job(report_month: str = None, triggered_by: str = 's
 
     logger.error('开播邮件月报发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
     return {'sent': False, 'count': len(recipients)}
+
 
 def _build_unstarted_markdown(items: List[dict]) -> str:
     if not items:
@@ -428,7 +430,7 @@ def mail_reports_page():
 
 
 def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
-    """执行“未开播提醒”报表计算与邮件发送（供任务与路由复用）。
+    """执行"未开播提醒"报表计算与邮件发送（供任务与路由复用）。
 
     返回：{"sent": bool, "count": int}
     """
@@ -436,28 +438,35 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
 
     now_utc = get_current_utc_time()
     window_start_utc = now_utc - timedelta(hours=48)
-    deadline_threshold_utc = now_utc - timedelta(hours=4)
 
-    candidate_plans = Announcement.objects.filter(start_time__gte=window_start_utc, start_time__lte=deadline_threshold_utc).order_by('-start_time')
+    candidate_plans = Announcement.objects.filter(start_time__gte=window_start_utc).order_by('-start_time')
 
-    logger.debug('候选计划数量（48小时内且超4小时）：%d', candidate_plans.count())
+    logger.debug('候选计划数量（48小时内）：%d', candidate_plans.count())
 
     unstarted_items: List[dict] = []
     sample_logged = 0
     for ann in candidate_plans:
-        exists_record = BattleRecord.objects.filter(related_announcement=ann).first() is not None
-        if exists_record:
+        start_utc = ann.start_time
+        deadline_utc = start_utc + timedelta(hours=6)
+
+        if now_utc < deadline_utc:
             continue
 
-        start_utc = ann.start_time
-        deadline_utc = start_utc + timedelta(hours=4)
-
         start_local = utc_to_local(start_utc)
+        day_start_local = start_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        day_start_utc = local_to_utc(day_start_local)
+        day_end_utc = local_to_utc(day_start_local + timedelta(days=1))
+
+        pilot = ann.pilot
+        same_day_record = BattleRecord.objects.filter(pilot=pilot, start_time__gte=day_start_utc, start_time__lt=day_end_utc).first()
+
+        if same_day_record is not None:
+            continue
 
         overdue_delta = now_utc - deadline_utc
         overdue_hours = floor(max(0, overdue_delta.total_seconds()) / 3600)
 
-        pilot = ann.pilot
         owner_display = ''
         try:
             if getattr(pilot, 'owner', None):
