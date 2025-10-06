@@ -5,12 +5,12 @@
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 from models.battle_record import BattleRecord
 from models.pilot import Pilot
-from utils.timezone_helper import utc_to_local, get_current_local_time
 from utils.logging_setup import get_logger
+from utils.timezone_helper import get_current_local_time, utc_to_local
 
 logger = get_logger('pilot_performance')
 
@@ -60,7 +60,7 @@ def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Dict[str, Any
 
     # 计算统计数据
     record_count = records.count()
-    total_hours = sum(record.duration_hours for record in records if record.duration_hours)
+    total_hours = round(sum(record.duration_hours for record in records if record.duration_hours), 1)
     avg_hours = round(total_hours / record_count, 1) if record_count > 0 else 0
 
     total_revenue = sum(record.revenue_amount for record in records)
@@ -112,7 +112,7 @@ def _calculate_three_day_stats(pilot: Pilot, report_date: datetime) -> Dict[str,
 def _calculate_stats_from_records(records) -> Dict[str, Any]:
     """从开播记录计算统计数据"""
     record_count = records.count()
-    total_hours = sum(record.duration_hours for record in records if record.duration_hours)
+    total_hours = round(sum(record.duration_hours for record in records if record.duration_hours), 1)
     avg_hours = round(total_hours / record_count, 1) if record_count > 0 else 0
 
     total_revenue = sum(record.revenue_amount for record in records)

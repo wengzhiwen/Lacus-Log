@@ -181,7 +181,7 @@ def _serialize_battle_record_summary(record: BattleRecord) -> Dict[str, object]:
         'revenue_amount': format(record.revenue_amount or Decimal('0'), 'f'),
         'base_salary': format(record.base_salary or Decimal('0'), 'f'),
         'duration_hours': record.duration_hours or 0,
-        'duration_display': f"{record.duration_hours}小时" if record.duration_hours is not None else '0小时',
+        'duration_display': f"{record.duration_hours:.1f}小时" if record.duration_hours is not None else '0.0小时',
         'start_time': {
             'iso': start_local.isoformat() if start_local else None,
             'display': start_local.strftime('%m月%d日 %H:%M') if start_local else '',
@@ -243,7 +243,7 @@ def _serialize_battle_record_detail(record: BattleRecord) -> Dict[str, object]:
             'start_iso': start_local.isoformat() if start_local else None,
             'end_iso': end_local.isoformat() if end_local else None,
             'duration_hours': record.duration_hours or 0,
-            'duration_display': f"{record.duration_hours}小时" if record.duration_hours is not None else '0小时'
+            'duration_display': f"{record.duration_hours:.1f}小时" if record.duration_hours is not None else '0.0小时'
         },
         'financial': {
             'revenue_amount': format(record.revenue_amount or Decimal('0'), 'f'),

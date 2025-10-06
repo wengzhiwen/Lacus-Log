@@ -5,23 +5,26 @@
 提供完整的主播管理REST接口，支持列表、详情、创建、更新、状态调整等功能
 """
 
-from datetime import datetime
-import io
 import csv
-
+import io
+from datetime import datetime
 from decimal import Decimal
 
-from flask import Blueprint, jsonify, request, Response
-from flask_security import roles_accepted, current_user
-from flask_wtf.csrf import validate_csrf, ValidationError as CSRFValidationError
-from mongoengine import DoesNotExist, ValidationError, Q
+from flask import Blueprint, Response, jsonify, request
+from flask_security import current_user, roles_accepted
+from flask_wtf.csrf import ValidationError as CSRFValidationError
+from flask_wtf.csrf import validate_csrf
+from mongoengine import DoesNotExist, Q, ValidationError
 
-from models.pilot import Pilot, PilotChangeLog, Gender, Platform, WorkMode, Rank, Status
+from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank,
+                          Status, WorkMode)
 from models.user import User
 from utils.logging_setup import get_logger
+from utils.pilot_serializers import (create_error_response,
+                                     create_success_response,
+                                     serialize_change_log_list,
+                                     serialize_pilot)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
-
-from utils.pilot_serializers import (serialize_pilot, serialize_change_log_list, create_success_response, create_error_response)
 
 logger = get_logger('pilot')
 pilots_api_bp = Blueprint('pilots_api', __name__)
