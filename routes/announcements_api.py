@@ -2,29 +2,36 @@
 # pylint: disable=no-member,too-many-return-statements,too-many-branches,too-many-locals
 """通告管理 REST API 路由集合。"""
 
-import json
-import io
-import csv
 import calendar
+import csv
+import io
+import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from flask import Blueprint, jsonify, request, url_for, make_response
+from flask import Blueprint, jsonify, make_response, request, url_for
 from flask_security import current_user, roles_accepted
-from flask_wtf.csrf import ValidationError as CSRFValidationError, validate_csrf
+from flask_wtf.csrf import ValidationError as CSRFValidationError
+from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist, ValidationError
 
-from models.announcement import Announcement, AnnouncementChangeLog, RecurrenceType
+from models.announcement import (Announcement, AnnouncementChangeLog,
+                                 RecurrenceType)
 from models.battle_area import BattleArea
 from models.pilot import Pilot, Rank, Status
 from models.user import User
 from routes.announcement import _get_client_ip, _record_changes
-from utils.announcement_serializers import (create_error_response, create_success_response, serialize_announcement_detail, serialize_announcement_summary,
+from utils.announcement_serializers import (create_error_response,
+                                            create_success_response,
+                                            serialize_announcement_detail,
+                                            serialize_announcement_summary,
                                             serialize_change_logs)
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (format_local_datetime, get_current_local_time, local_to_utc, parse_local_date_to_end_datetime, parse_local_datetime,
-                                   utc_to_local)
+from utils.timezone_helper import (format_local_datetime,
+                                   get_current_local_time, local_to_utc,
+                                   parse_local_date_to_end_datetime,
+                                   parse_local_datetime, utc_to_local)
 
 announcements_api_bp = Blueprint('announcements_api', __name__)
 
@@ -585,6 +592,14 @@ def update_announcement_api(announcement_id: str):
         return jsonify(create_error_response('INTERNAL_ERROR', '服务器内部错误')), 500
 
 
+def _cleanup_orphaned_references(announcement_id):
+    """清理指向已删除通告的孤立引用"""
+    child_announcements = Announcement.objects(parent_announcement=announcement_id)
+    for child in child_announcements:
+        child.parent_announcement = None
+        child.save()
+
+
 @announcements_api_bp.route('/announcements/api/announcements/<announcement_id>', methods=['DELETE'])
 @roles_accepted('gicho', 'kancho')
 def delete_announcement_api(announcement_id: str):
@@ -603,11 +618,13 @@ def delete_announcement_api(announcement_id: str):
             future_announcements = announcement.get_future_announcements_in_group(include_self=True)
             count = len(future_announcements)
             for ann in future_announcements:
+                _cleanup_orphaned_references(ann.id)
                 ann.delete()
             logger.info('用户%s删除未来循环通告：%s（共%d个）', current_user.username, announcement.id, count)
             meta = {'message': f'删除未来循环通告成功（共{count}个）', 'deleted_count': count}
             return jsonify(create_success_response({'deleted': True}, meta))
 
+        _cleanup_orphaned_references(announcement.id)
         announcement.delete()
         logger.info('用户%s删除通告：%s', current_user.username, announcement.id)
         meta = {'message': '删除通告成功', 'deleted_count': 1}
@@ -848,6 +865,8 @@ def cleanup_delete_future_api(pilot_id: str):
         anns = Announcement.objects(pilot=pilot_id, start_time__gte=tomorrow_utc_start)
         count = anns.count()
         if count > 0:
+            for ann in anns:
+                _cleanup_orphaned_references(ann.id)
             anns.delete()
 
         logger.info('用户%s清理通告：pilot=%s，从明天开始删除共%d条', current_user.username, pilot_id, count)

@@ -3,6 +3,8 @@
 
 from typing import Any, Dict, Iterable, List, Optional
 
+from mongoengine.errors import DoesNotExist
+
 from models.announcement import Announcement, AnnouncementChangeLog
 from utils.timezone_helper import format_local_datetime, utc_to_local
 
@@ -45,9 +47,15 @@ def serialize_announcement_summary(announcement: Announcement) -> Dict[str, Any]
     local_created = utc_to_local(announcement.created_at) if announcement.created_at else None
 
     parent_indicator = ''
-    if announcement.parent_announcement:
-        parent_indicator = '循环事件'
-    elif announcement.recurrence_type and announcement.recurrence_type.name != 'NONE':
+    has_parent = False
+    try:
+        if announcement.parent_announcement:
+            parent_indicator = '循环事件'
+            has_parent = True
+    except DoesNotExist:
+        has_parent = False
+
+    if not has_parent and announcement.recurrence_type and announcement.recurrence_type.name != 'NONE':
         parent_indicator = '循环组'
 
     return {
@@ -71,7 +79,7 @@ def serialize_announcement_summary(announcement: Announcement) -> Dict[str, Any]
             'type': announcement.recurrence_type.name if announcement.recurrence_type else 'NONE',
             'value': announcement.recurrence_type.value if announcement.recurrence_type else '无重复',
             'display': announcement.recurrence_display,
-            'has_parent': bool(announcement.parent_announcement),
+            'has_parent': has_parent,
             'is_group': announcement.recurrence_type.name != 'NONE' if announcement.recurrence_type else False,
             'indicator': parent_indicator,
         },

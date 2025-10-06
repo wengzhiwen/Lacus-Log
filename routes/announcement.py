@@ -1,13 +1,16 @@
 # pylint: disable=no-member
-from flask import (Blueprint, abort, flash, redirect, render_template, request, url_for)
+from flask import (Blueprint, abort, flash, redirect, render_template, request,
+                   url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist
 
-from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
+from models.announcement import (Announcement, AnnouncementChangeLog,
+                                 RecurrenceType)
 from models.pilot import Pilot
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_local_datetime_for_input, get_current_month_last_day_for_input)
+from utils.timezone_helper import (get_current_local_datetime_for_input,
+                                   get_current_month_last_day_for_input)
 
 logger = get_logger('announcement')
 
@@ -168,6 +171,14 @@ def edit_announcement(announcement_id):
         abort(404)
 
 
+def _cleanup_orphaned_references(announcement_id):
+    """清理指向已删除通告的孤立引用"""
+    child_announcements = Announcement.objects(parent_announcement=announcement_id)
+    for child in child_announcements:
+        child.parent_announcement = None
+        child.save()
+
+
 @announcement_bp.route('/<announcement_id>/delete', methods=['POST'])
 @roles_accepted('gicho', 'kancho')
 def delete_announcement(announcement_id):
@@ -182,11 +193,13 @@ def delete_announcement(announcement_id):
 
             count = len(future_announcements)
             for ann in future_announcements:
+                _cleanup_orphaned_references(ann.id)
                 ann.delete()
 
             flash(f'删除未来循环通告成功（共{count}个）', 'success')
             logger.info('用户%s删除未来循环通告：%s（共%d个）', current_user.username, announcement.id, count)
         else:
+            _cleanup_orphaned_references(announcement.id)
             announcement.delete()
             flash('删除通告成功', 'success')
             logger.info('用户%s删除通告：%s', current_user.username, announcement.id)
