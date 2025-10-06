@@ -16,6 +16,11 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
         <div class="form-group">
+            <label for="pilot_search">昵称 / 真实姓名 搜索：</label>
+            <input type="text" id="pilot_search" class="form-control" placeholder="输入主播昵称或真实姓名进行筛选">
+        </div>
+
+        <div class="form-group">
             <label for="pilot_id">选择主播</label>
             <select id="pilot_id" name="pilot_id" class="form-control" required>
                 <option value="">正在加载...</option>
@@ -75,13 +80,17 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('[导出页面] API URLs:', { pilotsUrl, viewUrlBase, csvUrlBase });
 
     const pilotSelect = document.getElementById('pilot_id');
+    const pilotSearchInput = document.getElementById('pilot_search');
     const yearSelect = document.getElementById('year');
     const monthSelect = document.getElementById('month');
     const exportCsvBtn = document.getElementById('export-csv-btn');
     const exportViewBtn = document.getElementById('export-view-btn');
     
+    let allPilots = [];
+    
     console.log('[导出页面] DOM元素获取结果:', {
         pilotSelect: pilotSelect ? '✓' : '✗',
+        pilotSearchInput: pilotSearchInput ? '✓' : '✗',
         yearSelect: yearSelect ? '✓' : '✗',
         monthSelect: monthSelect ? '✓' : '✗',
         exportCsvBtn: exportCsvBtn ? '✓' : '✗',
@@ -110,6 +119,40 @@ document.addEventListener('DOMContentLoaded', function() {
     monthSelect.value = currentMonth;
     console.log('[导出页面] 月份选项填充完成，共', monthSelect.options.length, '项，当前选中:', currentMonth);
 
+    // 构建主播显示名称
+    function buildPilotDisplay(pilot) {
+        const nickname = pilot.nickname || '';
+        const realName = pilot.real_name ? ` (${pilot.real_name})` : '';
+        const owner = pilot.owner ? ` [${pilot.owner}]` : '';
+        return `${nickname}${realName}${owner}`;
+    }
+
+    // 填充主播下拉框
+    function populatePilotSelect(pilots) {
+        pilotSelect.innerHTML = '<option value="">请选择主播</option>';
+        pilots.forEach(pilot => {
+            const option = document.createElement('option');
+            option.value = pilot.id;
+            option.textContent = buildPilotDisplay(pilot);
+            pilotSelect.appendChild(option);
+        });
+    }
+
+    // 初始化主播搜索功能
+    function initPilotSearch() {
+        if (!pilotSearchInput) return;
+        
+        pilotSearchInput.addEventListener('input', () => {
+            const keyword = (pilotSearchInput.value || '').trim().toLowerCase();
+            const filtered = keyword ? allPilots.filter(p => {
+                return (p.nickname || '').toLowerCase().includes(keyword) || 
+                       (p.real_name || '').toLowerCase().includes(keyword);
+            }) : allPilots;
+            
+            populatePilotSelect(filtered);
+        });
+    }
+
     // 获取并填充主播选项
     console.log('[导出页面] 开始获取主播列表，URL:', pilotsUrl);
     fetch(pilotsUrl)
@@ -120,31 +163,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             console.log('[导出页面] API返回数据:', data);
             if (data.success) {
-                pilotSelect.innerHTML = '<option value="">请选择主播</option>';
-                const pilots = data.data.pilots;
-                console.log('[导出页面] 主播数量:', pilots.length);
+                allPilots = data.data.pilots || [];
+                console.log('[导出页面] 主播数量:', allPilots.length);
                 
-                const ownerGroups = {};
-                pilots.forEach(pilot => {
-                    if (!ownerGroups[pilot.owner]) {
-                        ownerGroups[pilot.owner] = [];
-                    }
-                    ownerGroups[pilot.owner].push(pilot);
-                });
-
-                const sortedOwners = Object.keys(ownerGroups).sort();
-                console.log('[导出页面] 运营分组:', sortedOwners);
-
-                sortedOwners.forEach(owner => {
-                    const optgroup = document.createElement('optgroup');
-                    optgroup.label = owner;
-                    ownerGroups[owner].forEach(pilot => {
-                        const displayName = `${pilot.nickname}${pilot.real_name ? '(' + pilot.real_name + ')' : ''}`;
-                        const option = new Option(displayName, pilot.id);
-                        optgroup.appendChild(option);
-                    });
-                    pilotSelect.appendChild(optgroup);
-                });
+                populatePilotSelect(allPilots);
+                initPilotSearch();
                 
                 console.log('[导出页面] 主播列表填充完成，总选项数:', pilotSelect.options.length);
 
