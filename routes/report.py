@@ -12,11 +12,13 @@ from flask_security import roles_accepted
 from models.announcement import Announcement
 from models.battle_record import BattleRecord
 from models.pilot import Pilot, Rank, Status, WorkMode
-from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
-from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
-from utils.recruit_stats import calculate_recruit_today_stats
 from utils.cache_helper import cached_monthly_report
+from utils.commission_helper import (calculate_commission_amounts,
+                                     get_pilot_commission_rate_for_date)
+from utils.logging_setup import get_logger
+from utils.recruit_stats import calculate_recruit_today_stats
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 logger = get_logger('report')
 
@@ -572,7 +574,7 @@ def _calculate_daily_details(report_date, owner_id=None, mode: str = 'all'):
 
         details.append(detail)
 
-    details.sort(key=lambda x: (x['monthly_commission_stats']['month_total_profit'], -x['revenue']))
+    details.sort(key=lambda x: x['daily_profit'])
 
     return details
 
