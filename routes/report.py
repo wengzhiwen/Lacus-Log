@@ -176,6 +176,87 @@ def calculate_dashboard_candidate_metrics():
     }
 
 
+def calculate_dashboard_conversion_rate_metrics():
+    """计算仪表盘底薪流水转化率统计。"""
+    frames = _get_dashboard_time_frames()
+    now_local = frames['now_local']
+
+    yesterday_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+
+    month_conversion = _calculate_month_conversion_rate(yesterday_local)
+    day_conversion = _calculate_day_conversion_rate(yesterday_local)
+    week_conversion = _calculate_week_conversion_rate(yesterday_local)
+
+    return {
+        'generated_at': frames['now_local'].strftime('%Y-%m-%d %H:%M:%S'),
+        'month_conversion_rate': month_conversion,
+        'yesterday_conversion_rate': day_conversion,
+        'last_week_conversion_rate': week_conversion,
+    }
+
+
+def _calculate_month_conversion_rate(report_date):
+    """计算月度底薪流水转化率（截至报表日所在月）。"""
+    month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id=None, mode='offline')
+
+    total_revenue = Decimal('0')
+    total_base_salary = Decimal('0')
+
+    for record in month_records:
+        total_revenue += record.revenue_amount or Decimal('0')
+        total_base_salary += record.base_salary or Decimal('0')
+
+    if total_base_salary > 0:
+        return int((total_revenue / total_base_salary) * 100)
+    return None
+
+
+def _calculate_day_conversion_rate(report_date):
+    """计算日度底薪流水转化率（报表日当天）。"""
+    day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id=None, mode='offline')
+
+    total_revenue = Decimal('0')
+    total_base_salary = Decimal('0')
+
+    for record in day_records:
+        total_revenue += record.revenue_amount or Decimal('0')
+        total_base_salary += record.base_salary or Decimal('0')
+
+    if total_base_salary > 0:
+        return int((total_revenue / total_base_salary) * 100)
+    return None
+
+
+def _calculate_week_conversion_rate(report_date):
+    """计算周度底薪流水转化率（报表日所在周的上一周，周二至次周一）。"""
+    current_weekday = report_date.weekday()
+    days_since_tuesday = (current_weekday - 1) % 7
+    this_week_tuesday = report_date - timedelta(days=days_since_tuesday)
+    last_week_tuesday = this_week_tuesday - timedelta(days=7)
+
+    week_start = last_week_tuesday.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = (last_week_tuesday + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+
+    week_records = get_battle_records_for_date_range(week_start, week_end + timedelta(microseconds=1), owner_id=None, mode='offline')
+
+    total_revenue = Decimal('0')
+    total_base_salary = Decimal('0')
+
+    for record in week_records:
+        total_revenue += record.revenue_amount or Decimal('0')
+        total_base_salary += record.base_salary or Decimal('0')
+
+    if total_base_salary > 0:
+        return int((total_revenue / total_base_salary) * 100)
+    return None
+
+
 def get_local_date_from_string(date_str):
     """解析 YYYY-MM-DD 为本地日期对象。"""
     if not date_str:

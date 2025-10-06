@@ -1,21 +1,20 @@
 # pylint: disable=no-member
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import (Blueprint, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_login import login_required
 from flask_security import current_user
 from flask_security.utils import hash_password
 
+from routes.report import (build_dashboard_feature_banner,
+                           calculate_dashboard_announcement_metrics,
+                           calculate_dashboard_battle_metrics,
+                           calculate_dashboard_candidate_metrics,
+                           calculate_dashboard_conversion_rate_metrics,
+                           calculate_dashboard_pilot_metrics,
+                           calculate_dashboard_recruit_metrics)
 from utils.dashboard_serializers import create_success_response
 from utils.logging_setup import get_logger
-
-from routes.report import (
-    build_dashboard_feature_banner,
-    calculate_dashboard_announcement_metrics,
-    calculate_dashboard_battle_metrics,
-    calculate_dashboard_candidate_metrics,
-    calculate_dashboard_pilot_metrics,
-    calculate_dashboard_recruit_metrics,
-)
 
 logger = get_logger('main')
 
@@ -82,6 +81,15 @@ def dashboard_feature_data():
     """仪表盘横幅展示接口。"""
     data = build_dashboard_feature_banner()
     meta = {'segment': 'feature'}
+    return jsonify(create_success_response(data, meta))
+
+
+@main_bp.route('/api/dashboard/conversion-rate', methods=['GET'])
+@login_required
+def dashboard_conversion_rate_data():
+    """仪表盘底薪流水转化率统计接口。"""
+    data = calculate_dashboard_conversion_rate_metrics()
+    meta = {'segment': 'conversion_rate', 'link': url_for('report.monthly_report')}
     return jsonify(create_success_response(data, meta))
 
 

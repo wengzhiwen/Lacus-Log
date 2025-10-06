@@ -40,6 +40,29 @@
       </div>
     </div>
 
+    <div class="card" data-card-id="conversion-rate" data-default-link="{{ url_for('report.monthly_report') }}">
+      <div class="card-header">
+        <div class="card-title">线下底薪流水转化率</div>
+        <div class="card-icon">💰</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value" data-field="month_conversion_rate">--</div>
+          <div class="main-label">本月转化率</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value" data-field="yesterday_conversion_rate">--</div>
+            <div class="sub-label">昨日转化率</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value" data-field="last_week_conversion_rate">--</div>
+            <div class="sub-label">上周转化率</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card" data-card-id="announcement" data-default-link="{{ url_for('calendar.day_view') }}">
       <div class="card-header">
         <div class="card-title">通告计划统计</div>
@@ -156,6 +179,7 @@
 
   const endpoints = [
     { url: "{{ url_for('main.dashboard_recruit_data') }}", handler: applyRecruit },
+    { url: "{{ url_for('main.dashboard_conversion_rate_data') }}", handler: applyConversionRate },
     { url: "{{ url_for('main.dashboard_announcement_data') }}", handler: applyAnnouncement },
     { url: "{{ url_for('main.dashboard_battle_data') }}", handler: applyBattle },
     { url: "{{ url_for('main.dashboard_pilot_data') }}", handler: applyPilot },
@@ -221,6 +245,25 @@
     }
     if (meta && meta.link) {
       setCardLink('recruit', meta.link);
+    }
+  }
+
+  function applyConversionRate(data, meta) {
+    updateMeta(data.generated_at);
+    if (fieldMap.month_conversion_rate) {
+      const monthRate = data.month_conversion_rate;
+      fieldMap.month_conversion_rate.textContent = monthRate !== null && monthRate !== undefined ? monthRate + '%' : '--';
+    }
+    if (fieldMap.yesterday_conversion_rate) {
+      const yesterdayRate = data.yesterday_conversion_rate;
+      fieldMap.yesterday_conversion_rate.textContent = yesterdayRate !== null && yesterdayRate !== undefined ? yesterdayRate + '%' : '--';
+    }
+    if (fieldMap.last_week_conversion_rate) {
+      const weekRate = data.last_week_conversion_rate;
+      fieldMap.last_week_conversion_rate.textContent = weekRate !== null && weekRate !== undefined ? weekRate + '%' : '--';
+    }
+    if (meta && meta.link) {
+      setCardLink('conversion-rate', meta.link);
     }
   }
 
@@ -353,6 +396,21 @@
             window.location.href = link;
           });
           recruitCard.dataset.navBound = 'true';
+        }
+      }
+    }
+
+    const conversionRateCard = app.querySelector('.card[data-card-id="conversion-rate"]');
+    if (conversionRateCard) {
+      const link = conversionRateCard.dataset.link || conversionRateCard.dataset.defaultLink;
+      if (link) {
+        conversionRateCard.classList.add('is-clickable');
+        conversionRateCard.style.cursor = 'pointer';
+        if (!conversionRateCard.dataset.navBound) {
+          conversionRateCard.addEventListener('click', () => {
+            window.location.href = link;
+          });
+          conversionRateCard.dataset.navBound = 'true';
         }
       }
     }
