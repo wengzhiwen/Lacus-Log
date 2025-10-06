@@ -257,6 +257,51 @@ def _calculate_week_conversion_rate(report_date):
     return None
 
 
+def calculate_dashboard_pilot_ranking_metrics():
+    """计算仪表盘昨日主播排名统计。"""
+    frames = _get_dashboard_time_frames()
+    now_local = frames['now_local']
+
+    yesterday_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+    day_start = yesterday_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = yesterday_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id=None, mode='all')
+
+    pilot_revenue = {}
+
+    for record in day_records:
+        pilot_id = str(record.pilot.id)
+        if pilot_id not in pilot_revenue:
+            pilot_revenue[pilot_id] = {'pilot': record.pilot, 'total_revenue': Decimal('0')}
+        pilot_revenue[pilot_id]['total_revenue'] += record.revenue_amount or Decimal('0')
+
+    sorted_pilots = sorted(pilot_revenue.values(), key=lambda x: x['total_revenue'], reverse=True)
+
+    def format_pilot_info(pilot_data):
+        if not pilot_data:
+            return '--'
+        pilot = pilot_data['pilot']
+        nickname = pilot.nickname or ''
+        real_name = pilot.real_name or ''
+        owner_name = pilot.owner.username if pilot.owner else '无'
+
+        if real_name:
+            return f"{nickname}（{real_name}）[{owner_name}]"
+        return f"{nickname}[{owner_name}]"
+
+    champion = format_pilot_info(sorted_pilots[0]) if len(sorted_pilots) > 0 else '--'
+    second = format_pilot_info(sorted_pilots[1]) if len(sorted_pilots) > 1 else '--'
+    third = format_pilot_info(sorted_pilots[2]) if len(sorted_pilots) > 2 else '--'
+
+    return {
+        'generated_at': frames['now_local'].strftime('%Y-%m-%d %H:%M:%S'),
+        'champion': champion,
+        'second_place': second,
+        'third_place': third,
+    }
+
+
 def get_local_date_from_string(date_str):
     """解析 YYYY-MM-DD 为本地日期对象。"""
     if not date_str:

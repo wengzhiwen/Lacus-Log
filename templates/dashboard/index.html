@@ -63,6 +63,29 @@
       </div>
     </div>
 
+    <div class="card" data-card-id="pilot-ranking">
+      <div class="card-header">
+        <div class="card-title">昨日主播排名</div>
+        <div class="card-icon">🏆</div>
+      </div>
+      <div class="card-body">
+        <div class="main-data">
+          <div class="main-value" data-field="champion" style="font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+          <div class="main-label">冠军</div>
+        </div>
+        <div class="sub-data">
+          <div class="sub-item">
+            <div class="sub-value" data-field="second_place" style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+            <div class="sub-label">亚军</div>
+          </div>
+          <div class="sub-item">
+            <div class="sub-value" data-field="third_place" style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+            <div class="sub-label">季军</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card" data-card-id="announcement" data-default-link="{{ url_for('calendar.day_view') }}">
       <div class="card-header">
         <div class="card-title">通告计划统计</div>
@@ -180,6 +203,7 @@
   const endpoints = [
     { url: "{{ url_for('main.dashboard_recruit_data') }}", handler: applyRecruit },
     { url: "{{ url_for('main.dashboard_conversion_rate_data') }}", handler: applyConversionRate },
+    { url: "{{ url_for('main.dashboard_pilot_ranking_data') }}", handler: applyPilotRanking },
     { url: "{{ url_for('main.dashboard_announcement_data') }}", handler: applyAnnouncement },
     { url: "{{ url_for('main.dashboard_battle_data') }}", handler: applyBattle },
     { url: "{{ url_for('main.dashboard_pilot_data') }}", handler: applyPilot },
@@ -264,6 +288,22 @@
     }
     if (meta && meta.link) {
       setCardLink('conversion-rate', meta.link);
+    }
+  }
+
+  function applyPilotRanking(data, meta) {
+    updateMeta(data.generated_at);
+    if (fieldMap.champion) {
+      fieldMap.champion.textContent = data.champion || '--';
+      fieldMap.champion.title = data.champion || '';
+    }
+    if (fieldMap.second_place) {
+      fieldMap.second_place.textContent = data.second_place || '--';
+      fieldMap.second_place.title = data.second_place || '';
+    }
+    if (fieldMap.third_place) {
+      fieldMap.third_place.textContent = data.third_place || '--';
+      fieldMap.third_place.title = data.third_place || '';
     }
   }
 

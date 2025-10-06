@@ -12,6 +12,7 @@ from routes.report import (build_dashboard_feature_banner,
                            calculate_dashboard_candidate_metrics,
                            calculate_dashboard_conversion_rate_metrics,
                            calculate_dashboard_pilot_metrics,
+                           calculate_dashboard_pilot_ranking_metrics,
                            calculate_dashboard_recruit_metrics)
 from utils.dashboard_serializers import create_success_response
 from utils.logging_setup import get_logger
@@ -90,6 +91,15 @@ def dashboard_conversion_rate_data():
     """仪表盘底薪流水转化率统计接口。"""
     data = calculate_dashboard_conversion_rate_metrics()
     meta = {'segment': 'conversion_rate', 'link': url_for('report.monthly_report')}
+    return jsonify(create_success_response(data, meta))
+
+
+@main_bp.route('/api/dashboard/pilot-ranking', methods=['GET'])
+@login_required
+def dashboard_pilot_ranking_data():
+    """仪表盘昨日主播排名统计接口。"""
+    data = calculate_dashboard_pilot_ranking_metrics()
+    meta = {'segment': 'pilot_ranking'}
     return jsonify(create_success_response(data, meta))
 
 
