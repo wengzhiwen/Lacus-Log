@@ -3,7 +3,7 @@
 
 {% block content %}
 <section class="recruit-detail" data-recruit-id="{{ recruit_id }}">
-  <div class="back-nav">
+  <div class="back-nav" id="backNav">
     <a class="btn btn-secondary" href="{{ url_for('recruit.list_recruits') }}">
       <span>←</span>
       返回招募列表
@@ -68,11 +68,42 @@
 
 <script>
 const recruitId = document.querySelector('.recruit-detail').dataset.recruitId;
+const urlParams = new URLSearchParams(window.location.search);
 
 function formatDateTime(isoString) {
     if (!isoString) return '-';
     const date = new Date(isoString);
     return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderBackButton() {
+    const backNav = document.getElementById('backNav');
+    const fromParam = urlParams.get('from');
+    
+    if (fromParam === 'recruit_report_detail') {
+        const reportDate = urlParams.get('report_date');
+        const reportRange = urlParams.get('report_range');
+        const reportMetric = urlParams.get('report_metric');
+        const reportRecruiter = urlParams.get('report_recruiter') || 'all';
+        
+        if (reportDate && reportRange && reportMetric) {
+            const returnUrl = `/reports/recruits/daily-report/detail?date=${reportDate}&range=${reportRange}&metric=${reportMetric}&recruiter=${reportRecruiter}`;
+            backNav.innerHTML = `
+                <a class="btn btn-secondary" href="${returnUrl}">
+                    <span>←</span>
+                    返回日报详情
+                </a>
+            `;
+            return;
+        }
+    }
+    
+    backNav.innerHTML = `
+        <a class="btn btn-secondary" href="/recruits">
+            <span>←</span>
+            返回招募列表
+        </a>
+    `;
 }
 
 function renderPilotInfo(pilot) {
@@ -139,9 +170,24 @@ function renderRecruitInfo(recruit) {
     container.innerHTML = content;
 }
 
+function buildQueryString() {
+    const params = new URLSearchParams();
+    const fromParam = urlParams.get('from');
+    
+    if (fromParam) params.set('from', fromParam);
+    if (urlParams.get('report_date')) params.set('report_date', urlParams.get('report_date'));
+    if (urlParams.get('report_range')) params.set('report_range', urlParams.get('report_range'));
+    if (urlParams.get('report_metric')) params.set('report_metric', urlParams.get('report_metric'));
+    if (urlParams.get('report_recruiter')) params.set('report_recruiter', urlParams.get('report_recruiter'));
+    
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : '';
+}
+
 function renderActionButtons(recruit) {
     const container = document.getElementById('footbar-container');
-    let buttons = `<a class="btn btn-secondary" href="/recruits/${recruit.id}/edit">编辑</a>`;
+    const queryString = buildQueryString();
+    let buttons = `<a class="btn btn-secondary" href="/recruits/${recruit.id}/edit${queryString}">编辑</a>`;
     const status = recruit.effective_status;
 
     const actionMap = {
@@ -153,7 +199,7 @@ function renderActionButtons(recruit) {
     };
 
     if (actionMap[status]) {
-        const url = `/recruits/${recruit.id}/${actionMap[status].path}`;
+        const url = `/recruits/${recruit.id}/${actionMap[status].path}${queryString}`;
         buttons += `<a class="btn btn-primary" href="${url}">${actionMap[status].text}</a>`;
     }
 
@@ -196,6 +242,8 @@ function hideChangesModal() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    renderBackButton();
+    
     try {
         const payload = await RecruitAPI.getRecruitDetail(recruitId);
         const recruit = payload.data;

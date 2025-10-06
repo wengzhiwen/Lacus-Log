@@ -2,7 +2,7 @@
 {% block title %}编辑招募 - Lacus-Log{% endblock %}
 {% block content %}
 <section class="edit-recruit" data-recruit-id="{{ recruit_id }}">
-  <div class="back-nav">
+  <div class="back-nav" id="backNav">
     <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">
       <span>←</span>
       返回招募详情
@@ -96,8 +96,8 @@
   </form>
 </section>
 
-<div class="footbar">
-  <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}">返回</a>
+<div class="footbar" id="footbar">
+  <a class="btn btn-secondary" href="{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}" id="footbarBackBtn">返回</a>
   <button type="submit" form="edit-recruit-form" class="btn btn-primary" id="save-button">保存修改</button>
 </div>
 
@@ -130,6 +130,8 @@ input, select, textarea { padding: 8px 12px; border: 1px solid var(--gray); bord
 document.addEventListener('DOMContentLoaded', async function() {
   const section = document.querySelector('.edit-recruit');
   const recruitId = section.dataset.recruitId;
+  const urlParams = new URLSearchParams(window.location.search);
+  
   const rankMapping = {
     '候补机师': '候选人',
     '训练机师': '试播主播',
@@ -143,6 +145,28 @@ document.addEventListener('DOMContentLoaded', async function() {
     '已阵亡': '流失'
   };
   const genderIcon = { 0: '♂', 1: '♀', 2: '?' };
+  
+  function buildDetailUrl() {
+    const baseUrl = `/recruits/${recruitId}`;
+    const params = new URLSearchParams();
+    
+    if (urlParams.get('from')) params.set('from', urlParams.get('from'));
+    if (urlParams.get('report_date')) params.set('report_date', urlParams.get('report_date'));
+    if (urlParams.get('report_range')) params.set('report_range', urlParams.get('report_range'));
+    if (urlParams.get('report_metric')) params.set('report_metric', urlParams.get('report_metric'));
+    if (urlParams.get('report_recruiter')) params.set('report_recruiter', urlParams.get('report_recruiter'));
+    
+    const queryString = params.toString();
+    return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+  }
+  
+  function updateBackButtons() {
+    const detailUrl = buildDetailUrl();
+    document.getElementById('backNav').querySelector('a').href = detailUrl;
+    document.getElementById('footbarBackBtn').href = detailUrl;
+  }
+  
+  updateBackButtons();
 
   const toDatetimeLocal = (isoString) => {
     if (!isoString) return '';
@@ -274,7 +298,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (response.success) {
         showMessage('招募信息已成功更新！正在跳转回详情页...', 'success');
         setTimeout(() => {
-          window.location.href = "{{ url_for('recruit.detail_recruit', recruit_id=recruit_id) }}";
+          window.location.href = buildDetailUrl();
         }, 1500);
       }
     } catch (error) {
