@@ -63,7 +63,7 @@ class Pilot(Document):
 
     nickname = StringField(required=True, unique=True, max_length=20)
     real_name = StringField(max_length=20)
-    gender = EnumField(Gender, default=Gender.FEMALE)
+    gender = EnumField(Gender, default=Gender.UNKNOWN)
     hometown = StringField(max_length=20)  # 籍贯
     birth_year = IntField()
 
