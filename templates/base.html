@@ -196,14 +196,22 @@
       
       if (menuToggle && topNav) {
         menuToggle.addEventListener('click', function() {
-          topNav.classList.toggle('active');
+          const isActive = topNav.classList.toggle('active');
           menuToggle.classList.toggle('active');
+          
+          // 切换body的滚动状态
+          if (isActive) {
+            document.body.classList.add('menu-open');
+          } else {
+            document.body.classList.remove('menu-open');
+          }
         });
         
         document.addEventListener('click', function(event) {
           if (!menuToggle.contains(event.target) && !topNav.contains(event.target)) {
             topNav.classList.remove('active');
             menuToggle.classList.remove('active');
+            document.body.classList.remove('menu-open');
           }
         });
       }

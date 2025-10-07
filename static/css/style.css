@@ -772,6 +772,8 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   transition: left 0.3s ease; 
   box-shadow: 2px 0 5px rgba(0,0,0,0.1);
   z-index: 100;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .topnav.active { left: 0; }
@@ -784,6 +786,13 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 }
 
 .topnav .navlink:hover { background: var(--table-header); }
+
+/* 当菜单打开时禁止body滚动 */
+body.menu-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
 
 .container { padding: 12px; }
 
