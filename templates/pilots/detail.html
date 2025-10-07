@@ -531,7 +531,7 @@ function renderBackNav(params) {
   } else if (params.from === 'announcement_detail' && params.announcement_id) {
     backUrl = `/announcement/${params.announcement_id}`;
   } else if (params.from === 'battle_record_detail' && params.record_id) {
-    backUrl = `/battle_record/${params.record_id}`;
+    backUrl = `/battle-records/${params.record_id}`;
   } else if (params.from === 'performance') {
     backUrl = `/pilots/${currentPilot.id}/performance`;
   }
