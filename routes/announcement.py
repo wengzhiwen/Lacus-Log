@@ -1,16 +1,13 @@
 # pylint: disable=no-member
-from flask import (Blueprint, abort, flash, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, abort, flash, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist
 
-from models.announcement import (Announcement, AnnouncementChangeLog,
-                                 RecurrenceType)
+from models.announcement import (Announcement, AnnouncementChangeLog)
 from models.pilot import Pilot
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_local_datetime_for_input,
-                                   get_current_month_last_day_for_input)
+from utils.timezone_helper import (get_current_local_datetime_for_input, get_current_month_last_day_for_input)
 
 logger = get_logger('announcement')
 
@@ -121,24 +118,13 @@ def export_page():
 @announcement_bp.route('/<announcement_id>')
 @roles_accepted('gicho', 'kancho')
 def announcement_detail(announcement_id):
-    """通告详情页面"""
+    """通告详情页面（REST API版本）"""
     try:
-        announcement = Announcement.objects.get(id=announcement_id)
+        # 验证通告是否存在
+        Announcement.objects.get(id=announcement_id)
 
-        related_announcements = []
-        if announcement.parent_announcement:
-            related_announcements = Announcement.objects(parent_announcement=announcement.parent_announcement).order_by('start_time')
-        elif announcement.recurrence_type != RecurrenceType.NONE:
-            related_announcements = Announcement.objects(parent_announcement=announcement).order_by('start_time')
-
-        from_param = request.args.get('from')
-        date_param = request.args.get('date')
-
-        return render_template('announcements/detail.html',
-                               announcement=announcement,
-                               related_announcements=related_announcements,
-                               from_param=from_param,
-                               date_param=date_param)
+        # 直接渲染模板，数据由前端REST API加载
+        return render_template('announcements/detail.html', announcement_id=announcement_id)
     except DoesNotExist:
         abort(404)
 

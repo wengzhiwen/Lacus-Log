@@ -15,23 +15,17 @@ from flask_wtf.csrf import ValidationError as CSRFValidationError
 from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist, ValidationError
 
-from models.announcement import (Announcement, AnnouncementChangeLog,
-                                 RecurrenceType)
+from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
 from models.battle_area import BattleArea
 from models.pilot import Pilot, Rank, Status
 from models.user import User
 from routes.announcement import _get_client_ip, _record_changes
-from utils.announcement_serializers import (create_error_response,
-                                            create_success_response,
-                                            serialize_announcement_detail,
-                                            serialize_announcement_summary,
+from utils.announcement_serializers import (create_error_response, create_success_response, serialize_announcement_detail, serialize_announcement_summary,
                                             serialize_change_logs)
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (format_local_datetime,
-                                   get_current_local_time, local_to_utc,
-                                   parse_local_date_to_end_datetime,
-                                   parse_local_datetime, utc_to_local)
+from utils.timezone_helper import (format_local_datetime, get_current_local_time, local_to_utc, parse_local_date_to_end_datetime, parse_local_datetime,
+                                   utc_to_local)
 
 announcements_api_bp = Blueprint('announcements_api', __name__)
 
@@ -676,6 +670,21 @@ def get_announcement_changes_api(announcement_id: str):
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('获取通告变更记录失败：%s', str(exc), exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '获取通告变更记录失败')), 500
+
+
+@announcements_api_bp.route('/api/announcements/options', methods=['GET'])
+@roles_accepted('gicho', 'kancho')
+def get_announcement_filter_options():
+    """获取通告筛选选项（统一接口）。
+    
+    返回运营、基地坐标、时间范围等所有筛选选项。
+    """
+    try:
+        options = _build_filter_options()
+        return jsonify(create_success_response(options))
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('获取筛选选项失败：%s', str(exc), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '获取筛选选项失败')), 500
 
 
 @announcements_api_bp.route('/announcements/api/areas/options', methods=['GET'])

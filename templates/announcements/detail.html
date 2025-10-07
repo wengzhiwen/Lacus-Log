@@ -1,42 +1,44 @@
 {% extends "base.html" %}
 
-{% block title %}通告详情 - {{ announcement.pilot.nickname }} - Lacus-Log{% endblock %}
+{% block title %}通告详情 - Lacus-Log{% endblock %}
 
 {% block content %}
-<section class="announcement-detail">
+<div id="loading-indicator" style="text-align: center; padding: 100px 20px;">
+  <div style="display: inline-block; border: 4px solid rgba(59, 130, 246, 0.1); border-top: 4px solid var(--brand); border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite;"></div>
+  <p style="margin-top: 20px; color: var(--muted);">加载中...</p>
+</div>
+
+<div id="error-indicator" style="display: none; text-align: center; padding: 100px 20px;">
+  <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+  <h2 style="color: var(--error); margin-bottom: 10px;">加载失败</h2>
+  <p id="error-message" style="color: var(--muted);"></p>
+  <button class="btn btn-primary" onclick="location.href='/announcements'" style="margin-top: 20px;">返回通告列表</button>
+</div>
+
+<section class="announcement-detail" id="detail-content" style="display: none;">
   <div class="back-nav">
-    {% if from_param == 'calendar' and date_param %}
-    <a class="btn btn-secondary" href="{{ url_for('calendar.day_view') }}?date={{ date_param }}">
+    <a class="btn btn-secondary" href="#" id="back-btn">
       <span>←</span>
-      返回日历
+      <span id="back-text">返回</span>
     </a>
-    {% else %}
-    <a class="btn btn-secondary" href="{{ url_for('announcement.list_announcements') }}">
-      <span>←</span>
-      返回通告列表
-    </a>
-    {% endif %}
   </div>
 
   <div class="pilot-info-card">
     <div class="card-header">
       <div class="pilot-main-info">
-        <div class="pilot-name"><a href="{{ url_for('pilot.pilot_detail', pilot_id=announcement.pilot.id, from='announcement_detail', announcement_id=announcement.id) }}">{{ announcement.pilot.nickname }}</a></div>
-        <div class="pilot-real-name">{{ announcement.pilot.real_name or '未填写姓名' }}</div>
-        <div class="pilot-badges">
-          <span class="rank-badge rank-{{ announcement.pilot.rank.value.replace(' ', '') }}">{{ announcement.pilot.rank.value }}</span>
-          <span class="status-badge status-{{ announcement.pilot.status.value.replace(' ', '') }}">{{ announcement.pilot.status.value }}</span>
-        </div>
+        <div class="pilot-name"><a href="#" id="pilot-link"></a></div>
+        <div class="pilot-real-name" id="pilot-real-name"></div>
+        <div class="pilot-badges" id="pilot-badges"></div>
       </div>
     </div>
     <div class="pilot-basic-info">
       <div class="info-item">
         <span class="info-label">性别/年龄：</span>
-        <span class="info-value">{{ announcement.pilot.gender_display }}{% if announcement.pilot.age %}/{{ announcement.pilot.age }}岁{% endif %}</span>
+        <span class="info-value" id="pilot-gender-age"></span>
       </div>
       <div class="info-item">
         <span class="info-label">直属运营：</span>
-        <span class="info-value">{{ announcement.pilot.owner.nickname or announcement.pilot.owner.username if announcement.pilot.owner else '无' }}</span>
+        <span class="info-value" id="pilot-owner"></span>
       </div>
     </div>
   </div>
@@ -47,11 +49,11 @@
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">开播地点</div>
-          <div class="info-value coords">{{ announcement.x_coord }}-{{ announcement.y_coord }}-{{ announcement.z_coord }}</div>
+          <div class="info-value coords" id="coords"></div>
         </div>
         <div class="info-item">
           <div class="info-label">开播平台</div>
-          <div class="info-value">{{ announcement.pilot.platform.value }}</div>
+          <div class="info-value" id="platform"></div>
         </div>
       </div>
     </div>
@@ -61,85 +63,63 @@
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">开始时间</div>
-          <div class="info-value">{{ announcement.start_time | local_datetime }}</div>
+          <div class="info-value" id="start-time"></div>
         </div>
         <div class="info-item">
           <div class="info-label">计划时长</div>
-          <div class="info-value">{{ announcement.duration_display }}</div>
+          <div class="info-value" id="duration"></div>
         </div>
         <div class="info-item">
           <div class="info-label">结束时间</div>
-          <div class="info-value">{{ announcement.end_time | local_datetime }}</div>
+          <div class="info-value" id="end-time"></div>
         </div>
         <div class="info-item">
           <div class="info-label">循环规则</div>
-          <div class="info-value">{{ announcement.recurrence_display }}</div>
+          <div class="info-value" id="recurrence"></div>
         </div>
       </div>
     </div>
 
-    {% if announcement.recurrence_type.value != '无重复' or related_announcements %}
-    <div class="info-section">
+    <div class="info-section" id="recurrence-section" style="display: none;">
       <h3 class="section-title">循环信息</h3>
-      {% if announcement.recurrence_end %}
-      <div class="info-grid">
+      <div class="info-grid" id="recurrence-end-grid" style="display: none;">
         <div class="info-item">
           <div class="info-label">循环结束</div>
-          <div class="info-value">{{ announcement.recurrence_end | local_datetime }}</div>
+          <div class="info-value" id="recurrence-end"></div>
         </div>
       </div>
-      {% endif %}
 
-      {% if related_announcements %}
-      <div class="related-events">
-        <h4>相关事件（{{ related_announcements.count() }}个）</h4>
-        <div class="events-list">
-          {% for related in related_announcements %}
-          <div class="event-item {% if related.id == announcement.id %}current{% endif %}">
-            <a href="{{ url_for('announcement.announcement_detail', announcement_id=related.id) }}{% if from_param == 'calendar' and date_param %}?from=calendar&date={{ date_param }}{% endif %}">
-              <span class="event-time">{{ related.start_time | local_datetime('%m-%d %H:%M') }}</span>
-              <span class="event-duration">{{ related.duration_display }}</span>
-              {% if related.id == announcement.id %}
-              <span class="current-indicator">当前</span>
-              {% endif %}
-            </a>
-          </div>
-          {% endfor %}
-        </div>
+      <div class="related-events" id="related-events" style="display: none;">
+        <h4 id="related-events-title"></h4>
+        <div class="events-list" id="events-list"></div>
       </div>
-      {% endif %}
     </div>
-    {% endif %}
 
     <div class="info-section">
       <h3 class="section-title">系统信息</h3>
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">创建时间</div>
-          <div class="info-value">{{ announcement.created_at | local_datetime('%Y年%m月%d日 %H:%M:%S') }}</div>
+          <div class="info-value" id="created-at"></div>
         </div>
         <div class="info-item">
           <div class="info-label">最后修改</div>
-          <div class="info-value">{{ announcement.updated_at | local_datetime('%Y年%m月%d日 %H:%M:%S') }}</div>
+          <div class="info-value" id="updated-at"></div>
         </div>
         <div class="info-item">
           <div class="info-label">创建用户</div>
-          <div class="info-value">{{ announcement.created_by.nickname or announcement.created_by.username }}</div>
+          <div class="info-value" id="created-by"></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<div class="footbar">
+<div class="footbar" id="footbar" style="display: none;">
     <div class="inner">
-        {% if announcement.is_in_recurrence_group %}
-        <button type="button" class="btn btn-primary" onclick="showEditModal()">编辑</button>
-        {% else %}
-        <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}{% if from_param == 'calendar' and date_param %}?from=calendar&date={{ date_param }}{% endif %}" class="btn btn-primary">编辑</a>
-        {% endif %}
-
-        <a href="{{ url_for('battle_record.new_battle_record', announcement_id=announcement.id) }}" class="btn btn-hud">
+        <button type="button" class="btn btn-primary" id="edit-btn">编辑</button>
+        
+        <a href="#" class="btn btn-hud" id="record-btn">
             登录开播记录
         </a>
 
@@ -149,19 +129,18 @@
     </div>
 </div>
 
-{% if announcement.is_in_recurrence_group %}
-<div id="editModal" class="modal">
+<div id="editModal" class="modal" style="display: none;">
     <div class="modal-content">
         <h4>选择编辑范围</h4>
         <p>请选择要编辑的范围：</p>
         <div class="edit-options">
-            <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}?edit_scope=this_only{% if from_param == 'calendar' and date_param %}&from=calendar&date={{ date_param }}{% endif %}" class="option-link">
+            <a href="#" id="edit-this-link" class="option-link">
                 <div class="option-card">
                     <h5>仅编辑这一次</h5>
                     <p>只修改当前这个通告，不影响其他循环事件</p>
                 </div>
             </a>
-            <a href="{{ url_for('announcement.edit_announcement', announcement_id=announcement.id) }}?edit_scope=future_all{% if from_param == 'calendar' and date_param %}&from=calendar&date={{ date_param }}{% endif %}" class="option-link">
+            <a href="#" id="edit-future-link" class="option-link">
                 <div class="option-card">
                     <h5>编辑未来所有</h5>
                     <p>修改从当前开始的所有未来循环事件</p>
@@ -173,31 +152,31 @@
         </div>
     </div>
 </div>
-{% endif %}
 
-<div id="deleteModal" class="modal">
+<div id="deleteModal" class="modal" style="display: none;">
     <div class="modal-content">
         <h4>确认删除</h4>
-        {% if announcement.is_in_recurrence_group %}
-        <p>请选择删除范围：</p>
-        <div class="delete-option-buttons">
-            <button type="button" class="btn btn-warning" onclick="confirmDelete('this_only')">只删除这一次</button>
-            <button type="button" class="btn btn-danger" onclick="confirmDelete('future_all')">删除未来所有</button>
+        <div id="delete-recurrence-options" style="display: none;">
+            <p>请选择删除范围：</p>
+            <div class="delete-option-buttons">
+                <button type="button" class="btn btn-warning" onclick="confirmDelete('this_only')">只删除这一次</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete('future_all')">删除未来所有</button>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" onclick="hideDeleteModal()">取消</button>
+            </div>
         </div>
-        <div class="modal-actions">
-            <button type="button" class="btn btn-outline" onclick="hideDeleteModal()">取消</button>
+        <div id="delete-single-options">
+            <p>确定要删除这个通告吗？此操作不可恢复。</p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-danger" onclick="confirmDelete('this_only')">确认删除</button>
+                <button type="button" class="btn btn-outline" onclick="hideDeleteModal()">取消</button>
+            </div>
         </div>
-        {% else %}
-        <p>确定要删除这个通告吗？此操作不可恢复。</p>
-        <div class="modal-actions">
-            <button type="button" class="btn btn-danger" onclick="confirmDelete('this_only')">确认删除</button>
-            <button type="button" class="btn btn-outline" onclick="hideDeleteModal()">取消</button>
-        </div>
-        {% endif %}
     </div>
 </div>
 
-<div id="changesModal" class="modal">
+<div id="changesModal" class="modal" style="display: none;">
     <div class="modal-content">
         <h4>变更记录</h4>
         <div id="changesContent">
@@ -210,6 +189,10 @@
 </div>
 
 <style>
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .announcement-detail {
   padding: 20px;
   padding-bottom: 100px;
@@ -274,12 +257,12 @@
   font-weight: 500;
 }
 
-.rank-候补机师, .rank-trainee { background: var(--table-header); color: var(--text); }
-.rank-训练机师, .rank-实习机师, .rank-正式机师 { background: var(--brand); color: white; }
+.rank-候补机师, .rank-候选人, .rank-trainee { background: var(--table-header); color: var(--text); }
+.rank-训练机师, .rank-试播主播, .rank-实习主播, .rank-正式主播 { background: var(--brand); color: white; }
 
-.status-未征召 { background: var(--table-header); color: var(--text); }
-.status-已征召, .status-已签约 { background: var(--hud-green); color: white; }
-.status-不征召, .status-已阵亡 { background: var(--error); color: white; }
+.status-未征召, .status-未招募 { background: var(--table-header); color: var(--text); }
+.status-已征召, .status-已招募, .status-已签约 { background: var(--hud-green); color: white; }
+.status-不征召, .status-不招募, .status-已阵亡, .status-流失 { background: var(--error); color: white; }
 
 .pilot-basic-info {
   display: grid;
@@ -353,78 +336,85 @@
 }
 
 .related-events {
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 .related-events h4 {
-  margin: 0 0 15px 0;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
   color: var(--text);
-  font-size: 16px;
 }
 
 .events-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
 }
 
 .event-item {
-  border: 1px solid var(--gray);
+  border: 1px solid var(--table-header);
   border-radius: 4px;
   overflow: hidden;
+  transition: all 0.2s ease;
 }
 
 .event-item.current {
-  border-color: var(--brand);
-  background: #f8f9ff;
+  background: var(--hud-green);
+  border-color: var(--hud-green);
 }
 
 .event-item a {
   display: flex;
   align-items: center;
-  padding: 10px 15px;
-  text-decoration: none;
+  gap: 12px;
+  padding: 12px;
   color: var(--text);
-  transition: background-color 0.2s ease;
+  text-decoration: none;
+  transition: background 0.2s ease;
 }
 
-.event-item a:hover {
+.event-item.current a {
+  color: white;
+}
+
+.event-item:not(.current):hover {
   background: var(--table-header);
 }
 
-.event-item.current a:hover {
-  background: #e6f3ff;
-}
-
 .event-time {
+  flex: 1;
+  font-size: 14px;
   font-weight: 500;
-  margin-right: 15px;
 }
 
 .event-duration {
+  font-size: 12px;
   color: var(--muted);
-  margin-right: auto;
+}
+
+.event-item.current .event-duration {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .current-indicator {
-  background: var(--brand);
-  color: white;
+  background: white;
+  color: var(--hud-green);
   padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
 }
-
 
 .footbar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: #fff;
-  border-top: 1px solid var(--table-header, #ddd);
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
-  padding: 10px 12px calc(env(safe-area-inset-bottom, 0) + 10px) 12px;
+  background: white;
+  border-top: 1px solid var(--table-header);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  padding: 12px;
   z-index: 100;
 }
 
@@ -436,61 +426,47 @@
   margin: 0 auto;
 }
 
-
 .footbar .btn {
-  display: flex !important;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  line-height: 1.2;
-  min-height: 56px;
   flex: 1 1 auto;
   min-width: 100px;
-  max-width: 240px;
-  box-sizing: border-box;
+  max-width: 200px;
 }
 
 .modal {
-  display: none;
   position: fixed;
-  z-index: 1000;
-  left: 0;
   top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
   animation: fadeIn 0.2s ease;
 }
 
 .modal-content {
-  background-color: white;
-  margin: 10% auto;
-  padding: 30px;
+  background: white;
   border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
   width: 90%;
-  max-width: 600px;
-  max-height: 70vh;
+  max-height: 80vh;
   overflow-y: auto;
   animation: slideIn 0.3s ease;
 }
 
 .modal-content h4 {
-  margin: 0 0 20px 0;
-  color: #333;
+  margin: 0 0 16px 0;
+  color: var(--text);
+  font-size: 18px;
 }
 
-.delete-options {
-  margin: 20px 0;
-}
-
-.radio-option {
-  display: block;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-
-.radio-option input {
-  margin-right: 8px;
+.modal-content p {
+  margin: 0 0 16px 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .modal-actions {
@@ -498,77 +474,12 @@
   gap: 10px;
   justify-content: flex-end;
   margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
 }
 
 .loading {
   text-align: center;
   padding: 40px;
-  color: #666;
-}
-
-.changes-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 15px;
-}
-
-.changes-table th,
-.changes-table td {
-  padding: 8px 12px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-.changes-table th {
-  background: #f8f9fa;
-  font-weight: 500;
-  color: #555;
-}
-
-.changes-table tr:hover {
-  background: #f8f9fa;
-}
-
-.btn {
-  display: inline-block;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
-  text-decoration: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #0056b3;
-}
-
-.btn-danger {
-  background: #dc3545;
-  color: white;
-}
-
-.btn-danger:hover {
-  background: #c82333;
-}
-
-.btn-outline {
-  background: transparent;
-  color: #6c757d;
-  border: 1px solid #6c757d;
-}
-
-.btn-outline:hover {
-  background: #6c757d;
-  color: white;
+  color: var(--muted);
 }
 
 .btn-warning {
@@ -638,7 +549,6 @@
   width: 100%;
 }
 
-
 .btn-hud {
   background: var(--hud-green);
   color: #fff;
@@ -675,15 +585,9 @@
   }
   
   .modal-content {
-    margin: 5% auto;
     width: 95%;
-    max-height: 90vh;
+    padding: 20px;
   }
-  
-  .modal-actions {
-    flex-direction: column;
-  }
-  
   
   .footbar .inner {
     flex-direction: row;
@@ -701,18 +605,11 @@
 </style>
 
 <script>
-const announcementId = '{{ announcement.id }}';
+const announcementId = '{{ announcement_id }}';
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-const fromParam = '{{ from_param or "" }}';
-const dateParam = '{{ date_param or "" }}';
-const calendarDayUrl = "{{ url_for('calendar.day_view') }}";
-const listUrl = "{{ url_for('announcement.list_announcements') }}";
-
-function showLoading(isLoading) {
-    const overlay = document.getElementById('loading-overlay');
-    if (!overlay) return;
-    overlay.style.display = isLoading ? 'flex' : 'none';
-}
+let announcementData = null;
+let fromParam = new URLSearchParams(window.location.search).get('from') || '';
+let dateParam = new URLSearchParams(window.location.search).get('date') || '';
 
 async function fetchJson(url, options = {}) {
     const response = await fetch(url, options);
@@ -726,8 +623,135 @@ async function fetchJson(url, options = {}) {
     return result;
 }
 
+async function loadAnnouncementDetail() {
+    try {
+        const result = await fetchJson(`/announcements/api/announcements/${announcementId}`);
+        announcementData = result.data;
+        renderAnnouncementDetail(announcementData);
+        
+        document.getElementById('loading-indicator').style.display = 'none';
+        document.getElementById('detail-content').style.display = 'block';
+        document.getElementById('footbar').style.display = 'block';
+    } catch (error) {
+        console.error('加载通告详情失败:', error);
+        document.getElementById('loading-indicator').style.display = 'none';
+        document.getElementById('error-indicator').style.display = 'block';
+        document.getElementById('error-message').textContent = error.message || '网络错误';
+    }
+}
+
+function renderAnnouncementDetail(data) {
+    const pilot = data.pilot;
+    
+    // 返回按钮
+    const backBtn = document.getElementById('back-btn');
+    const backText = document.getElementById('back-text');
+    if (fromParam === 'calendar' && dateParam) {
+        backBtn.href = `/calendar/day?date=${dateParam}`;
+        backText.textContent = '返回日历';
+    } else {
+        backBtn.href = '/announcements';
+        backText.textContent = '返回通告列表';
+    }
+    
+    // 主播信息
+    document.querySelector('#pilot-link').textContent = pilot.nickname || '';
+    document.querySelector('#pilot-link').href = `/pilots/${pilot.id}?from=announcement_detail&announcement_id=${announcementId}`;
+    document.getElementById('pilot-real-name').textContent = pilot.real_name || '未填写姓名';
+    
+    const badges = document.getElementById('pilot-badges');
+    badges.innerHTML = `
+        <span class="rank-badge rank-${(pilot.rank || '').replace(/\s/g, '')}">${pilot.rank || ''}</span>
+        <span class="status-badge status-${(pilot.status || '').replace(/\s/g, '')}">${pilot.status || ''}</span>
+    `;
+    
+    let genderAge = pilot.gender || '';
+    if (pilot.age) {
+        genderAge += genderAge ? `/${pilot.age}岁` : `${pilot.age}岁`;
+    }
+    document.getElementById('pilot-gender-age').textContent = genderAge || '未填写';
+    
+    const owner = pilot.owner;
+    document.getElementById('pilot-owner').textContent = owner ? owner.display_name : '无';
+    
+    // 通告信息
+    document.getElementById('coords').textContent = data.coordinates.display;
+    document.getElementById('platform').textContent = pilot.platform || '';
+    document.getElementById('start-time').textContent = data.time.start || '';
+    document.getElementById('duration').textContent = data.time.duration || '';
+    document.getElementById('end-time').textContent = data.time.end || '';
+    document.getElementById('recurrence').textContent = data.recurrence.display || '';
+    
+    // 循环信息
+    if (data.recurrence.is_in_group || data.related_announcements.length > 0) {
+        document.getElementById('recurrence-section').style.display = 'block';
+        
+        if (data.recurrence.end) {
+            document.getElementById('recurrence-end-grid').style.display = 'grid';
+            document.getElementById('recurrence-end').textContent = data.recurrence.end;
+        }
+        
+        if (data.related_announcements.length > 0) {
+            document.getElementById('related-events').style.display = 'block';
+            document.getElementById('related-events-title').textContent = `相关事件（${data.related_announcements.length}个）`;
+            
+            const eventsList = document.getElementById('events-list');
+            eventsList.innerHTML = '';
+            
+            data.related_announcements.forEach(event => {
+                const eventDiv = document.createElement('div');
+                eventDiv.className = 'event-item' + (event.is_current ? ' current' : '');
+                
+                const link = document.createElement('a');
+                const linkUrl = `/announcements/${event.id}`;
+                link.href = fromParam === 'calendar' && dateParam ? `${linkUrl}?from=calendar&date=${dateParam}` : linkUrl;
+                link.innerHTML = `
+                    <span class="event-time">${event.start_time}</span>
+                    <span class="event-duration">${event.duration}</span>
+                    ${event.is_current ? '<span class="current-indicator">当前</span>' : ''}
+                `;
+                
+                eventDiv.appendChild(link);
+                eventsList.appendChild(eventDiv);
+            });
+        }
+    }
+    
+    // 系统信息
+    document.getElementById('created-at').textContent = data.audit.created_at || '';
+    document.getElementById('updated-at').textContent = data.audit.updated_at || '';
+    document.getElementById('created-by').textContent = data.audit.created_by ? data.audit.created_by.display_name : '';
+    
+    // 编辑按钮
+    const editBtn = document.getElementById('edit-btn');
+    if (data.recurrence.is_in_group) {
+        editBtn.onclick = showEditModal;
+        const baseUrl = `/announcements/${announcementId}/edit`;
+        const urlParams = fromParam === 'calendar' && dateParam ? `&from=calendar&date=${dateParam}` : '';
+        document.getElementById('edit-this-link').href = `${baseUrl}?edit_scope=this_only${urlParams}`;
+        document.getElementById('edit-future-link').href = `${baseUrl}?edit_scope=future_all${urlParams}`;
+    } else {
+        editBtn.onclick = function() {
+            const editUrl = `/announcements/${announcementId}/edit`;
+            window.location.href = fromParam === 'calendar' && dateParam ? `${editUrl}?from=calendar&date=${dateParam}` : editUrl;
+        };
+    }
+    
+    // 登录开播记录按钮
+    document.getElementById('record-btn').href = `/battle-records/new?announcement_id=${announcementId}`;
+    
+    // 删除模态框选项
+    if (data.recurrence.is_in_group) {
+        document.getElementById('delete-recurrence-options').style.display = 'block';
+        document.getElementById('delete-single-options').style.display = 'none';
+    } else {
+        document.getElementById('delete-recurrence-options').style.display = 'none';
+        document.getElementById('delete-single-options').style.display = 'block';
+    }
+}
+
 function showEditModal() {
-    document.getElementById('editModal').style.display = 'block';
+    document.getElementById('editModal').style.display = 'flex';
 }
 
 function hideEditModal() {
@@ -735,7 +759,7 @@ function hideEditModal() {
 }
 
 function showDeleteModal() {
-    document.getElementById('deleteModal').style.display = 'block';
+    document.getElementById('deleteModal').style.display = 'flex';
 }
 
 function hideDeleteModal() {
@@ -754,7 +778,6 @@ function confirmDelete(scope) {
 
 async function deleteAnnouncement(scope) {
     try {
-        showLoading(true);
         const result = await fetchJson(`/announcements/api/announcements/${announcementId}`, {
             method: 'DELETE',
             headers: {
@@ -767,58 +790,55 @@ async function deleteAnnouncement(scope) {
         showMessage(meta.message || '删除通告成功', 'success');
         hideDeleteModal();
         if (fromParam === 'calendar' && dateParam) {
-            window.location.href = `${calendarDayUrl}?date=${dateParam}`;
+            window.location.href = `/calendar/day?date=${dateParam}`;
         } else {
-            window.location.href = listUrl;
+            window.location.href = '/announcements';
         }
     } catch (error) {
         console.error('删除通告失败:', error);
         showMessage(error.message || '删除通告失败', 'error');
-    } finally {
-        showLoading(false);
+        hideDeleteModal();
     }
 }
 
 function showChangesModal() {
     const modal = document.getElementById('changesModal');
     const content = document.getElementById('changesContent');
-    
-    modal.style.display = 'block';
+    modal.style.display = 'flex';
     content.innerHTML = '<div class="loading">加载中...</div>';
     
-    fetch(`/announcements/api/announcements/${announcementId}/changes`)
-        .then(response => response.json())
+    fetchJson(`/announcements/api/announcements/${announcementId}/changes`)
         .then(result => {
-            if (result.success) {
-                const changes = result.data?.items || [];
-                if (changes.length > 0) {
-                    let html = '<table class="changes-table">';
-                    html += '<thead><tr><th>时间</th><th>用户</th><th>字段</th><th>旧值</th><th>新值</th><th>IP</th></tr></thead>';
-                    html += '<tbody>';
-                    
-                    changes.forEach(change => {
-                        html += '<tr>';
-                        html += `<td>${change.change_time}</td>`;
-                        html += `<td>${change.user_name}</td>`;
-                        html += `<td>${change.field_name}</td>`;
-                        html += `<td>${change.old_value || '空'}</td>`;
-                        html += `<td>${change.new_value || '空'}</td>`;
-                        html += `<td>${change.ip_address}</td>`;
-                        html += '</tr>';
-                    });
-                    
-                    html += '</tbody></table>';
-                    content.innerHTML = html;
-                } else {
-                    content.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">暂无变更记录</p>';
-                }
+            if (result.data && result.data.length > 0) {
+                let html = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                html += '<thead><tr style="background: var(--table-header);">';
+                html += '<th style="padding: 8px; text-align: left; border: 1px solid var(--table-header);">变更时间</th>';
+                html += '<th style="padding: 8px; text-align: left; border: 1px solid var(--table-header);">操作人</th>';
+                html += '<th style="padding: 8px; text-align: left; border: 1px solid var(--table-header);">字段名</th>';
+                html += '<th style="padding: 8px; text-align: left; border: 1px solid var(--table-header);">原值</th>';
+                html += '<th style="padding: 8px; text-align: left; border: 1px solid var(--table-header);">新值</th>';
+                html += '<th style="padding: 8px; text-align: left; border: 1px solid var(--table-header);">IP地址</th>';
+                html += '</tr></thead><tbody>';
+                
+                result.data.forEach(change => {
+                    html += '<tr>';
+                    html += `<td style="padding: 8px; border: 1px solid var(--table-header);">${change.change_time}</td>`;
+                    html += `<td style="padding: 8px; border: 1px solid var(--table-header);">${change.user_name}</td>`;
+                    html += `<td style="padding: 8px; border: 1px solid var(--table-header);">${change.field_name}</td>`;
+                    html += `<td style="padding: 8px; border: 1px solid var(--table-header);">${change.old_value || '空'}</td>`;
+                    html += `<td style="padding: 8px; border: 1px solid var(--table-header);">${change.new_value || '空'}</td>`;
+                    html += `<td style="padding: 8px; border: 1px solid var(--table-header);">${change.ip_address}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                content.innerHTML = html;
             } else {
-                const message = result.error?.message || '加载失败';
-                content.innerHTML = `<p style="text-align: center; color: #dc3545; padding: 40px;">加载失败：${message}</p>`;
+                content.innerHTML = '<div class="loading">暂无变更记录</div>';
             }
         })
         .catch(error => {
-            content.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 40px;">加载失败：网络错误</p>';
+            content.innerHTML = '<div class="loading" style="color: var(--error);">加载失败：网络错误</div>';
         });
 }
 
@@ -827,19 +847,20 @@ function hideChangesModal() {
 }
 
 window.onclick = function(event) {
-    const editModal = document.getElementById('editModal');
-    const deleteModal = document.getElementById('deleteModal');
-    const changesModal = document.getElementById('changesModal');
-    
-    if (editModal && event.target === editModal) {
-        hideEditModal();
-    }
-    if (event.target === deleteModal) {
-        hideDeleteModal();
-    }
-    if (event.target === changesModal) {
-        hideChangesModal();
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
     }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (!announcementId) {
+        document.getElementById('loading-indicator').style.display = 'none';
+        document.getElementById('error-indicator').style.display = 'block';
+        document.getElementById('error-message').textContent = '缺少通告ID';
+        return;
+    }
+    
+    loadAnnouncementDetail();
+});
 </script>
 {% endblock %}
