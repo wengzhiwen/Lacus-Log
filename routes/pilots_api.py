@@ -73,7 +73,7 @@ def _record_changes(pilot, old_data, user, changes_summary):
 
 def _has_enum_value(enum_class, value):
     """检查值是否为枚举类的有效值"""
-    if not value:
+    if value is None or value == '':
         return False
     try:
         enum_class(value)
@@ -84,7 +84,7 @@ def _has_enum_value(enum_class, value):
 
 def try_enum(enum_class, value, default=None):
     """安全地转换枚举值"""
-    if not value:
+    if value is None or value == '':
         return default
     try:
         return enum_class(value)

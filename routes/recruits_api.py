@@ -102,7 +102,7 @@ def _get_client_ip():
 
 def _has_enum_value(enum_class, value):
     """检查值是否为枚举类的有效值"""
-    if not value:
+    if value is None or value == '':
         return False
     try:
         enum_class(value)
@@ -113,7 +113,7 @@ def _has_enum_value(enum_class, value):
 
 def try_enum(enum_class, value, default=None):
     """安全地转换枚举值"""
-    if not value:
+    if value is None or value == '':
         return default
     try:
         return enum_class(value)
@@ -776,7 +776,7 @@ def interview_decision(recruit_id):
                 return jsonify(create_error_response('VALIDATION_ERROR', '预约试播时必须填写真实姓名')), 400
 
             birth_year_str = data.get('birth_year')
-            if not birth_year_str:
+            if birth_year_str is None or birth_year_str == '':
                 return jsonify(create_error_response('VALIDATION_ERROR', '预约试播时必须填写出生年')), 400
 
             try:

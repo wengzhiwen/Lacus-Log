@@ -2,6 +2,7 @@
 > 以下所有日期为更新发生时的系统GMT+8时间
 
 ## 2025-10-07 修复：
+- 枚举值0判断错误的全面修复：修复系统中所有使用`if not value`判断枚举值/数值的逻辑错误，统一改为`if value is None or value == ''`精确判断空值。修复范围包括：try_enum函数（pilots_api.py和recruits_api.py）、_has_enum_value函数（pilots_api.py和recruits_api.py）、birth_year_str验证（recruits_api.py）。这个bug会导致值为0的枚举（如性别=男）被错误地视为空值而使用默认值
 - 主播详情页返回按钮404问题：修复从开播记录详情页点击主播昵称跳转到主播详情页后，返回按钮URL错误导致404的问题。将返回URL从`/battle_record/{id}`修正为`/battle-records/{id}`，确保能正确返回到开播记录详情页
 - 主播性别默认值错误：修正主播模型中性别字段默认值从"女"改为"不明确"，同步更新新建/编辑主播页面的性别下拉框顺序（不明确/男/女），确保与业务需求文档一致
 - 菜单滚动问题：修复移动端打开菜单时，鼠标滚轮滚动的是背后页面而非菜单的问题。通过在菜单打开时禁用body滚动（添加menu-open类），并为菜单容器添加overflow-y: auto使其自身可滚动来解决
