@@ -3,12 +3,14 @@ from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from flask import Flask
+from flask_jwt_extended import JWTManager
 from flask_wtf import CSRFProtect
 from mongoengine import connect
 
 from routes.admin import admin_bp
 from routes.announcement import announcement_bp
 from routes.announcements_api import announcements_api_bp
+from routes.auth_api import auth_api_bp
 from routes.battle_area import battle_area_bp
 from routes.battle_areas_api import battle_areas_api_bp
 from routes.battle_record import battle_record_bp
@@ -49,6 +51,14 @@ def create_app() -> Flask:
     lifetime = int(os.getenv('PERMANENT_SESSION_LIFETIME', '36000'))
     flask_app.permanent_session_lifetime = timedelta(seconds=lifetime)
 
+    # Session 安全配置
+    is_production = os.getenv('FLASK_ENV') == 'production'
+    flask_app.config.update(
+        SESSION_COOKIE_SECURE=is_production,  # 生产环境强制 HTTPS
+        SESSION_COOKIE_HTTPONLY=True,  # 防止 JavaScript 访问 Session Cookie (防 XSS)
+        SESSION_COOKIE_SAMESITE='Lax',  # 防止 CSRF 攻击
+    )
+
     flask_app.config.update(
         SECURITY_REGISTERABLE=False,  # 禁止自注册
         SECURITY_RECOVERABLE=False,  # 未启用邮件找回
@@ -71,6 +81,19 @@ def create_app() -> Flask:
         SECURITY_POST_LOGOUT_VIEW='/login',
     )
 
+    # JWT 配置
+    flask_app.config.update(
+        JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', flask_app.config['SECRET_KEY']),
+        JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=2),  # Access Token 有效期 2 小时
+        JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=30),  # Refresh Token 有效期 30 天
+        JWT_TOKEN_LOCATION=['headers', 'cookies'],  # 支持 header 和 cookie
+        JWT_COOKIE_SECURE=os.getenv('FLASK_ENV') != 'development',  # 开发环境不启用 Secure
+        JWT_COOKIE_CSRF_PROTECT=True,  # 启用 CSRF 保护
+        JWT_COOKIE_SAMESITE='Lax',  # SameSite 策略
+        JWT_ACCESS_COOKIE_NAME='access_token_cookie',
+        JWT_REFRESH_COOKIE_NAME='refresh_token_cookie',
+    )
+
     mongodb_uri = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017/lacus')
     try:
         connect(host=mongodb_uri, uuidRepresentation='standard')
@@ -87,12 +110,30 @@ def create_app() -> Flask:
         flask_app.logger.error('清空任务计划令牌失败：%s', exc)
 
     CSRFProtect(flask_app)
+    jwt = JWTManager(flask_app)
 
     user_datastore = create_user_datastore()
     _security = init_security(flask_app, user_datastore)
 
+    # JWT 用户加载器：将 JWT identity 转换为用户对象（与 Flask-Security-Too 集成）
+    @jwt.user_identity_loader
+    def user_identity_lookup(user):
+        """将用户对象转换为 JWT identity（使用 fs_uniquifier）。"""
+        return user.fs_uniquifier
+
+    @jwt.user_lookup_loader
+    def user_lookup_callback(_jwt_header, jwt_data):
+        """从 JWT payload 加载用户对象。"""
+        from models.user import User
+        identity = jwt_data["sub"]
+        try:
+            return User.objects.get(fs_uniquifier=identity)  # pylint: disable=no-member
+        except Exception:  # pylint: disable=broad-except
+            return None
+
     flask_app.register_blueprint(main_bp)
     flask_app.register_blueprint(admin_bp, url_prefix='/admin')
+    flask_app.register_blueprint(auth_api_bp)
     flask_app.register_blueprint(users_api_bp)
     flask_app.register_blueprint(pilots_api_bp)
     flask_app.register_blueprint(commissions_api_bp)

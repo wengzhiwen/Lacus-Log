@@ -1,4 +1,4 @@
-# RunJPLib AGENTS 指南
+# AGENTS 指南
 
 本文件为在本仓库内协作的智能体（Agent）提供统一的工作约定与操作指引。其作用范围为本文件所在目录及其全部子目录。
 
@@ -42,9 +42,19 @@
 
 - `app.py`：Flask 入口与主要应用逻辑。
 - `routes/`：各路由与视图处理。
+  - 传统视图文件（如 `announcement.py`、`pilot.py`）：渲染 HTML 页面
+  - REST API 文件（如 `announcements_api.py`、`pilots_api.py`）：提供 JSON 接口
+  - `auth_api.py`：REST 认证 API（登录、登出、token 管理）
+- `models/`：MongoEngine 数据模型定义。
 - `templates/`：Jinja2 模板文件。
 - `utils/`：通用工具函数与辅助模块。
-- `static/`：静态资源。
+  - `*_serializers.py`：各模块的序列化工具和响应格式化函数
+  - `logging_setup.py`：日志配置
+  - `security.py`：Flask-Security-Too 集成
+  - `scheduler.py`：定时任务管理
+- `static/`：静态资源（CSS、JS、图片等）。
+- `tests/`：测试代码（集成测试、单元测试等）。
+- `scripts/`：独立的工具脚本。
 - `venv/`：专用 Python 虚拟环境。
 - `docs/`：项目文档（须在修改后更新，包含 `CHANGELOG.md`）。
 
@@ -55,6 +65,106 @@
   - 变更类型（新增/修复/重构/文档/性能/其他）。
   - 具体内容简述（不超过100字）
   - 针对一个功能一次可能有多次修改或变更，只要保证留下最新的信息即可。
+
+## REST API 开发规范
+
+### REST API 全面化要求
+
+**所有新功能必须提供 REST API 接口**，除非仅需单纯的页面渲染且无任何数据交互。
+
+- 新增模块应同时实现：
+  - 传统视图蓝图（`routes/<module>.py`）：用于页面渲染
+  - REST API 蓝图（`routes/<module>s_api.py`）：用于数据接口
+- 优先使用 REST API 实现前后端分离，减少传统模板渲染的使用
+
+### 统一响应格式
+
+所有 REST API 必须遵循以下统一的响应格式：
+
+#### 成功响应
+```json
+{
+  "success": true,
+  "data": { /* 实际数据 */ },
+  "error": null,
+  "meta": {
+    /* 可选的元信息，如分页信息 */
+    "pagination": {
+      "page": 1,
+      "per_page": 20,
+      "total": 100,
+      "pages": 5
+    }
+  }
+}
+```
+
+#### 错误响应
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "人类可读的错误描述"
+  },
+  "meta": {}
+}
+```
+
+### 辅助函数
+
+在每个模块的 `utils/<module>_serializers.py` 中实现：
+
+- `create_success_response(data, meta=None)`: 创建成功响应
+- `create_error_response(code, message, meta=None)`: 创建错误响应
+- `serialize_<model>(obj)`: 序列化单个对象
+- `serialize_<model>_list(objs)`: 序列化对象列表
+
+### 认证与授权
+
+- 使用 Flask-JWT-Extended 进行 JWT 认证（Cookie + Header 双模式）
+- 使用 `@jwt_required()` 装饰器保护需要认证的接口
+- 使用 `@roles_required('role_name')` 进行角色权限控制
+- 所有需要修改数据的接口（POST/PUT/PATCH/DELETE）必须验证 CSRF token：
+  ```python
+  from utils.csrf_helper import validate_csrf_header, CSRFError
+  
+  try:
+      validate_csrf_header()
+  except CSRFError as exc:
+      return jsonify(create_error_response(exc.code, exc.message)), 401
+  ```
+
+### 路由命名规范
+
+- 获取列表：`GET /api/<resources>`
+- 获取单个：`GET /api/<resources>/<id>`
+- 创建：`POST /api/<resources>`
+- 更新：`PUT /api/<resources>/<id>` 或 `PATCH /api/<resources>/<id>`
+- 删除：`DELETE /api/<resources>/<id>`
+- 批量操作：`POST /api/<resources>/batch`
+- 特殊操作：`POST /api/<resources>/<id>/<action>`
+
+### HTTP 状态码使用
+
+- `200 OK`：成功（查询、更新、删除）
+- `201 Created`：创建成功
+- `400 Bad Request`：请求参数错误
+- `401 Unauthorized`：未认证或认证失败
+- `403 Forbidden`：无权限
+- `404 Not Found`：资源不存在
+- `409 Conflict`：资源冲突（如重复创建）
+- `422 Unprocessable Entity`：验证失败
+- `500 Internal Server Error`：服务器内部错误
+
+### 参考示例
+
+请参考以下文件了解现有 REST API 实现规范：
+- `routes/auth_api.py`：认证接口
+- `routes/users_api.py`：用户管理接口
+- `routes/announcements_api.py`：通告管理接口
+- `utils/user_serializers.py`：序列化工具示例
 
 ## 沟通与确认
 

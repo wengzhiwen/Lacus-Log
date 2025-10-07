@@ -1,8 +1,14 @@
 # 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+## 2025-10-07 修复：
+- 菜单滚动问题：修复移动端打开菜单时，鼠标滚轮滚动的是背后页面而非菜单的问题。通过在菜单打开时禁用body滚动（添加menu-open类），并为菜单容器添加overflow-y: auto使其自身可滚动来解决
+
 ## 2025-10-07 新增：
 - CSRF校验统一化：创建 utils/csrf_helper.py 统一CSRF校验模块，提供 validate_csrf_header() 函数和 CSRFError 异常类，实现 Double-submit Cookie + Custom Header 校验机制
+- JWT认证体系：在app.py中配置Flask-JWT-Extended，创建routes/auth_api.py提供REST认证API（登录、登出、token刷新、获取当前用户等），支持Access Token + Refresh Token机制，与Flask-Security-Too完全兼容
+- Session安全配置：添加SESSION_COOKIE_SECURE、SESSION_COOKIE_HTTPONLY、SESSION_COOKIE_SAMESITE配置，增强Session Cookie的安全性，防止XSS和CSRF攻击
+- API集成测试框架：搭建完整的pytest+httpx集成测试基础设施，包括ApiClient测试客户端、测试数据工厂（Faker）、admin_client和kancho_client fixtures。实现用户管理API的17个集成测试用例，覆盖列表查询、创建、详情、更新、激活/停用、密码重置、运营列表、邮箱列表等全部功能
 
 ## 2025-10-07 重构：
 - 通告详情页：改为完全使用REST API加载数据，通过JavaScript调用 /announcements/api/announcements/<id> 接口获取所有信息并动态渲染，同时完整保持原有的用户体验（包括编辑/删除的模态框交互）
