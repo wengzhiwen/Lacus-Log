@@ -10,13 +10,12 @@ from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, Response, jsonify, request
 from flask_security import current_user, roles_accepted
-from flask_wtf.csrf import ValidationError as CSRFValidationError
-from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import Pilot, Platform, Rank, Status, WorkMode
 from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision)
 from models.user import Role, User
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.logging_setup import get_logger
 from utils.recruit_serializers import (create_error_response, create_success_response, serialize_change_log_list, serialize_recruit, serialize_recruit_grouped,
                                        serialize_recruit_list)
@@ -63,19 +62,6 @@ def safe_strip(value):
         stripped = value.strip()
         return stripped if stripped else None
     return None
-
-
-def validate_csrf_token():
-    """验证CSRF令牌"""
-    csrf_token = request.headers.get('X-CSRFToken')
-    if not csrf_token:
-        return False, '缺少CSRF令牌'
-    try:
-        validate_csrf(csrf_token)
-        return True, None
-    except CSRFValidationError as e:
-        logger.warning('CSRF令牌验证失败: %s', str(e))
-        return False, 'CSRF令牌无效'
 
 
 def _record_changes(recruit, old_data, user, ip_address):
@@ -519,9 +505,10 @@ def create_recruit():
     """创建招募"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         data = request.get_json()
         if not data:
@@ -615,9 +602,10 @@ def update_recruit(recruit_id):
     """更新招募（整体更新）"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         recruit = Recruit.objects.get(id=recruit_id)
 
@@ -747,9 +735,10 @@ def interview_decision(recruit_id):
     """执行面试决策"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         recruit = Recruit.objects.get(id=recruit_id)
 
@@ -878,9 +867,10 @@ def schedule_training(recruit_id):
     """执行预约试播"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         recruit = Recruit.objects.get(id=recruit_id)
 
@@ -986,9 +976,10 @@ def training_decision(recruit_id):
     """执行试播决策"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         recruit = Recruit.objects.get(id=recruit_id)
 
@@ -1093,9 +1084,10 @@ def schedule_broadcast(recruit_id):
     """执行预约开播"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         recruit = Recruit.objects.get(id=recruit_id)
 
@@ -1172,9 +1164,10 @@ def broadcast_decision(recruit_id):
     """执行开播决策"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         recruit = Recruit.objects.get(id=recruit_id)
 

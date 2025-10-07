@@ -157,54 +157,6 @@ def edit_announcement(announcement_id):
         abort(404)
 
 
-def _cleanup_orphaned_references(announcement_id):
-    """清理指向已删除通告的孤立引用"""
-    child_announcements = Announcement.objects(parent_announcement=announcement_id)
-    for child in child_announcements:
-        child.parent_announcement = None
-        child.save()
-
-
-@announcement_bp.route('/<announcement_id>/delete', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
-def delete_announcement(announcement_id):
-    """删除通告"""
-    try:
-        announcement = Announcement.objects.get(id=announcement_id)
-
-        delete_scope = request.form.get('delete_scope', 'this_only')
-
-        if delete_scope == 'future_all' and announcement.is_in_recurrence_group:
-            future_announcements = announcement.get_future_announcements_in_group(include_self=True)
-
-            count = len(future_announcements)
-            for ann in future_announcements:
-                _cleanup_orphaned_references(ann.id)
-                ann.delete()
-
-            flash(f'删除未来循环通告成功（共{count}个）', 'success')
-            logger.info('用户%s删除未来循环通告：%s（共%d个）', current_user.username, announcement.id, count)
-        else:
-            _cleanup_orphaned_references(announcement.id)
-            announcement.delete()
-            flash('删除通告成功', 'success')
-            logger.info('用户%s删除通告：%s', current_user.username, announcement.id)
-
-        from_param = request.form.get('from')
-        date_param = request.form.get('date')
-
-        if from_param == 'calendar' and date_param:
-            return redirect(url_for('calendar.day_view', date=date_param))
-        return redirect(url_for('announcement.list_announcements'))
-
-    except DoesNotExist:
-        abort(404)
-    except Exception as e:
-        flash(f'删除失败：{str(e)}', 'error')
-        logger.error('删除通告失败：%s', str(e))
-        return redirect(url_for('announcement.list_announcements'))
-
-
 @announcement_bp.route('/export/view')
 @roles_accepted('gicho', 'kancho')
 def export_view_page():

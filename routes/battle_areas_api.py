@@ -6,12 +6,12 @@ from typing import Dict, List, Tuple
 
 from flask import Blueprint, jsonify, request
 from flask_security import current_user, roles_accepted
-from flask_wtf.csrf import ValidationError as CSRFValidationError, validate_csrf
 from mongoengine import DoesNotExist, ValidationError
 from mongoengine.errors import NotUniqueError
 
 from models.battle_area import Availability, BattleArea
 from utils.battle_area_serializers import (create_error_response, create_success_response, serialize_battle_area, serialize_battle_area_list)
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
 
@@ -27,20 +27,6 @@ def safe_strip(value) -> str:
     if isinstance(value, str):
         return value.strip()
     return str(value).strip()
-
-
-def validate_csrf_token() -> Tuple[bool, str]:
-    """验证请求头中的 CSRF Token。"""
-    csrf_token = request.headers.get('X-CSRFToken')
-    if not csrf_token:
-        return False, '缺少 CSRF 令牌'
-
-    try:
-        validate_csrf(csrf_token)
-        return True, ''
-    except CSRFValidationError as exc:  # pylint: disable=raise-missing-from
-        logger.warning('CSRF 校验失败：%s', str(exc))
-        return False, 'CSRF 令牌无效'
 
 
 def _collect_choices(x_filter: str) -> Dict[str, List[str]]:
@@ -152,9 +138,10 @@ def get_battle_area_options():
 @roles_accepted('gicho')
 def create_battle_area():
     """创建开播地点。"""
-    is_valid_csrf, error_msg = validate_csrf_token()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', error_msg)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
 
@@ -192,9 +179,10 @@ def create_battle_area():
 @roles_accepted('gicho')
 def update_battle_area(area_id: str):
     """更新开播地点信息。"""
-    is_valid_csrf, error_msg = validate_csrf_token()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', error_msg)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
 
@@ -242,9 +230,10 @@ def update_battle_area(area_id: str):
 @roles_accepted('gicho')
 def bulk_generate_battle_areas():
     """基于源开播地点批量生成新的坐席。"""
-    is_valid_csrf, error_msg = validate_csrf_token()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', error_msg)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
 

@@ -12,13 +12,12 @@ from decimal import Decimal
 
 from flask import Blueprint, Response, jsonify, request
 from flask_security import current_user, roles_accepted
-from flask_wtf.csrf import ValidationError as CSRFValidationError
-from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank,
                           Status, WorkMode)
 from models.user import User
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.logging_setup import get_logger
 from utils.pilot_serializers import (create_error_response,
                                      create_success_response,
@@ -38,19 +37,6 @@ def safe_strip(value):
         stripped = value.strip()
         return stripped if stripped else None
     return None
-
-
-def validate_csrf_token():
-    """验证CSRF令牌"""
-    csrf_token = request.headers.get('X-CSRFToken')
-    if not csrf_token:
-        return False, '缺少CSRF令牌'
-    try:
-        validate_csrf(csrf_token)
-        return True, None
-    except CSRFValidationError as e:
-        logger.warning('CSRF令牌验证失败: %s', str(e))
-        return False, 'CSRF令牌无效'
 
 
 def _record_changes(pilot, old_data, user, changes_summary):
@@ -302,9 +288,10 @@ def create_pilot():
     """创建主播"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         data = request.get_json()
         if not data:
@@ -379,9 +366,10 @@ def update_pilot(pilot_id):
     """更新主播（整体更新）"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         pilot = Pilot.objects.get(id=pilot_id)
 
@@ -463,9 +451,10 @@ def update_pilot_status(pilot_id):
     """调整主播状态"""
     try:
         # CSRF令牌验证
-        csrf_valid, csrf_error = validate_csrf_token()
-        if not csrf_valid:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         pilot = Pilot.objects.get(id=pilot_id)
 

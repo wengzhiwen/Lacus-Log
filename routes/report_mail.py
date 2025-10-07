@@ -14,6 +14,7 @@ from flask_security import current_user, roles_required
 from models.announcement import Announcement
 from models.battle_record import BattleRecord
 from models.user import User
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
@@ -504,6 +505,11 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
 @roles_required('gicho')
 def trigger_unstarted_report():
     """触发"未开播提醒"报表计算与邮件发送（异步最小实现：请求内完成）。"""
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify({'error': exc.message}), 401
+    
     username = getattr(current_user, 'username', '未知')
     result = run_unstarted_report_job(triggered_by=username)
     status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
@@ -516,6 +522,11 @@ def trigger_recruit_daily_report():
     """触发或显示招募日报。GET请求用于显示，POST请求用于触发邮件。"""
     if request.method == 'GET':
         return redirect(url_for('report.recruit_daily_report', **request.args))
+
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify({'error': exc.message}), 401
 
     username = getattr(current_user, 'username', '未知')
 
@@ -530,6 +541,11 @@ def trigger_recruit_daily_report():
 @roles_required('gicho')
 def trigger_daily_report():
     """触发开播日报邮件发送。"""
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify({'error': exc.message}), 401
+    
     username = getattr(current_user, 'username', '未知')
 
     report_date = request.json.get('report_date') if request.is_json else None
@@ -544,8 +560,13 @@ def trigger_daily_report():
 def trigger_monthly_mail_report():
     """触发开播月报（邮件）发送。
 
-    请求JSON：{"report_month": "YYYY-MM"}，留空则按“前一自然日所在月”。
+    请求JSON：{"report_month": "YYYY-MM"}，留空则按"前一自然日所在月"。
     """
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify({'error': exc.message}), 401
+    
     username = getattr(current_user, 'username', '未知')
 
     report_month = request.json.get('report_month') if request.is_json else None

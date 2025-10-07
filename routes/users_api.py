@@ -3,10 +3,10 @@
 from flask import Blueprint, jsonify, request
 from flask_security import roles_required, roles_accepted
 from flask_security.utils import hash_password
-from flask_wtf.csrf import validate_csrf, ValidationError as CSRFValidationError
 from mongoengine import DoesNotExist, ValidationError
 
 from models.user import Role, User
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.logging_setup import get_logger
 from utils.user_serializers import (serialize_user, serialize_user_list, create_success_response, create_error_response)
 
@@ -23,20 +23,6 @@ def safe_strip(value):
         stripped = value.strip()
         return stripped if stripped else None
     return None
-
-
-def validate_csrf_token():
-    """验证CSRF令牌。"""
-    csrf_token = request.headers.get('X-CSRFToken')
-    if not csrf_token:
-        return False, '缺少CSRF令牌'
-
-    try:
-        validate_csrf(csrf_token)
-        return True, None
-    except CSRFValidationError as e:
-        logger.warning('CSRF令牌验证失败: %s', str(e))
-        return False, 'CSRF令牌无效'
 
 
 @users_api_bp.route('/api/users', methods=['GET'])
@@ -112,9 +98,10 @@ def create_user():
     """创建运营账户。"""
     try:
         # 验证CSRF令牌
-        is_valid, error_msg = validate_csrf_token()
-        if not is_valid:
-            return jsonify(create_error_response('CSRF_ERROR', error_msg)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         data = request.get_json()
         if not data:
@@ -173,9 +160,10 @@ def update_user(user_id: str):
     """更新用户信息。"""
     try:
         # 验证CSRF令牌
-        is_valid, error_msg = validate_csrf_token()
-        if not is_valid:
-            return jsonify(create_error_response('CSRF_ERROR', error_msg)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         user = User.objects.get(id=user_id)
         data = request.get_json()
@@ -228,9 +216,10 @@ def toggle_user_activation(user_id: str):
     """切换用户激活状态。"""
     try:
         # 验证CSRF令牌
-        is_valid, error_msg = validate_csrf_token()
-        if not is_valid:
-            return jsonify(create_error_response('CSRF_ERROR', error_msg)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         user = User.objects.get(id=user_id)
         data = request.get_json()
@@ -269,9 +258,10 @@ def reset_user_password(user_id: str):
     """重置用户密码。"""
     try:
         # 验证CSRF令牌
-        is_valid, error_msg = validate_csrf_token()
-        if not is_valid:
-            return jsonify(create_error_response('CSRF_ERROR', error_msg)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         user = User.objects.get(id=user_id)
 

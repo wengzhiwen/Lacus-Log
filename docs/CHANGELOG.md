@@ -1,8 +1,13 @@
 # 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+## 2025-10-07 新增：
+- CSRF校验统一化：创建 utils/csrf_helper.py 统一CSRF校验模块，提供 validate_csrf_header() 函数和 CSRFError 异常类，实现 Double-submit Cookie + Custom Header 校验机制
+
 ## 2025-10-07 重构：
 - 通告详情页：改为完全使用REST API加载数据，通过JavaScript调用 /announcements/api/announcements/<id> 接口获取所有信息并动态渲染，同时完整保持原有的用户体验（包括编辑/删除的模态框交互）
+- 所有REST API模块：重构为使用统一的CSRF校验，删除各模块中重复的校验函数
+- 清理遗留的表单POST端点：删除announcement.py的delete端点、admin.py的toggle/reset端点（已被REST API替代），移除pilot.py的new/edit路由中多余的POST方法声明
 
 ## 2025-10-06 新增：
 - 仪表盘昨日主播排名卡片：新增"昨日主播排名"卡片，位于线下底薪流水转化率卡片下方，展示昨日流水排名前三的主播（冠军、亚军、季军）。显示格式为"昵称（真实姓名）[直属运营昵称]"（优先显示运营昵称，无昵称时降级显示用户名），统计所有开播方式的记录，按流水金额总和降序排列

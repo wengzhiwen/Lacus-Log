@@ -29,14 +29,14 @@ def pilot_detail(pilot_id):  # pylint: disable=unused-argument
     return render_template('pilots/detail.html')
 
 
-@pilot_bp.route('/new', methods=['GET', 'POST'])
+@pilot_bp.route('/new', methods=['GET'])
 @roles_accepted('gicho', 'kancho')
 def new_pilot():
     """新建主播页面 - REST化版本"""
     return render_template('pilots/new.html')
 
 
-@pilot_bp.route('/<pilot_id>/edit', methods=['GET', 'POST'])
+@pilot_bp.route('/<pilot_id>/edit', methods=['GET'])
 @roles_accepted('gicho', 'kancho')
 def edit_pilot(pilot_id):  # pylint: disable=unused-argument
     """编辑主播页面 - REST化版本"""

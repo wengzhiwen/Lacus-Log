@@ -10,8 +10,6 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from flask import Blueprint, jsonify, request, url_for
 from flask_login import login_required
 from flask_security import current_user, roles_accepted
-from flask_wtf.csrf import ValidationError as CSRFValidationError
-from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist
 
 from models.announcement import Announcement
@@ -23,6 +21,7 @@ from routes.battle_record import (log_battle_record_change,
                                   validate_notes_required)
 from utils.announcement_serializers import (create_error_response,
                                             create_success_response)
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.james_alert import trigger_james_alert_if_needed
 from utils.logging_setup import get_logger
@@ -32,20 +31,6 @@ from utils.timezone_helper import (get_current_utc_time, local_to_utc,
 logger = get_logger('battle_records_api')
 
 battle_records_api_bp = Blueprint('battle_records_api', __name__)
-
-
-def _validate_csrf_header() -> Tuple[bool, str]:
-    """验证请求头中的 CSRF Token。"""
-    token = request.headers.get('X-CSRFToken')
-    if not token:
-        return False, '缺少 CSRF 令牌'
-
-    try:
-        validate_csrf(token)
-        return True, ''
-    except CSRFValidationError as exc:  # pylint: disable=raise-missing-from
-        logger.warning('CSRF 校验失败：%s', exc)
-        return False, 'CSRF 令牌无效'
 
 
 def _persist_filters_from_request() -> Dict[str, str]:
@@ -419,9 +404,10 @@ def get_record(record_id: str):
 @roles_accepted('gicho', 'kancho')
 def create_record():
     """创建开播记录。"""
-    is_valid_csrf, csrf_error = _validate_csrf_header()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
 
@@ -510,9 +496,10 @@ def create_record():
 @roles_accepted('gicho', 'kancho')
 def update_record(record_id: str):
     """更新开播记录。"""
-    is_valid_csrf, csrf_error = _validate_csrf_header()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
 
@@ -601,9 +588,10 @@ def update_record(record_id: str):
 @roles_accepted('gicho', 'kancho')
 def delete_record(record_id: str):
     """删除开播记录。"""
-    is_valid_csrf, csrf_error = _validate_csrf_header()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     try:
         record = BattleRecord.objects.get(id=record_id)

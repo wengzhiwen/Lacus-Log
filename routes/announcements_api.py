@@ -11,8 +11,6 @@ from typing import Dict, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, make_response, request, url_for
 from flask_security import current_user, roles_accepted
-from flask_wtf.csrf import ValidationError as CSRFValidationError
-from flask_wtf.csrf import validate_csrf
 from mongoengine import DoesNotExist, ValidationError
 
 from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
@@ -22,6 +20,7 @@ from models.user import User
 from routes.announcement import _get_client_ip, _record_changes
 from utils.announcement_serializers import (create_error_response, create_success_response, serialize_announcement_detail, serialize_announcement_summary,
                                             serialize_change_logs)
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (format_local_datetime, get_current_local_time, local_to_utc, parse_local_date_to_end_datetime, parse_local_datetime,
@@ -30,20 +29,6 @@ from utils.timezone_helper import (format_local_datetime, get_current_local_time
 announcements_api_bp = Blueprint('announcements_api', __name__)
 
 logger = get_logger('announcement_api')
-
-
-def _validate_csrf_header() -> Tuple[bool, str]:
-    """验证请求头中的 CSRF Token。"""
-    token = request.headers.get('X-CSRFToken')
-    if not token:
-        return False, '缺少 CSRF 令牌'
-
-    try:
-        validate_csrf(token)
-        return True, ''
-    except CSRFValidationError as exc:  # pylint: disable=raise-missing-from
-        logger.warning('CSRF 校验失败：%s', str(exc))
-        return False, 'CSRF 令牌无效'
 
 
 def _safe_strip(value: Optional[str]) -> str:
@@ -419,9 +404,10 @@ def check_conflicts_api():
 @roles_accepted('gicho', 'kancho')
 def create_announcement_api():
     """创建通告。"""
-    is_valid_csrf, csrf_error = _validate_csrf_header()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
 
@@ -519,9 +505,10 @@ def _serialize_old_data(announcement: Announcement) -> Dict[str, Optional[str]]:
 @roles_accepted('gicho', 'kancho')
 def update_announcement_api(announcement_id: str):
     """更新通告。"""
-    is_valid_csrf, csrf_error = _validate_csrf_header()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
 
@@ -624,9 +611,10 @@ def _cleanup_orphaned_references(announcement_id):
 @roles_accepted('gicho', 'kancho')
 def delete_announcement_api(announcement_id: str):
     """删除通告。"""
-    is_valid_csrf, csrf_error = _validate_csrf_header()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     payload = request.get_json(silent=True) or {}
     delete_scope = payload.get('delete_scope', 'this_only')
@@ -888,9 +876,10 @@ def get_cleanup_list_api():
 @roles_accepted('gicho', 'kancho')
 def cleanup_delete_future_api(pilot_id: str):
     """删除指定主播从明天开始的所有通告 API。"""
-    is_valid_csrf, csrf_error = _validate_csrf_header()
-    if not is_valid_csrf:
-        return jsonify(create_error_response('CSRF_ERROR', csrf_error)), 401
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
 
     try:
         current_local = get_current_local_time()

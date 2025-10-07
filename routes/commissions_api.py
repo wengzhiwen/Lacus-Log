@@ -10,10 +10,10 @@ from typing import Any, Dict
 
 from flask import Blueprint, jsonify, request
 from flask_security import roles_accepted, current_user
-from flask_wtf.csrf import validate_csrf, ValidationError as CSRFValidationError
 from mongoengine import DoesNotExist, ValidationError
 
 from models.pilot import Pilot, PilotCommission, PilotCommissionChangeLog
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.logging_setup import get_logger
 from utils.timezone_helper import utc_to_local, local_to_utc, get_current_utc_time
 from utils.pilot_serializers import create_success_response, create_error_response
@@ -30,17 +30,6 @@ def _safe_strip(value):
         s = value.strip()
         return s if s else None
     return None
-
-
-def _validate_csrf_header() -> (bool, str):
-    token = request.headers.get('X-CSRFToken')
-    if not token:
-        return False, '缺少CSRF令牌'
-    try:
-        validate_csrf(token)
-        return True, ''
-    except CSRFValidationError as e:  # pragma: no cover - 运行期验证
-        return False, str(e)
 
 
 def _serialize_commission(c: PilotCommission) -> Dict[str, Any]:
@@ -128,9 +117,10 @@ def list_commission_records(pilot_id):
 def create_commission_record(pilot_id):
     """创建分成调整记录"""
     try:
-        csrf_ok, csrf_err = _validate_csrf_header()
-        if not csrf_ok:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_err)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         pilot = Pilot.objects.get(id=pilot_id)
         data = request.get_json() or {}
@@ -191,9 +181,10 @@ def create_commission_record(pilot_id):
 def update_commission_record(pilot_id, record_id):
     """更新分成调整记录"""
     try:
-        csrf_ok, csrf_err = _validate_csrf_header()
-        if not csrf_ok:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_err)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         _ = Pilot.objects.get(id=pilot_id)
         record = PilotCommission.objects.get(id=record_id, pilot_id=pilot_id)
@@ -257,9 +248,10 @@ def update_commission_record(pilot_id, record_id):
 def deactivate_commission_record(pilot_id, record_id):
     """软删除分成记录"""
     try:
-        csrf_ok, csrf_err = _validate_csrf_header()
-        if not csrf_ok:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_err)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         _ = Pilot.objects.get(id=pilot_id)
         record = PilotCommission.objects.get(id=record_id, pilot_id=pilot_id)
@@ -287,9 +279,10 @@ def deactivate_commission_record(pilot_id, record_id):
 def activate_commission_record(pilot_id, record_id):
     """恢复分成记录"""
     try:
-        csrf_ok, csrf_err = _validate_csrf_header()
-        if not csrf_ok:
-            return jsonify(create_error_response('CSRF_ERROR', csrf_err)), 401
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
 
         _ = Pilot.objects.get(id=pilot_id)
         record = PilotCommission.objects.get(id=record_id, pilot_id=pilot_id)
