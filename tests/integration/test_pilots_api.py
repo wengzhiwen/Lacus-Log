@@ -155,7 +155,6 @@ class TestPilotsCreate:
         # 清理
         admin_client.patch(f'/api/pilots/{pilot_id}/status', json={'status': '流失'})
 
-    @pytest.mark.skip(reason="Flask-Security多test_client实例session隔离问题 - 需要改进测试架构")
     def test_create_pilot_as_kancho(self, kancho_client):
         """测试运营创建主播 - 自动关联owner为当前运营
         
@@ -610,7 +609,6 @@ class TestPilotsWorkflow:
             # 6. 清理（设置为流失）
             admin_client.patch(f'/api/pilots/{pilot_id}/status', json={'status': '流失'})
 
-    @pytest.mark.skip(reason="Flask-Security多test_client实例session隔离问题 - 需要改进测试架构")
     def test_kancho_creates_own_pilots(self, kancho_client):
         """测试运营创建自己的主播（基于用户测试创建的运营账号）
         

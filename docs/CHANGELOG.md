@@ -1,6 +1,11 @@
 # 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+## 2025-10-08 修复：
+- REST API JWT认证问题：修复主播管理API使用Flask-Security-Too的@roles_accepted装饰器导致JWT认证失败的问题。创建utils/jwt_roles.py模块，实现jwt_roles_required和jwt_roles_accepted装饰器，正确从JWT token中加载用户和角色信息。更新routes/pilots_api.py中所有路由使用JWT装饰器，并在需要current_user的地方使用get_jwt_user()辅助函数。修复后，test_create_pilot_as_kancho和test_kancho_creates_own_pilots测试全部通过，主播管理模块26个测试100%通过
+
+# 历史的更新内容
+
 ## 2025-10-07 修复：
 - 枚举值0判断错误的全面修复：修复系统中所有使用`if not value`判断枚举值/数值的逻辑错误，统一改为`if value is None or value == ''`精确判断空值。修复范围包括：try_enum函数（pilots_api.py和recruits_api.py）、_has_enum_value函数（pilots_api.py和recruits_api.py）、birth_year_str验证（recruits_api.py）。这个bug会导致值为0的枚举（如性别=男）被错误地视为空值而使用默认值
 - 主播详情页返回按钮404问题：修复从开播记录详情页点击主播昵称跳转到主播详情页后，返回按钮URL错误导致404的问题。将返回URL从`/battle_record/{id}`修正为`/battle-records/{id}`，确保能正确返回到开播记录详情页
@@ -63,8 +68,6 @@
 - 统一通告编辑页面与通告新增页面的样式风格，包括返回按钮、布局、配色、圆角设计等，提升前端用户体验一致性
 - 通告详情页底部功能按钮布局：设置合理的最小/最大宽度（桌面端 100px-240px，移动端 70px 起），按钮宽度可根据页面宽度自适应并平均分布，为页面内容底部添加留白防止被遮挡
 - 主播详情页底部操作按钮优化：采用固定底部栏（footbar）设计与通告详情页保持一致，去除按钮上的图标，优化按钮配色（编辑/业绩查看使用 primary 蓝色，启动招募使用 hud 绿色，分成管理/变更记录使用 outline 灰色），按钮宽度自适应（桌面端 80px-200px，移动端 60px 起）并平均分布
-
-# 历史的更新内容
 
 ## 2025-10-05 修复：
 - 主播管理列表分页问题：将单次数据量上限从20条提升至500条

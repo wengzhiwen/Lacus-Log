@@ -11,13 +11,14 @@ from datetime import datetime
 from decimal import Decimal
 
 from flask import Blueprint, Response, jsonify, request
-from flask_security import current_user, roles_accepted
+from flask_security import current_user
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank,
                           Status, WorkMode)
 from models.user import User
 from utils.csrf_helper import CSRFError, validate_csrf_header
+from utils.jwt_roles import get_jwt_user, jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.pilot_serializers import (create_error_response,
                                      create_success_response,
@@ -93,7 +94,7 @@ def try_enum(enum_class, value, default=None):
 
 
 @pilots_api_bp.route('/api/pilots', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_pilots():
     """获取主播列表"""
     try:
@@ -252,7 +253,7 @@ def get_pilots():
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_pilot_detail(pilot_id):
     """获取主播详情（不包含分成分数据，分成分数据通过独立的commission API获取）"""
     try:
@@ -283,7 +284,7 @@ def get_pilot_detail(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def create_pilot():
     """创建主播"""
     try:
@@ -327,23 +328,27 @@ def create_pilot():
                 pilot.owner = owner
             except DoesNotExist:
                 return jsonify(create_error_response('INVALID_OWNER', '指定的直属运营不存在')), 400
-        elif current_user.has_role('kancho') and not current_user.has_role('gicho'):
-            # 运营用户默认指定自己为直属运营
-            pilot.owner = current_user
-            logger.debug('运营创建主播，自动关联owner: %s -> %s', current_user.username, pilot.nickname)
         else:
-            logger.debug('创建主播未设置owner: current_user=%s, has_kancho=%s, has_gicho=%s',
-                        current_user.username if current_user and current_user.is_authenticated else 'None',
-                        current_user.has_role('kancho') if current_user and current_user.is_authenticated else False,
-                        current_user.has_role('gicho') if current_user and current_user.is_authenticated else False)
+            # 获取JWT认证的用户
+            jwt_user = get_jwt_user()
+            if jwt_user and jwt_user.has_role('kancho') and not jwt_user.has_role('gicho'):
+                # 运营用户默认指定自己为直属运营
+                pilot.owner = jwt_user
+                logger.debug('运营创建主播，自动关联owner: %s -> %s', jwt_user.username, pilot.nickname)
+            else:
+                logger.debug('创建主播未设置owner: jwt_user=%s, has_kancho=%s, has_gicho=%s',
+                            jwt_user.username if jwt_user else 'None',
+                            jwt_user.has_role('kancho') if jwt_user else False,
+                            jwt_user.has_role('gicho') if jwt_user else False)
 
         # 保存主播
         pilot.created_at = pilot.updated_at = get_current_utc_time()
         pilot.save()
 
-        # 记录变更日志
+        # 记录变更日志（使用JWT用户或current_user）
+        log_user = get_jwt_user() or current_user
         create_log = PilotChangeLog(pilot_id=pilot,
-                                    user_id=current_user,
+                                    user_id=log_user,
                                     field_name='status',
                                     old_value='',
                                     new_value='created',
@@ -367,7 +372,7 @@ def create_pilot():
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>', methods=['PUT'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def update_pilot(pilot_id):
     """更新主播（整体更新）"""
     try:
@@ -431,7 +436,7 @@ def update_pilot(pilot_id):
         # 保存并记录变更
         pilot.updated_at = get_current_utc_time()
         pilot.save()
-        _record_changes(pilot, old_data, current_user, '主播信息更新')
+        _record_changes(pilot, old_data, get_jwt_user() or current_user, '主播信息更新')
 
         logger.info('更新主播成功：%s', pilot.nickname)
         serializer_data = serialize_pilot(pilot)
@@ -452,7 +457,7 @@ def update_pilot(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>/status', methods=['PATCH'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def update_pilot_status(pilot_id):
     """调整主播状态"""
     try:
@@ -481,7 +486,7 @@ def update_pilot_status(pilot_id):
 
         # 记录变更日志
         change_log = PilotChangeLog(pilot_id=pilot,
-                                    user_id=current_user,
+                                    user_id=get_jwt_user() or current_user,
                                     field_name='status',
                                     old_value=str(old_status) if old_status else '',
                                     new_value=str(new_status),
@@ -501,7 +506,7 @@ def update_pilot_status(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>/changes', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_pilot_changes(pilot_id):
     """获取主播变更记录"""
     try:
@@ -533,7 +538,7 @@ def get_pilot_changes(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots/options', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_pilot_options():
     """获取主播筛选器枚举选项
     
@@ -574,7 +579,7 @@ def get_pilot_options():
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>/performance', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_pilot_performance(pilot_id):
     """获取主播业绩数据"""
     try:
@@ -647,10 +652,11 @@ def get_pilot_performance(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots/export', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def export_pilots():
     """导出主播数据"""
-    logger.info('%s 请求导出主播数据', current_user.username)
+    jwt_user = get_jwt_user()
+    logger.info('%s 请求导出主播数据', jwt_user.username if jwt_user else current_user.username)
 
     try:
         # 获取筛选参数（复用列表接口的筛选逻辑）
