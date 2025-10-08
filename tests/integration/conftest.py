@@ -49,11 +49,12 @@ def admin_client(api_client):
 
 
 @pytest.fixture(scope='function')
-def kancho_client(api_client, admin_client):
+def kancho_client(base_url, client, admin_client):
     """
     运营身份的API客户端
     
     自动创建一个临时运营账号并登录
+    注意：使用独立的test_client以避免session冲突
     """
     from tests.fixtures.factories import user_factory
 
@@ -71,8 +72,13 @@ def kancho_client(api_client, admin_client):
     username = user_data['username']
     password = user_data['password']
 
-    # 创建新的client并通过传统登录方式登录
-    new_client = ApiClient(api_client.base_url, client=api_client.client)
+    # ⚠️ 重要：为kancho创建独立的test_client，避免与admin_client的session冲突
+    # 获取Flask app并创建新的test_client
+    flask_app = client.application
+    independent_test_client = flask_app.test_client()
+    
+    # 创建新的ApiClient（使用独立的test_client）
+    new_client = ApiClient(base_url, client=independent_test_client)
 
     # 使用传统登录（维护session）
     login_resp = new_client.client.post('/login', data={'username': username, 'password': password}, follow_redirects=True)
@@ -90,7 +96,7 @@ def kancho_client(api_client, admin_client):
     # 测试结束后清理
     try:
         new_client.client.post('/logout')
-        # 使用管理员删除该运营账号
-        admin_client.delete(f'/api/users/{user_id}')
+        # 使用管理员停用该运营账号（系统不支持删除用户，只能停用）
+        admin_client.patch(f'/api/users/{user_id}/activation', json={'active': False})
     except:
         pass

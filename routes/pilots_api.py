@@ -330,6 +330,12 @@ def create_pilot():
         elif current_user.has_role('kancho') and not current_user.has_role('gicho'):
             # 运营用户默认指定自己为直属运营
             pilot.owner = current_user
+            logger.debug('运营创建主播，自动关联owner: %s -> %s', current_user.username, pilot.nickname)
+        else:
+            logger.debug('创建主播未设置owner: current_user=%s, has_kancho=%s, has_gicho=%s',
+                        current_user.username if current_user and current_user.is_authenticated else 'None',
+                        current_user.has_role('kancho') if current_user and current_user.is_authenticated else False,
+                        current_user.has_role('gicho') if current_user and current_user.is_authenticated else False)
 
         # 保存主播
         pilot.created_at = pilot.updated_at = get_current_utc_time()
