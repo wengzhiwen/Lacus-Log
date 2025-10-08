@@ -445,7 +445,6 @@
 </style>
 
 <script>
-const csrfToken = '{{ csrf_token() }}';
 const changesUrl = '{{ url_for('battle_records_api.record_changes', record_id=battle_record.id) }}';
 const deleteUrl = '{{ url_for('battle_records_api.delete_record', record_id=battle_record.id) }}';
 const listUrl = '{{ url_for('battle_record.list_battle_records') }}';
@@ -506,8 +505,8 @@ async function deleteBattleRecord() {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
+      credentials: 'include'  // 确保浏览器发送包含JWT token的cookie
     });
     const result = await response.json();
     if (!result.success) {

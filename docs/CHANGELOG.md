@@ -2,10 +2,32 @@
 > 以下所有日期为更新发生时的系统GMT+8时间
 
 ## 2025-10-08 修复：
-- **API认证冲突问题的全面修复**：系统性检查并修复了所有REST API中的装饰器执行顺序问题。修复了以下两个文件中的认证冲突：
-  - battle_records_api.py：移除所有11个API路由上的@login_required装饰器
-  - calendar_api.py：移除所有3个API路由上的@login_required装饰器
-现在所有REST API统一使用JWT认证机制，避免了装饰器执行顺序导致的未认证错误。这解决了生产环境中前端调用API时出现认证失败的问题
+- **后端CSRF验证完全移除：API层完成JWT纯化**：从所有REST API中移除CSRF token验证逻辑：
+  - **移除validate_csrf_header调用**：清理所有API路由中的CSRF验证代码块
+  - **移除csrf_helper导入**：从所有API文件中移除`from utils.csrf_helper import CSRFError, validate_csrf_header`
+  - **清理范围**：announcements_api.py（4处）、users_api.py（5处）、commissions_api.py（4处）、recruits_api.py、battle_areas_api.py、report_mail.py（4处）、auth_api.py
+  - **统一JWT认证**：所有API现在完全依赖`@jwt_roles_accepted`和`@jwt_roles_required`装饰器进行认证和授权
+  - **代码格式化**：使用yapf对所有修改的API文件进行格式化
+- **前端CSRF代码清理：完成JWT纯化**：系统已完全移除CSRF token保护机制，进行前端代码全面清理：
+  - **移除CSRF token函数调用**：清理所有模板文件中的`getCSRFToken()`函数调用和`csrfToken`变量定义
+  - **移除CSRF请求头**：清理所有fetch请求中的`'X-CSRFToken': csrfToken`请求头
+  - **统一JWT认证方式**：所有API请求统一使用`credentials: 'include'`自动携带JWT cookie
+  - **清理范围**：涵盖通告模块（detail.html、edit.html、new.html、cleanup.html）、用户模块（list.html、detail.html、edit.html、new.html）、主播模块（new.html、edit.html、commission相关页面）、地点模块（generate.html、edit.html、new.html）、邮件报告（mail_reports.html）、基础模板（base.html）和静态JS（recruit-api.js）
+  - **去除自定义CSRF函数定义**：移除各页面中自定义的`getCSRFToken()`函数（如users/edit.html、pilots/commission模块等）
+- **认证架构彻底简化：完全移除CSRF体系**：为彻底解决JWT认证与CSRF验证的冲突，进行了完整的架构清理：
+  - **移除Flask-WTF依赖**：从app.py中完全移除CSRFProtect的导入和初始化，禁用全局CSRF保护
+  - **清理模板引用**：从base.html和所有相关模板中移除csrf_token()函数调用，解决'csrf_token' is undefined错误
+  - **简化API代码**：从battle_records_api.py中移除所有CSRF验证逻辑（validate_csrf_header调用和CSRFError导入）
+  - **清理前端代码**：移除所有模板中的CSRF token hidden字段和JavaScript中的csrfToken变量引用
+  - **统一JWT认证**：所有API请求使用credentials: 'include'发送JWT cookie，依赖Flask-JWT-Extended的内置CSRF保护
+- **JWT token传递优化**：修复开播记录新建页面API调用中的JWT token传递问题：
+  - **新增getJWTToken函数**：从cookie中提取access_token_cookie
+  - **创建apiFetch辅助函数**：统一处理所有API请求，自动添加Authorization: Bearer <token>头部
+  - **更新所有fetch调用**：将页面中的所有fetch调用替换为apiFetch，确保JWT token正确传递
+  - **禁用JWT CSRF保护**：设置JWT_COOKIE_CSRF_PROTECT=False，解决JWT认证与CSRF机制的冲突
+  - **优化调试能力**：添加详细的控制台日志和认证状态检查，帮助诊断JWT token传递问题
+  - **确认HTTP兼容性**：验证JWT_COOKIE_SECURE配置在开发环境中正确设置，支持HTTP协议
+现在系统完全基于JWT认证，前后端代码全面清理完成，架构统一简洁，不再有任何CSRF相关的代码和错误
 
 # 历史的更新内容
 

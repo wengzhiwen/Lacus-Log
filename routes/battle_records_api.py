@@ -18,7 +18,6 @@ from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
 from routes.battle_record import (log_battle_record_change, validate_notes_required)
 from utils.announcement_serializers import (create_error_response, create_success_response)
-from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.james_alert import trigger_james_alert_if_needed
 from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
@@ -398,10 +397,7 @@ def get_record(record_id: str):
 @jwt_roles_accepted('gicho', 'kancho')
 def create_record():
     """创建开播记录。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
+    # JWT认证的API不需要CSRF验证，因为JWT cookie已有CSRF保护
 
     payload = request.get_json(silent=True) or {}
 
@@ -489,10 +485,7 @@ def create_record():
 @jwt_roles_accepted('gicho', 'kancho')
 def update_record(record_id: str):
     """更新开播记录。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
+    # JWT认证的API不需要CSRF验证，因为JWT cookie已有CSRF保护
 
     payload = request.get_json(silent=True) or {}
 
@@ -580,10 +573,7 @@ def update_record(record_id: str):
 @jwt_roles_accepted('gicho', 'kancho')
 def delete_record(record_id: str):
     """删除开播记录。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
+    # JWT认证的API不需要CSRF验证，因为JWT cookie已有CSRF保护
 
     try:
         record = BattleRecord.objects.get(id=record_id)

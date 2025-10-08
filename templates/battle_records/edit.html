@@ -18,8 +18,7 @@
               data-detail-url="{{ url_for('battle_records_api.get_record', record_id=battle_record.id) }}"
               data-update-url="{{ url_for('battle_records_api.update_record', record_id=battle_record.id) }}"
               data-detail-page-url="{{ url_for('battle_record.detail_battle_record', record_id=battle_record.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="hidden" name="pilot" id="pilot_id" value="">
+                        <input type="hidden" name="pilot" id="pilot_id" value="">
             <input type="hidden" name="related_announcement" id="related_announcement_value" value="">
             
             <div class="form-section">
@@ -426,7 +425,7 @@ const battleRecordForm = document.getElementById('battleRecordForm');
 const recordDetailUrl = battleRecordForm?.dataset.detailUrl || '';
 const updateRecordUrl = battleRecordForm?.dataset.updateUrl || '';
 const detailPageUrl = battleRecordForm?.dataset.detailPageUrl || '';
-const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
 
 const elements = {
   pilotDisplay: document.getElementById('pilot_display'),
@@ -751,9 +750,9 @@ async function submitBattleRecordUpdate() {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
       body: JSON.stringify(payload),
+      credentials: 'include'  // 确保浏览器发送包含JWT token的cookie
     });
     const result = await response.json();
     if (!result.success) {

@@ -24,7 +24,6 @@ from utils.announcement_serializers import (create_error_response,
                                             serialize_announcement_detail,
                                             serialize_announcement_summary,
                                             serialize_change_logs)
-from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
@@ -411,11 +410,6 @@ def check_conflicts_api():
 @jwt_roles_accepted('gicho', 'kancho')
 def create_announcement_api():
     """创建通告。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     payload = request.get_json(silent=True) or {}
 
     try:
@@ -512,11 +506,6 @@ def _serialize_old_data(announcement: Announcement) -> Dict[str, Optional[str]]:
 @jwt_roles_accepted('gicho', 'kancho')
 def update_announcement_api(announcement_id: str):
     """更新通告。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     payload = request.get_json(silent=True) or {}
 
     try:
@@ -618,11 +607,6 @@ def _cleanup_orphaned_references(announcement_id):
 @jwt_roles_accepted('gicho', 'kancho')
 def delete_announcement_api(announcement_id: str):
     """删除通告。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     payload = request.get_json(silent=True) or {}
     delete_scope = payload.get('delete_scope', 'this_only')
 
@@ -883,11 +867,6 @@ def get_cleanup_list_api():
 @jwt_roles_accepted('gicho', 'kancho')
 def cleanup_delete_future_api(pilot_id: str):
     """删除指定主播从明天开始的所有通告 API。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     try:
         current_local = get_current_local_time()
         tomorrow_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)

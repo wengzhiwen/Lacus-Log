@@ -33,12 +33,6 @@ let currentPage = 1;
 let currentRole = '';
 let isLoading = false;
 
-// 获取CSRF令牌
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
-         window.CSRF_TOKEN || '';
-}
-
 // 获取用户列表
 async function loadUsers(page = 1, role = '') {
   if (isLoading) return;
@@ -64,9 +58,9 @@ async function loadUsers(page = 1, role = '') {
     const response = await fetch(`/api/users?${params}`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
-      }
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
     });
     
     const result = await response.json();
@@ -163,9 +157,9 @@ async function toggleUserActivation(userId, currentActive) {
     const response = await fetch(`/api/users/${userId}/activation`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify({ active: !currentActive })
     });
     
@@ -198,9 +192,9 @@ async function resetUserPassword(userId) {
     const response = await fetch(`/api/users/${userId}/reset-password`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
-      }
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
     });
     
     const result = await response.json();
@@ -230,9 +224,6 @@ function showMessage(message, type = 'info', duration = 5000) {
 
 // 初始化页面
 document.addEventListener('DOMContentLoaded', function() {
-  // 设置CSRF令牌到全局变量
-  window.CSRF_TOKEN = getCSRFToken();
-  
   // 检查URL参数中的成功消息
   const urlParams = new URLSearchParams(window.location.search);
   const success = urlParams.get('success');

@@ -8,12 +8,11 @@
         <h1 class="page-title">导出通告</h1>
     </div>
 
-    <form id="export-form" 
+    <form id="export-form"
           class="form-card"
           data-pilots-url="{{ url_for('announcements_api.get_export_pilot_options_api') }}"
           data-view-url-base="{{ url_for('announcement.export_view_page') }}"
           data-csv-url-base="{{ url_for('announcements_api.export_announcements_api') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
         <div class="form-group">
             <label for="pilot_search">昵称 / 真实姓名 搜索：</label>

@@ -12,12 +12,6 @@
 </section>
 
 <script>
-// 获取CSRF令牌
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
-         window.CSRF_TOKEN || '';
-}
-
 // 显示消息 - 使用全局消息提示系统
 function showMessage(message, type = 'info', duration = 5000) {
   if (window.showMessage) {
@@ -45,9 +39,9 @@ async function loadUserInfo() {
     const response = await fetch(`/api/users/${userId}`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
-      }
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
     });
     
     const result = await response.json();
@@ -86,7 +80,6 @@ function renderEditForm(user) {
   
   content.innerHTML = `
     <form class="form" id="editUserForm">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="hidden" id="userId" value="${user.id}" />
 
       <label>用户名</label>
@@ -159,9 +152,9 @@ async function updateUser(userId, formData) {
     const response = await fetch(`/api/users/${userId}`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify(formData)
     });
     
@@ -182,9 +175,6 @@ async function updateUser(userId, formData) {
 
 // 初始化页面
 document.addEventListener('DOMContentLoaded', function() {
-  // 设置CSRF令牌到全局变量
-  window.CSRF_TOKEN = getCSRFToken();
-  
   // 加载用户信息
   loadUserInfo();
 });

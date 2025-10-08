@@ -17,7 +17,6 @@
     </div>
 
     <form method="POST" id="announcementForm" class="announcement-form-content">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
       <div class="form-section">
         <h3 class="section-title">基础信息</h3>
@@ -401,16 +400,15 @@
 
 
 <script>
-const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-const announcementForm = document.getElementById('announcementForm');
-const submitBtn = document.getElementById('submit_btn');
-const conflictResults = document.getElementById('conflict_results');
-const conflictContent = document.getElementById('conflict_content');
-const xSelect = document.getElementById('x_coord');
-const ySelect = document.getElementById('y_coord');
-const zSelect = document.getElementById('battle_area');
-const pilotSelect = document.getElementById('pilot');
-const recurrenceSelect = document.getElementById('recurrence_type');
+let announcementForm;
+let submitBtn;
+let conflictResults;
+let conflictContent;
+let xSelect;
+let ySelect;
+let zSelect;
+let pilotSelect;
+let recurrenceSelect;
 
 let allPilots = [];
 
@@ -421,7 +419,13 @@ function showLoading(isLoading) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
+  // 确保包含credentials以发送JWT Cookie
+  const fetchOptions = {
+    ...options,
+    credentials: 'include'
+  };
+
+  const response = await fetch(url, fetchOptions);
   const result = await response.json();
   if (!result.success) {
     const error = new Error(result.error?.message || '请求失败');
@@ -665,7 +669,6 @@ async function handleConflictCheck() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
       body: JSON.stringify(payload),
     });
@@ -703,7 +706,6 @@ async function handleFormSubmit(event) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
       body: JSON.stringify(payload),
     });
@@ -778,10 +780,22 @@ document.getElementById('y_coord').addEventListener('change', async function () 
   clearConflicts();
 });
 
-document.getElementById('check_btn').addEventListener('click', handleConflictCheck);
-announcementForm.addEventListener('submit', handleFormSubmit);
-
 document.addEventListener('DOMContentLoaded', async () => {
+  // 初始化需要DOM和全局函数的变量
+  announcementForm = document.getElementById('announcementForm');
+  submitBtn = document.getElementById('submit_btn');
+  conflictResults = document.getElementById('conflict_results');
+  conflictContent = document.getElementById('conflict_content');
+  xSelect = document.getElementById('x_coord');
+  ySelect = document.getElementById('y_coord');
+  zSelect = document.getElementById('battle_area');
+  pilotSelect = document.getElementById('pilot');
+  recurrenceSelect = document.getElementById('recurrence_type');
+
+  // 绑定事件监听器
+  document.getElementById('check_btn').addEventListener('click', handleConflictCheck);
+  announcementForm.addEventListener('submit', handleFormSubmit);
+
   resetSubmitButton();
   await loadAreaOptions();
   await loadAllPilots();

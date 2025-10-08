@@ -13,8 +13,7 @@
 
     <div class="form-container">
         <form method="POST" id="battleRecordForm" data-announcement-id="{{ related_announcement.id if related_announcement else '' }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="hidden" name="related_announcement" id="related_announcement_value" value="">
+                        <input type="hidden" name="related_announcement" id="related_announcement_value" value="">
             <input type="hidden" name="pilot" id="pilot_id" value="">
             
             <div class="form-section">
@@ -434,7 +433,6 @@
 
 <script>
 const battleRecordForm = document.getElementById('battleRecordForm');
-const csrfToken = document.querySelector('input[name="csrf_token"]').value;
 const createRecordUrl = "{{ url_for('battle_records_api.create_record') }}";
 const pageState = {
     announcementId: battleRecordForm?.dataset.announcementId || '',
@@ -529,6 +527,9 @@ function initializeDefaultTimes() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // 添加认证状态检查
+    await checkAuthenticationStatus();
+
     initializeDefaultTimes();
     applyDefaultsToForm();
 
@@ -568,9 +569,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateSubmitButtonState();
 });
 
+// 检查认证状态的函数
+async function checkAuthenticationStatus() {
+    console.log('=== 检查认证状态 ===');
+    console.log('当前URL:', window.location.href);
+    console.log('所有cookies:', document.cookie);
+
+    // 尝试调用一个需要认证的API来检查认证状态
+    try {
+        const response = await apiFetch('{{ url_for("battle_records_api.pilots_filtered") }}');
+        const result = await response.json();
+
+        if (result.success) {
+            console.log('✅ 认证状态：正常');
+            console.log('API响应:', result);
+        } else {
+            console.error('❌ 认证状态：API返回失败', result);
+        }
+    } catch (error) {
+        console.error('❌ 认证状态：API调用失败', error);
+
+        if (error.message && error.message.includes('401')) {
+            console.error('❌ 401认证失败，可能需要重新登录');
+            // 可以选择在这里提示用户重新登录
+        }
+    }
+
+    console.log('=== 认证状态检查结束 ===');
+}
+
 function loadAllPilots() {
     if (!pilotSelect) return Promise.resolve();
-    return fetch(`{{ url_for('battle_records_api.pilots_filtered') }}`)
+    return apiFetch(`{{ url_for('battle_records_api.pilots_filtered') }}`)
         .then(response => response.json())
         .then(result => {
             pilotSelect.innerHTML = '<option value="">请选择主播</option>';
@@ -629,7 +659,7 @@ function buildPilotDisplay(p) {
 }
 
 function loadBattleAreaData() {
-    return fetch('{{ url_for("battle_records_api.battle_areas") }}')
+    return apiFetch('{{ url_for("battle_records_api.battle_areas") }}')
         .then(response => response.json())
         .then(result => {
             if (!result.success) return;
@@ -791,7 +821,7 @@ async function prefillFromAnnouncement() {
     if (!pageState.announcementId) return;
     const url = `{{ url_for('battle_records_api.announcement_detail', announcement_id='__ANN_ID__') }}`.replace('__ANN_ID__', pageState.announcementId);
     try {
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         const payload = await response.json();
         if (!payload.success) {
             throw new Error(payload.error?.message || '加载通告详情失败');
@@ -843,7 +873,7 @@ async function prefillFromAnnouncement() {
 async function populatePilotDisplay(pilotId) {
     if (!pilotId) return;
     try {
-        const response = await fetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`);
+        const response = await apiFetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`);
         const payload = await response.json();
         if (!payload.success) return;
         const pilot = (payload.data?.items || [])[0];
@@ -914,7 +944,7 @@ function setupPilotChangeListener() {
 
 async function handlePilotChange(pilotId) {
     try {
-        const response = await fetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`);
+        const response = await apiFetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`);
         const payload = await response.json();
         if (payload.success) {
             const pilot = (payload.data?.items || [])[0];
@@ -944,7 +974,7 @@ async function loadRelatedAnnouncementsForPilot(pilotId) {
     clearRelatedAnnouncementOptions();
     if (!pilotId) return;
     try {
-        const response = await fetch(`{{ url_for('battle_records_api.related_announcements') }}?pilot_id=${pilotId}`);
+        const response = await apiFetch(`{{ url_for('battle_records_api.related_announcements') }}?pilot_id=${pilotId}`);
         const result = await response.json();
         if (!result.success) return;
         const announcements = (result.data && result.data.announcements) || [];
@@ -971,7 +1001,7 @@ function setupRelatedAnnouncementListener() {
         }
         const url = `{{ url_for('battle_records_api.announcement_detail', announcement_id='__ANN_ID__') }}`.replace('__ANN_ID__', annId);
         try {
-            const resp = await fetch(url);
+            const resp = await apiFetch(url);
             const result = await resp.json();
             if (!result.success) return;
             const a = result.data?.announcement || {};
@@ -1212,6 +1242,40 @@ function collectBattleRecordPayload() {
     };
 }
 
+// 通用API调用辅助函数，专注于正确发送cookie
+function apiFetch(url, options = {}) {
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+    };
+
+    console.log('发起API请求:', url, '方法:', options.method || 'GET');
+    console.log('当前cookies:', document.cookie);
+
+    // 由于JWT cookie是HttpOnly的，JavaScript无法读取，只能依赖浏览器自动发送
+    const fetchOptions = {
+        ...options,
+        headers,
+        credentials: 'include',  // 确保浏览器发送包含JWT token的cookie
+        // 添加更多选项以确保cookie正确发送
+        mode: 'cors',  // 确保跨域请求正确处理
+        cache: 'no-cache',  // 避免缓存问题
+    };
+
+    console.log('请求选项:', fetchOptions);
+
+    return fetch(url, fetchOptions).then(response => {
+        console.log('API响应状态:', response.status, response.statusText);
+        if (response.status === 401) {
+            console.error('401认证失败，检查cookie是否正确发送');
+        }
+        return response;
+    }).catch(error => {
+        console.error('API请求失败:', error);
+        throw error;
+    });
+}
+
 async function submitBattleRecord() {
     const submitBtn = document.getElementById('submit-btn');
     if (!submitBtn) return;
@@ -1223,12 +1287,8 @@ async function submitBattleRecord() {
 
     try {
         const payload = collectBattleRecordPayload();
-        const response = await fetch(createRecordUrl, {
+        const response = await apiFetch(createRecordUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
-            },
             body: JSON.stringify(payload),
         });
 

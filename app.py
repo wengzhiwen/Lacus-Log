@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from flask import Flask
 from flask_jwt_extended import JWTManager
-from flask_wtf import CSRFProtect
 from mongoengine import connect
 
 from routes.admin import admin_bp
@@ -89,7 +88,7 @@ def create_app() -> Flask:
         JWT_TOKEN_LOCATION=['headers', 'cookies'],  # 支持 header 和 cookie
         # 与 Session 一致：仅生产环境才标记 Secure；开发下通过 http 传输 Cookie
         JWT_COOKIE_SECURE=is_production,
-        JWT_COOKIE_CSRF_PROTECT=True,  # 启用 CSRF 保护
+        JWT_COOKIE_CSRF_PROTECT=False,  # 禁用 CSRF 保护，因为已完全移除CSRF机制
         JWT_COOKIE_SAMESITE='Lax',  # SameSite 策略
         JWT_ACCESS_COOKIE_NAME='access_token_cookie',
         JWT_REFRESH_COOKIE_NAME='refresh_token_cookie',
@@ -110,7 +109,6 @@ def create_app() -> Flask:
     except Exception as exc:  # pylint: disable=broad-except
         flask_app.logger.error('清空任务计划令牌失败：%s', exc)
 
-    csrf = CSRFProtect(flask_app)
     jwt = JWTManager(flask_app)
 
     user_datastore = create_user_datastore()
@@ -154,12 +152,7 @@ def create_app() -> Flask:
     flask_app.register_blueprint(report_bp, url_prefix='/reports')
     flask_app.register_blueprint(report_mail_bp, url_prefix='/reports')
 
-    # 仅豁免 REST 登录接口的全局 CSRF 拦截（其余修改类接口仍使用自定义校验）
-    try:
-        from routes.auth_api import login as auth_login_view  # 延迟导入以获取视图函数
-        csrf.exempt(auth_login_view)
-    except Exception as exc:  # pylint: disable=broad-except
-        flask_app.logger.error('为 /api/auth/login 关闭全局CSRF失败：%s', exc)
+    flask_app.logger.info('已完全禁用Flask-WTF的全局CSRF保护，使用JWT认证统一管理安全')
 
     @flask_app.template_filter('role_display_name')
     def role_display_name(role_name):

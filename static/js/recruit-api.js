@@ -4,11 +4,6 @@
  */
 
 const RecruitAPI = (() => {
-  const getCsrfToken = () => {
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute('content') : null;
-  };
-
   const showLoader = () => {
     let loader = document.getElementById('loading-overlay');
     if (loader) loader.style.display = 'flex';
@@ -27,12 +22,11 @@ const RecruitAPI = (() => {
         ...options.headers,
       };
 
-      const csrfToken = getCsrfToken();
-      if (csrfToken && options.method && options.method !== 'GET') {
-        headers['X-CSRFToken'] = csrfToken;
-      }
-
-      const response = await fetch(url, { ...options, headers });
+      const response = await fetch(url, { 
+        ...options, 
+        headers,
+        credentials: 'include'
+      });
 
       if (!response.ok) {
         let errorMessage = `HTTP 错误: ${response.status}`;

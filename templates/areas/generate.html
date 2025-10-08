@@ -115,9 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/api/battle-areas/bulk-generate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCSRFToken()
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           source_id: generateAreaId,
           z_start: startValue,

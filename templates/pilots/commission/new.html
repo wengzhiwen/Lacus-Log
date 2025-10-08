@@ -315,10 +315,6 @@ function getPilotIdFromUrl() {
   return pathParts[pathParts.indexOf('pilots') + 1];
 }
 
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-}
-
 function showErrorAlert(message) {
   const box = document.getElementById('errorAlert');
   document.getElementById('errorMessage').textContent = message || '保存失败';
@@ -376,9 +372,9 @@ async function saveCommission() {
     const response = await fetch(`/api/pilots/${pilotId}/commission/records`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify({
         adjustment_date: adjustmentDate,
         commission_rate: rate,

@@ -10,11 +10,7 @@ from mongoengine import DoesNotExist, ValidationError
 from mongoengine.errors import NotUniqueError
 
 from models.battle_area import Availability, BattleArea
-from utils.battle_area_serializers import (create_error_response,
-                                           create_success_response,
-                                           serialize_battle_area,
-                                           serialize_battle_area_list)
-from utils.csrf_helper import CSRFError, validate_csrf_header
+from utils.battle_area_serializers import (create_error_response, create_success_response, serialize_battle_area, serialize_battle_area_list)
 from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
@@ -142,11 +138,6 @@ def get_battle_area_options():
 @jwt_roles_accepted('gicho')
 def create_battle_area():
     """创建开播地点。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     payload = request.get_json(silent=True) or {}
 
     x_coord = safe_strip(payload.get('x_coord'))
@@ -183,11 +174,6 @@ def create_battle_area():
 @jwt_roles_accepted('gicho')
 def update_battle_area(area_id: str):
     """更新开播地点信息。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     payload = request.get_json(silent=True) or {}
 
     x_coord = safe_strip(payload.get('x_coord'))
@@ -234,11 +220,6 @@ def update_battle_area(area_id: str):
 @jwt_roles_accepted('gicho')
 def bulk_generate_battle_areas():
     """基于源开播地点批量生成新的坐席。"""
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     payload = request.get_json(silent=True) or {}
 
     source_id = safe_strip(payload.get('source_id'))

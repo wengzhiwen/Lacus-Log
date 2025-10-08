@@ -606,13 +606,18 @@
 
 <script>
 const announcementId = '{{ announcement_id }}';
-const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 let announcementData = null;
 let fromParam = new URLSearchParams(window.location.search).get('from') || '';
 let dateParam = new URLSearchParams(window.location.search).get('date') || '';
 
 async function fetchJson(url, options = {}) {
-    const response = await fetch(url, options);
+    // 确保包含credentials以发送JWT Cookie
+    const fetchOptions = {
+        ...options,
+        credentials: 'include'
+    };
+
+    const response = await fetch(url, fetchOptions);
     const result = await response.json();
     if (!result.success) {
         const error = new Error(result.error?.message || '请求失败');
@@ -782,7 +787,6 @@ async function deleteAnnouncement(scope) {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
             },
             body: JSON.stringify({ delete_scope: scope }),
         });

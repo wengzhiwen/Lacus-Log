@@ -15,7 +15,6 @@
     </div>
 
     <form method="post" class="pilot-form-content">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       
       <div class="form-section">
         <h3 class="section-title">基础信息</h3>
@@ -403,9 +402,9 @@ async function createPilot(formData) {
     const response = await fetch('/api/pilots', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify(formData)
     });
     

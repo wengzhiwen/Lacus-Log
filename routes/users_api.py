@@ -5,7 +5,6 @@ from flask_security.utils import hash_password
 from mongoengine import DoesNotExist, ValidationError
 
 from models.user import Role, User
-from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
 from utils.user_serializers import (create_error_response,
@@ -99,12 +98,6 @@ def get_user(user_id: str):
 def create_user():
     """创建运营账户。"""
     try:
-        # 验证CSRF令牌
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         data = request.get_json()
         if not data:
             return jsonify(create_error_response('INVALID_REQUEST', '请求数据格式错误')), 400
@@ -168,12 +161,6 @@ def create_user():
 def delete_user(user_id: str):
     """删除用户。"""
     try:
-        # 验证CSRF令牌
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         user = User.objects.get(id=user_id)
 
         # 检查是否尝试删除最后一个管理员
@@ -202,12 +189,6 @@ def delete_user(user_id: str):
 def update_user(user_id: str):
     """更新用户信息。"""
     try:
-        # 验证CSRF令牌
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         user = User.objects.get(id=user_id)
         data = request.get_json()
 
@@ -258,12 +239,6 @@ def update_user(user_id: str):
 def toggle_user_activation(user_id: str):
     """切换用户激活状态。"""
     try:
-        # 验证CSRF令牌
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         user = User.objects.get(id=user_id)
         data = request.get_json()
 
@@ -300,12 +275,6 @@ def toggle_user_activation(user_id: str):
 def reset_user_password(user_id: str):
     """重置用户密码。"""
     try:
-        # 验证CSRF令牌
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         user = User.objects.get(id=user_id)
 
         # 重置为临时密码

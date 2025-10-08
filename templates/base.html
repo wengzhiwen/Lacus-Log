@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>{% block title %}Lacus-Log{% endblock %}</title>
+    <title>{% block title %}Lacus-Log{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="mask-icon" href="{{ url_for('static', filename='favicon.svg') }}" color="#000000">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -139,9 +138,9 @@
         fetch('/api/errors/frontend', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
+            'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify({
             type: type,
             message: message,
@@ -157,10 +156,10 @@
       }
     }
     
-    // 获取CSRF令牌
+    // 获取CSRF令牌（JWT认证模式下返回空字符串）
     function getCSRFToken() {
-      return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
-             window.CSRF_TOKEN || '';
+      // 在JWT认证体系下，不再使用CSRF令牌
+      return '';
     }
     
     // 全局消息提示系统

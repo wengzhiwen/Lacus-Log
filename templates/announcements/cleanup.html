@@ -52,7 +52,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const tableBody = document.getElementById('cleanup-table-body');
     const emptyState = document.getElementById('empty-state');
-    const csrfToken = '{{ csrf_token() }}';
 
     function renderTable(items) {
         tableBody.innerHTML = '';
@@ -85,9 +84,9 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/announcements/api/cleanup/by-pilot/${pilotId}`, {
             method: 'DELETE',
             headers: {
-                'X-CSRFToken': csrfToken,
                 'Content-Type': 'application/json'
-            }
+            },
+            credentials: 'include'
         })
         .then(response => response.json())
         .then(data => {

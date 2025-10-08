@@ -585,10 +585,6 @@ document.addEventListener('click', function(e) {
 </script>
 
 <script>
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-}
-
 function promptDate(defaultValue) {
   const v = prompt('调整日期 (YYYY-MM-DD):', defaultValue || '');
   if (v === null) return null;
@@ -622,9 +618,9 @@ async function createRecordPrompt() {
     const resp = await fetch(`/api/pilots/${pilotId}/commission/records`, {
       method: 'POST',
       headers: { 
-        'Content-Type': 'application/json', 
-        'X-CSRFToken': getCSRFToken() 
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify({ 
         adjustment_date: dateStr, 
         commission_rate: rate, 
@@ -652,7 +648,8 @@ async function deactivateRecord(recordId) {
   try {
     const resp = await fetch(`/api/pilots/${pilotId}/commission/records/${recordId}/deactivate`, {
       method: 'POST',
-      headers: { 'X-CSRFToken': getCSRFToken() }
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
     });
     const result = await resp.json();
     if (!result.success) {
@@ -673,7 +670,8 @@ async function activateRecord(recordId) {
   try {
     const resp = await fetch(`/api/pilots/${pilotId}/commission/records/${recordId}/activate`, {
       method: 'POST',
-      headers: { 'X-CSRFToken': getCSRFToken() }
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
     });
     const result = await resp.json();
     if (!result.success) {

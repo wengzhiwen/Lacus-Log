@@ -17,12 +17,6 @@
 </section>
 
 <script>
-// 获取CSRF令牌
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
-         window.CSRF_TOKEN || '';
-}
-
 // 格式化日期时间
 function formatDateTime(dateString) {
   if (!dateString) return '未知';
@@ -70,9 +64,9 @@ async function loadUserDetail() {
     const response = await fetch(`/api/users/${userId}`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
-      }
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
     });
     
     const result = await response.json();
@@ -195,9 +189,9 @@ async function toggleUserActivation(userId, currentActive) {
     const response = await fetch(`/api/users/${userId}/activation`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify({ active: !currentActive })
     });
     
@@ -229,9 +223,9 @@ async function resetUserPassword(userId) {
     const response = await fetch(`/api/users/${userId}/reset-password`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
-      }
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
     });
     
     const result = await response.json();
@@ -260,9 +254,6 @@ function showMessage(message, type = 'info', duration = 5000) {
 
 // 初始化页面
 document.addEventListener('DOMContentLoaded', function() {
-  // 设置CSRF令牌到全局变量
-  window.CSRF_TOKEN = getCSRFToken();
-  
   // 检查URL参数中的成功消息
   const urlParams = new URLSearchParams(window.location.search);
   const success = urlParams.get('success');

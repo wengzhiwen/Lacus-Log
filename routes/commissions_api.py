@@ -15,7 +15,6 @@ from mongoengine import DoesNotExist, ValidationError
 from models.pilot import Pilot, PilotCommission, PilotCommissionChangeLog
 from utils.commission_helper import (calculate_commission_distribution,
                                      get_pilot_commission_rate_for_date)
-from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.pilot_serializers import (create_error_response,
@@ -121,11 +120,6 @@ def list_commission_records(pilot_id):
 def create_commission_record(pilot_id):
     """创建分成调整记录"""
     try:
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         pilot = Pilot.objects.get(id=pilot_id)
         data = request.get_json() or {}
 
@@ -185,11 +179,6 @@ def create_commission_record(pilot_id):
 def update_commission_record(pilot_id, record_id):
     """更新分成调整记录"""
     try:
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         _ = Pilot.objects.get(id=pilot_id)
         record = PilotCommission.objects.get(id=record_id, pilot_id=pilot_id)
 
@@ -252,11 +241,6 @@ def update_commission_record(pilot_id, record_id):
 def deactivate_commission_record(pilot_id, record_id):
     """软删除分成记录"""
     try:
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         _ = Pilot.objects.get(id=pilot_id)
         record = PilotCommission.objects.get(id=record_id, pilot_id=pilot_id)
         if record.is_active:
@@ -283,11 +267,6 @@ def deactivate_commission_record(pilot_id, record_id):
 def activate_commission_record(pilot_id, record_id):
     """恢复分成记录"""
     try:
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         _ = Pilot.objects.get(id=pilot_id)
         record = PilotCommission.objects.get(id=record_id, pilot_id=pilot_id)
         if not record.is_active:

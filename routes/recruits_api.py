@@ -13,21 +13,13 @@ from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import Pilot, Platform, Rank, Status, WorkMode
-from models.recruit import (BroadcastDecision, InterviewDecision, Recruit,
-                            RecruitChangeLog, RecruitChannel, RecruitStatus,
-                            TrainingDecision)
+from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision)
 from models.user import Role, User
-from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
-from utils.recruit_serializers import (create_error_response,
-                                       create_success_response,
-                                       serialize_change_log_list,
-                                       serialize_recruit,
-                                       serialize_recruit_grouped,
+from utils.recruit_serializers import (create_error_response, create_success_response, serialize_change_log_list, serialize_recruit, serialize_recruit_grouped,
                                        serialize_recruit_list)
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('recruit')
 recruits_api_bp = Blueprint('recruits_api', __name__)
@@ -513,11 +505,6 @@ def create_recruit():
     """创建招募"""
     try:
         # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         data = request.get_json()
         if not data:
             return jsonify(create_error_response('INVALID_DATA', '请求数据格式错误')), 400
@@ -610,11 +597,6 @@ def update_recruit(recruit_id):
     """更新招募（整体更新）"""
     try:
         # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         recruit = Recruit.objects.get(id=recruit_id)
 
         # 记录修改前的数据状态
@@ -743,11 +725,6 @@ def interview_decision(recruit_id):
     """执行面试决策"""
     try:
         # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         recruit = Recruit.objects.get(id=recruit_id)
 
         effective_status = recruit.get_effective_status()
@@ -875,11 +852,6 @@ def schedule_training(recruit_id):
     """执行预约试播"""
     try:
         # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         recruit = Recruit.objects.get(id=recruit_id)
 
         effective_status = recruit.get_effective_status()
@@ -984,11 +956,6 @@ def training_decision(recruit_id):
     """执行试播决策"""
     try:
         # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         recruit = Recruit.objects.get(id=recruit_id)
 
         effective_status = recruit.get_effective_status()
@@ -1092,11 +1059,6 @@ def schedule_broadcast(recruit_id):
     """执行预约开播"""
     try:
         # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         recruit = Recruit.objects.get(id=recruit_id)
 
         effective_status = recruit.get_effective_status()
@@ -1172,11 +1134,6 @@ def broadcast_decision(recruit_id):
     """执行开播决策"""
     try:
         # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         recruit = Recruit.objects.get(id=recruit_id)
 
         effective_status = recruit.get_effective_status()

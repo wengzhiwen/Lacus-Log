@@ -10,7 +10,6 @@ from flask_wtf.csrf import generate_csrf
 from mongoengine import DoesNotExist
 
 from models.user import User
-from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.logging_setup import get_logger
 
 logger = get_logger('auth_api')
@@ -132,11 +131,6 @@ def logout():
     
     清除 JWT 和 CSRF cookie。
     """
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     response = make_response(jsonify(create_success_response(meta={'message': '登出成功'})), 200)
 
     # 清除所有认证相关的 cookie
@@ -155,11 +149,6 @@ def refresh():
     
     使用 Refresh Token 获取新的 Access Token 和 CSRF Token。
     """
-    try:
-        validate_csrf_header()
-    except CSRFError as exc:
-        return jsonify(create_error_response(exc.code, exc.message)), 401
-
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
     csrf_token = generate_csrf()
@@ -238,9 +227,9 @@ def logout_with_jwt():
     这个路由用于替代Flask-Security-Too的默认logout路由。
     """
     from flask import redirect, url_for, session
-    
+
     response = make_response(redirect(url_for('security.login')))
-    
+
     # 先登出 Flask-Login / Flask-Security 会话
     try:
         flask_logout_user()
@@ -255,7 +244,7 @@ def logout_with_jwt():
 
     # 清除所有JWT相关的cookie
     unset_jwt_cookies(response)
-    
+
     # 同步清除 Flask-Login/Flask-Security 相关Cookie（浏览器侧）
     try:
         # 删除 remember_token / session 等浏览器端 Cookie
@@ -266,6 +255,6 @@ def logout_with_jwt():
 
     # 同时清除CSRF token cookie
     response.set_cookie('csrf_token', '', expires=0)
-    
+
     logger.info('用户登出（传统页面）：IP=%s', request.remote_addr)
     return response

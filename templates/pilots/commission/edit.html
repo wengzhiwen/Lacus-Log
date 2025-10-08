@@ -480,10 +480,6 @@ function getCommissionIdFromUrl() {
   return pathParts[commissionIndex + 1]; // commission/{id}/edit
 }
 
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-}
-
 function showErrorAlert(message) {
   const box = document.getElementById('errorAlert');
   document.getElementById('errorMessage').textContent = message || '保存失败';
@@ -534,8 +530,9 @@ async function saveCommission() {
       const response = await fetch(`/api/pilots/${pilotId}/commission/records/${commissionId}/${statusEndpoint}`, {
         method: 'POST',
         headers: {
-          'X-CSRFToken': getCSRFToken()
-        }
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
       
       const statusResult = await response.json();
@@ -549,9 +546,9 @@ async function saveCommission() {
     const response = await fetch(`/api/pilots/${pilotId}/commission/records/${commissionId}`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify({
         commission_rate: rate,
         remark: remark

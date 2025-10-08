@@ -24,7 +24,6 @@
     </div>
 
     <form method="POST" id="announcementForm" class="announcement-form-content" data-announcement-id="{{ announcement.id }}" data-edit-scope="{{ edit_scope }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <input type="hidden" name="edit_scope" value="{{ request.args.get('edit_scope', 'this_only') }}"/>
 
       <div class="form-section">
@@ -477,27 +476,26 @@
 </style>
 
 <script>
-const announcementForm = document.getElementById('announcementForm');
-const announcementId = announcementForm?.dataset.announcementId || '';
-const editScope = announcementForm?.dataset.editScope || 'this_only';
-const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-const submitBtn = document.getElementById('submit_btn');
-const conflictResults = document.getElementById('conflict_results');
-const conflictContent = document.getElementById('conflict_content');
-const xSelect = document.getElementById('x_coord');
-const ySelect = document.getElementById('y_coord');
-const zSelect = document.getElementById('z_coord');
-const hiddenBattleArea = document.getElementById('battle_area');
-const durationSelect = document.getElementById('duration_hours');
-const pilotInfoEl = document.getElementById('pilot_info');
-const pilotHiddenInput = document.getElementById('pilot_id');
-const startTimeInput = document.getElementById('start_time');
-const startDateInput = document.getElementById('start_date');
-const startHourSelect = document.getElementById('start_hour');
-const startMinuteSelect = document.getElementById('start_minute');
-const recurrenceNotice = document.getElementById('recurrence_notice');
-const recurrenceScopeText = document.getElementById('recurrence_scope');
-const recurrenceDescriptionText = document.getElementById('recurrence_description');
+let announcementForm;
+let announcementId;
+let editScope;
+let submitBtn;
+let conflictResults;
+let conflictContent;
+let xSelect;
+let ySelect;
+let zSelect;
+let hiddenBattleArea;
+let durationSelect;
+let pilotInfoEl;
+let pilotHiddenInput;
+let startTimeInput;
+let startDateInput;
+let startHourSelect;
+let startMinuteSelect;
+let recurrenceNotice;
+let recurrenceScopeText;
+let recurrenceDescriptionText;
 
 let announcementDetail = null;
 let pilotId = '';
@@ -511,7 +509,13 @@ function showLoading(isLoading) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
+  // 确保包含credentials以发送JWT Cookie
+  const fetchOptions = {
+    ...options,
+    credentials: 'include'
+  };
+
+  const response = await fetch(url, fetchOptions);
   const result = await response.json();
   if (!result.success) {
     const error = new Error(result.error?.message || '请求失败');
@@ -696,7 +700,6 @@ async function handleConflictCheck() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
       body: JSON.stringify(payload),
     });
@@ -731,7 +734,6 @@ async function handleFormSubmit(event) {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken,
       },
       body: JSON.stringify(payload),
     });
@@ -760,25 +762,48 @@ function bindFieldChangeReset() {
   });
 }
 
-xSelect.addEventListener('change', async () => {
-  await loadYOptions(xSelect.value);
-  clearConflicts();
-});
-
-ySelect.addEventListener('change', async () => {
-  await loadZOptions(xSelect.value, ySelect.value);
-  clearConflicts();
-});
-
-zSelect.addEventListener('change', () => {
-  hiddenBattleArea.value = zSelect.value;
-  clearConflicts();
-});
-
-document.getElementById('check_btn').addEventListener('click', handleConflictCheck);
-announcementForm.addEventListener('submit', handleFormSubmit);
-
 document.addEventListener('DOMContentLoaded', async () => {
+  // 初始化需要DOM和全局函数的变量
+  announcementForm = document.getElementById('announcementForm');
+  announcementId = announcementForm?.dataset.announcementId || '';
+  editScope = announcementForm?.dataset.editScope || 'this_only';
+  submitBtn = document.getElementById('submit_btn');
+  conflictResults = document.getElementById('conflict_results');
+  conflictContent = document.getElementById('conflict_content');
+  xSelect = document.getElementById('x_coord');
+  ySelect = document.getElementById('y_coord');
+  zSelect = document.getElementById('z_coord');
+  hiddenBattleArea = document.getElementById('battle_area');
+  durationSelect = document.getElementById('duration_hours');
+  pilotInfoEl = document.getElementById('pilot_info');
+  pilotHiddenInput = document.getElementById('pilot_id');
+  startTimeInput = document.getElementById('start_time');
+  startDateInput = document.getElementById('start_date');
+  startHourSelect = document.getElementById('start_hour');
+  startMinuteSelect = document.getElementById('start_minute');
+  recurrenceNotice = document.getElementById('recurrence_notice');
+  recurrenceScopeText = document.getElementById('recurrence_scope');
+  recurrenceDescriptionText = document.getElementById('recurrence_description');
+
+  // 绑定事件监听器
+  document.getElementById('check_btn').addEventListener('click', handleConflictCheck);
+  announcementForm.addEventListener('submit', handleFormSubmit);
+
+  xSelect.addEventListener('change', async () => {
+    await loadYOptions(xSelect.value);
+    clearConflicts();
+  });
+
+  ySelect.addEventListener('change', async () => {
+    await loadZOptions(xSelect.value, ySelect.value);
+    clearConflicts();
+  });
+
+  zSelect.addEventListener('change', () => {
+    hiddenBattleArea.value = zSelect.value;
+    clearConflicts();
+  });
+
   resetSubmitButton();
   try {
     await loadAnnouncementDetail();

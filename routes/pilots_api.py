@@ -16,7 +16,6 @@ from mongoengine import DoesNotExist, Q, ValidationError
 from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank,
                           Status, WorkMode)
 from models.user import User
-from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.jwt_roles import get_jwt_user, jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.pilot_serializers import (create_error_response,
@@ -287,12 +286,6 @@ def get_pilot_detail(pilot_id):
 def create_pilot():
     """创建主播"""
     try:
-        # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         data = request.get_json()
         if not data:
             return jsonify(create_error_response('INVALID_DATA', '请求数据格式错误')), 400
@@ -375,12 +368,6 @@ def create_pilot():
 def update_pilot(pilot_id):
     """更新主播（整体更新）"""
     try:
-        # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         pilot = Pilot.objects.get(id=pilot_id)
 
         # 记录修改前的数据状态
@@ -460,12 +447,6 @@ def update_pilot(pilot_id):
 def update_pilot_status(pilot_id):
     """调整主播状态"""
     try:
-        # CSRF令牌验证
-        try:
-            validate_csrf_header()
-        except CSRFError as exc:
-            return jsonify(create_error_response(exc.code, exc.message)), 401
-
         pilot = Pilot.objects.get(id=pilot_id)
 
         data = request.get_json()

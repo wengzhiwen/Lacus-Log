@@ -4,7 +4,6 @@
 <section>
   <h1 class="title">新增运营</h1>
   <form class="form" id="createUserForm">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <label>用户名</label>
     <input class="input" type="text" name="username" id="username" required />
 
@@ -25,12 +24,6 @@
 </section>
 
 <script>
-// 获取CSRF令牌
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
-         window.CSRF_TOKEN || '';
-}
-
 // 显示消息 - 使用全局消息提示系统
 function showMessage(message, type = 'info', duration = 5000) {
   if (window.showMessage) {
@@ -47,9 +40,9 @@ async function createUser(formData) {
     const response = await fetch('/api/users', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify(formData)
     });
     
@@ -70,9 +63,6 @@ async function createUser(formData) {
 
 // 表单提交处理
 document.addEventListener('DOMContentLoaded', function() {
-  // 设置CSRF令牌到全局变量
-  window.CSRF_TOKEN = getCSRFToken();
-  
   const form = document.getElementById('createUserForm');
   const submitBtn = document.getElementById('submitBtn');
   
