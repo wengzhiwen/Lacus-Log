@@ -280,11 +280,11 @@ def test_<action>_<scenario>(self, fixture):
 
 ## 4. 开播记录模块 (Battle Records API)
 
-**文件路径**：`tests/integration/test_battle_records_api.py`  
-**状态**：⏳ 待开始  
+**文件路径**：`tests/integration/test_battle_records_api.py`
+**状态**：🚧 进行中
 **API前缀**：`/api/battle-records`
 
-### 待实现的测试类
+### 测试类清单
 
 #### 4.1 TestBattleRecordsList - 开播记录列表
 | 测试用例 | 场景 | 状态 | 优先级 | 备注 |
@@ -311,6 +311,57 @@ def test_<action>_<scenario>(self, fixture):
 | 测试用例 | 场景 | 状态 | 优先级 | 备注 |
 |---------|------|------|--------|------|
 | test_delete_record_success | 删除记录 - 成功 | ⏳ | P0 | 基础删除 |
+
+#### 4.5 TestBattleRecordsWorkflow - 开播记录工作流
+| 测试用例 | 场景 | 状态 | 优先级 | 备注 |
+|---------|------|------|--------|------|
+| test_batch_create_battle_records_from_announcements | 批量创建开播记录 | ⏳ | P0 | 从通告生成记录的端到端测试 |
+| test_create_mixed_battle_records | 创建混合开播记录 | ⏳ | P0 | 有通告+无通告的综合测试 |
+
+**综合测试设计思路：**
+
+1. **test_batch_create_battle_records_from_announcements**
+   - 利用通告测试已创建的大量通告数据（约50+个通告）
+   - 为其中80%的通告创建关联的开播记录
+   - 流水金额：10-3000元随机分布，大部分落在300-500元区间
+   - 底薪统一为150元
+   - 时间分布在60天内，确保有足够的历史数据用于报告测试
+
+2. **test_create_mixed_battle_records**
+   - 创建一些没有关联通告的开播记录
+   - 流水同样采用10-3000元随机分布
+   - 底薪为0（因为没有通告关联）
+   - 测试独立开播记录的创建和管理
+
+**数据生成策略：**
+```python
+# 流水金额分布：偏向300-500的加权随机
+def generate_revenue_amount():
+    import random
+    # 80%概率落在300-500范围
+    if random.random() < 0.8:
+        return random.uniform(300, 500)
+    # 20%概率落在其他范围
+    return random.choice([
+        random.uniform(10, 100),   # 10%概率小额
+        random.uniform(500, 1500), # 8%概率中额
+        random.uniform(1500, 3000) # 2%概率大额
+    ])
+
+# 时间分布：60天内均匀分布
+def generate_start_time(base_date):
+    days_offset = random.randint(0, 60)
+    hour_offset = random.randint(8, 23)  # 工作时间
+    minute_offset = random.choice([0, 30])  # 整点或半点
+    return base_date - timedelta(days=days_offset, hours=24-hour_offset, minutes=60-minute_offset)
+```
+
+**测试断言策略：**
+1. 精确验证创建的记录数量
+2. 验证关联通告的记录正确设置了通告引用
+3. 验证底薪设置（150元 vs 0元）
+4. 验证流水金额分布范围
+5. 记录所有创建的记录ID和具体数值，供后续报告测试使用
 
 ---
 
@@ -475,12 +526,12 @@ def test_<action>_<scenario>(self, fixture):
 | 用户管理 | 20 | 17 | 0 | 3 | 0 | 85% | ✅ |
 | 主播管理 | 26 | 26 | 0 | 0 | 0 | 100% | ✅ |
 | 通告管理 | ~40 | 0 | 3 | 0 | 37 | 7% | 🔴 P0 |
-| 开播记录 | ~15 | 0 | 0 | 0 | 15 | 0% | 🟡 P1 |
+| 开播记录 | ~17 | 0 | 0 | 0 | 17 | 0% | 🟡 P1 |
 | 招募记录 | ~15 | 0 | 1 | 0 | 14 | 7% | 🟡 P1 |
 | 战区管理 | ~8 | 0 | 0 | 0 | 8 | 0% | 🟢 P2 |
 | 分成管理 | ~6 | 0 | 0 | 0 | 6 | 0% | 🟢 P2 |
 | 认证模块 | ~10 | 0 | 0 | 0 | 10 | 0% | 🟡 P1 |
-| **总计** | **~140** | **41** | **4** | **5** | **90** | **32%** | - |
+| **总计** | **~142** | **41** | **4** | **5** | **92** | **31%** | - |
 
 **说明：**
 - **已完成（✅）**：独立测试用例已实现并通过
@@ -726,13 +777,13 @@ class AnnouncementFactory:
 ## 📅 开发计划
 
 ### Phase 1：核心模块（Week 1-2）
-- [ ] 主播管理模块（30个用例）
-- [ ] 通告管理模块（35个用例）
+- [x] 主播管理模块（26个用例）- ✅ 已完成
+- [x] 通告管理模块（综合测试3个）- 🚧 进行中
 - 目标：完成核心业务功能测试
 
 ### Phase 2：数据模块（Week 3）
-- [ ] 开播记录模块（15个用例）
-- [ ] 招募记录模块（12个用例）
+- [ ] 开播记录模块（17个用例）- 🚧 开始开发
+- [ ] 招募记录模块（14个用例）- 🚧 进行中
 - 目标：完成数据记录功能测试
 
 ### Phase 3：辅助模块（Week 4）
