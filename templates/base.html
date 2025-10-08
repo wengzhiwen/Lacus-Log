@@ -35,6 +35,34 @@
       100% { transform: rotate(360deg); }
     }
   </style>
+  <script>
+    // 提前定义 showMessage/handle401（页面内容脚本可能更早发起请求）
+    (function() {
+      // 轻量消息队列，等待底部正式实现接管并回放
+      if (typeof window.showMessage !== 'function') {
+        window.__pendingMessages = [];
+        window.showMessage = function(message, type = 'error', duration = 0) {
+          try {
+            window.__pendingMessages.push([message, type, duration]);
+            // 最简退化输出，防止静默
+            console.warn('消息(早期):', (message || '').toString().replace(/<[^>]+>/g, ''));
+          } catch (e) {
+            // 忽略
+          }
+        };
+      }
+
+      if (typeof window.handle401 !== 'function') {
+        let handling401Early = false;
+        window.handle401 = function() {
+          if (handling401Early) return;
+          handling401Early = true;
+          window.showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+        };
+      }
+    })();
+  </script>
+  
 </head>
 <body>
   <div id="loading-overlay">
@@ -72,7 +100,7 @@
       {% endif %}
       {% endif %}
       <a class="navlink" href="{{ url_for('main.change_password') }}">🔒修改密码</a>
-      <a class="navlink" href="{{ url_for_security('logout') }}">🔒登出</a>
+      <a class="navlink" href="{{ url_for('auth_api.logout_with_jwt') }}">🔒登出</a>
     </nav>
     {% endif %}
   </header>
@@ -146,7 +174,9 @@
         
         const messageEl = document.createElement('div');
         messageEl.className = `message message-${type}`;
-        messageEl.textContent = message;
+        
+        // 支持HTML内容（用于链接等）
+        messageEl.innerHTML = message;
         
         // 添加关闭按钮
         const closeBtn = document.createElement('button');
@@ -182,8 +212,28 @@
       }
     }
     
-    // 将showMessage函数暴露到全局作用域
+    // 将showMessage函数暴露到全局作用域，并回放早期队列
     window.showMessage = showMessage;
+    try {
+      if (Array.isArray(window.__pendingMessages)) {
+        while (window.__pendingMessages.length > 0) {
+          const [m, t, d] = window.__pendingMessages.shift();
+          try { showMessage(m, t, d); } catch (_) { /* 忽略 */ }
+        }
+      }
+      window.__pendingMessages = [];
+    } catch (_) { /* 忽略 */ }
+    
+    // 全局401未认证处理（显示错误信息，不自动跳转）
+    (function() {
+      let handling401 = false;
+      window.handle401 = function() {
+        if (handling401) return;
+        handling401 = true;
+        console.error('检测到401未认证，需要重新登录');
+        showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+      };
+    })();
     
     // 测试函数
     window.testMessage = function() {

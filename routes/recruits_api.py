@@ -13,13 +13,21 @@ from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import Pilot, Platform, Rank, Status, WorkMode
-from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision)
+from models.recruit import (BroadcastDecision, InterviewDecision, Recruit,
+                            RecruitChangeLog, RecruitChannel, RecruitStatus,
+                            TrainingDecision)
 from models.user import Role, User
 from utils.csrf_helper import CSRFError, validate_csrf_header
+from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
-from utils.recruit_serializers import (create_error_response, create_success_response, serialize_change_log_list, serialize_recruit, serialize_recruit_grouped,
+from utils.recruit_serializers import (create_error_response,
+                                       create_success_response,
+                                       serialize_change_log_list,
+                                       serialize_recruit,
+                                       serialize_recruit_grouped,
                                        serialize_recruit_list)
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 logger = get_logger('recruit')
 recruits_api_bp = Blueprint('recruits_api', __name__)
@@ -122,7 +130,7 @@ def try_enum(enum_class, value, default=None):
 
 
 @recruits_api_bp.route('/api/recruits', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_recruits():
     """获取招募列表"""
     try:
@@ -243,7 +251,7 @@ def get_recruits():
 
 
 @recruits_api_bp.route('/api/recruits/grouped', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_recruits_grouped():
     """获取分组的招募列表（用于首页展示）"""
     try:
@@ -278,7 +286,7 @@ def get_recruits_grouped():
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_recruit_detail(recruit_id):
     """获取招募详情"""
     try:
@@ -309,7 +317,7 @@ def get_recruit_detail(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/changes', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_recruit_changes(recruit_id):
     """获取招募变更记录"""
     try:
@@ -341,7 +349,7 @@ def get_recruit_changes(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/options', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_recruit_options():
     """获取招募筛选器枚举选项"""
     try:
@@ -402,7 +410,7 @@ def get_recruit_options():
 
 
 @recruits_api_bp.route('/api/recruits/export', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def export_recruits():
     """导出招募数据"""
     logger.info('%s 请求导出招募数据', current_user.username)
@@ -500,7 +508,7 @@ def export_recruits():
 
 
 @recruits_api_bp.route('/api/recruits', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def create_recruit():
     """创建招募"""
     try:
@@ -597,7 +605,7 @@ def create_recruit():
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>', methods=['PUT'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def update_recruit(recruit_id):
     """更新招募（整体更新）"""
     try:
@@ -730,7 +738,7 @@ def update_recruit(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/interview-decision', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def interview_decision(recruit_id):
     """执行面试决策"""
     try:
@@ -862,7 +870,7 @@ def interview_decision(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/schedule-training', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def schedule_training(recruit_id):
     """执行预约试播"""
     try:
@@ -971,7 +979,7 @@ def schedule_training(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/training-decision', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def training_decision(recruit_id):
     """执行试播决策"""
     try:
@@ -1079,7 +1087,7 @@ def training_decision(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/schedule-broadcast', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def schedule_broadcast(recruit_id):
     """执行预约开播"""
     try:
@@ -1159,7 +1167,7 @@ def schedule_broadcast(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/broadcast-decision', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def broadcast_decision(recruit_id):
     """执行开播决策"""
     try:

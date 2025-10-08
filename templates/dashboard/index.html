@@ -493,6 +493,13 @@
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
       credentials: 'same-origin'
     }).then(response => {
+      // 检查401未认证
+      if (response.status === 401) {
+        if (typeof window.handle401 === 'function') {
+          window.handle401();
+        }
+        throw new Error('未认证，请重新登录');
+      }
       if (!response.ok) {
         throw new Error('接口返回异常');
       }
@@ -515,7 +522,10 @@
     })
     .catch(error => {
       console.error('加载仪表盘失败：', error);
-      showError(error.message || '仪表盘加载失败，请稍后再试。');
+      // 如果是401错误，不显示通用错误消息（已经由handle401处理）
+      if (error.message !== '未认证，请重新登录') {
+        showError(error.message || '仪表盘加载失败，请稍后再试。');
+      }
     });
 })();
 </script>

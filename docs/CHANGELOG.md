@@ -1,6 +1,11 @@
 # 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+## 2025-10-08 重构：
+- **REST API完全JWT化**：将所有REST API端点（共10个文件）统一改为JWT认证，彻底移除Flask-Security-Too的Session认证依赖。修改文件包括：pilots_api.py、users_api.py、announcements_api.py、battle_areas_api.py、battle_records_api.py、commissions_api.py、recruits_api.py、reports_api.py、recruit_reports_api.py、calendar_api.py。创建utils/jwt_roles.py模块，提供jwt_roles_required和jwt_roles_accepted装饰器。修改utils/security.py，在传统表单登录成功后自动生成JWT token并设置为Cookie，使传统页面的fetch请求能自动携带JWT认证
+- **登出功能优化**：添加/logout-with-jwt路由，确保登出时清除JWT Cookie和CSRF Cookie，并重定向到登录页。修改base.html模板，将登出按钮指向新路由
+- **401自动跳转**：在base.html中添加全局fetch包装器，自动拦截所有401响应并跳转到登录页，提升用户体验
+
 ## 2025-10-08 修复：
 - REST API JWT认证问题：修复主播管理API使用Flask-Security-Too的@roles_accepted装饰器导致JWT认证失败的问题。创建utils/jwt_roles.py模块，实现jwt_roles_required和jwt_roles_accepted装饰器，正确从JWT token中加载用户和角色信息。更新routes/pilots_api.py中所有路由使用JWT装饰器，并在需要current_user的地方使用get_jwt_user()辅助函数。修复后，test_create_pilot_as_kancho和test_kancho_creates_own_pilots测试全部通过，主播管理模块26个测试100%通过
 

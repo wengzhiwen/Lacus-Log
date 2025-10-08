@@ -5,19 +5,23 @@
 提供机师分成的只读与写入接口，遵循 pilots_api 的统一响应结构与权限策略。
 """
 
-from datetime import datetime, date as date_class
+from datetime import datetime
 from typing import Any, Dict
 
 from flask import Blueprint, jsonify, request
-from flask_security import roles_accepted, current_user
+from flask_security import current_user
 from mongoengine import DoesNotExist, ValidationError
 
 from models.pilot import Pilot, PilotCommission, PilotCommissionChangeLog
+from utils.commission_helper import (calculate_commission_distribution,
+                                     get_pilot_commission_rate_for_date)
 from utils.csrf_helper import CSRFError, validate_csrf_header
+from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.timezone_helper import utc_to_local, local_to_utc, get_current_utc_time
-from utils.pilot_serializers import create_success_response, create_error_response
-from utils.commission_helper import get_pilot_commission_rate_for_date, calculate_commission_distribution
+from utils.pilot_serializers import (create_error_response,
+                                     create_success_response)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 logger = get_logger('commission')
 commissions_api_bp = Blueprint('commissions_api', __name__)
@@ -61,7 +65,7 @@ def _serialize_commission_change(log: PilotCommissionChangeLog) -> Dict[str, Any
 
 
 @commissions_api_bp.route('/api/pilots/<pilot_id>/commission/current', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_current_commission(pilot_id):
     """获取主播当前分成与计算信息"""
     try:
@@ -90,7 +94,7 @@ def get_current_commission(pilot_id):
 
 
 @commissions_api_bp.route('/api/pilots/<pilot_id>/commission/records', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def list_commission_records(pilot_id):
     """分页获取分成调整记录"""
     try:
@@ -113,7 +117,7 @@ def list_commission_records(pilot_id):
 
 
 @commissions_api_bp.route('/api/pilots/<pilot_id>/commission/records', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def create_commission_record(pilot_id):
     """创建分成调整记录"""
     try:
@@ -177,7 +181,7 @@ def create_commission_record(pilot_id):
 
 
 @commissions_api_bp.route('/api/pilots/<pilot_id>/commission/records/<record_id>', methods=['PUT'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def update_commission_record(pilot_id, record_id):
     """更新分成调整记录"""
     try:
@@ -244,7 +248,7 @@ def update_commission_record(pilot_id, record_id):
 
 
 @commissions_api_bp.route('/api/pilots/<pilot_id>/commission/records/<record_id>/deactivate', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def deactivate_commission_record(pilot_id, record_id):
     """软删除分成记录"""
     try:
@@ -275,7 +279,7 @@ def deactivate_commission_record(pilot_id, record_id):
 
 
 @commissions_api_bp.route('/api/pilots/<pilot_id>/commission/records/<record_id>/activate', methods=['POST'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def activate_commission_record(pilot_id, record_id):
     """恢复分成记录"""
     try:
@@ -306,7 +310,7 @@ def activate_commission_record(pilot_id, record_id):
 
 
 @commissions_api_bp.route('/api/pilots/<pilot_id>/commission/records/<record_id>/changes', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def list_commission_changes(pilot_id, record_id):
     """获取单条分成记录的变更日志"""
     try:

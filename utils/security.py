@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 import logging
 
 from flask import Flask
@@ -17,8 +18,7 @@ def create_user_datastore(db=None) -> MongoEngineUserDatastore:
     return MongoEngineUserDatastore(db, User, Role)
 
 
-def init_security(app: Flask,
-                  user_datastore: MongoEngineUserDatastore) -> Security:
+def init_security(app: Flask, user_datastore: MongoEngineUserDatastore) -> Security:
     """初始化 Flask-Security-Too，并接入登录相关日志。"""
     security = Security(app, user_datastore)
 
@@ -27,6 +27,9 @@ def init_security(app: Flask,
     @user_authenticated.connect_via(app)
     def _on_user_authenticated(sender, user, **extra):  # pylint: disable=unused-argument
         logger.info('用户登录成功：%s', getattr(user, 'username', 'unknown'))
+
+        # JWT token将在首页第一次访问时生成（routes/main.py的home()函数）
+        # 不在这里生成，因为302重定向响应中的Set-Cookie可能不会被浏览器保存
 
     @security.login_manager.user_loader
     def _load_user(user_id):  # pylint: disable=unused-argument
@@ -38,6 +41,5 @@ def init_security(app: Flask,
             return User.objects(id=ObjectId(user_id)).first()
         except Exception:  # pylint: disable=broad-except
             return None
-
 
     return security

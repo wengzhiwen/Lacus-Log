@@ -4,14 +4,26 @@
 from datetime import timedelta
 
 from flask import Blueprint, jsonify, request
-from flask_security import roles_accepted
 
-from routes.report import (get_local_date_from_string, get_local_date_from_string_safe, get_local_month_from_string, get_week_start_tuesday,
-                           get_default_week_start_for_now_prev_week, _calculate_day_summary, _calculate_daily_details, _calculate_monthly_details,
-                           _calculate_monthly_summary, _calculate_weekly_summary, _calculate_weekly_details)
+from routes.report import (_calculate_daily_details, _calculate_day_summary,
+                           _calculate_monthly_details,
+                           _calculate_monthly_summary,
+                           _calculate_weekly_details,
+                           _calculate_weekly_summary,
+                           get_default_week_start_for_now_prev_week,
+                           get_local_date_from_string,
+                           get_local_date_from_string_safe,
+                           get_local_month_from_string, get_week_start_tuesday)
+from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.report_serializers import (create_error_response, create_success_response, serialize_daily_details, serialize_daily_summary,
-                                      serialize_monthly_details, serialize_monthly_summary, serialize_weekly_details, serialize_weekly_summary)
+from utils.report_serializers import (create_error_response,
+                                      create_success_response,
+                                      serialize_daily_details,
+                                      serialize_daily_summary,
+                                      serialize_monthly_details,
+                                      serialize_monthly_summary,
+                                      serialize_weekly_details,
+                                      serialize_weekly_summary)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
 
 logger = get_logger('reports_api')
@@ -35,7 +47,7 @@ def _parse_mode_param() -> str:
 
 
 @reports_api_bp.route('/daily', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def daily_report_data():
     """返回开播日报数据。"""
     date_str = request.args.get('date')
@@ -82,7 +94,7 @@ def daily_report_data():
 
 
 @reports_api_bp.route('/weekly', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def weekly_report_data():
     """返回开播周报数据（周二-次周一）。"""
     week_start_str = request.args.get('week_start')
@@ -127,7 +139,7 @@ def weekly_report_data():
 
 
 @reports_api_bp.route('/monthly', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def monthly_report_data():
     """返回开播月报数据。"""
     month_str = request.args.get('month')

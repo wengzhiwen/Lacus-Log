@@ -87,7 +87,8 @@ def create_app() -> Flask:
         JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=2),  # Access Token 有效期 2 小时
         JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=30),  # Refresh Token 有效期 30 天
         JWT_TOKEN_LOCATION=['headers', 'cookies'],  # 支持 header 和 cookie
-        JWT_COOKIE_SECURE=os.getenv('FLASK_ENV') != 'development',  # 开发环境不启用 Secure
+        # 与 Session 一致：仅生产环境才标记 Secure；开发下通过 http 传输 Cookie
+        JWT_COOKIE_SECURE=is_production,
         JWT_COOKIE_CSRF_PROTECT=True,  # 启用 CSRF 保护
         JWT_COOKIE_SAMESITE='Lax',  # SameSite 策略
         JWT_ACCESS_COOKIE_NAME='access_token_cookie',
@@ -109,7 +110,7 @@ def create_app() -> Flask:
     except Exception as exc:  # pylint: disable=broad-except
         flask_app.logger.error('清空任务计划令牌失败：%s', exc)
 
-    CSRFProtect(flask_app)
+    csrf = CSRFProtect(flask_app)
     jwt = JWTManager(flask_app)
 
     user_datastore = create_user_datastore()
@@ -152,6 +153,13 @@ def create_app() -> Flask:
     flask_app.register_blueprint(reports_api_bp, url_prefix='/reports/api')
     flask_app.register_blueprint(report_bp, url_prefix='/reports')
     flask_app.register_blueprint(report_mail_bp, url_prefix='/reports')
+
+    # 仅豁免 REST 登录接口的全局 CSRF 拦截（其余修改类接口仍使用自定义校验）
+    try:
+        from routes.auth_api import login as auth_login_view  # 延迟导入以获取视图函数
+        csrf.exempt(auth_login_view)
+    except Exception as exc:  # pylint: disable=broad-except
+        flask_app.logger.error('为 /api/auth/login 关闭全局CSRF失败：%s', exc)
 
     @flask_app.template_filter('role_display_name')
     def role_display_name(role_name):

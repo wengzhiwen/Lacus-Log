@@ -5,9 +5,11 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
-from flask_security import roles_accepted
 
-from utils.calendar_aggregator import (aggregate_daily_data, aggregate_monthly_data, aggregate_weekly_data)
+from utils.calendar_aggregator import (aggregate_daily_data,
+                                       aggregate_monthly_data,
+                                       aggregate_weekly_data)
+from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 
 logger = get_logger('calendar_api')
@@ -17,7 +19,7 @@ calendar_api_bp = Blueprint('calendar_api', __name__)
 
 @calendar_api_bp.route('/month-data')
 @login_required
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def month_data():
     """获取月视图数据。"""
     try:
@@ -32,7 +34,7 @@ def month_data():
 
 @calendar_api_bp.route('/week-data')
 @login_required
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def week_data():
     """获取周视图数据。"""
     try:
@@ -47,7 +49,7 @@ def week_data():
 
 @calendar_api_bp.route('/day-data')
 @login_required
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def day_data():
     """获取日视图数据。"""
     try:

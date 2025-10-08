@@ -10,9 +10,13 @@ from mongoengine import DoesNotExist, ValidationError
 from mongoengine.errors import NotUniqueError
 
 from models.battle_area import Availability, BattleArea
-from utils.battle_area_serializers import (create_error_response, create_success_response, serialize_battle_area, serialize_battle_area_list)
+from utils.battle_area_serializers import (create_error_response,
+                                           create_success_response,
+                                           serialize_battle_area,
+                                           serialize_battle_area_list)
 from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
+from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
 
 logger = get_logger('battle_area_api')
@@ -46,7 +50,7 @@ def _collect_choices(x_filter: str) -> Dict[str, List[str]]:
 
 
 @battle_areas_api_bp.route('/api/battle-areas', methods=['GET'])
-@roles_accepted('gicho')
+@jwt_roles_accepted('gicho')
 def get_battle_areas():
     """获取开播地点列表。"""
     try:
@@ -100,7 +104,7 @@ def get_battle_areas():
 
 
 @battle_areas_api_bp.route('/api/battle-areas/<area_id>', methods=['GET'])
-@roles_accepted('gicho')
+@jwt_roles_accepted('gicho')
 def get_battle_area(area_id: str):
     """获取单个开播地点详情。"""
     try:
@@ -114,7 +118,7 @@ def get_battle_area(area_id: str):
 
 
 @battle_areas_api_bp.route('/api/battle-areas/options', methods=['GET'])
-@roles_accepted('gicho')
+@jwt_roles_accepted('gicho')
 def get_battle_area_options():
     """获取筛选器可选项。"""
     try:
@@ -135,7 +139,7 @@ def get_battle_area_options():
 
 
 @battle_areas_api_bp.route('/api/battle-areas', methods=['POST'])
-@roles_accepted('gicho')
+@jwt_roles_accepted('gicho')
 def create_battle_area():
     """创建开播地点。"""
     try:
@@ -176,7 +180,7 @@ def create_battle_area():
 
 
 @battle_areas_api_bp.route('/api/battle-areas/<area_id>', methods=['PUT'])
-@roles_accepted('gicho')
+@jwt_roles_accepted('gicho')
 def update_battle_area(area_id: str):
     """更新开播地点信息。"""
     try:
@@ -227,7 +231,7 @@ def update_battle_area(area_id: str):
 
 
 @battle_areas_api_bp.route('/api/battle-areas/bulk-generate', methods=['POST'])
-@roles_accepted('gicho')
+@jwt_roles_accepted('gicho')
 def bulk_generate_battle_areas():
     """基于源开播地点批量生成新的坐席。"""
     try:

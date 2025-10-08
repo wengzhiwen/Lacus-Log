@@ -4,7 +4,8 @@
 <section class="auth">
   <h1 class="title">登录</h1>
   {% include 'security/_messages.html' %}
-  <form action="{{ url_for_security('login') }}" method="POST" name="login_user_form" class="form" novalidate>
+  <div id="login-error" style="display:none; color:red; margin:10px 0;"></div>
+  <form id="loginForm" action="{{ url_for_security('login') }}" method="POST" name="login_user_form" class="form" novalidate>
     {{ login_user_form.hidden_tag() }}
 
     {% if login_user_form.identity is defined %}
@@ -36,10 +37,71 @@
     <div class="form-check">
       {{ login_user_form.remember }} 记住我
     </div>
-    {{ login_user_form.next }}
     <div class="form-actions">
       <input class="btn btn-primary" type="submit" value="登录" />
     </div>
   </form>
 </section>
+
+<script>
+// 使用REST API登录（完全JWT化）
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(this);
+  const submitBtn = this.querySelector('input[type="submit"]');
+  const errorDiv = document.getElementById('login-error');
+  
+  submitBtn.disabled = true;
+  submitBtn.value = '登录中...';
+  errorDiv.style.display = 'none';
+  
+  // 获取表单字段
+  const username = formData.get('username') || formData.get('identity') || formData.get('email');
+  const password = formData.get('password');
+  
+  try {
+    // 调用REST API登录
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password }),
+      credentials: 'same-origin'
+    });
+    
+    // 可能服务端返回HTML错误页，先尝试解析JSON，失败再读文本
+    let result = null;
+    try {
+      result = await response.json();
+    } catch (_) {
+      const raw = await response.text();
+      throw new Error('登录接口非JSON响应：' + raw.slice(0, 200));
+    }
+    
+    if (result && result.success) {
+      // 登录成功，手动等待 Cookie 落盘再跳首页
+      console.log('登录成功，准备跳转');
+      setTimeout(function() { window.location.href = '/'; }, 50);
+    } else {
+      // 登录失败
+      errorDiv.textContent = result.error.message || '登录失败';
+      errorDiv.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.value = '登录';
+    }
+  } catch (error) {
+    try {
+      const text = await response.text();
+      console.error('登录错误，原始响应：', text);
+    } catch (_) {}
+    console.error('登录错误:', error);
+    errorDiv.textContent = '登录失败：' + (error && error.message ? error.message : '网络错误');
+    errorDiv.style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.value = '登录';
+  }
+});
+</script>
 {% endblock %}

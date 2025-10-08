@@ -1,20 +1,15 @@
 # pylint: disable=no-member
 
-from flask import (Blueprint, flash, jsonify, redirect, render_template,
-                   request, url_for)
+from flask import (Blueprint, flash, jsonify, redirect, render_template, request, url_for)
 from flask_login import login_required
 from flask_security import current_user
 from flask_security.utils import hash_password
 
-from routes.report import (build_dashboard_feature_banner,
-                           calculate_dashboard_announcement_metrics,
-                           calculate_dashboard_battle_metrics,
-                           calculate_dashboard_candidate_metrics,
-                           calculate_dashboard_conversion_rate_metrics,
-                           calculate_dashboard_pilot_metrics,
-                           calculate_dashboard_pilot_ranking_metrics,
-                           calculate_dashboard_recruit_metrics)
+from routes.report import (build_dashboard_feature_banner, calculate_dashboard_announcement_metrics, calculate_dashboard_battle_metrics,
+                           calculate_dashboard_candidate_metrics, calculate_dashboard_conversion_rate_metrics, calculate_dashboard_pilot_metrics,
+                           calculate_dashboard_pilot_ranking_metrics, calculate_dashboard_recruit_metrics)
 from utils.dashboard_serializers import create_success_response
+from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 
 logger = get_logger('main')
@@ -25,14 +20,17 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route('/')
 @login_required
 def home():
-    """用户首页（移动端优先）。"""
+    """用户首页（移动端优先）。
+    
+    注意：页面中的API请求使用JWT认证。
+    用户通过传统表单登录后，前端会调用REST API登录以获取JWT token。
+    """
     logger.debug('用户进入首页：%s', getattr(current_user, 'username', 'anonymous'))
-
     return render_template('dashboard/index.html')
 
 
 @main_bp.route('/api/dashboard/recruit', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_recruit_data():
     """仪表盘招募统计接口。"""
     data = calculate_dashboard_recruit_metrics()
@@ -41,7 +39,7 @@ def dashboard_recruit_data():
 
 
 @main_bp.route('/api/dashboard/announcements', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_announcement_data():
     """仪表盘通告统计接口。"""
     data = calculate_dashboard_announcement_metrics()
@@ -50,7 +48,7 @@ def dashboard_announcement_data():
 
 
 @main_bp.route('/api/dashboard/battle-records', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_battle_data():
     """仪表盘开播记录统计接口。"""
     data = calculate_dashboard_battle_metrics()
@@ -59,7 +57,7 @@ def dashboard_battle_data():
 
 
 @main_bp.route('/api/dashboard/pilots', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_pilot_data():
     """仪表盘主播统计接口。"""
     data = calculate_dashboard_pilot_metrics()
@@ -68,7 +66,7 @@ def dashboard_pilot_data():
 
 
 @main_bp.route('/api/dashboard/candidates', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_candidate_data():
     """仪表盘候选人统计接口。"""
     data = calculate_dashboard_candidate_metrics()
@@ -77,7 +75,7 @@ def dashboard_candidate_data():
 
 
 @main_bp.route('/api/dashboard/feature', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_feature_data():
     """仪表盘横幅展示接口。"""
     data = build_dashboard_feature_banner()
@@ -86,7 +84,7 @@ def dashboard_feature_data():
 
 
 @main_bp.route('/api/dashboard/conversion-rate', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_conversion_rate_data():
     """仪表盘底薪流水转化率统计接口。"""
     data = calculate_dashboard_conversion_rate_metrics()
@@ -95,7 +93,7 @@ def dashboard_conversion_rate_data():
 
 
 @main_bp.route('/api/dashboard/pilot-ranking', methods=['GET'])
-@login_required
+@jwt_roles_accepted("gicho", "kancho")
 def dashboard_pilot_ranking_data():
     """仪表盘昨日主播排名统计接口。"""
     data = calculate_dashboard_pilot_ranking_metrics()

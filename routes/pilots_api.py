@@ -11,7 +11,6 @@ from datetime import datetime
 from decimal import Decimal
 
 from flask import Blueprint, Response, jsonify, request
-from flask_security import current_user
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank,
@@ -69,7 +68,7 @@ def _record_changes(pilot, old_data, user, changes_summary):
 
     if changes:
         PilotChangeLog.objects.insert(changes)
-        logger.info('记录主播变更：%s，共%d个字段', pilot.nickname, len(changes))
+        logger.info('记录主播变更：%s, %s，共%d个字段', changes_summary, pilot.nickname, len(changes))
 
 
 def _has_enum_value(enum_class, value):
@@ -345,8 +344,8 @@ def create_pilot():
         pilot.created_at = pilot.updated_at = get_current_utc_time()
         pilot.save()
 
-        # 记录变更日志（使用JWT用户或current_user）
-        log_user = get_jwt_user() or current_user
+        # 记录变更日志
+        log_user = get_jwt_user()
         create_log = PilotChangeLog(pilot_id=pilot,
                                     user_id=log_user,
                                     field_name='status',
@@ -436,7 +435,7 @@ def update_pilot(pilot_id):
         # 保存并记录变更
         pilot.updated_at = get_current_utc_time()
         pilot.save()
-        _record_changes(pilot, old_data, get_jwt_user() or current_user, '主播信息更新')
+        _record_changes(pilot, old_data, get_jwt_user(), '主播信息更新')
 
         logger.info('更新主播成功：%s', pilot.nickname)
         serializer_data = serialize_pilot(pilot)
@@ -486,7 +485,7 @@ def update_pilot_status(pilot_id):
 
         # 记录变更日志
         change_log = PilotChangeLog(pilot_id=pilot,
-                                    user_id=get_jwt_user() or current_user,
+                                    user_id=get_jwt_user(),
                                     field_name='status',
                                     old_value=str(old_status) if old_status else '',
                                     new_value=str(new_status),
@@ -656,7 +655,7 @@ def get_pilot_performance(pilot_id):
 def export_pilots():
     """导出主播数据"""
     jwt_user = get_jwt_user()
-    logger.info('%s 请求导出主播数据', jwt_user.username if jwt_user else current_user.username)
+    logger.info('%s 请求导出主播数据', jwt_user.username if jwt_user else 'Unknown')
 
     try:
         # 获取筛选参数（复用列表接口的筛选逻辑）

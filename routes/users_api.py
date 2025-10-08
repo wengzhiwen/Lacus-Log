@@ -1,14 +1,16 @@
 # pylint: disable=no-member
 
 from flask import Blueprint, jsonify, request
-from flask_security import roles_required, roles_accepted
 from flask_security.utils import hash_password
 from mongoengine import DoesNotExist, ValidationError
 
 from models.user import Role, User
 from utils.csrf_helper import CSRFError, validate_csrf_header
+from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
-from utils.user_serializers import (serialize_user, serialize_user_list, create_success_response, create_error_response)
+from utils.user_serializers import (create_error_response,
+                                    create_success_response, serialize_user,
+                                    serialize_user_list)
 
 logger = get_logger('admin')
 
@@ -26,7 +28,7 @@ def safe_strip(value):
 
 
 @users_api_bp.route('/api/users', methods=['GET'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def get_users():
     """获取用户列表。
     
@@ -77,7 +79,7 @@ def get_users():
 
 
 @users_api_bp.route('/api/users/<user_id>', methods=['GET'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def get_user(user_id: str):
     """获取用户详情。"""
     try:
@@ -93,7 +95,7 @@ def get_user(user_id: str):
 
 
 @users_api_bp.route('/api/users', methods=['POST'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def create_user():
     """创建运营账户。"""
     try:
@@ -155,7 +157,7 @@ def create_user():
 
 
 @users_api_bp.route('/api/users/<user_id>', methods=['PUT'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def update_user(user_id: str):
     """更新用户信息。"""
     try:
@@ -211,7 +213,7 @@ def update_user(user_id: str):
 
 
 @users_api_bp.route('/api/users/<user_id>/activation', methods=['PATCH'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def toggle_user_activation(user_id: str):
     """切换用户激活状态。"""
     try:
@@ -253,7 +255,7 @@ def toggle_user_activation(user_id: str):
 
 
 @users_api_bp.route('/api/users/<user_id>/reset-password', methods=['POST'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def reset_user_password(user_id: str):
     """重置用户密码。"""
     try:
@@ -285,7 +287,7 @@ def reset_user_password(user_id: str):
 
 
 @users_api_bp.route('/api/users/operators', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho')
 def get_operators():
     """获取运营和管理员列表（用于下拉选择等）
     
@@ -329,7 +331,7 @@ def get_operators():
 
 
 @users_api_bp.route('/api/users/emails', methods=['GET'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def get_user_emails():
     """查询角色可用邮箱。"""
     try:
@@ -348,7 +350,7 @@ def get_user_emails():
 
 
 @users_api_bp.route('/api/auth/csrf', methods=['GET'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def get_csrf_token():
     """获取CSRF令牌。"""
     try:
@@ -364,7 +366,7 @@ def get_csrf_token():
 
 
 @users_api_bp.route('/api/errors/frontend', methods=['POST'])
-@roles_required('gicho')
+@jwt_roles_required('gicho')
 def log_frontend_error():
     """记录前端错误到后端日志。"""
     try:

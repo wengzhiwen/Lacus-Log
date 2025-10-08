@@ -3,6 +3,7 @@
 提供登录、登出、token 刷新、CSRF token 获取等接口。
 """
 from flask import Blueprint, jsonify, make_response, request
+from flask_login import logout_user as flask_logout_user
 from flask_jwt_extended import (create_access_token, create_refresh_token, get_jwt_identity, jwt_required, set_access_cookies, set_refresh_cookies,
                                 unset_jwt_cookies)
 from flask_wtf.csrf import generate_csrf
@@ -88,6 +89,12 @@ def login():
     user.login_count = (user.login_count or 0) + 1
     user.save()
 
+    # 建立 Flask-Security-Too Session（让 @login_required 能识别）
+    from flask_login import login_user
+    # REST 登录不强制长记住，避免产生 remember_token 导致 /login 自动认为已登录
+    login_user(user, remember=False)
+    logger.debug('已为用户建立Flask-Security Session（remember=False）：username=%s', username)
+
     # 创建 JWT token（直接传User对象，JWT回调会提取fs_uniquifier）
     access_token = create_access_token(identity=user)
     refresh_token = create_refresh_token(identity=user)
@@ -114,7 +121,7 @@ def login():
     # 设置 CSRF cookie（非 httpOnly，供前端读取）
     response.set_cookie('csrf_token', csrf_token, httponly=False, secure=request.is_secure, samesite='Lax')
 
-    logger.info('用户登录成功（REST API）：username=%s，IP=%s', username, request.remote_addr)
+    logger.info('用户登录成功（REST API + Session）：username=%s，IP=%s', username, request.remote_addr)
     return response
 
 
@@ -221,3 +228,44 @@ def get_current_user():
     }
 
     return jsonify(create_success_response(data={'user': user_data}))
+
+
+@auth_api_bp.route('/logout-with-jwt', methods=['GET'])
+def logout_with_jwt():
+    """传统页面的登出（GET方法）
+    
+    清除JWT Cookie并重定向到登录页。
+    这个路由用于替代Flask-Security-Too的默认logout路由。
+    """
+    from flask import redirect, url_for, session
+    
+    response = make_response(redirect(url_for('security.login')))
+    
+    # 先登出 Flask-Login / Flask-Security 会话
+    try:
+        flask_logout_user()
+    except Exception:  # pylint: disable=broad-except
+        pass
+
+    # 清理服务端会话内容（防止已登录状态导致/login跳回首页）
+    try:
+        session.clear()
+    except Exception:  # pylint: disable=broad-except
+        pass
+
+    # 清除所有JWT相关的cookie
+    unset_jwt_cookies(response)
+    
+    # 同步清除 Flask-Login/Flask-Security 相关Cookie（浏览器侧）
+    try:
+        # 删除 remember_token / session 等浏览器端 Cookie
+        response.set_cookie('remember_token', '', expires=0)
+        response.set_cookie('session', '', expires=0)
+    except Exception:  # pylint: disable=broad-except
+        pass
+
+    # 同时清除CSRF token cookie
+    response.set_cookie('csrf_token', '', expires=0)
+    
+    logger.info('用户登出（传统页面）：IP=%s', request.remote_addr)
+    return response
