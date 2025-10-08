@@ -8,7 +8,6 @@ from decimal import Decimal
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, request, url_for
-from flask_login import login_required
 from flask_security import current_user, roles_accepted
 from mongoengine import DoesNotExist
 
@@ -17,17 +16,14 @@ from models.battle_area import Availability, BattleArea
 from models.battle_record import BattleRecord, BattleRecordChangeLog
 from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
-from routes.battle_record import (log_battle_record_change,
-                                  validate_notes_required)
-from utils.announcement_serializers import (create_error_response,
-                                            create_success_response)
+from routes.battle_record import (log_battle_record_change, validate_notes_required)
+from utils.announcement_serializers import (create_error_response, create_success_response)
 from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.james_alert import trigger_james_alert_if_needed
 from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('battle_records_api')
 
@@ -341,7 +337,6 @@ def _get_client_ip() -> str:
 
 
 @battle_records_api_bp.route('/battle-records', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def list_records():
     """获取开播记录列表。"""
@@ -385,7 +380,6 @@ def list_records():
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def get_record(record_id: str):
     """获取指定开播记录详情。"""
@@ -401,7 +395,6 @@ def get_record(record_id: str):
 
 
 @battle_records_api_bp.route('/battle-records', methods=['POST'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def create_record():
     """创建开播记录。"""
@@ -493,7 +486,6 @@ def create_record():
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>', methods=['PUT'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def update_record(record_id: str):
     """更新开播记录。"""
@@ -585,7 +577,6 @@ def update_record(record_id: str):
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>', methods=['DELETE'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def delete_record(record_id: str):
     """删除开播记录。"""
@@ -608,7 +599,6 @@ def delete_record(record_id: str):
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>/changes', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def record_changes(record_id: str):
     """获取开播记录变更日志。"""
@@ -625,7 +615,6 @@ def record_changes(record_id: str):
 
 
 @battle_records_api_bp.route('/pilot-filters', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def pilot_filters():
     """获取主播筛选器数据。"""
@@ -659,7 +648,6 @@ def pilot_filters():
 
 
 @battle_records_api_bp.route('/pilots-filtered', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def pilots_filtered():
     """按筛选条件获取主播列表。"""
@@ -735,7 +723,6 @@ def pilots_filtered():
 
 
 @battle_records_api_bp.route('/battle-areas', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def battle_areas():
     """获取开播地点三联数据。"""
@@ -763,7 +750,6 @@ def battle_areas():
 
 
 @battle_records_api_bp.route('/announcements/<announcement_id>', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def announcement_detail(announcement_id: str):
     """获取通告详情用于预填。"""
@@ -797,7 +783,6 @@ def announcement_detail(announcement_id: str):
 
 
 @battle_records_api_bp.route('/related-announcements', methods=['GET'])
-@login_required
 @jwt_roles_accepted('gicho', 'kancho')
 def related_announcements():
     """根据主播获取昨天/今天/明天的通告列表。"""
