@@ -114,10 +114,22 @@ def create_user():
         password = safe_strip(data.get('password'))
         nickname = safe_strip(data.get('nickname'))
         email = safe_strip(data.get('email'))
+        role = safe_strip(data.get('role'))
 
         # 验证必需字段
-        if not username or not password:
-            return jsonify(create_error_response('MISSING_FIELDS', '用户名与密码为必填项')), 400
+        if not username or not password or not role:
+            return jsonify(create_error_response('MISSING_FIELDS', '用户名、密码与角色为必填项')), 400
+
+        # 验证角色
+        # 验证角色是否有效
+        valid_roles = ['gicho', 'kancho']
+        if role not in valid_roles:
+            return jsonify(create_error_response('INVALID_ROLE', f'无效的角色: {role}，有效角色为: {", ".join(valid_roles)}')), 400
+
+        # 获取指定角色
+        target_role = Role.objects(name=role).first()
+        if not target_role:
+            return jsonify(create_error_response('ROLE_NOT_FOUND', f'角色 {role} 不存在')), 500
 
         # 验证用户名长度
         if len(username) < 3 or len(username) > 20:
@@ -135,13 +147,8 @@ def create_user():
         if User.objects(username=username).first():
             return jsonify(create_error_response('USERNAME_EXISTS', '该用户名已存在')), 409
 
-        # 获取运营角色
-        kancho_role = Role.objects(name='kancho').first()
-        if not kancho_role:
-            return jsonify(create_error_response('ROLE_NOT_FOUND', '系统缺少角色：运营')), 500
-
         # 创建用户
-        user = User(username=username, nickname=nickname, password=hash_password(password), email=email or None, roles=[kancho_role], active=True)
+        user = User(username=username, nickname=nickname, password=hash_password(password), email=email or None, roles=[target_role], active=True)
         user.save()
 
         logger.info('管理员创建运营：%s', username)
@@ -153,6 +160,40 @@ def create_user():
         return jsonify(create_error_response('VALIDATION_ERROR', '数据验证失败')), 400
     except Exception as e:
         logger.error('创建用户失败: %s', str(e))
+        return jsonify(create_error_response('INTERNAL_ERROR', '服务器内部错误')), 500
+
+
+@users_api_bp.route('/api/users/<user_id>', methods=['DELETE'])
+@jwt_roles_required('gicho')
+def delete_user(user_id: str):
+    """删除用户。"""
+    try:
+        # 验证CSRF令牌
+        try:
+            validate_csrf_header()
+        except CSRFError as exc:
+            return jsonify(create_error_response(exc.code, exc.message)), 401
+
+        user = User.objects.get(id=user_id)
+
+        # 检查是否尝试删除最后一个管理员
+        if user.has_role('gicho'):
+            gicho_role = Role.objects(name='gicho').first()
+            active_gicho_count = User.objects(roles=gicho_role, active=True).count()
+            if active_gicho_count <= 1:
+                return jsonify(create_error_response('CANNOT_DELETE_LAST_ADMIN', '不能删除最后一个管理员')), 409
+
+        username = user.username
+        user.delete()
+
+        logger.info('删除用户：%s', username)
+        data = {'message': f'用户 {username} 已删除'}
+        return jsonify(create_success_response(data))
+
+    except DoesNotExist:
+        return jsonify(create_error_response('USER_NOT_FOUND', '用户不存在')), 404
+    except Exception as e:
+        logger.error('删除用户失败: %s', str(e))
         return jsonify(create_error_response('INTERNAL_ERROR', '服务器内部错误')), 500
 
 

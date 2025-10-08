@@ -101,7 +101,6 @@ class TestUserCreate:
         # 清理
         admin_client.delete(f"/api/users/{user_id}")
 
-    @pytest.mark.skip(reason="API缺少输入验证逻辑 - 待修复")
     def test_create_user_missing_required_fields(self, admin_client):
         """测试缺少必需字段 - 应失败"""
         # 缺少username
@@ -116,7 +115,6 @@ class TestUserCreate:
         response = admin_client.post('/api/users', json={'username': user_factory.generate_username(), 'password': '123456'})
         assert response['success'] is False
 
-    @pytest.mark.skip(reason="API缺少角色验证逻辑 - 待修复")
     def test_create_user_invalid_role(self, admin_client):
         """测试无效角色 - 应失败"""
         user_data = user_factory.create_user_data(role='invalid_role')
@@ -317,7 +315,6 @@ class TestUserEmails:
 class TestUserWorkflow:
     """测试用户管理完整工作流"""
 
-    @pytest.mark.skip(reason="停用后的登录测试存在session缓存问题 - 待优化")
     def test_complete_user_lifecycle(self, admin_client):
         """测试完整的用户生命周期：创建->查询->更新->停用->激活->删除"""
         # 1. 创建用户
@@ -344,9 +341,12 @@ class TestUserWorkflow:
 
         # 5. 验证停用后用户无法登录
         from tests.fixtures.api_client import ApiClient
-        test_client = ApiClient(admin_client.base_url, client=admin_client.client)
-        login_response = test_client.login(user_data['username'], user_data['password'])
-        assert login_response['success'] is False
+        from app import create_app
+        app = create_app()
+        with app.test_client() as fresh_client:
+            test_client = ApiClient(admin_client.base_url, client=fresh_client)
+            login_response = test_client.login(user_data['username'], user_data['password'])
+            assert login_response['success'] is False
 
         # 6. 重新激活用户
         activate_response = admin_client.patch(f'/api/users/{user_id}/activation', json={'active': True})
@@ -354,8 +354,10 @@ class TestUserWorkflow:
         assert activate_response['data']['active'] is True
 
         # 7. 验证激活后可以登录
-        login_response2 = test_client.login(user_data['username'], user_data['password'])
-        assert login_response2['success'] is True
+        with app.test_client() as another_fresh_client:
+            activated_test_client = ApiClient(admin_client.base_url, client=another_fresh_client)
+            login_response2 = activated_test_client.login(user_data['username'], user_data['password'])
+            assert login_response2['success'] is True
 
         # 8. 删除用户
         delete_response = admin_client.delete(f'/api/users/{user_id}')
