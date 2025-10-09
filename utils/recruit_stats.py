@@ -377,48 +377,17 @@ def get_recruit_monthly_detail_records(recruiter_id: str = None) -> list:
     if recruiter_id and recruiter_id != 'all':
         base_query['recruiter'] = recruiter_id
 
-    # 获取所有相关的招募记录（按决策时间筛选，与统计逻辑一致）
-    recruit_records = []
+    # 查询窗口内创建的所有招募记录（包含所有状态的招募）
+    # 这样可以确保展示完整的招募流程，即使某些历史数据缺少中间决策时间
+    base_query.update({'created_at__gte': start_utc, 'created_at__lte': end_utc})
 
-    # 1. 约面记录：窗口内创建的招募
-    appointments_query = {**base_query, 'created_at__gte': start_utc, 'created_at__lte': end_utc}
-    for recruit in Recruit.objects.filter(**appointments_query):
-        recruit_records.append({'recruit': recruit, 'metric': 'appointments'})
-
-    # 2. 到面记录：窗口内面试决策的招募
-    interviews_query = Q(**base_query) & (Q(interview_decision_time__gte=start_utc, interview_decision_time__lte=end_utc)
-                                          | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lte=end_utc))
-    for recruit in Recruit.objects.filter(interviews_query):
-        # 避免重复添加
-        if not any(r['recruit'].id == recruit.id for r in recruit_records):
-            recruit_records.append({'recruit': recruit, 'metric': 'interviews'})
-
-    # 3. 试播记录：窗口内试播决策的招募
-    trials_query = Q(**base_query) & (Q(training_decision_time__gte=start_utc, training_decision_time__lte=end_utc)
-                                      | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lte=end_utc))
-    for recruit in Recruit.objects.filter(trials_query):
-        # 避免重复添加
-        if not any(r['recruit'].id == recruit.id for r in recruit_records):
-            recruit_records.append({'recruit': recruit, 'metric': 'trials'})
-
-    # 4. 新开播记录：窗口内开播决策的招募
-    new_recruits_query = Q(**base_query) & (
-        Q(broadcast_decision_time__gte=start_utc,
-          broadcast_decision_time__lte=end_utc,
-          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
-        | Q(final_decision_time__gte=start_utc, final_decision_time__lte=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
-    for recruit in Recruit.objects.filter(new_recruits_query):
-        # 避免重复添加
-        if not any(r['recruit'].id == recruit.id for r in recruit_records):
-            recruit_records.append({'recruit': recruit, 'metric': 'new_recruit'})
+    recruits = Recruit.objects.filter(**base_query).order_by('-created_at')
 
     # 为每个招募记录计算开播天数
     recruit_list = []
     processed_ids = set()  # 避免重复处理同一个招募记录
 
-    for recruit_data in recruit_records:
-        recruit = recruit_data['recruit']
-
+    for recruit in recruits:
         if recruit.id in processed_ids or not recruit.pilot:
             processed_ids.add(recruit.id)
             continue
@@ -441,13 +410,7 @@ def get_recruit_monthly_detail_records(recruiter_id: str = None) -> list:
             if local_start:
                 unique_dates.add(local_start.date())
 
-        recruit_dict = {
-            'recruit': recruit,
-            'broadcast_days': len(unique_dates),
-            'long_sessions_count': long_sessions_count,
-            'last_broadcast_time': None,
-            'metric': recruit_data['metric']  # 记录这个招募属于哪个指标
-        }
+        recruit_dict = {'recruit': recruit, 'broadcast_days': len(unique_dates), 'long_sessions_count': long_sessions_count, 'last_broadcast_time': None}
 
         # 获取最近一次开播时间
         if battle_records:
