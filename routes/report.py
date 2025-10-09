@@ -13,12 +13,10 @@ from models.announcement import Announcement
 from models.battle_record import BattleRecord
 from models.pilot import Pilot, Rank, Status, WorkMode
 from utils.cache_helper import cached_monthly_report
-from utils.commission_helper import (calculate_commission_amounts,
-                                     get_pilot_commission_rate_for_date)
+from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
 from utils.recruit_stats import calculate_recruit_today_stats
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('report')
 
@@ -321,16 +319,22 @@ def get_battle_records_for_date_range(start_local_date, end_local_date, owner_id
         owner_id: 直属运营ID，'all' 或 None 表示不过滤
         mode: 开播方式筛选（'all' | 'online' | 'offline'），默认'all'
     """
+    # 标准化参数：将 'all' 统一转换为 None
+    if owner_id == 'all':
+        owner_id = None
+    if mode == 'all':
+        mode = None
+
     start_utc = local_to_utc(start_local_date)
     end_utc = local_to_utc(end_local_date)
 
     records = BattleRecord.objects.filter(start_time__gte=start_utc, start_time__lt=end_utc)
 
-    if (owner_id and owner_id != 'all') or (mode and mode != 'all'):
+    if owner_id is not None or mode is not None:
         from models.user import User
         try:
             owner_user = None
-            if owner_id and owner_id != 'all':
+            if owner_id is not None:
                 owner_user = User.objects.get(id=owner_id)
 
             # 规则：以筛选范围内“每位主播最后一次开播记录”的运营与开播方式为准，
@@ -352,9 +356,9 @@ def get_battle_records_for_date_range(start_local_date, end_local_date, owner_id
 
                 # 校验 mode 条件
                 mode_ok = True
-                if mode and mode != 'all':
+                if mode is not None:
                     target_mode = WorkMode.ONLINE if mode == 'online' else WorkMode.OFFLINE
-                    mode_ok = (last_rec.work_mode == target_mode)
+                    mode_ok = last_rec.work_mode == target_mode
 
                 if owner_ok and mode_ok:
                     filtered_records.extend(rec_list)
