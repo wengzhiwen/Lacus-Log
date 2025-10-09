@@ -11,15 +11,18 @@ from mongoengine import Q
 
 from models.battle_record import BattleRecord
 from models.recruit import BroadcastDecision, FinalDecision, Recruit
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 from utils.logging_setup import get_logger
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 # 设置日志器
 logger = get_logger('recruit_stats')
 
 
 def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recruiter_id: str = None) -> Dict[str, int]:
-    """计算指定时间范围内的招募统计数据
+    """计算指定时间范围内的招募统计数据（用于招募日报）
+    
+    日报口径：按决策发生时间统计
     
     Args:
         start_utc: 开始时间（UTC）
@@ -40,12 +43,12 @@ def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recru
                                           | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     interviews = Recruit.objects.filter(interviews_query).count()
 
+    # 日报：试播数 = 当天发生试播决策的招募数量
     trials_query = Q(**base_query) & (Q(training_decision_time__gte=start_utc, training_decision_time__lt=end_utc)
                                       | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     trials = Recruit.objects.filter(trials_query).count()
 
-    # 查询窗口内所有招募记录中，其招募决策为正式主播或实习主播的
-    # 这样不论招募经历了什么中间状态，只要最终被决定招募就计入新开播数
+    # 日报：新开播数 = 当天做出开播决策且决策为正式/实习主播的数量
     new_recruits_query = Q(**base_query) & (
         Q(broadcast_decision_time__gte=start_utc,
           broadcast_decision_time__lt=end_utc,
@@ -56,17 +59,66 @@ def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recru
     new_recruits_count = 0
     processed_pilots = set()  # 避免重复统计同一主播
 
-    logger.info(f"新开播数计算：查询到 {recruits.count()} 条招募记录")
+    logger.debug(f"新开播数计算：查询到 {recruits.count()} 条招募记录")
 
     for recruit in recruits:
         if recruit.pilot and recruit.pilot.id not in processed_pilots:
             processed_pilots.add(recruit.pilot.id)
-
-            # 调试日志：记录每个主播的信息
-            logger.info(f"✓ {recruit.pilot.nickname} (ID: {recruit.pilot.id}) 被计入新开播数")
+            logger.debug(f"✓ {recruit.pilot.nickname} (ID: {recruit.pilot.id}) 被计入新开播数")
             new_recruits_count += 1
 
-    logger.info(f"新开播数计算完成，总计: {new_recruits_count}")
+    logger.debug(f"新开播数计算完成，总计: {new_recruits_count}")
+    return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits_count}
+
+
+def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: datetime, recruiter_id: str = None) -> Dict[str, int]:
+    """计算指定时间范围内的招募统计数据（用于招募月报）
+    
+    月报口径：按招募创建时间统计
+    
+    Args:
+        start_utc: 开始时间（UTC）
+        end_utc: 结束时间（UTC）
+        recruiter_id: 招募负责人ID，为None时统计全部
+        
+    Returns:
+        dict: 包含约面、到面、试播、新开播的统计数据
+    """
+    base_query = {}
+    if recruiter_id and recruiter_id != 'all':
+        base_query['recruiter'] = recruiter_id
+
+    appointments_query = {**base_query, 'created_at__gte': start_utc, 'created_at__lt': end_utc}
+    appointments = Recruit.objects.filter(**appointments_query).count()
+
+    # 月报：到面数仍按面试决策时间统计（保持不变）
+    interviews_query = Q(**base_query) & (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
+                                          | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
+    interviews = Recruit.objects.filter(interviews_query).count()
+
+    # 月报：试播数 = 窗口内创建的招募记录中，有过试播决策（不论结果）的招募记录数
+    trials_query = Q(**base_query) & Q(created_at__gte=start_utc, created_at__lt=end_utc) & (Q(training_decision_time__exists=True)
+                                                                                             | Q(training_decision_time_old__exists=True))
+    trials = Recruit.objects.filter(trials_query).count()
+
+    # 月报：新开播数 = 窗口内创建的招募记录中，当前状态为已结束且开播决策为正式/实习主播的招募记录数
+    new_recruits_query = Q(**base_query) & Q(created_at__gte=start_utc, created_at__lt=end_utc) & (
+        Q(broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
+        | Q(final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
+    recruits = Recruit.objects.filter(new_recruits_query)
+
+    new_recruits_count = 0
+    processed_pilots = set()  # 避免重复统计同一主播
+
+    logger.debug(f"新开播数计算（月报口径）：查询到 {recruits.count()} 条招募记录")
+
+    for recruit in recruits:
+        if recruit.pilot and recruit.pilot.id not in processed_pilots:
+            processed_pilots.add(recruit.pilot.id)
+            logger.debug(f"✓ {recruit.pilot.nickname} (ID: {recruit.pilot.id}) 被计入新开播数")
+            new_recruits_count += 1
+
+    logger.debug(f"新开播数计算完成（月报口径），总计: {new_recruits_count}")
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits_count}
 
 
@@ -228,11 +280,11 @@ def calculate_recruit_monthly_stats(recruiter_id: str = None) -> Dict[str, Any]:
     previous_start_utc = local_to_utc(previous_window_start)
     previous_end_utc = local_to_utc(previous_window_end)
 
-    # 计算当期统计数据
-    current_stats = calculate_recruit_period_stats(current_start_utc, current_end_utc, recruiter_id)
+    # 计算当期统计数据（使用月报口径：按创建时间统计）
+    current_stats = calculate_recruit_period_stats_by_created_at(current_start_utc, current_end_utc, recruiter_id)
 
-    # 计算上期统计数据
-    previous_stats = calculate_recruit_period_stats(previous_start_utc, previous_end_utc, recruiter_id)
+    # 计算上期统计数据（使用月报口径：按创建时间统计）
+    previous_stats = calculate_recruit_period_stats_by_created_at(previous_start_utc, previous_end_utc, recruiter_id)
 
     # 计算满7天数（需要特殊处理）
     current_full_7_days = calculate_full_7_days_recruits(current_start_utc, current_end_utc, recruiter_id)
@@ -264,6 +316,8 @@ def calculate_recruit_monthly_stats(recruiter_id: str = None) -> Dict[str, Any]:
 
 def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recruiter_id: str = None) -> int:
     """计算满7天的主播数量
+    
+    满7天数 = 筛选时间内创建的招募记录中，对应主播有7条及以上6小时及以上的开播记录的招募记录数
 
     Args:
         start_utc: 开始时间（UTC）
@@ -273,18 +327,13 @@ def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recru
     Returns:
         int: 满7天的主播数量
     """
-    # 查找窗口内被决定招募的主播（与新开播数相同的逻辑）
     base_query = {}
     if recruiter_id and recruiter_id != 'all':
         base_query['recruiter'] = recruiter_id
 
-    # 查询窗口内被决定招募的主播
-    new_recruits_query = Q(**base_query) & (
-        Q(broadcast_decision_time__gte=start_utc,
-          broadcast_decision_time__lt=end_utc,
-          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
-        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
-    recruits = Recruit.objects.filter(new_recruits_query)
+    # 查询窗口内创建的招募记录
+    created_recruits_query = Q(**base_query) & Q(created_at__gte=start_utc, created_at__lt=end_utc)
+    recruits = Recruit.objects.filter(created_recruits_query)
 
     full_7_days_count = 0
     processed_pilots = set()  # 避免重复统计同一主播
@@ -293,13 +342,13 @@ def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recru
         if recruit.pilot and recruit.pilot.id not in processed_pilots:
             processed_pilots.add(recruit.pilot.id)
 
-            # 检查该主播在滚动窗口内的开播记录
-            battle_records = BattleRecord.objects.filter(pilot=recruit.pilot, start_time__gte=start_utc, start_time__lte=end_utc)
+            # 检查该主播是否有7条或以上6小时及以上的开播记录（不限时间范围）
+            battle_records = BattleRecord.objects.filter(pilot=recruit.pilot)
 
             # 计算超过6小时的开播记录数
             long_sessions_count = 0
             for record in battle_records:
-                if record.duration_hours and record.duration_hours > 6:
+                if record.duration_hours and record.duration_hours >= 6:
                     long_sessions_count += 1
 
             # 如果有7条或以上超过6小时的开播记录，计入满7天数
