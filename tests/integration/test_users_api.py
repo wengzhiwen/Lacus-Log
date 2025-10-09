@@ -84,6 +84,21 @@ class TestUserCreate:
         # 清理
         admin_client.delete(f"/api/users/{created_user['id']}")
 
+    def test_create_user_without_role_defaults_to_kancho(self, admin_client):
+        """测试不提供角色时默认为kancho"""
+        user_data = {'username': user_factory.generate_username(), 'password': user_factory.generate_password()}
+
+        response = admin_client.post('/api/users', json=user_data)
+
+        assert response['success'] is True
+        created_user = response['data']
+        assert created_user['username'] == user_data['username']
+        # 验证默认角色是kancho
+        assert 'kancho' in created_user['roles']
+
+        # 清理
+        admin_client.delete(f"/api/users/{created_user['id']}")
+
     def test_create_user_duplicate_username(self, admin_client):
         """测试创建重复用户名 - 应失败"""
         user_data = user_factory.create_user_data()
@@ -111,9 +126,15 @@ class TestUserCreate:
         response = admin_client.post('/api/users', json={'username': user_factory.generate_username(), 'role': 'kancho'})
         assert response['success'] is False
 
-        # 缺少role
+        # 缺少role（现在应该成功，自动默认为kancho）
         response = admin_client.post('/api/users', json={'username': user_factory.generate_username(), 'password': '123456'})
-        assert response['success'] is False
+        assert response['success'] is True
+        created_user = response['data']
+        # 验证默认角色是kancho
+        assert 'kancho' in created_user['roles']
+
+        # 清理
+        admin_client.delete(f"/api/users/{created_user['id']}")
 
     def test_create_user_invalid_role(self, admin_client):
         """测试无效角色 - 应失败"""

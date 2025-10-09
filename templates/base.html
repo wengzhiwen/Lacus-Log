@@ -53,10 +53,34 @@
 
       if (typeof window.handle401 !== 'function') {
         let handling401Early = false;
-        window.handle401 = function() {
+        window.handle401 = async function() {
           if (handling401Early) return;
           handling401Early = true;
-          window.showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+          
+          console.log('早期401处理：尝试自动刷新Token...');
+          
+          try {
+            const response = await fetch('/api/auth/refresh', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              console.log('早期Token刷新成功');
+              window.showMessage('登录状态已自动恢复', 'success', 3000);
+            } else {
+              console.error('早期Token刷新失败:', response.status);
+              window.showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+            }
+          } catch (error) {
+            console.error('早期Token刷新请求失败:', error);
+            window.showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+          }
+          
+          handling401Early = false;
         };
       }
     })();
@@ -223,14 +247,87 @@
       window.__pendingMessages = [];
     } catch (_) { /* 忽略 */ }
     
-    // 全局401未认证处理（显示错误信息，不自动跳转）
+    // 全局401未认证处理（自动刷新Token并重试请求）
     (function() {
-      let handling401 = false;
-      window.handle401 = function() {
-        if (handling401) return;
-        handling401 = true;
-        console.error('检测到401未认证，需要重新登录');
-        showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+      let isRefreshing = false;
+      let refreshPromise = null;
+      
+      // 自动刷新Token函数
+      async function refreshToken() {
+        if (refreshPromise) {
+          return refreshPromise;
+        }
+        
+        if (isRefreshing) {
+          return false;
+        }
+        
+        isRefreshing = true;
+        console.log('开始刷新Token...');
+        
+        refreshPromise = fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }).then(response => {
+          if (response.ok) {
+            console.log('Token刷新成功');
+            return true;
+          } else {
+            console.error('Token刷新失败:', response.status);
+            return false;
+          }
+        }).catch(error => {
+          console.error('Token刷新请求失败:', error);
+          return false;
+        }).finally(() => {
+          isRefreshing = false;
+          refreshPromise = null;
+        });
+        
+        return refreshPromise;
+      }
+      
+      // 兼容旧代码的handle401函数（仅提示，不自动重试）
+      window.handle401 = async function() {
+        console.log('检测到401未认证，尝试自动刷新Token...');
+        
+        const refreshSuccess = await refreshToken();
+        
+        if (refreshSuccess) {
+          console.log('Token刷新成功，请重试操作');
+          showMessage('登录状态已恢复，请重试刚才的操作', 'info', 5000);
+        } else {
+          console.error('Token刷新失败，需要重新登录');
+          showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+        }
+      };
+      
+      // 增强fetch函数，自动处理401并重试
+      const originalFetch = window.fetch;
+      window.fetch = async function(...args) {
+        const response = await originalFetch.apply(this, args);
+        
+        // 如果是401且不是刷新接口本身，尝试刷新并重试
+        if (response.status === 401 && !args[0].includes('/api/auth/refresh')) {
+          console.log('请求返回401，尝试刷新Token并重试...');
+          
+          const refreshSuccess = await refreshToken();
+          
+          if (refreshSuccess) {
+            console.log('Token刷新成功，重试原请求...');
+            // 刷新成功，重试原请求
+            return originalFetch.apply(this, args);
+          } else {
+            console.error('Token刷新失败，显示登录过期提示');
+            showMessage('登录已过期，请<a href="/logout-with-jwt" style="color: white; text-decoration: underline; font-weight: bold;">点击这里登出并重新登录</a>', 'error', 0);
+            return response;
+          }
+        }
+        
+        return response;
       };
     })();
     

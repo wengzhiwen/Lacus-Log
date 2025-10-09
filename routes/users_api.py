@@ -7,9 +7,7 @@ from mongoengine import DoesNotExist, ValidationError
 from models.user import Role, User
 from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
 from utils.logging_setup import get_logger
-from utils.user_serializers import (create_error_response,
-                                    create_success_response, serialize_user,
-                                    serialize_user_list)
+from utils.user_serializers import (create_error_response, create_success_response, serialize_user, serialize_user_list)
 
 logger = get_logger('admin')
 
@@ -109,9 +107,13 @@ def create_user():
         email = safe_strip(data.get('email'))
         role = safe_strip(data.get('role'))
 
+        # 如果前端未提供角色，默认设置为运营（kancho）
+        if not role:
+            role = 'kancho'
+
         # 验证必需字段
-        if not username or not password or not role:
-            return jsonify(create_error_response('MISSING_FIELDS', '用户名、密码与角色为必填项')), 400
+        if not username or not password:
+            return jsonify(create_error_response('MISSING_FIELDS', '用户名与密码为必填项')), 400
 
         # 验证角色
         # 验证角色是否有效
@@ -356,22 +358,6 @@ def get_user_emails():
 
     except Exception as e:
         logger.error('获取用户邮箱失败: %s', str(e))
-        return jsonify(create_error_response('INTERNAL_ERROR', '服务器内部错误')), 500
-
-
-@users_api_bp.route('/api/auth/csrf', methods=['GET'])
-@jwt_roles_required('gicho')
-def get_csrf_token():
-    """获取CSRF令牌。"""
-    try:
-        from flask_wtf.csrf import generate_csrf
-        token = generate_csrf()
-
-        data = {'token': token}
-        return jsonify(create_success_response(data))
-
-    except Exception as e:
-        logger.error('获取CSRF令牌失败: %s', str(e))
         return jsonify(create_error_response('INTERNAL_ERROR', '服务器内部错误')), 500
 
 

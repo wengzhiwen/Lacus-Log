@@ -1,6 +1,15 @@
 # 最新的更新内容
 > 以下所有日期为更新发生时的系统GMT+8时间
 
+## 2025-10-09 修复：
+- **修复用户创建API默认角色问题**：修复REST化后用户创建时要求必须提供角色字段的问题：
+- **实现前端自动Token刷新与请求重试机制**：修复生产环境中Token过期后需要重新登录的问题：
+
+## 2025-10-09 重构：
+- **完全移除CSRF残留代码，实现纯JWT认证架构**：彻底清理系统中所有CSRF相关的残留代码，完成向纯JWT认证的完整转向
+
+# 历史的更新内容
+
 ## 2025-10-08 修复：
 - **后端CSRF验证完全移除：API层完成JWT纯化**：从所有REST API中移除CSRF token验证逻辑：
   - **移除validate_csrf_header调用**：清理所有API路由中的CSRF验证代码块
@@ -28,8 +37,6 @@
   - **优化调试能力**：添加详细的控制台日志和认证状态检查，帮助诊断JWT token传递问题
   - **确认HTTP兼容性**：验证JWT_COOKIE_SECURE配置在开发环境中正确设置，支持HTTP协议
 现在系统完全基于JWT认证，前后端代码全面清理完成，架构统一简洁，不再有任何CSRF相关的代码和错误
-
-# 历史的更新内容
 
 ## 2025-10-07 修复：
 - 枚举值0判断错误的全面修复：修复系统中所有使用`if not value`判断枚举值/数值的逻辑错误，统一改为`if value is None or value == ''`精确判断空值。修复范围包括：try_enum函数（pilots_api.py和recruits_api.py）、_has_enum_value函数（pilots_api.py和recruits_api.py）、birth_year_str验证（recruits_api.py）。这个bug会导致值为0的枚举（如性别=男）被错误地视为空值而使用默认值

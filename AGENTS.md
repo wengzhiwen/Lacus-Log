@@ -126,15 +126,7 @@
 - 使用 Flask-JWT-Extended 进行 JWT 认证（Cookie + Header 双模式）
 - 使用 `@jwt_required()` 装饰器保护需要认证的接口
 - 使用 `@roles_required('role_name')` 进行角色权限控制
-- 所有需要修改数据的接口（POST/PUT/PATCH/DELETE）必须验证 CSRF token：
-  ```python
-  from utils.csrf_helper import validate_csrf_header, CSRFError
-  
-  try:
-      validate_csrf_header()
-  except CSRFError as exc:
-      return jsonify(create_error_response(exc.code, exc.message)), 401
-  ```
+- REST API使用JWT认证，无需额外的CSRF验证（已通过JWT装饰器保护）
 
 ### 路由命名规范
 

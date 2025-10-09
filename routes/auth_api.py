@@ -1,12 +1,11 @@
 """REST 认证 API。
 
-提供登录、登出、token 刷新、CSRF token 获取等接口。
+提供登录、登出、token 刷新等接口。
 """
 from flask import Blueprint, jsonify, make_response, request
 from flask_login import logout_user as flask_logout_user
 from flask_jwt_extended import (create_access_token, create_refresh_token, get_jwt_identity, jwt_required, set_access_cookies, set_refresh_cookies,
                                 unset_jwt_cookies)
-from flask_wtf.csrf import generate_csrf
 from mongoengine import DoesNotExist
 
 from models.user import User
@@ -47,16 +46,12 @@ def login():
                     "nickname": "管理员",
                     "roles": ["gicho"]
                 }
-            },
-            "meta": {
-                "csrf_token": "..."
             }
         }
     
     同时设置以下 cookie：
         - access_token_cookie (httpOnly)
         - refresh_token_cookie (httpOnly)
-        - csrf_token (非 httpOnly，供前端读取)
     """
     payload = request.get_json(silent=True) or {}
     username = payload.get('username', '').strip()
@@ -98,9 +93,6 @@ def login():
     access_token = create_access_token(identity=user)
     refresh_token = create_refresh_token(identity=user)
 
-    # 生成 CSRF token
-    csrf_token = generate_csrf()
-
     # 构造响应
     user_data = {
         'id': str(user.id),
@@ -109,16 +101,13 @@ def login():
         'roles': [role.name for role in user.roles],
     }
 
-    response_data = create_success_response(data={'access_token': access_token, 'user': user_data}, meta={'csrf_token': csrf_token})
+    response_data = create_success_response(data={'access_token': access_token, 'user': user_data})
 
     response = make_response(jsonify(response_data), 200)
 
     # 设置 JWT cookie（httpOnly，防止 XSS）
     set_access_cookies(response, access_token)
     set_refresh_cookies(response, refresh_token)
-
-    # 设置 CSRF cookie（非 httpOnly，供前端读取）
-    response.set_cookie('csrf_token', csrf_token, httponly=False, secure=request.is_secure, samesite='Lax')
 
     logger.info('用户登录成功（REST API + Session）：username=%s，IP=%s', username, request.remote_addr)
     return response
@@ -129,13 +118,12 @@ def login():
 def logout():
     """用户登出。
     
-    清除 JWT 和 CSRF cookie。
+    清除 JWT cookie。
     """
     response = make_response(jsonify(create_success_response(meta={'message': '登出成功'})), 200)
 
     # 清除所有认证相关的 cookie
     unset_jwt_cookies(response)
-    response.set_cookie('csrf_token', '', expires=0)
 
     identity = get_jwt_identity()
     logger.info('用户登出成功（REST API）：identity=%s，IP=%s', identity, request.remote_addr)
@@ -147,38 +135,19 @@ def logout():
 def refresh():
     """刷新 Access Token。
     
-    使用 Refresh Token 获取新的 Access Token 和 CSRF Token。
+    使用 Refresh Token 获取新的 Access Token。
     """
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
-    csrf_token = generate_csrf()
 
-    response_data = create_success_response(data={'access_token': access_token}, meta={'csrf_token': csrf_token})
+    response_data = create_success_response(data={'access_token': access_token})
 
     response = make_response(jsonify(response_data), 200)
 
     set_access_cookies(response, access_token)
 
-    response.set_cookie('csrf_token', csrf_token, httponly=False, secure=request.is_secure, samesite='Lax')
-
     logger.info('Token 刷新成功：identity=%s，IP=%s', identity, request.remote_addr)
     return response
-
-
-@auth_api_bp.route('/api/auth/csrf', methods=['GET'])
-def get_csrf_token():
-    """获取CSRF令牌（匿名访问）。
-    
-    响应：
-        {
-            "success": true,
-            "data": {
-                "csrf_token": "..."
-            }
-        }
-    """
-    csrf_token = generate_csrf()
-    return jsonify(create_success_response(data={'csrf_token': csrf_token}))
 
 
 @auth_api_bp.route('/api/auth/me', methods=['GET'])
@@ -252,9 +221,6 @@ def logout_with_jwt():
         response.set_cookie('session', '', expires=0)
     except Exception:  # pylint: disable=broad-except
         pass
-
-    # 同时清除CSRF token cookie
-    response.set_cookie('csrf_token', '', expires=0)
 
     logger.info('用户登出（传统页面）：IP=%s', request.remote_addr)
     return response

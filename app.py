@@ -67,7 +67,7 @@ def create_app() -> Flask:
         SECURITY_USERNAME_ENABLE=True,  # 启用用户名登录字段（需 bleach）
         SECURITY_EMAIL_REQUIRED=False,  # 不要求邮箱
         SECURITY_PASSWORD_HASH='pbkdf2_sha512',  # 避免对外部加密库的额外依赖
-        WTF_CSRF_ENABLED=True,
+        WTF_CSRF_ENABLED=False,  # 已禁用：REST API使用JWT认证，传统表单依赖Session+SameSite防护
         SECURITY_FLASH_MESSAGES=True,
         SECURITY_ROLES_ENABLED=True,  # 启用角色功能
         SECURITY_CHANGE_PASSWORD_TEMPLATE='security/change_password.html',
@@ -83,7 +83,7 @@ def create_app() -> Flask:
     # JWT 配置
     flask_app.config.update(
         JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', flask_app.config['SECRET_KEY']),
-        JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=2),  # Access Token 有效期 2 小时
+        JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=24),  # Access Token 有效期 24 小时
         JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=30),  # Refresh Token 有效期 30 天
         JWT_TOKEN_LOCATION=['headers', 'cookies'],  # 支持 header 和 cookie
         # 与 Session 一致：仅生产环境才标记 Secure；开发下通过 http 传输 Cookie
