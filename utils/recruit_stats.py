@@ -144,6 +144,40 @@ def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: d
                         f"决策结果: {decision}")
             new_recruits_count += 1
 
+    # 额外分析：检查所有试播记录的开播决策情况
+    logger.info(f"\n=== 试播记录开播决策分析 ===")
+    trials_recruits = Recruit.objects.filter(trials_query)
+    for i, recruit in enumerate(trials_recruits, 1):
+        created_local = utc_to_local(recruit.created_at)
+        training_time = recruit.get_effective_training_decision_time()
+        training_local = utc_to_local(training_time) if training_time else None
+        
+        # 检查开播决策字段
+        broadcast_decision = recruit.get_effective_broadcast_decision()
+        broadcast_time = recruit.get_effective_broadcast_decision_time()
+        broadcast_local = utc_to_local(broadcast_time) if broadcast_time else None
+        
+        # 检查原始字段
+        has_broadcast_decision = bool(recruit.broadcast_decision)
+        has_final_decision = bool(recruit.final_decision)
+        
+        logger.info(f"试播{i}: {recruit.pilot.nickname if recruit.pilot else 'Unknown'}")
+        logger.info(f"  创建: {created_local.strftime('%Y-%m-%d') if created_local else 'N/A'} | "
+                    f"试播决策: {training_local.strftime('%Y-%m-%d') if training_local else 'N/A'}")
+        logger.info(f"  开播决策: {broadcast_local.strftime('%Y-%m-%d') if broadcast_local else 'N/A'} | "
+                    f"决策结果: {broadcast_decision}")
+        logger.info(f"  原始字段: broadcast_decision={recruit.broadcast_decision}({has_broadcast_decision}) | "
+                    f"final_decision={recruit.final_decision}({has_final_decision})")
+        
+        # 检查是否应该被计入新开播数
+        should_count = False
+        if recruit.broadcast_decision in [BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD]:
+            should_count = True
+        elif recruit.final_decision in [FinalDecision.OFFICIAL, FinalDecision.INTERN]:
+            should_count = True
+            
+        logger.info(f"  应该计入新开播数: {should_count}")
+
     logger.info(f"新开播数（窗口内创建且开播决策为正式/实习的招募记录，去重后）: {new_recruits_count}")
     logger.info(f"========== 招募月报统计完成 ==========")
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits_count}
