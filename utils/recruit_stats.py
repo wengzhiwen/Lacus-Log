@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from mongoengine import Q
 
+from models.battle_record import BattleRecord
 from models.recruit import BroadcastDecision, FinalDecision, Recruit
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
@@ -166,7 +167,7 @@ def get_recruit_records_for_detail(report_date: datetime, range_param: str, metr
 
 def calculate_recruit_today_stats() -> Dict[str, int]:
     """计算今日的招募统计数据（用于仪表盘）
-    
+
     Returns:
         dict: 包含今日约面、到面、新开播的统计数据
     """
@@ -177,3 +178,239 @@ def calculate_recruit_today_stats() -> Dict[str, int]:
     today_stats = calculate_recruit_stats_for_date(today_local)
 
     return {'appointments': today_stats['appointments'], 'interviews': today_stats['interviews'], 'new_recruits': today_stats['new_recruits']}
+
+
+def calculate_recruit_monthly_stats(recruiter_id: str = None) -> Dict[str, Any]:
+    """计算招募月报统计数据（滚动60天）
+
+    Args:
+        recruiter_id: 招募负责人ID，为None时统计全部
+
+    Returns:
+        dict: 包含当期和上期的统计数据及趋势比较
+    """
+    now = get_current_utc_time()
+    today_local = utc_to_local(now)
+
+    # 当期窗口：今天向前滚动60天（包含今天）
+    current_window_end = today_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+    current_window_start = today_local - timedelta(days=59)
+    current_window_start = current_window_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 上期窗口：第61-120天
+    previous_window_end = current_window_start - timedelta(days=1)
+    previous_window_end = previous_window_end.replace(hour=23, minute=59, second=59, microsecond=999999)
+    previous_window_start = current_window_start - timedelta(days=60)
+
+    # 转换为UTC进行查询
+    current_start_utc = local_to_utc(current_window_start)
+    current_end_utc = local_to_utc(current_window_end)
+    previous_start_utc = local_to_utc(previous_window_start)
+    previous_end_utc = local_to_utc(previous_window_end)
+
+    # 计算当期统计数据
+    current_stats = calculate_recruit_period_stats(current_start_utc, current_end_utc, recruiter_id)
+
+    # 计算上期统计数据
+    previous_stats = calculate_recruit_period_stats(previous_start_utc, previous_end_utc, recruiter_id)
+
+    # 计算满7天数（需要特殊处理）
+    current_full_7_days = calculate_full_7_days_recruits(current_start_utc, current_end_utc, recruiter_id)
+    previous_full_7_days = calculate_full_7_days_recruits(previous_start_utc, previous_end_utc, recruiter_id)
+
+    current_stats['full_7_days'] = current_full_7_days
+    previous_stats['full_7_days'] = previous_full_7_days
+
+    # 计算转化率
+    current_rates = calculate_conversion_rates(current_stats)
+    previous_rates = calculate_conversion_rates(previous_stats)
+
+    return {
+        'current_window': {
+            'start_date': current_window_start.strftime('%Y-%m-%d'),
+            'end_date': current_window_end.strftime('%Y-%m-%d'),
+            'stats': current_stats,
+            'rates': current_rates
+        },
+        'previous_window': {
+            'start_date': previous_window_start.strftime('%Y-%m-%d'),
+            'end_date': previous_window_end.strftime('%Y-%m-%d'),
+            'stats': previous_stats,
+            'rates': previous_rates
+        },
+        'trends': calculate_trends(current_stats, previous_stats)
+    }
+
+
+def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recruiter_id: str = None) -> int:
+    """计算满7天的主播数量
+
+    Args:
+        start_utc: 开始时间（UTC）
+        end_utc: 结束时间（UTC）
+        recruiter_id: 招募负责人ID，为None时统计全部
+
+    Returns:
+        int: 满7天的主播数量
+    """
+    # 首先找到在指定时间窗口内被决定招募的主播
+    base_query = {}
+    if recruiter_id and recruiter_id != 'all':
+        base_query['recruiter'] = recruiter_id
+
+    # 找到被决定为主播的招募记录
+    recruits_query = Q(**base_query) & (
+        Q(broadcast_decision_time__gte=start_utc,
+          broadcast_decision_time__lte=end_utc,
+          broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lte=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
+
+    recruits = Recruit.objects.filter(recruits_query)
+
+    full_7_days_count = 0
+
+    for recruit in recruits:
+        if recruit.pilot:
+            # 检查该主播在滚动窗口内的开播记录
+            battle_records = BattleRecord.objects.filter(pilot=recruit.pilot, start_time__gte=start_utc, start_time__lte=end_utc)
+
+            # 计算超过6小时的开播记录数
+            long_sessions_count = 0
+            for record in battle_records:
+                if record.duration_hours and record.duration_hours > 6:
+                    long_sessions_count += 1
+
+            # 如果有7条或以上超过6小时的开播记录，计入满7天数
+            if long_sessions_count >= 7:
+                full_7_days_count += 1
+
+    return full_7_days_count
+
+
+def calculate_conversion_rates(stats: Dict[str, int]) -> Dict[str, float]:
+    """计算转化率
+
+    Args:
+        stats: 统计数据
+
+    Returns:
+        dict: 各项转化率
+    """
+    rates = {}
+
+    # 到面转化率 = 到面数 / 约面数
+    if stats.get('appointments', 0) > 0:
+        rates['interview_conversion'] = round(stats.get('interviews', 0) / stats['appointments'] * 100, 1)
+    else:
+        rates['interview_conversion'] = 0.0
+
+    # 试播转化率 = 试播数 / 到面数
+    if stats.get('interviews', 0) > 0:
+        rates['trial_conversion'] = round(stats.get('trials', 0) / stats['interviews'] * 100, 1)
+    else:
+        rates['trial_conversion'] = 0.0
+
+    # 新开播转化率 = 新开播数 / 到面数
+    if stats.get('interviews', 0) > 0:
+        rates['broadcast_conversion'] = round(stats.get('new_recruits', 0) / stats['interviews'] * 100, 1)
+    else:
+        rates['broadcast_conversion'] = 0.0
+
+    # 满7天转化率 = 满7天数 / 到面数
+    if stats.get('interviews', 0) > 0:
+        rates['full_7_days_conversion'] = round(stats.get('full_7_days', 0) / stats['interviews'] * 100, 1)
+    else:
+        rates['full_7_days_conversion'] = 0.0
+
+    return rates
+
+
+def calculate_trends(current_stats: Dict[str, int], previous_stats: Dict[str, int]) -> Dict[str, str]:
+    """计算趋势比较
+
+    Args:
+        current_stats: 当期统计数据
+        previous_stats: 上期统计数据
+
+    Returns:
+        dict: 趋势指示器
+    """
+    trends = {}
+
+    for key in ['appointments', 'interviews', 'trials', 'new_recruits', 'full_7_days']:
+        current_value = current_stats.get(key, 0)
+        previous_value = previous_stats.get(key, 0)
+
+        if current_value > previous_value:
+            trends[key] = 'up'
+        elif current_value < previous_value:
+            trends[key] = 'down'
+        else:
+            trends[key] = 'stable'
+
+    return trends
+
+
+def get_recruit_monthly_detail_records(recruiter_id: str = None) -> list:
+    """获取招募月报明细记录
+
+    Args:
+        recruiter_id: 招募负责人ID，为None时统计全部
+
+    Returns:
+        list: 招募记录列表（按开播天数排序）
+    """
+    now = get_current_utc_time()
+    today_local = utc_to_local(now)
+
+    # 滚动60天窗口
+    window_end = today_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+    window_start = today_local - timedelta(days=59)
+    window_start = window_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 转换为UTC进行查询
+    start_utc = local_to_utc(window_start)
+    end_utc = local_to_utc(window_end)
+
+    # 查询窗口内创建的招募记录
+    base_query = {'created_at__gte': start_utc, 'created_at__lte': end_utc}
+
+    if recruiter_id and recruiter_id != 'all':
+        base_query['recruiter'] = recruiter_id
+
+    recruits = Recruit.objects.filter(**base_query).order_by('-created_at')
+
+    # 为每个招募记录计算开播天数
+    recruit_list = []
+    for recruit in recruits:
+        if recruit.pilot:
+            # 计算该主播在滚动窗口内的开播天数
+            battle_records = BattleRecord.objects.filter(pilot=recruit.pilot, start_time__gte=start_utc, start_time__lte=end_utc)
+
+            # 计算不重复的开播日期数
+            unique_dates = set()
+            long_sessions_count = 0
+
+            for record in battle_records:
+                if record.duration_hours and record.duration_hours > 6:
+                    long_sessions_count += 1
+
+                # 获取本地日期
+                local_start = utc_to_local(record.start_time)
+                if local_start:
+                    unique_dates.add(local_start.date())
+
+            recruit_dict = {'recruit': recruit, 'broadcast_days': len(unique_dates), 'long_sessions_count': long_sessions_count, 'last_broadcast_time': None}
+
+            # 获取最近一次开播时间
+            if battle_records:
+                latest_record = battle_records.order_by('-start_time').first()
+                if latest_record:
+                    recruit_dict['last_broadcast_time'] = latest_record.start_time
+
+            recruit_list.append(recruit_dict)
+
+    # 按开播天数降序排序
+    recruit_list.sort(key=lambda x: x['broadcast_days'], reverse=True)
+
+    return recruit_list

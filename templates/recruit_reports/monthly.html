@@ -1,0 +1,992 @@
+{% extends "base.html" %}
+
+{% block title %}主播招募月报{% endblock %}
+
+{% block content %}
+<div id="recruitMonthlyApp" data-selected-recruiter="{{ recruiter_id or 'all' }}">
+  <div class="page-header">
+    <nav class="breadcrumb">
+      <a href="{{ url_for('report.recruit_daily_report') }}" class="breadcrumb-link">招募日报</a>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-current">招募月报</span>
+    </nav>
+    <h1 class="page-title">📊 主播招募月报</h1>
+  </div>
+
+  <div class="filter-section">
+    <div class="recruiter-filter">
+      <label for="recruiterSelector" class="filter-label">招募负责人：</label>
+      <select id="recruiterSelector" class="recruiter-select">
+        <option value="all">全部负责人</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="summary-section">
+    <div id="monthly-loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div style="display: none;" id="monthly-content">
+      <h2 class="section-title" id="monthly-summary-title">招募月报统计</h2>
+      <p class="text-muted" id="windowInfo"></p>
+      <div class="summary-cards epic-intro" data-animate-group="monthly" id="monthly-summary-cards"></div>
+    </div>
+  </div>
+
+  <div class="detail-section">
+    <div class="detail-header">
+      <h2 class="section-title">招募明细</h2>
+      <div class="detail-controls">
+        <input type="text" id="pilotSearchInput" placeholder="搜索主播昵称或真实姓名..." class="search-input">
+      </div>
+    </div>
+
+    <div class="detail-cards" id="detailCards">
+      <div class="loading-cards">
+        <div class="loading-card">
+          <div class="loading-content"></div>
+        </div>
+        <div class="loading-card">
+          <div class="loading-content"></div>
+        </div>
+        <div class="loading-card">
+          <div class="loading-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-state" id="detailEmpty" style="display: none;">
+      <div class="empty-icon">📭</div>
+      <h3>近30日无招募记录</h3>
+      <p>当前筛选条件下未找到任何招募记录</p>
+      <a href="{{ url_for('report.recruit_daily_report') }}" class="btn btn-primary">返回招募日报</a>
+    </div>
+
+    <div class="empty-state" id="detailError" style="display: none;">
+      <p>明细数据加载失败，请稍后再试。</p>
+    </div>
+  </div>
+
+  <div class="explanation-section">
+    <h2 class="section-title">指标说明</h2>
+    <div class="explanation-cards">
+      <div class="explanation-card">
+        <div class="card-icon">📅</div>
+        <div class="card-content">
+          <h3>约面数</h3>
+          <p>滚动30天内创建的招募数量</p>
+        </div>
+      </div>
+      <div class="explanation-card">
+        <div class="card-icon">👥</div>
+        <div class="card-content">
+          <h3>到面数</h3>
+          <p>滚动30天内发生面试决策的招募数量</p>
+        </div>
+      </div>
+      <div class="explanation-card">
+        <div class="card-icon">🎯</div>
+        <div class="card-content">
+          <h3>试播数</h3>
+          <p>滚动30天内发生试播决策的招募数量</p>
+        </div>
+      </div>
+      <div class="explanation-card">
+        <div class="card-icon">🚀</div>
+        <div class="card-content">
+          <h3>新开播数</h3>
+          <p>滚动30天内决定招募为主播的数量</p>
+        </div>
+      </div>
+      <div class="explanation-card">
+        <div class="card-icon">⭐</div>
+        <div class="card-content">
+          <h3>满7天数</h3>
+          <p>滚动30天内满足7次超过6小时开播的主播数量</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.breadcrumb-link {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: var(--muted);
+}
+
+.breadcrumb-current {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.filter-section {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.recruiter-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+.recruiter-select {
+  padding: 6px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+  min-width: 120px;
+}
+
+.summary-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.epic-intro {
+  perspective: 1000px;
+  perspective-origin: 50% 40%;
+}
+
+.epic-intro .summary-card {
+  transform: translateZ(240px) translateY(30px) scale(0.85) rotateX(-12deg);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.epic-intro.play .summary-card {
+  animation: epicFlyIn 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.epic-intro.play .summary-card:nth-child(1) { animation-delay: 0ms; }
+.epic-intro.play .summary-card:nth-child(2) { animation-delay: 90ms; }
+.epic-intro.play .summary-card:nth-child(3) { animation-delay: 180ms; }
+.epic-intro.play .summary-card:nth-child(4) { animation-delay: 270ms; }
+.epic-intro.play .summary-card:nth-child(5) { animation-delay: 360ms; }
+
+@keyframes epicFlyIn {
+  0%   { transform: translateZ(240px) translateY(30px) scale(0.85) rotateX(-12deg); opacity: 0; }
+  60%  { transform: translateZ(-20px) translateY(-6px) scale(1.02) rotateX(2deg); opacity: 1; }
+  85%  { transform: translateZ(10px) translateY(0px) scale(0.995) rotateX(0deg); opacity: 1; }
+  100% { transform: translateZ(0) translateY(0px) scale(1) rotateX(0); opacity: 1; }
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.summary-card.danger-outline {
+  border-color: #dc3545;
+}
+
+.card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.card-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.metric-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.metric-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.metric-trend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.metric-trend.up {
+  color: #dc3545;
+}
+
+.metric-trend.down {
+  color: #28a745;
+  animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+.metric-trend.stable {
+  color: var(--muted);
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(40, 167, 69, 0.8),
+                 0 0 16px rgba(40, 167, 69, 0.6),
+                 0 0 24px rgba(40, 167, 69, 0.4),
+                 0 0 32px rgba(40, 167, 69, 0.3);
+    filter: brightness(1);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(40, 167, 69, 1),
+                 0 0 24px rgba(40, 167, 69, 0.9),
+                 0 0 36px rgba(40, 167, 69, 0.7),
+                 0 0 48px rgba(40, 167, 69, 0.5),
+                 0 0 60px rgba(40, 167, 69, 0.3);
+    filter: brightness(1.3);
+  }
+}
+
+.conversion-rate {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--hover-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.metric-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.metric-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.metric-trend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.metric-trend.up {
+  color: #dc3545;
+}
+
+.metric-trend.down {
+  color: #28a745;
+  animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+.metric-trend.stable {
+  color: var(--muted);
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(40, 167, 69, 0.8),
+                 0 0 16px rgba(40, 167, 69, 0.6),
+                 0 0 24px rgba(40, 167, 69, 0.4),
+                 0 0 32px rgba(40, 167, 69, 0.3);
+    filter: brightness(1);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(40, 167, 69, 1),
+                 0 0 24px rgba(40, 167, 69, 0.9),
+                 0 0 36px rgba(40, 167, 69, 0.7),
+                 0 0 48px rgba(40, 167, 69, 0.5),
+                 0 0 60px rgba(40, 167, 69, 0.3);
+    filter: brightness(1.3);
+  }
+}
+
+.conversion-rate {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--hover-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.detail-section {
+  margin: 32px 0;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.detail-controls {
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  font-size: 14px;
+  width: 250px;
+}
+
+.detail-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.detail-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.detail-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.detail-card.hidden {
+  display: none;
+}
+
+.pilot-header {
+  margin-bottom: 12px;
+}
+
+.pilot-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.meta-label {
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.meta-value {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.broadcast-days {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.detail-status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.detail-footer {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.detail-dates {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray);
+}
+
+.date-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.date-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.date-value {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.pilot-name {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pilot-gender {
+  font-size: 16px;
+}
+
+.loading-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.loading-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.loading-content {
+  height: 120px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.explanation-section {
+  margin: 32px 0;
+}
+
+.explanation-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.explanation-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-icon {
+  font-size: 24px;
+}
+
+.card-content h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card-content p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .filter-section {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .recruiter-filter {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .recruiter-select {
+    width: 100%;
+  }
+
+  .metrics-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .detail-cards {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<script>
+(function() {
+  const app = document.getElementById('recruitMonthlyApp');
+  if (!app) {
+    return;
+  }
+
+  const recruiterSelector = document.getElementById('recruiterSelector');
+  const pilotSearchInput = document.getElementById('pilotSearchInput');
+  const monthlyLoadingState = document.getElementById('monthly-loading-state');
+  const monthlyContent = document.getElementById('monthly-content');
+  const monthlySummaryTitle = document.getElementById('monthly-summary-title');
+  const windowInfo = document.getElementById('windowInfo');
+  const monthlySummaryCards = document.getElementById('monthly-summary-cards');
+  const detailCards = document.getElementById('detailCards');
+  const detailEmpty = document.getElementById('detailEmpty');
+  const detailError = document.getElementById('detailError');
+
+  const operatorsApi = '{{ url_for('users_api.get_operators') }}';
+  const monthlyApi = '{{ url_for('recruit_monthly_reports_api.get_recruit_monthly_report') }}';
+  const monthlyDetailApi = '{{ url_for('recruit_monthly_reports_api.get_recruit_monthly_detail') }}';
+
+  let currentRecruiter = app.dataset.selectedRecruiter || 'all';
+  let allDetailRecords = [];
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '无';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+  }
+
+  function formatDateOnly(dateStr) {
+    if (!dateStr) return '无';
+    try {
+      // 将UTC时间转换为GMT+8日期
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '无';
+
+      // 转换为GMT+8时区
+      const gmt8Date = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+      return gmt8Date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+    } catch (error) {
+      console.warn('日期格式化错误:', dateStr, error);
+      return '无';
+    }
+  }
+
+  function showLoading() {
+    monthlyLoadingState.style.display = 'flex';
+    monthlyContent.style.display = 'none';
+    detailError.style.display = 'none';
+    showDetailLoading();
+  }
+
+  function showDetailLoading() {
+    detailCards.innerHTML = `
+      <div class="loading-cards">
+        <div class="loading-card"><div class="loading-content"></div></div>
+        <div class="loading-card"><div class="loading-content"></div></div>
+        <div class="loading-card"><div class="loading-content"></div></div>
+      </div>
+    `;
+    detailEmpty.style.display = 'none';
+  }
+
+  function showError(message) {
+    monthlyLoadingState.style.display = 'none';
+    monthlyContent.style.display = 'block';
+    monthlySummaryTitle.textContent = '招募统计加载失败';
+    monthlySummaryCards.innerHTML = `<div class="empty-state"><p>${message}</p></div>`;
+  }
+
+  function showDetailError(message) {
+    detailError.style.display = 'block';
+    detailError.querySelector('p').textContent = message;
+  }
+
+  function updateWindowInfo(windowInfo) {
+    if (!windowInfo) return;
+
+    const currentStart = windowInfo.current_start;
+    const currentEnd = windowInfo.current_end;
+    const windowInfoElement = document.getElementById('windowInfo');
+    if (windowInfoElement) {
+      windowInfoElement.textContent = `统计窗口：${currentStart} 至 ${currentEnd}（滚动30天）`;
+    }
+  }
+
+  function createSummaryCard(card) {
+    const cardEl = document.createElement('div');
+    cardEl.className = 'summary-card';
+
+    // 如果值低于5且不为约面数，添加警告样式
+    if (card.metric !== 'appointments' && card.value < 5) {
+      cardEl.classList.add('danger-outline');
+    }
+
+    let conversionRateHtml = '';
+    if (card.conversion_rate) {
+      conversionRateHtml = `<div class="card-sub">${card.conversion_rate.display}</div>`;
+    }
+
+    cardEl.innerHTML = `
+      <div class="card-label">${card.label}</div>
+      <div class="card-value">${card.value}</div>
+      ${conversionRateHtml}
+    `;
+
+    return cardEl;
+  }
+
+  function buildSummaryCards(cards) {
+    monthlySummaryCards.innerHTML = '';
+    cards.forEach(card => {
+      monthlySummaryCards.appendChild(createSummaryCard(card));
+    });
+
+    // 启动动画
+    setTimeout(() => {
+      monthlySummaryCards.classList.add('play');
+    }, 100);
+  }
+
+  function createDetailCard(record) {
+    const cardEl = document.createElement('div');
+    cardEl.className = 'detail-card';
+
+    const pilot = record.pilot || {};
+    const recruiter = record.recruiter || {};
+
+    // 性别图标（参考开播记录详情页格式）
+    let genderIcon = '?';
+    if (pilot.gender === '男' || pilot.gender === 0) {
+      genderIcon = '♂';
+    } else if (pilot.gender === '女' || pilot.gender === 1) {
+      genderIcon = '♀';
+    }
+
+    cardEl.innerHTML = `
+      <div class="pilot-header">
+        <div class="pilot-name">
+          ${pilot.nickname || '未知'}${pilot.real_name ? `（${pilot.real_name}）` : ''}${genderIcon}
+        </div>
+      </div>
+
+      <div class="detail-meta">
+        <div class="meta-item">
+          <span class="meta-label">招募状态</span>
+          <span class="meta-value">${record.status || '未知'}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">渠道</span>
+          <span class="meta-value">${record.channel || '未知'}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">招募负责人</span>
+          <span class="meta-value">${recruiter.nickname || recruiter.username || '未知'}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">直属运营</span>
+          <span class="meta-value">${recruiter.nickname || recruiter.username || '未知'}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">介绍费</span>
+          <span class="meta-value">${record.introduction_fee || 0}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">开播天数</span>
+          <span class="meta-value broadcast-days">${record.broadcast_days || 0}</span>
+        </div>
+      </div>
+
+      <div class="detail-dates">
+        <div class="date-item">
+          <span class="date-label">启动招募：</span>
+          <span class="date-value">${record.created_at ? formatDateOnly(record.created_at) : '未知'}</span>
+        </div>
+        <div class="date-item">
+          <span class="date-label">面试决策：</span>
+          <span class="date-value">${record.interview_decision_time ? formatDateOnly(record.interview_decision_time) : '无'}</span>
+        </div>
+        <div class="date-item">
+          <span class="date-label">开播决策：</span>
+          <span class="date-value">${record.broadcast_decision_time ? formatDateOnly(record.broadcast_decision_time) : '无'}</span>
+        </div>
+        <div class="date-item">
+          <span class="date-label">最近开播：</span>
+          <span class="date-value">${record.last_broadcast_time ? formatDateOnly(record.last_broadcast_time) : '无'}</span>
+        </div>
+      </div>
+    `;
+
+    return cardEl;
+  }
+
+  function updateDetailCards(records) {
+    allDetailRecords = records;
+    filterDetailCards();
+  }
+
+  function filterDetailCards() {
+    const searchTerm = pilotSearchInput.value.toLowerCase().trim();
+
+    const filteredRecords = allDetailRecords.filter(record => {
+      if (!searchTerm) return true;
+
+      const pilot = record.pilot || {};
+      const nickname = (pilot.nickname || '').toLowerCase();
+      const realName = (pilot.real_name || '').toLowerCase();
+
+      return nickname.includes(searchTerm) || realName.includes(searchTerm);
+    });
+
+    detailCards.innerHTML = '';
+
+    if (filteredRecords.length === 0 && allDetailRecords.length > 0) {
+      detailCards.innerHTML = '<div class="empty-state"><p>没有找到匹配的主播</p></div>';
+    } else if (filteredRecords.length === 0) {
+      detailEmpty.style.display = 'block';
+      detailCards.innerHTML = '';
+    } else {
+      filteredRecords.forEach(record => {
+        detailCards.appendChild(createDetailCard(record));
+      });
+    }
+  }
+
+  function buildApiParams() {
+    const params = new URLSearchParams();
+    if (currentRecruiter && currentRecruiter !== 'all') {
+      params.set('recruiter', currentRecruiter);
+    }
+    return params;
+  }
+
+  async function loadMonthlySummary() {
+    showLoading();
+    try {
+      const response = await fetch(`${monthlyApi}?${buildApiParams().toString()}`);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data || {};
+
+      // 隐藏loading，显示内容
+      monthlyLoadingState.style.display = 'none';
+      monthlyContent.style.display = 'block';
+
+      monthlySummaryTitle.textContent = '招募月报统计';
+      updateWindowInfo(data.window_info);
+      buildSummaryCards(data.cards || []);
+    } catch (error) {
+      console.error('加载招募月报汇总失败：', error);
+      showError('报表加载失败，请稍后再试');
+    }
+  }
+
+  async function loadMonthlyDetail() {
+    showDetailLoading();
+    try {
+      const response = await fetch(`${monthlyDetailApi}?${buildApiParams().toString()}`);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data || {};
+
+      detailError.style.display = 'none';
+      updateDetailCards(data.records || []);
+    } catch (error) {
+      console.error('加载招募月报明细失败：', error);
+      showDetailError('明细数据加载失败，请稍后再试');
+    }
+  }
+
+  async function loadRecruiterOptions() {
+    try {
+      const response = await fetch(operatorsApi);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const options = payload.data || [];
+      recruiterSelector.innerHTML = '';
+      const allOption = document.createElement('option');
+      allOption.value = 'all';
+      allOption.textContent = '全部负责人';
+      recruiterSelector.appendChild(allOption);
+      options.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.nickname || user.username || user.id;
+        recruiterSelector.appendChild(option);
+      });
+      recruiterSelector.value = currentRecruiter;
+    } catch (error) {
+      console.error('加载招募负责人列表失败：', error);
+      recruiterSelector.value = currentRecruiter;
+    }
+  }
+
+  function navigate(recruiter) {
+    const url = new URL(window.location.pathname, window.location.origin);
+    if (recruiter && recruiter !== 'all') {
+      url.searchParams.set('recruiter', recruiter);
+    } else {
+      url.searchParams.delete('recruiter');
+    }
+    window.location.href = url.toString();
+  }
+
+  recruiterSelector.addEventListener('change', function() {
+    navigate(this.value || 'all');
+  });
+
+  let searchTimeout;
+  pilotSearchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(filterDetailCards, 300);
+  });
+
+  (async function init() {
+    await loadRecruiterOptions();
+    await Promise.all([
+      loadMonthlySummary(),
+      loadMonthlyDetail()
+    ]);
+  })();
+})();
+</script>
+{% endblock %}
