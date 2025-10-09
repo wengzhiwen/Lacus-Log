@@ -12,8 +12,7 @@ from mongoengine import Q
 from models.battle_record import BattleRecord
 from models.recruit import BroadcastDecision, FinalDecision, Recruit
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 # 设置日志器
 logger = get_logger('recruit_stats')
@@ -124,7 +123,9 @@ def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: d
     # 新开播数
     new_recruits_query = Q(**base_query) & Q(created_at__gte=start_utc, created_at__lt=end_utc) & (
         Q(broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
-        | Q(final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
+        | Q(final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN])
+        | Q(final_decision='正式机师')  # 历史字段兼容
+        | Q(final_decision='实习机师'))  # 历史字段兼容
     recruits = Recruit.objects.filter(new_recruits_query)
 
     new_recruits_count = 0
@@ -151,16 +152,16 @@ def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: d
         created_local = utc_to_local(recruit.created_at)
         training_time = recruit.get_effective_training_decision_time()
         training_local = utc_to_local(training_time) if training_time else None
-        
+
         # 检查开播决策字段
         broadcast_decision = recruit.get_effective_broadcast_decision()
         broadcast_time = recruit.get_effective_broadcast_decision_time()
         broadcast_local = utc_to_local(broadcast_time) if broadcast_time else None
-        
+
         # 检查原始字段
         has_broadcast_decision = bool(recruit.broadcast_decision)
         has_final_decision = bool(recruit.final_decision)
-        
+
         logger.info(f"试播{i}: {recruit.pilot.nickname if recruit.pilot else 'Unknown'}")
         logger.info(f"  创建: {created_local.strftime('%Y-%m-%d') if created_local else 'N/A'} | "
                     f"试播决策: {training_local.strftime('%Y-%m-%d') if training_local else 'N/A'}")
@@ -168,14 +169,16 @@ def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: d
                     f"决策结果: {broadcast_decision}")
         logger.info(f"  原始字段: broadcast_decision={recruit.broadcast_decision}({has_broadcast_decision}) | "
                     f"final_decision={recruit.final_decision}({has_final_decision})")
-        
+
         # 检查是否应该被计入新开播数
         should_count = False
         if recruit.broadcast_decision in [BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD]:
             should_count = True
         elif recruit.final_decision in [FinalDecision.OFFICIAL, FinalDecision.INTERN]:
             should_count = True
-            
+        elif recruit.final_decision in ['正式机师', '实习机师']:  # 历史字段兼容
+            should_count = True
+
         logger.info(f"  应该计入新开播数: {should_count}")
 
     logger.info(f"新开播数（窗口内创建且开播决策为正式/实习的招募记录，去重后）: {new_recruits_count}")
