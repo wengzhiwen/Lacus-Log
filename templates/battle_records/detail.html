@@ -162,7 +162,10 @@
       <button class="modal-close" onclick="hideChangeLog()">&times;</button>
     </div>
     <div class="modal-body" id="changeLogContent">
-      <div class="loading">加载中...</div>
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+      </div>
     </div>
   </div>
 </div>
@@ -454,7 +457,7 @@ function showChangeLog() {
   const content = document.getElementById('changeLogContent');
   
   modal.style.display = 'flex';
-  content.innerHTML = '<div class="loading">加载中...</div>';
+  content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">加载中...</div></div>';
   
   fetch(changesUrl)
     .then(response => response.json())
@@ -462,7 +465,7 @@ function showChangeLog() {
       if (result.success) {
         const changes = (result.data && result.data.items) || [];
         if (changes.length === 0) {
-          content.innerHTML = '<div class="loading">暂无变更记录</div>';
+          content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">暂无变更记录</div></div>';
         } else {
           const html = changes.map(change => `
             <div class="change-log-item">
@@ -477,12 +480,12 @@ function showChangeLog() {
           content.innerHTML = html;
         }
       } else {
-        content.innerHTML = '<div class="loading">加载失败</div>';
+        content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">加载失败</div></div>';
       }
     })
     .catch(error => {
       console.error('获取变更记录失败:', error);
-      content.innerHTML = '<div class="loading">加载失败</div>';
+      content.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">加载失败</div></div>';
     });
 }
 
