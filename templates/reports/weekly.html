@@ -37,9 +37,15 @@
   </div>
 
   <div class="summary-section">
-    <h2 class="section-title">周度汇总（周二-次周一）</h2>
-    <div class="summary-cards" id="weekly-summary-cards"></div>
-    <div class="summary-hint">注：周定义为周二至次周一；盈利口径不计返点</div>
+    <div id="weekly-loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div style="display: none;" id="weekly-content">
+      <h2 class="section-title">周度汇总（周二-次周一）</h2>
+      <div class="summary-cards" id="weekly-summary-cards"></div>
+      <div class="summary-hint">注：周定义为周二至次周一；盈利口径不计返点</div>
+    </div>
   </div>
 
   <div class="details-section">
@@ -71,6 +77,30 @@
 </div>
 
 <style>
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 4px solid var(--table-header);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px;
+}
+
 .date-navigation {
   display: flex;
   justify-content: space-between;
@@ -246,12 +276,26 @@
   }
 
   function showLoading() {
-    summaryCards.innerHTML = '';
+    const loadingState = document.getElementById('weekly-loading-state');
+    const content = document.getElementById('weekly-content');
+    const tableContainer = document.getElementById('weekly-table-container');
+    const emptyState = document.getElementById('weekly-empty-state');
+
+    loadingState.style.display = 'block';
+    content.style.display = 'none';
     tableContainer.style.display = 'none';
     emptyState.style.display = 'none';
   }
 
   function showError(message) {
+    const loadingState = document.getElementById('weekly-loading-state');
+    const content = document.getElementById('weekly-content');
+    const tableContainer = document.getElementById('weekly-table-container');
+    const emptyState = document.getElementById('weekly-empty-state');
+    const emptyStateText = emptyState.querySelector('p');
+
+    loadingState.style.display = 'none';
+    content.style.display = 'block';
     summaryCards.innerHTML = '';
     detailsBody.innerHTML = '';
     tableContainer.style.display = 'none';
@@ -316,6 +360,12 @@
       }
       ownerSelector.value = currentOwner;
       modeSelector.value = currentMode;
+      // 隐藏loading状态，显示内容
+      const loadingState = document.getElementById('weekly-loading-state');
+      const content = document.getElementById('weekly-content');
+      loadingState.style.display = 'none';
+      content.style.display = 'block';
+
       renderSummary(data.summary || {});
       renderDetails(data.details || [], data.week_start);
     } catch (error) {

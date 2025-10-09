@@ -36,8 +36,14 @@
   </div>
 
   <div class="summary-section">
-    <h2 class="section-title" id="daily-summary-title">加载中…</h2>
-    <div class="summary-cards epic-intro" data-animate-group="day" id="daily-summary-cards"></div>
+    <div id="daily-loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div style="display: none;" id="daily-content">
+      <h2 class="section-title" id="daily-summary-title"></h2>
+      <div class="summary-cards epic-intro" data-animate-group="day" id="daily-summary-cards"></div>
+    </div>
   </div>
 
   <div class="details-section">
@@ -73,6 +79,30 @@
 </div>
 
 <style>
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 4px solid var(--table-header);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px;
+}
+
 .date-navigation {
   display: flex;
   justify-content: space-between;
@@ -482,13 +512,26 @@
   }
 
   function showLoading() {
-    summaryTitle.textContent = '加载中…';
-    summaryCards.innerHTML = '';
+    const loadingState = document.getElementById('daily-loading-state');
+    const content = document.getElementById('daily-content');
+    const tableContainer = document.getElementById('daily-table-container');
+    const emptyState = document.getElementById('daily-empty-state');
+
+    loadingState.style.display = 'block';
+    content.style.display = 'none';
     tableContainer.style.display = 'none';
     emptyState.style.display = 'none';
   }
 
   function showError(message) {
+    const loadingState = document.getElementById('daily-loading-state');
+    const content = document.getElementById('daily-content');
+    const tableContainer = document.getElementById('daily-table-container');
+    const emptyState = document.getElementById('daily-empty-state');
+    const emptyStateText = emptyState.querySelector('p');
+
+    loadingState.style.display = 'none';
+    content.style.display = 'block';
     summaryTitle.textContent = '加载失败';
     summaryCards.innerHTML = '';
     detailsBody.innerHTML = '';
@@ -552,6 +595,12 @@
       dateSelector.value = data.date;
       ownerSelector.value = currentOwner;
       modeSelector.value = currentMode;
+      // 隐藏loading状态，显示内容
+      const loadingState = document.getElementById('daily-loading-state');
+      const content = document.getElementById('daily-content');
+      loadingState.style.display = 'none';
+      content.style.display = 'block';
+
       summaryTitle.textContent = `${data.date} 日报汇总`;
       buildSummaryCards(data.summary || {});
       renderDetails(data.details || [], filters || {}, data.date);
