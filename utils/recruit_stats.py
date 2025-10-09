@@ -83,12 +83,6 @@ def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: d
     Returns:
         dict: 包含约面、到面、试播、新开播的统计数据
     """
-    start_local = utc_to_local(start_utc)
-    end_local = utc_to_local(end_utc)
-    logger.info(f"========== 招募月报统计开始 ==========")
-    logger.info(f"统计窗口: {start_local.strftime('%Y-%m-%d %H:%M:%S')} 至 {end_local.strftime('%Y-%m-%d %H:%M:%S')} (GMT+8)")
-    logger.info(f"负责人筛选: {recruiter_id if recruiter_id and recruiter_id != 'all' else '全部'}")
-
     base_query = {}
     if recruiter_id and recruiter_id != 'all':
         base_query['recruiter'] = recruiter_id
@@ -96,29 +90,16 @@ def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: d
     # 约面数
     appointments_query = {**base_query, 'created_at__gte': start_utc, 'created_at__lt': end_utc}
     appointments = Recruit.objects.filter(**appointments_query).count()
-    logger.info(f"约面数（窗口内创建的招募记录）: {appointments}")
 
     # 到面数
     interviews_query = Q(**base_query) & (Q(interview_decision_time__gte=start_utc, interview_decision_time__lt=end_utc)
                                           | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     interviews = Recruit.objects.filter(interviews_query).count()
-    logger.info(f"到面数（窗口内发生面试决策的招募记录）: {interviews}")
 
     # 试播数
     trials_query = Q(**base_query) & Q(created_at__gte=start_utc, created_at__lt=end_utc) & (Q(training_decision_time__exists=True)
                                                                                              | Q(training_decision_time_old__exists=True))
-    trials_recruits = Recruit.objects.filter(trials_query)
-    trials = trials_recruits.count()
-    logger.info(f"试播数（窗口内创建且有试播决策的招募记录）: {trials}")
-    for i, recruit in enumerate(trials_recruits[:10], 1):
-        created_local = utc_to_local(recruit.created_at)
-        training_time = recruit.get_effective_training_decision_time()
-        training_local = utc_to_local(training_time) if training_time else None
-        logger.info(f"  试播{i}: {recruit.pilot.nickname if recruit.pilot else 'Unknown'} | "
-                    f"创建: {created_local.strftime('%Y-%m-%d') if created_local else 'N/A'} | "
-                    f"试播决策: {training_local.strftime('%Y-%m-%d') if training_local else 'N/A'}")
-    if trials > 10:
-        logger.info(f"  ... 还有 {trials - 10} 条试播记录未显示")
+    trials = Recruit.objects.filter(trials_query).count()
 
     # 新开播数
     new_recruits_query = Q(**base_query) & Q(created_at__gte=start_utc, created_at__lt=end_utc) & (
@@ -131,58 +112,10 @@ def calculate_recruit_period_stats_by_created_at(start_utc: datetime, end_utc: d
     new_recruits_count = 0
     processed_pilots = set()
 
-    logger.info(f"新开播数查询到的招募记录总数: {recruits.count()}")
     for recruit in recruits:
         if recruit.pilot and recruit.pilot.id not in processed_pilots:
             processed_pilots.add(recruit.pilot.id)
-            created_local = utc_to_local(recruit.created_at)
-            broadcast_time = recruit.get_effective_broadcast_decision_time()
-            broadcast_local = utc_to_local(broadcast_time) if broadcast_time else None
-            decision = recruit.get_effective_broadcast_decision()
-            logger.info(f"  新开播{new_recruits_count + 1}: {recruit.pilot.nickname} | "
-                        f"创建: {created_local.strftime('%Y-%m-%d') if created_local else 'N/A'} | "
-                        f"开播决策: {broadcast_local.strftime('%Y-%m-%d') if broadcast_local else 'N/A'} | "
-                        f"决策结果: {decision}")
             new_recruits_count += 1
-
-    # 额外分析：检查所有试播记录的开播决策情况
-    logger.info(f"\n=== 试播记录开播决策分析 ===")
-    trials_recruits = Recruit.objects.filter(trials_query)
-    for i, recruit in enumerate(trials_recruits, 1):
-        created_local = utc_to_local(recruit.created_at)
-        training_time = recruit.get_effective_training_decision_time()
-        training_local = utc_to_local(training_time) if training_time else None
-
-        # 检查开播决策字段
-        broadcast_decision = recruit.get_effective_broadcast_decision()
-        broadcast_time = recruit.get_effective_broadcast_decision_time()
-        broadcast_local = utc_to_local(broadcast_time) if broadcast_time else None
-
-        # 检查原始字段
-        has_broadcast_decision = bool(recruit.broadcast_decision)
-        has_final_decision = bool(recruit.final_decision)
-
-        logger.info(f"试播{i}: {recruit.pilot.nickname if recruit.pilot else 'Unknown'}")
-        logger.info(f"  创建: {created_local.strftime('%Y-%m-%d') if created_local else 'N/A'} | "
-                    f"试播决策: {training_local.strftime('%Y-%m-%d') if training_local else 'N/A'}")
-        logger.info(f"  开播决策: {broadcast_local.strftime('%Y-%m-%d') if broadcast_local else 'N/A'} | "
-                    f"决策结果: {broadcast_decision}")
-        logger.info(f"  原始字段: broadcast_decision={recruit.broadcast_decision}({has_broadcast_decision}) | "
-                    f"final_decision={recruit.final_decision}({has_final_decision})")
-
-        # 检查是否应该被计入新开播数
-        should_count = False
-        if recruit.broadcast_decision in [BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD]:
-            should_count = True
-        elif recruit.final_decision in [FinalDecision.OFFICIAL, FinalDecision.INTERN]:
-            should_count = True
-        elif recruit.final_decision in ['正式机师', '实习机师']:  # 历史字段兼容
-            should_count = True
-
-        logger.info(f"  应该计入新开播数: {should_count}")
-
-    logger.info(f"新开播数（窗口内创建且开播决策为正式/实习的招募记录，去重后）: {new_recruits_count}")
-    logger.info(f"========== 招募月报统计完成 ==========")
     return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits_count}
 
 
@@ -325,9 +258,6 @@ def calculate_recruit_monthly_stats(recruiter_id: str = None) -> Dict[str, Any]:
     Returns:
         dict: 包含当期和上期的统计数据及趋势比较
     """
-    logger.info(f"╔════════════════════════════════════════════════════════════════╗")
-    logger.info(f"║           招募月报完整统计流程开始                              ║")
-    logger.info(f"╚════════════════════════════════════════════════════════════════╝")
 
     now = get_current_utc_time()
     today_local = utc_to_local(now)
@@ -343,37 +273,20 @@ def calculate_recruit_monthly_stats(recruiter_id: str = None) -> Dict[str, Any]:
     previous_window_end = previous_window_end.replace(hour=23, minute=59, second=59, microsecond=999999)
     previous_window_start = current_window_start - timedelta(days=60)
 
-    logger.info(f"\n当期窗口: {current_window_start.strftime('%Y-%m-%d')} 至 {current_window_end.strftime('%Y-%m-%d')} (共60天)")
-    logger.info(f"上期窗口: {previous_window_start.strftime('%Y-%m-%d')} 至 {previous_window_end.strftime('%Y-%m-%d')} (共60天)")
-    logger.info(f"负责人筛选: {recruiter_id if recruiter_id and recruiter_id != 'all' else '全部'}")
-
     # 转换为UTC进行查询
     current_start_utc = local_to_utc(current_window_start)
     current_end_utc = local_to_utc(current_window_end)
     previous_start_utc = local_to_utc(previous_window_start)
     previous_end_utc = local_to_utc(previous_window_end)
 
-    logger.info(f"\n┌──────────────────────────────────────────────────────────────┐")
-    logger.info(f"│ 阶段1: 计算当期统计数据（月报口径：按创建时间统计）          │")
-    logger.info(f"└──────────────────────────────────────────────────────────────┘")
     # 计算当期统计数据（使用月报口径：按创建时间统计）
     current_stats = calculate_recruit_period_stats_by_created_at(current_start_utc, current_end_utc, recruiter_id)
 
-    logger.info(f"\n┌──────────────────────────────────────────────────────────────┐")
-    logger.info(f"│ 阶段2: 计算上期统计数据（月报口径：按创建时间统计）          │")
-    logger.info(f"└──────────────────────────────────────────────────────────────┘")
     # 计算上期统计数据（使用月报口径：按创建时间统计）
     previous_stats = calculate_recruit_period_stats_by_created_at(previous_start_utc, previous_end_utc, recruiter_id)
 
-    logger.info(f"\n┌──────────────────────────────────────────────────────────────┐")
-    logger.info(f"│ 阶段3: 计算当期满7天数                                        │")
-    logger.info(f"└──────────────────────────────────────────────────────────────┘")
     # 计算满7天数（需要特殊处理）
     current_full_7_days = calculate_full_7_days_recruits(current_start_utc, current_end_utc, recruiter_id)
-
-    logger.info(f"\n┌──────────────────────────────────────────────────────────────┐")
-    logger.info(f"│ 阶段4: 计算上期满7天数                                        │")
-    logger.info(f"└──────────────────────────────────────────────────────────────┘")
     previous_full_7_days = calculate_full_7_days_recruits(previous_start_utc, previous_end_utc, recruiter_id)
 
     current_stats['full_7_days'] = current_full_7_days
@@ -386,27 +299,6 @@ def calculate_recruit_monthly_stats(recruiter_id: str = None) -> Dict[str, Any]:
     # 计算趋势
     trends = calculate_trends(current_stats, previous_stats)
 
-    logger.info(f"\n╔════════════════════════════════════════════════════════════════╗")
-    logger.info(f"║                   统计结果汇总                                  ║")
-    logger.info(f"╠════════════════════════════════════════════════════════════════╣")
-    logger.info(f"║ 当期数据 ({current_window_start.strftime('%Y-%m-%d')} ~ {current_window_end.strftime('%Y-%m-%d')})")
-    logger.info(
-        f"║   约面数: {current_stats['appointments']} | 到面数: {current_stats['interviews']} | 试播数: {current_stats['trials']} | 新开播数: {current_stats['new_recruits']} | 满7天数: {current_stats['full_7_days']}"
-    )
-    logger.info(
-        f"║   到面转化率: {current_rates['interview_conversion']:.1f}% | 试播转化率: {current_rates['trial_conversion']:.1f}% | 新开播转化率: {current_rates['broadcast_conversion']:.1f}% | 满7天转化率: {current_rates['full_7_days_conversion']:.1f}%"
-    )
-    logger.info(f"║")
-    logger.info(f"║ 上期数据 ({previous_window_start.strftime('%Y-%m-%d')} ~ {previous_window_end.strftime('%Y-%m-%d')})")
-    logger.info(
-        f"║   约面数: {previous_stats['appointments']} | 到面数: {previous_stats['interviews']} | 试播数: {previous_stats['trials']} | 新开播数: {previous_stats['new_recruits']} | 满7天数: {previous_stats['full_7_days']}"
-    )
-    logger.info(f"║")
-    logger.info(f"║ 趋势对比")
-    logger.info(
-        f"║   约面数: {trends['appointments']} | 到面数: {trends['interviews']} | 试播数: {trends['trials']} | 新开播数: {trends['new_recruits']} | 满7天数: {trends['full_7_days']}"
-    )
-    logger.info(f"╚════════════════════════════════════════════════════════════════╝")
 
     return {
         'current_window': {
@@ -438,11 +330,6 @@ def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recru
     Returns:
         int: 满7天的主播数量
     """
-    start_local = utc_to_local(start_utc)
-    end_local = utc_to_local(end_utc)
-    logger.info(f"========== 满7天数统计开始 ==========")
-    logger.info(f"统计窗口: {start_local.strftime('%Y-%m-%d %H:%M:%S')} 至 {end_local.strftime('%Y-%m-%d %H:%M:%S')} (GMT+8)")
-
     base_query = {}
     if recruiter_id and recruiter_id != 'all':
         base_query['recruiter'] = recruiter_id
@@ -451,19 +338,15 @@ def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recru
     created_recruits_query = Q(**base_query) & Q(created_at__gte=start_utc, created_at__lt=end_utc)
     recruits = Recruit.objects.filter(created_recruits_query)
 
-    logger.info(f"窗口内创建的招募记录总数: {recruits.count()}")
-
     full_7_days_count = 0
     processed_pilots = set()  # 避免重复统计同一主播
 
     for recruit in recruits:
         if recruit.pilot and recruit.pilot.id not in processed_pilots:
             processed_pilots.add(recruit.pilot.id)
-            created_local = utc_to_local(recruit.created_at)
 
             # 检查该主播是否有7条或以上6小时及以上的开播记录（不限时间范围）
             battle_records = BattleRecord.objects.filter(pilot=recruit.pilot)
-            total_records = battle_records.count()
 
             # 计算超过6小时的开播记录数
             long_sessions_count = 0
@@ -474,16 +357,6 @@ def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recru
             # 如果有7条或以上超过6小时的开播记录，计入满7天数
             if long_sessions_count >= 7:
                 full_7_days_count += 1
-                logger.info(f"  ✓ 满7天{full_7_days_count}: {recruit.pilot.nickname} | "
-                            f"创建: {created_local.strftime('%Y-%m-%d') if created_local else 'N/A'} | "
-                            f"开播记录: {total_records}条 | 6小时以上: {long_sessions_count}条")
-            else:
-                logger.info(f"  ✗ 未满7天: {recruit.pilot.nickname} | "
-                            f"创建: {created_local.strftime('%Y-%m-%d') if created_local else 'N/A'} | "
-                            f"开播记录: {total_records}条 | 6小时以上: {long_sessions_count}条（不足7条）")
-
-    logger.info(f"满7天数（窗口内创建且主播有7条以上6小时以上开播记录的招募记录数，去重后）: {full_7_days_count}")
-    logger.info(f"========== 满7天数统计完成 ==========")
     return full_7_days_count
 
 
