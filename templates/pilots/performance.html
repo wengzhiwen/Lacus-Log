@@ -636,7 +636,7 @@ function generateBackButton() {
       <span>←</span> 返回
     </a>`;
   } else if (fromParam === 'battle_record_detail' && recordIdParam) {
-    backHtml = `<a class="btn btn-secondary" href="/battle_records/${recordIdParam}">
+    backHtml = `<a class="btn btn-secondary" href="/battle-records/${recordIdParam}">
       <span>←</span> 返回
     </a>`;
   } else {
@@ -732,7 +732,7 @@ function renderRecentRecords(records, pilotInfo) {
   }
   
   container.innerHTML = records.map(record => `
-    <a href="/battle_records/${record.id}" class="record-card">
+    <a href="/battle-records/${record.id}" class="record-card">
       <div class="card-header">
         <div class="record-time">
           <div class="start-time">${formatDateTime(record.start_time)}</div>
