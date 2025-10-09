@@ -12,6 +12,10 @@ from mongoengine import Q
 from models.battle_record import BattleRecord
 from models.recruit import BroadcastDecision, FinalDecision, Recruit
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.logging_setup import get_logger
+
+# 设置日志器
+logger = get_logger('recruit_stats')
 
 
 def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recruiter_id: str = None) -> Dict[str, int]:
@@ -40,14 +44,30 @@ def calculate_recruit_period_stats(start_utc: datetime, end_utc: datetime, recru
                                       | Q(training_decision_time_old__gte=start_utc, training_decision_time_old__lt=end_utc))
     trials = Recruit.objects.filter(trials_query).count()
 
+    # 查询窗口内所有招募记录中，其招募决策为正式主播或实习主播的
+    # 这样不论招募经历了什么中间状态，只要最终被决定招募就计入新开播数
     new_recruits_query = Q(**base_query) & (
         Q(broadcast_decision_time__gte=start_utc,
           broadcast_decision_time__lt=end_utc,
           broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
         | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
-    new_recruits = Recruit.objects.filter(new_recruits_query).count()
+    recruits = Recruit.objects.filter(new_recruits_query)
 
-    return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits}
+    new_recruits_count = 0
+    processed_pilots = set()  # 避免重复统计同一主播
+
+    logger.info(f"新开播数计算：查询到 {recruits.count()} 条招募记录")
+
+    for recruit in recruits:
+        if recruit.pilot and recruit.pilot.id not in processed_pilots:
+            processed_pilots.add(recruit.pilot.id)
+
+            # 调试日志：记录每个主播的信息
+            logger.info(f"✓ {recruit.pilot.nickname} (ID: {recruit.pilot.id}) 被计入新开播数")
+            new_recruits_count += 1
+
+    logger.info(f"新开播数计算完成，总计: {new_recruits_count}")
+    return {'appointments': appointments, 'interviews': interviews, 'trials': trials, 'new_recruits': new_recruits_count}
 
 
 def calculate_recruit_stats_for_date(target_date: datetime, recruiter_id: str = None) -> Dict[str, int]:
@@ -253,24 +273,26 @@ def calculate_full_7_days_recruits(start_utc: datetime, end_utc: datetime, recru
     Returns:
         int: 满7天的主播数量
     """
-    # 首先找到在指定时间窗口内被决定招募的主播
+    # 查找窗口内被决定招募的主播（与新开播数相同的逻辑）
     base_query = {}
     if recruiter_id and recruiter_id != 'all':
         base_query['recruiter'] = recruiter_id
 
-    # 找到被决定为主播的招募记录
-    recruits_query = Q(**base_query) & (
+    # 查询窗口内被决定招募的主播
+    new_recruits_query = Q(**base_query) & (
         Q(broadcast_decision_time__gte=start_utc,
-          broadcast_decision_time__lte=end_utc,
+          broadcast_decision_time__lt=end_utc,
           broadcast_decision__in=[BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN, BroadcastDecision.OFFICIAL_OLD, BroadcastDecision.INTERN_OLD])
-        | Q(final_decision_time__gte=start_utc, final_decision_time__lte=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
-
-    recruits = Recruit.objects.filter(recruits_query)
+        | Q(final_decision_time__gte=start_utc, final_decision_time__lt=end_utc, final_decision__in=[FinalDecision.OFFICIAL, FinalDecision.INTERN]))
+    recruits = Recruit.objects.filter(new_recruits_query)
 
     full_7_days_count = 0
+    processed_pilots = set()  # 避免重复统计同一主播
 
     for recruit in recruits:
-        if recruit.pilot:
+        if recruit.pilot and recruit.pilot.id not in processed_pilots:
+            processed_pilots.add(recruit.pilot.id)
+
             # 检查该主播在滚动窗口内的开播记录
             battle_records = BattleRecord.objects.filter(pilot=recruit.pilot, start_time__gte=start_utc, start_time__lte=end_utc)
 
