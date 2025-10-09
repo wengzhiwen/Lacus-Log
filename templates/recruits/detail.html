@@ -158,8 +158,56 @@ function renderRecruitInfo(recruit) {
             { label: '面试决策时间', value: formatDateTime(recruit.effective_interview_decision_time) },
         ]) + '</div>';
     }
-    
-    // ... Add other decision blocks similarly ...
+
+    if (recruit.effective_scheduled_training_time) {
+        content += '<div class="info-section"><h3 class="section-title">试播预约阶段</h3>' + renderInfoGrid([
+            { label: '预约试播时间', value: formatDateTime(recruit.effective_scheduled_training_time) },
+            { label: '预约试播决策人', value: recruit.effective_scheduled_training_decision_maker?.nickname },
+            { label: '预约试播决策时间', value: formatDateTime(recruit.effective_scheduled_training_decision_time) },
+        ]) + '</div>';
+    }
+
+    if (recruit.effective_training_decision) {
+        content += '<div class="info-section"><h3 class="section-title">试播阶段</h3>' + renderInfoGrid([
+            { label: '试播决策', value: recruit.effective_training_decision },
+            { label: '试播决策人', value: recruit.effective_training_decision_maker?.nickname },
+            { label: '试播决策时间', value: formatDateTime(recruit.effective_training_decision_time) },
+        ]) + '</div>';
+    }
+
+    if (recruit.effective_scheduled_broadcast_time) {
+        content += '<div class="info-section"><h3 class="section-title">开播预约阶段</h3>' + renderInfoGrid([
+            { label: '预约开播时间', value: formatDateTime(recruit.effective_scheduled_broadcast_time) },
+            { label: '预约开播决策人', value: recruit.effective_scheduled_broadcast_decision_maker?.nickname },
+            { label: '预约开播决策时间', value: formatDateTime(recruit.effective_scheduled_broadcast_decision_time) },
+        ]) + '</div>';
+    }
+
+    if (recruit.effective_broadcast_decision) {
+        content += '<div class="info-section"><h3 class="section-title">开播阶段</h3>' + renderInfoGrid([
+            { label: '开播决策', value: recruit.effective_broadcast_decision },
+            { label: '开播决策人', value: recruit.effective_broadcast_decision_maker?.nickname },
+            { label: '开播决策时间', value: formatDateTime(recruit.effective_broadcast_decision_time) },
+        ]) + '</div>';
+    }
+
+    // 历史数据兼容性
+    if (recruit.training_decision_old || recruit.training_time || recruit.final_decision) {
+        const historyItems = [];
+        if (recruit.training_decision_old) {
+            historyItems.push({ label: '试播招募决策 (历史)', value: recruit.training_decision_old });
+        }
+        if (recruit.training_time) {
+            historyItems.push({ label: '试播时间 (历史)', value: formatDateTime(recruit.training_time) });
+        }
+        if (recruit.final_decision) {
+            historyItems.push({ label: '结束招募决策 (历史)', value: recruit.final_decision });
+        }
+        
+        if (historyItems.length > 0) {
+            content += '<div class="info-section"><h3 class="section-title">历史数据</h3>' + renderInfoGrid(historyItems) + '</div>';
+        }
+    }
 
     content += '<div class="info-section"><h3 class="section-title">系统信息</h3>' + renderInfoGrid([
         { label: '创建时间', value: formatDateTime(recruit.created_at) },

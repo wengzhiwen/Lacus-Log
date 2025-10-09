@@ -78,6 +78,12 @@ def serialize_recruit(recruit: Recruit) -> Dict[str, Any]:
         utc_to_local(recruit.scheduled_training_decision_time).isoformat() if recruit.scheduled_training_decision_time else None,
         'effective_scheduled_training_time':
         utc_to_local(recruit.get_effective_scheduled_training_time()).isoformat() if recruit.get_effective_scheduled_training_time() else None,
+        'effective_scheduled_training_decision_maker': {
+            'id': str(recruit.get_effective_scheduled_training_decision_maker().id),
+            'nickname': recruit.get_effective_scheduled_training_decision_maker().nickname,
+        } if recruit.get_effective_scheduled_training_decision_maker() else None,
+        'effective_scheduled_training_decision_time':
+        utc_to_local(recruit.get_effective_scheduled_training_decision_time()).isoformat() if recruit.get_effective_scheduled_training_decision_time() else None,
 
         # 试播决策相关
         'training_decision':
@@ -108,6 +114,12 @@ def serialize_recruit(recruit: Recruit) -> Dict[str, Any]:
         utc_to_local(recruit.scheduled_broadcast_decision_time).isoformat() if recruit.scheduled_broadcast_decision_time else None,
         'effective_scheduled_broadcast_time':
         utc_to_local(recruit.get_effective_scheduled_broadcast_time()).isoformat() if recruit.get_effective_scheduled_broadcast_time() else None,
+        'effective_scheduled_broadcast_decision_maker': {
+            'id': str(recruit.get_effective_scheduled_broadcast_decision_maker().id),
+            'nickname': recruit.get_effective_scheduled_broadcast_decision_maker().nickname,
+        } if recruit.get_effective_scheduled_broadcast_decision_maker() else None,
+        'effective_scheduled_broadcast_decision_time':
+        utc_to_local(recruit.get_effective_scheduled_broadcast_decision_time()).isoformat() if recruit.get_effective_scheduled_broadcast_decision_time() else None,
 
         # 开播决策相关
         'broadcast_decision':
