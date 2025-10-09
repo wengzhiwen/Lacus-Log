@@ -14,6 +14,7 @@
   - 对修改过的python代码逐一运行 `yapf`。
 - 对修改过的python代码逐一使用静态检查，可参考 `pylint` 的相关禁用/限制项（见 `pyproject.toml`）。
 - 上述工作只需要针对涉及修改的python代码文件，按文件逐一进行；不要执行针对全库的格式化操作
+- 遵循REST化原则，所有的新功能的设计都优先考虑完全REST化
 
 ## 工作流与重要约定
 
@@ -44,7 +45,6 @@
 - `routes/`：各路由与视图处理。
   - 传统视图文件（如 `announcement.py`、`pilot.py`）：渲染 HTML 页面
   - REST API 文件（如 `announcements_api.py`、`pilots_api.py`）：提供 JSON 接口
-  - `auth_api.py`：REST 认证 API（登录、登出、token 管理）
 - `models/`：MongoEngine 数据模型定义。
 - `templates/`：Jinja2 模板文件。
 - `utils/`：通用工具函数与辅助模块。
@@ -60,7 +60,7 @@
 
 ## 文档与变更记录
 
-- 每次变更后，在 `docs/CHANGELOG.md` 记录：
+- 每次发生代码变更后（纯文档变更不需要），在 `docs/CHANGELOG.md` 记录：
   - 日期（使用当前真实日期，建议 `YYYY-MM-DD`）。
   - 变更类型（新增/修复/重构/文档/性能/其他）。
   - 具体内容简述（不超过100字）
@@ -126,7 +126,15 @@
 - 使用 Flask-JWT-Extended 进行 JWT 认证（Cookie + Header 双模式）
 - 使用 `@jwt_required()` 装饰器保护需要认证的接口
 - 使用 `@roles_required('role_name')` 进行角色权限控制
-- REST API使用JWT认证，无需额外的CSRF验证（已通过JWT装饰器保护）
+- 所有需要修改数据的接口（POST/PUT/PATCH/DELETE）必须验证 CSRF token：
+  ```python
+  from utils.csrf_helper import validate_csrf_header, CSRFError
+
+  try:
+      validate_csrf_header()
+  except CSRFError as exc:
+      return jsonify(create_error_response(exc.code, exc.message)), 401
+  ```
 
 ### 路由命名规范
 
@@ -162,5 +170,4 @@
 
 - 若需求不明确或存在实现路径分歧，优先提出方案与影响面，征求用户确认后再实施。
 - 对潜在破坏性或不可逆操作（删除数据、批量重命名、接口大改等）需先确认。
-
 
