@@ -58,7 +58,7 @@
 
     <div class="empty-state" id="detailEmpty" style="display: none;">
       <div class="empty-icon">📭</div>
-      <h3>近30日无招募记录</h3>
+      <h3>近60日无招募记录</h3>
       <p>当前筛选条件下未找到任何招募记录</p>
       <a href="{{ url_for('report.recruit_daily_report') }}" class="btn btn-primary">返回招募日报</a>
     </div>
@@ -75,35 +75,35 @@
         <div class="card-icon">📅</div>
         <div class="card-content">
           <h3>约面数</h3>
-          <p>滚动30天内创建的招募数量</p>
+          <p>滚动60天内创建的招募数量</p>
         </div>
       </div>
       <div class="explanation-card">
         <div class="card-icon">👥</div>
         <div class="card-content">
           <h3>到面数</h3>
-          <p>滚动30天内发生面试决策的招募数量</p>
+          <p>滚动60天内发生面试决策的招募数量</p>
         </div>
       </div>
       <div class="explanation-card">
         <div class="card-icon">🎯</div>
         <div class="card-content">
           <h3>试播数</h3>
-          <p>滚动30天内发生试播决策的招募数量</p>
+          <p>滚动60天内发生试播决策的招募数量</p>
         </div>
       </div>
       <div class="explanation-card">
         <div class="card-icon">🚀</div>
         <div class="card-content">
           <h3>新开播数</h3>
-          <p>滚动30天内决定招募为主播的数量</p>
+          <p>滚动60天内决定招募为主播的数量</p>
         </div>
       </div>
       <div class="explanation-card">
         <div class="card-icon">⭐</div>
         <div class="card-content">
           <h3>满7天数</h3>
-          <p>滚动30天内满足7次超过6小时开播的主播数量</p>
+          <p>滚动60天内满足7次超过6小时开播的主播数量</p>
         </div>
       </div>
     </div>
@@ -742,7 +742,7 @@
     const currentEnd = windowInfo.current_end;
     const windowInfoElement = document.getElementById('windowInfo');
     if (windowInfoElement) {
-      windowInfoElement.textContent = `统计窗口：${currentStart} 至 ${currentEnd}（滚动30天）`;
+      windowInfoElement.textContent = `统计窗口：${currentStart} 至 ${currentEnd}（滚动60天）`;
     }
   }
 
