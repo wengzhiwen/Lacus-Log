@@ -67,10 +67,20 @@ def cached_monthly_report(ttl: int = 900):  # pylint: disable=unused-argument
     return decorator
 
 
+def _clear_report_cache(log_message: str):
+    """统一清空报告缓存并记录日志"""
+    monthly_report_cache.clear()
+    logger.info(log_message)
+
+
 def clear_monthly_report_cache():
     """清空开播月报缓存"""
-    monthly_report_cache.clear()
-    logger.info('开播月报缓存已清空')
+    _clear_report_cache('开播月报缓存已清空')
+
+
+def clear_daily_report_cache():
+    """清空开播日报缓存"""
+    _clear_report_cache('开播日报缓存已清空')
 
 
 def cached_pilot_performance(ttl: int = 300):  # pylint: disable=unused-argument

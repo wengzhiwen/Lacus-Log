@@ -358,6 +358,109 @@
   const dailyApi = '{{ url_for('reports_api.daily_report_data') }}';
   const reportPageUrl = '{{ url_for('report.daily_report') }}';
   const pilotPerformanceTemplate = '{{ url_for('pilot.pilot_performance', pilot_id='__PID__') }}';
+  const refreshCacheApi = '{{ url_for('reports_api.refresh_daily_report_cache') }}';
+  const pageTitle = document.querySelector('.page-title');
+  const originalTitleText = pageTitle ? pageTitle.textContent.trim() : '📒 开播日报';
+  const SHORT_TITLE_TEXT = '📒 开播日';
+  const SECRET_TAP_THRESHOLD = 9;
+  const SECRET_RESET_MS = 1500;
+  let secretClickCount = 0;
+  let secretTimer = null;
+  let refreshReady = false;
+  let isRefreshingCache = false;
+
+  function resetSecretState(restoreTitle = true) {
+    refreshReady = false;
+    secretClickCount = 0;
+    if (secretTimer) {
+      clearTimeout(secretTimer);
+      secretTimer = null;
+    }
+    if (restoreTitle && pageTitle) {
+      pageTitle.textContent = originalTitleText;
+    }
+  }
+
+  function scheduleSecretReset() {
+    if (!pageTitle) {
+      return;
+    }
+    if (secretTimer) {
+      clearTimeout(secretTimer);
+    }
+    secretTimer = setTimeout(() => {
+      if (!isRefreshingCache) {
+        resetSecretState(true);
+      }
+    }, SECRET_RESET_MS);
+  }
+
+  async function triggerCacheRefresh() {
+    if (!pageTitle || !refreshCacheApi) {
+      return;
+    }
+    isRefreshingCache = true;
+    resetSecretState(false);
+    pageTitle.textContent = '缓存刷新中...';
+
+    try {
+      const response = await fetch(refreshCacheApi, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      });
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (parseError) {
+        console.error('解析刷新缓存响应失败：', parseError);
+      }
+
+      if (!response.ok || !payload || !payload.success) {
+        const errorMessage = payload && payload.error ? payload.error.message : '刷新缓存失败';
+        throw new Error(errorMessage);
+      }
+
+      pageTitle.textContent = '缓存已刷新，正在重新加载...';
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    } catch (error) {
+      console.error('刷新开播日报缓存失败：', error);
+      pageTitle.textContent = '刷新失败，请稍后重试';
+      setTimeout(() => {
+        isRefreshingCache = false;
+        resetSecretState(true);
+      }, 2000);
+    }
+  }
+
+  if (pageTitle) {
+    pageTitle.addEventListener('click', () => {
+      if (isRefreshingCache) {
+        return;
+      }
+
+      secretClickCount += 1;
+      scheduleSecretReset();
+
+      if (!refreshReady && secretClickCount >= SECRET_TAP_THRESHOLD) {
+        refreshReady = true;
+        secretClickCount = 0;
+        pageTitle.textContent = SHORT_TITLE_TEXT;
+        return;
+      }
+
+      if (refreshReady && secretClickCount >= SECRET_TAP_THRESHOLD) {
+        triggerCacheRefresh();
+      }
+    });
+  }
 
   const rankMapping = {
     '候补机师': '候选人',

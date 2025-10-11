@@ -5,25 +5,14 @@ from datetime import timedelta
 
 from flask import Blueprint, jsonify, request
 
-from routes.report import (_calculate_daily_details, _calculate_day_summary,
-                           _calculate_monthly_details,
-                           _calculate_monthly_summary,
-                           _calculate_weekly_details,
-                           _calculate_weekly_summary,
-                           get_default_week_start_for_now_prev_week,
-                           get_local_date_from_string,
-                           get_local_date_from_string_safe,
+from routes.report import (_calculate_daily_details, _calculate_day_summary, _calculate_monthly_details, _calculate_monthly_summary, _calculate_weekly_details,
+                           _calculate_weekly_summary, get_default_week_start_for_now_prev_week, get_local_date_from_string, get_local_date_from_string_safe,
                            get_local_month_from_string, get_week_start_tuesday)
+from utils.cache_helper import clear_daily_report_cache
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.report_serializers import (create_error_response,
-                                      create_success_response,
-                                      serialize_daily_details,
-                                      serialize_daily_summary,
-                                      serialize_monthly_details,
-                                      serialize_monthly_summary,
-                                      serialize_weekly_details,
-                                      serialize_weekly_summary)
+from utils.report_serializers import (create_error_response, create_success_response, serialize_daily_details, serialize_daily_summary,
+                                      serialize_monthly_details, serialize_monthly_summary, serialize_weekly_details, serialize_weekly_summary)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
 
 logger = get_logger('reports_api')
@@ -91,6 +80,20 @@ def daily_report_data():
     }
 
     return jsonify(create_success_response(data, meta))
+
+
+@reports_api_bp.route('/daily/cache/refresh', methods=['POST'])
+@jwt_roles_accepted('gicho', 'kancho')
+def refresh_daily_report_cache():
+    """刷新开播日报缓存。"""
+    logger.info('收到开播日报缓存刷新请求')
+    try:
+        clear_daily_report_cache()
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('刷新开播日报缓存失败：%s', exc)
+        return jsonify(create_error_response('CACHE_REFRESH_FAILED', '刷新开播日报缓存失败，请稍后重试')), 500
+
+    return jsonify(create_success_response({'message': '开播日报缓存已刷新'})), 200
 
 
 @reports_api_bp.route('/weekly', methods=['GET'])
