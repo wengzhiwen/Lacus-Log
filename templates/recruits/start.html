@@ -37,6 +37,16 @@
     </div>
   </div>
 
+  <!-- 招募记录警告提示 -->
+  <div id="recruit-history-warning" class="warning-alert" style="display: none;">
+    <div class="warning-icon">⚠️</div>
+    <div class="warning-content">
+      <div class="warning-title">该主播存在招募记录</div>
+      <div id="warning-message" class="warning-message"></div>
+    </div>
+    <button type="button" class="warning-close" onclick="closeRecruitWarning()">✕</button>
+  </div>
+
   <form id="start-recruit-form" class="recruit-form">
     <input type="hidden" name="pilot_id" value="{{ pilot_id }}">
     
@@ -122,6 +132,75 @@ label { font-weight: 500; font-size: 14px; }
 .required { color: var(--error); }
 input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--gray); border-radius: 6px; font-size: 14px; }
 textarea { resize: vertical; min-height: 80px; }
+
+/* 招募记录警告提示样式 */
+.warning-alert {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.warning-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.warning-content {
+  flex: 1;
+}
+
+.warning-title {
+  font-weight: 600;
+  color: #856404;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.warning-message {
+  color: #664d03;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.warning-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #856404;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.warning-close:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
 @media (min-width: 768px) { .form-row { grid-template-columns: 1fr 1fr; } }
 </style>
 
@@ -212,6 +291,47 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
   };
 
+  // 检测招募记录
+  const checkRecruitHistory = async (pilotId) => {
+    try {
+      const response = await fetch(`/api/recruits/check-pilot/${pilotId}`, {
+        credentials: 'include'
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('检测招募记录失败:', result.error?.message);
+        return;
+      }
+
+      if (result.data.has_recruit_history && result.data.recruit) {
+        const recruit = result.data.recruit;
+        const message = `${recruit.created_at_gmt8}，由${recruit.recruiter_nickname}创建，当前招募状态为${recruit.status}`;
+        showRecruitWarning(message);
+      }
+    } catch (error) {
+      console.error('检测招募记录异常:', error);
+    }
+  };
+
+  // 显示招募记录警告
+  const showRecruitWarning = (message) => {
+    const warningAlert = document.getElementById('recruit-history-warning');
+    const warningMessage = document.getElementById('warning-message');
+
+    warningMessage.textContent = message;
+    warningAlert.style.display = 'flex';
+
+    // 滚动到警告提示位置
+    warningAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  // 关闭招募记录警告
+  window.closeRecruitWarning = function() {
+    const warningAlert = document.getElementById('recruit-history-warning');
+    warningAlert.style.display = 'none';
+  };
+
   try {
     const [pilotResponse, optionsPayload] = await Promise.all([
       fetch(`/api/pilots/${pilotId}`),
@@ -230,6 +350,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     populateChannelOptions(optionsData.enums?.channel || {});
 
     document.getElementById('appointment_time').value = getNext14Clock();
+
+    // 检测招募记录
+    await checkRecruitHistory(pilotId);
 
   } catch (error) {
     console.error('加载启动招募页面数据失败:', error);

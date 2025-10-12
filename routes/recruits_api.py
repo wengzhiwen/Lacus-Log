@@ -1259,3 +1259,45 @@ def broadcast_decision(recruit_id):
     except Exception as e:
         logger.error('开播决策失败：%s', str(e), exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '开播决策失败')), 500
+
+
+@recruits_api_bp.route('/api/recruits/check-pilot/<pilot_id>', methods=['GET'])
+@jwt_roles_accepted('gicho', 'kancho')
+def check_pilot_recruit_history(pilot_id):
+    """检测指定主播的招募记录，返回最近创建的一条记录"""
+    try:
+        # 验证主播是否存在
+        try:
+            pilot = Pilot.objects.get(id=pilot_id)
+        except DoesNotExist:
+            return jsonify(create_error_response('PILOT_NOT_FOUND', '主播不存在')), 404
+
+        # 查找该主播的招募记录，按创建时间倒序排列，取第一条
+        recruit = Recruit.objects.filter(pilot=pilot).order_by('-created_at').first()
+
+        if not recruit:
+            # 没有招募记录
+            data = {'has_recruit_history': False, 'recruit': None}
+            return jsonify(create_success_response(data))
+
+        # 序列化招募记录
+        recruit_data = serialize_recruit(recruit)
+
+        # 添加创建时间（GMT+8格式）
+        created_at_gmt8 = utc_to_local(recruit.created_at)
+        recruit_data['created_at_gmt8'] = created_at_gmt8.strftime('%Y-%m-%d %H:%M:%S')
+
+        # 添加招募负责人昵称
+        if recruit.recruiter:
+            recruit_data['recruiter_nickname'] = recruit.recruiter.nickname or recruit.recruiter.username
+        else:
+            recruit_data['recruiter_nickname'] = '未知'
+
+        data = {'has_recruit_history': True, 'recruit': recruit_data}
+
+        logger.info('检测主播招募记录：主播=%s，找到记录=%s', pilot.nickname, recruit.id)
+        return jsonify(create_success_response(data))
+
+    except Exception as e:
+        logger.error('检测主播招募记录失败: %s', str(e), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '检测招募记录失败')), 500
