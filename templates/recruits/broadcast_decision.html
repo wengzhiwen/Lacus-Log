@@ -85,6 +85,7 @@
   <button type="submit" form="broadcast-decision-form" class="btn btn-primary">确认决策</button>
 </div>
 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/recruit-decision-protection.css') }}">
 <style>
 .broadcast-decision { padding: 20px; }
 .back-nav { margin-bottom: 20px; }
@@ -111,6 +112,7 @@ input[readonly] { background: var(--table-header); }
 @media (min-width: 768px) { .form-row { grid-template-columns: 1fr 1fr; } }
 </style>
 
+<script src="{{ url_for('static', filename='js/recruit-decision-protection.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     const section = document.querySelector('.broadcast-decision');
@@ -121,6 +123,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     const platformSelect = document.getElementById('platform');
     const introductionFeeInput = document.getElementById('introduction_fee');
     const remarksInput = document.getElementById('remarks');
+
+    // 初始化防呆功能
+    const protection = new RecruitDecisionProtection({
+        decisionSelector: '#broadcast_decision',
+        submitSelector: 'button[form="broadcast-decision-form"]',
+        formSelector: '#broadcast-decision-form'
+    });
 
     const rankMapping = {
         '候补机师': '候选人',
@@ -231,6 +240,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     const form = document.getElementById('broadcast-decision-form');
     form.addEventListener('submit', async function(event) {
         event.preventDefault();
+
+        // 检查防呆功能
+        if (window.recruitDecisionProtection && window.recruitDecisionProtection.shouldBlockSubmit()) {
+            window.recruitDecisionProtection.handleClick();
+            return;
+        }
 
         const formData = new FormData(form);
         const payload = {

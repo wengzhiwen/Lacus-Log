@@ -83,6 +83,7 @@
   <button type="submit" form="interview-form" class="btn btn-primary">确认决策</button>
 </div>
 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/recruit-decision-protection.css') }}">
 <style>
 .interview-decision { padding: 20px; }
 .back-nav { margin-bottom: 20px; }
@@ -109,6 +110,7 @@ input[readonly] { background: var(--table-header); }
 @media (min-width: 768px) { .form-row { grid-template-columns: 1fr 1fr; } }
 </style>
 
+<script src="{{ url_for('static', filename='js/recruit-decision-protection.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     const section = document.querySelector('.interview-decision');
@@ -123,6 +125,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     const currentYear = new Date().getFullYear();
     birthYearInput.min = currentYear - 60;
     birthYearInput.max = currentYear - 10;
+
+    // 初始化防呆功能
+    const protection = new RecruitDecisionProtection({
+        decisionSelector: '#interview_decision',
+        submitSelector: 'button[form="interview-form"]',
+        formSelector: '#interview-form'
+    });
 
     const rankMapping = {
         '候补机师': '候选人',
@@ -209,6 +218,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     const form = document.getElementById('interview-form');
     form.addEventListener('submit', async function(event) {
         event.preventDefault();
+
+        // 检查防呆功能
+        if (window.recruitDecisionProtection && window.recruitDecisionProtection.shouldBlockSubmit()) {
+            window.recruitDecisionProtection.handleClick();
+            return;
+        }
 
         const formData = new FormData(form);
         const payload = {

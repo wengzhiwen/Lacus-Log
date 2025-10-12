@@ -614,7 +614,7 @@ def update_recruit(recruit_id):
             'pilot': str(recruit.pilot.id) if recruit.pilot else None,
             'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
             'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
-            'channel': recruit.channel.value if recruit.channel else None,
+            'channel': recruit.channel.value if hasattr(recruit.channel, 'value') else recruit.channel,
             'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
             'remarks': recruit.remarks,
             'status': recruit.status.value if recruit.status else None,
@@ -1022,22 +1022,22 @@ def training_decision(recruit_id):
             'pilot': str(recruit.pilot.id) if recruit.pilot else None,
             'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
             'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
-            'channel': recruit.channel.value if recruit.channel else None,
+            'channel': recruit.channel.value if hasattr(recruit.channel, 'value') else recruit.channel,
             'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
             'remarks': recruit.remarks,
-            'status': recruit.status.value if recruit.status else None,
+            'status': recruit.status.value if hasattr(recruit.status, 'value') else recruit.status,
         }
 
         old_pilot_data = {
             'nickname': recruit.pilot.nickname,
             'real_name': recruit.pilot.real_name,
-            'gender': recruit.pilot.gender.value if recruit.pilot.gender else None,
+            'gender': recruit.pilot.gender.value if hasattr(recruit.pilot.gender, 'value') else recruit.pilot.gender,
             'birth_year': recruit.pilot.birth_year,
             'owner': str(recruit.pilot.owner.id) if recruit.pilot.owner else None,
-            'platform': recruit.pilot.platform.value if recruit.pilot.platform else None,
-            'work_mode': recruit.pilot.work_mode.value if recruit.pilot.work_mode else None,
-            'rank': recruit.pilot.rank.value if recruit.pilot.rank else None,
-            'status': recruit.pilot.status.value if recruit.pilot.status else None,
+            'platform': recruit.pilot.platform.value if hasattr(recruit.pilot.platform, 'value') else recruit.pilot.platform,
+            'work_mode': recruit.pilot.work_mode.value if hasattr(recruit.pilot.work_mode, 'value') else recruit.pilot.work_mode,
+            'rank': recruit.pilot.rank.value if hasattr(recruit.pilot.rank, 'value') else recruit.pilot.rank,
+            'status': recruit.pilot.status.value if hasattr(recruit.pilot.status, 'value') else recruit.pilot.status,
         }
 
         # 更新招募信息
@@ -1133,10 +1133,10 @@ def schedule_broadcast(recruit_id):
             'pilot': str(recruit.pilot.id) if recruit.pilot else None,
             'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
             'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
-            'channel': recruit.channel.value if recruit.channel else None,
+            'channel': recruit.channel.value if hasattr(recruit.channel, 'value') else recruit.channel,
             'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
             'remarks': recruit.remarks,
-            'status': recruit.status.value if recruit.status else None,
+            'status': recruit.status.value if hasattr(recruit.status, 'value') else recruit.status,
         }
 
         # 更新招募信息
@@ -1236,22 +1236,22 @@ def broadcast_decision(recruit_id):
             'pilot': str(recruit.pilot.id) if recruit.pilot else None,
             'recruiter': str(recruit.recruiter.id) if recruit.recruiter else None,
             'appointment_time': recruit.appointment_time.isoformat() if recruit.appointment_time else None,
-            'channel': recruit.channel.value if recruit.channel else None,
+            'channel': recruit.channel.value if hasattr(recruit.channel, 'value') else recruit.channel,
             'introduction_fee': str(recruit.introduction_fee) if recruit.introduction_fee else None,
             'remarks': recruit.remarks,
-            'status': recruit.status.value if recruit.status else None,
+            'status': recruit.status.value if hasattr(recruit.status, 'value') else recruit.status,
         }
 
         old_pilot_data = {
             'nickname': recruit.pilot.nickname,
             'real_name': recruit.pilot.real_name,
-            'gender': recruit.pilot.gender.value if recruit.pilot.gender else None,
+            'gender': recruit.pilot.gender.value if hasattr(recruit.pilot.gender, 'value') else recruit.pilot.gender,
             'birth_year': recruit.pilot.birth_year,
             'owner': str(recruit.pilot.owner.id) if recruit.pilot.owner else None,
-            'platform': recruit.pilot.platform.value if recruit.pilot.platform else None,
-            'work_mode': recruit.pilot.work_mode.value if recruit.pilot.work_mode else None,
-            'rank': recruit.pilot.rank.value if recruit.pilot.rank else None,
-            'status': recruit.pilot.status.value if recruit.pilot.status else None,
+            'platform': recruit.pilot.platform.value if hasattr(recruit.pilot.platform, 'value') else recruit.pilot.platform,
+            'work_mode': recruit.pilot.work_mode.value if hasattr(recruit.pilot.work_mode, 'value') else recruit.pilot.work_mode,
+            'rank': recruit.pilot.rank.value if hasattr(recruit.pilot.rank, 'value') else recruit.pilot.rank,
+            'status': recruit.pilot.status.value if hasattr(recruit.pilot.status, 'value') else recruit.pilot.status,
         }
 
         # 更新招募信息

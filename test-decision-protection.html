@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>招募决策防呆功能测试</title>
+    <link rel="stylesheet" href="/static/css/recruit-decision-protection.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .btn-primary {
+            background: #007bff;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>招募决策防呆功能测试</h1>
+
+    <div class="test-section">
+        <h2>面试决策测试</h2>
+        <p class="description">选择"不招募"选项，然后尝试提交表单。观察按钮变化和动效。</p>
+
+        <form id="interview-form">
+            <div class="form-group">
+                <label for="interview_decision">面试决策：</label>
+                <select id="interview_decision" required>
+                    <option value="">-- 请选择决策 --</option>
+                    <option value="预约试播">预约试播</option>
+                    <option value="不招募">不招募</option>
+                </select>
+            </div>
+
+            <button type="submit" form="interview-form" class="btn btn-primary">确认决策</button>
+        </form>
+    </div>
+
+    <div class="test-section">
+        <h2>试播决策测试</h2>
+        <p class="description">选择"不招募"选项，然后尝试提交表单。观察按钮变化和动效。</p>
+
+        <form id="training-decision-form">
+            <div class="form-group">
+                <label for="training_decision">试播决策：</label>
+                <select id="training_decision" required>
+                    <option value="">-- 请选择决策 --</option>
+                    <option value="预约开播">预约开播</option>
+                    <option value="不招募">不招募</option>
+                </select>
+            </div>
+
+            <button type="submit" form="training-decision-form" class="btn btn-primary">确认决策</button>
+        </form>
+    </div>
+
+    <div class="test-section">
+        <h2>开播决策测试</h2>
+        <p class="description">选择"不招募"选项，然后尝试提交表单。观察按钮变化和动效。</p>
+
+        <form id="broadcast-decision-form">
+            <div class="form-group">
+                <label for="broadcast_decision">开播决策：</label>
+                <select id="broadcast_decision" required>
+                    <option value="">-- 请选择决策 --</option>
+                    <option value="正式主播">正式主播</option>
+                    <option value="实习主播">实习主播</option>
+                    <option value="不招募">不招募</option>
+                </select>
+            </div>
+
+            <button type="submit" form="broadcast-decision-form" class="btn btn-primary">确认决策</button>
+        </form>
+    </div>
+
+    <div class="test-section">
+        <h2>使用说明</h2>
+        <ol>
+            <li>在任何一个测试区域选择"不招募"选项</li>
+            <li>观察按钮文本变为"确定不招募？再点N次"</li>
+            <li>N是18-38之间的随机数</li>
+            <li>点击按钮，观察打击感动效：
+                <ul>
+                    <li>前期：简单震动</li>
+                    <li>中期：震动 + 脉冲</li>
+                    <li>后期：震动 + 脉冲 + 发光 + 屏幕震动</li>
+                </ul>
+            </li>
+            <li>剩余次数少于5次时，按钮会有紧急闪烁效果</li>
+            <li>达到指定点击次数后，按钮变为"确定不招募？点击提交"</li>
+            <li>选择其他选项（如"预约试播"）会重置防呆功能</li>
+        </ol>
+    </div>
+
+    <script src="/static/js/recruit-decision-protection.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化面试决策防呆功能
+            const interviewProtection = new RecruitDecisionProtection({
+                decisionSelector: '#interview_decision',
+                submitSelector: 'button[form="interview-form"]',
+                formSelector: '#interview-form'
+            });
+
+            // 初始化试播决策防呆功能
+            const trainingProtection = new RecruitDecisionProtection({
+                decisionSelector: '#training_decision',
+                submitSelector: 'button[form="training-decision-form"]',
+                formSelector: '#training-decision-form'
+            });
+
+            // 初始化开播决策防呆功能
+            const broadcastProtection = new RecruitDecisionProtection({
+                decisionSelector: '#broadcast_decision',
+                submitSelector: 'button[form="broadcast-decision-form"]',
+                formSelector: '#broadcast-decision-form'
+            });
+
+            // 阻止表单实际提交，仅用于测试
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    alert('测试完成！功能正常工作。');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

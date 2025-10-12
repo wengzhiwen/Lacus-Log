@@ -1,0 +1,148 @@
+/**
+ * 招募决策防呆功能样式
+ */
+
+/* 按钮震动效果 */
+.btn-shake {
+    animation: shake 0.6s ease-in-out;
+}
+
+/* 按钮脉冲效果 */
+.btn-pulse {
+    animation: pulse 0.3s ease-in-out;
+}
+
+/* 按钮发光效果 */
+.btn-glow {
+    animation: glow 0.5s ease-in-out;
+}
+
+/* 震动动画 */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px) rotate(-1deg); }
+    20%, 40%, 60%, 80% { transform: translateX(5px) rotate(1deg); }
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* 发光动画 */
+@keyframes glow {
+    0% { box-shadow: 0 0 5px rgba(255, 107, 107, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(255, 107, 107, 0.8), 0 0 30px rgba(255, 107, 107, 0.6); }
+    100% { box-shadow: 0 0 5px rgba(255, 107, 107, 0.5); }
+}
+
+/* 粒子飞散动画 */
+@keyframes particle-float {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(
+            calc(cos(var(--angle)) * var(--distance)),
+            calc(sin(var(--angle)) * var(--distance))
+        ) scale(0);
+        opacity: 0;
+    }
+}
+
+/* 粒子基础样式 */
+.impact-particle {
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* 危险按钮样式 */
+.btn-danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    border: 1px solid #ff6b6b;
+    color: white;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #ff5252 0%, #e53935 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+}
+
+.btn-danger:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
+}
+
+/* 按钮点击波纹效果 */
+.btn-danger::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn-danger:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* 数字变化动画 */
+.btn-counting {
+    animation: countDown 0.3s ease-in-out;
+}
+
+@keyframes countDown {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); color: #ff6b6b; }
+    100% { transform: scale(1); }
+}
+
+/* 完成状态动画 */
+.btn-complete {
+    animation: complete 0.8s ease-in-out;
+}
+
+@keyframes complete {
+    0% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.2) rotate(180deg); background: linear-gradient(135deg, #4ecdc4 0%, #44a3a0 100%); }
+    100% { transform: scale(1) rotate(360deg); }
+}
+
+/* 屏幕震动效果（当次数很多时） */
+.screen-shake {
+    animation: screenShake 0.3s ease-in-out !important;
+}
+
+@keyframes screenShake {
+    0%, 100% { transform: translate(0, 0); }
+    10%, 30%, 50%, 70%, 90% { transform: translate(-3px, 3px) rotate(-0.5deg); }
+    20%, 40%, 60%, 80% { transform: translate(3px, -3px) rotate(0.5deg); }
+}
+
+/* 特殊效果：当剩余次数少于5次时 */
+.btn-urgent {
+    animation: urgent 1s infinite;
+}
+
+@keyframes urgent {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 10px rgba(255, 107, 107, 0.6);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px rgba(255, 107, 107, 0.8);
+    }
+}
