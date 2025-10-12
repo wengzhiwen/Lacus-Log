@@ -134,11 +134,25 @@ def logout():
 @jwt_required(refresh=True)
 def refresh():
     """刷新 Access Token。
-    
+
     使用 Refresh Token 获取新的 Access Token。
     """
     identity = get_jwt_identity()
-    access_token = create_access_token(identity=identity)
+    try:
+        user = User.objects.get(fs_uniquifier=identity)  # pylint: disable=no-member
+    except DoesNotExist:
+        logger.warning('Token 刷新失败：用户不存在，identity=%s，IP=%s', identity, request.remote_addr)
+        response = make_response(jsonify(create_error_response('USER_NOT_FOUND', '用户不存在')), 404)
+        unset_jwt_cookies(response)
+        return response
+
+    if not user.active:
+        logger.warning('Token 刷新失败：账户已停用，identity=%s，IP=%s', identity, request.remote_addr)
+        response = make_response(jsonify(create_error_response('ACCOUNT_DISABLED', '账户已停用')), 403)
+        unset_jwt_cookies(response)
+        return response
+
+    access_token = create_access_token(identity=user)
 
     response_data = create_success_response(data={'access_token': access_token})
 
