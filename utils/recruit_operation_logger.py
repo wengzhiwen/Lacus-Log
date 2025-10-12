@@ -98,7 +98,7 @@ def serialize_recruit_operation(operation: RecruitOperationLog) -> dict:
     Returns:
         dict: 序列化后的操作记录
     """
-    local_dt = utc_to_local(operation.operation_time) if operation.operation_time else None
+    # 直接使用模型的属性，确保时间显示为GMT+8
     return {
         'id': str(operation.id),
         'user_id': str(operation.user_id.id),
@@ -106,7 +106,7 @@ def serialize_recruit_operation(operation: RecruitOperationLog) -> dict:
         'operation_type': operation.operation_type.value,
         'operation_time_utc': operation.operation_time.isoformat() if operation.operation_time else None,
         'operation_time_gmt8': operation.operation_time_gmt8,
-        'operation_time_gmt8_iso': local_dt.isoformat() if local_dt else None,
+        'operation_time_gmt8_iso': utc_to_local(operation.operation_time).isoformat() if operation.operation_time else None,
         'recruit_id': str(operation.recruit_id.id),
         'pilot_id': str(operation.pilot_id.id),
         'pilot_nickname': operation.pilot_nickname,
