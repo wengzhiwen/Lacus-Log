@@ -4,6 +4,7 @@
 提供招募、变更记录等对象的JSON序列化功能
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from models.recruit import Recruit, RecruitChangeLog
@@ -17,6 +18,42 @@ def _safe_get_enum_value(enum_field):
     if isinstance(enum_field, str):
         return enum_field
     return enum_field.value
+
+
+def _convert_datetime_fields_in_change_log(value: str, field_name: str) -> str:
+    """
+    转换变更记录中的日期时间字段为GMT+8格式
+
+    Args:
+        value: 字段值（可能是UTC ISO格式字符串）
+        field_name: 字段名称
+
+    Returns:
+        str: 转换后的值（如果是时间字段则转换为GMT+8格式，否则返回原值）
+    """
+    if not value:
+        return value
+
+    # 定义需要时间转换的字段
+    datetime_fields = {
+        'appointment_time', 'scheduled_training_time', 'scheduled_broadcast_time', 'training_time', 'interview_decision_time', 'training_decision_time',
+        'broadcast_decision_time', 'scheduled_training_decision_time', 'scheduled_broadcast_decision_time', 'training_decision_time_old', 'final_decision_time'
+    }
+
+    # 如果不是时间字段，直接返回原值
+    if field_name not in datetime_fields:
+        return value
+
+    # 尝试解析ISO格式时间并转换为GMT+8
+    try:
+        # 尝试解析ISO格式时间字符串
+        utc_time = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        # 转换为GMT+8并格式化为易读格式
+        local_time = utc_to_local(utc_time)
+        return local_time.strftime('%Y-%m-%d %H:%M:%S')
+    except (ValueError, AttributeError):
+        # 如果解析失败，返回原值
+        return value
 
 
 def serialize_recruit(recruit: Recruit) -> Dict[str, Any]:
@@ -83,7 +120,8 @@ def serialize_recruit(recruit: Recruit) -> Dict[str, Any]:
             'nickname': recruit.get_effective_scheduled_training_decision_maker().nickname,
         } if recruit.get_effective_scheduled_training_decision_maker() else None,
         'effective_scheduled_training_decision_time':
-        utc_to_local(recruit.get_effective_scheduled_training_decision_time()).isoformat() if recruit.get_effective_scheduled_training_decision_time() else None,
+        utc_to_local(recruit.get_effective_scheduled_training_decision_time()).isoformat()
+        if recruit.get_effective_scheduled_training_decision_time() else None,
 
         # 试播决策相关
         'training_decision':
@@ -119,7 +157,8 @@ def serialize_recruit(recruit: Recruit) -> Dict[str, Any]:
             'nickname': recruit.get_effective_scheduled_broadcast_decision_maker().nickname,
         } if recruit.get_effective_scheduled_broadcast_decision_maker() else None,
         'effective_scheduled_broadcast_decision_time':
-        utc_to_local(recruit.get_effective_scheduled_broadcast_decision_time()).isoformat() if recruit.get_effective_scheduled_broadcast_decision_time() else None,
+        utc_to_local(recruit.get_effective_scheduled_broadcast_decision_time()).isoformat()
+        if recruit.get_effective_scheduled_broadcast_decision_time() else None,
 
         # 开播决策相关
         'broadcast_decision':
@@ -160,12 +199,16 @@ def serialize_recruit_list(recruits: List[Recruit]) -> List[Dict[str, Any]]:
 
 def serialize_change_log(change_log: RecruitChangeLog) -> Dict[str, Any]:
     """序列化单个变更记录"""
+    # 处理时间字段的GMT+8显示
+    old_value = _convert_datetime_fields_in_change_log(change_log.old_value, change_log.field_name)
+    new_value = _convert_datetime_fields_in_change_log(change_log.new_value, change_log.field_name)
+
     return {
         'id': str(change_log.id),
         'field_name': change_log.field_name,
         'field_display_name': change_log.field_display_name,
-        'old_value': change_log.old_value,
-        'new_value': change_log.new_value,
+        'old_value': old_value,
+        'new_value': new_value,
         'user': {
             'id': str(change_log.user_id.id),
             'nickname': change_log.user_id.nickname,
