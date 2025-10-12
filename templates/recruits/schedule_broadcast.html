@@ -26,6 +26,12 @@
     </div>
   </div>
 
+  <!-- Warning Message 卡片 -->
+  <div id="warning-card" class="warning-card" style="display: none;">
+    <div class="warning-icon">⚠️</div>
+    <div class="warning-message">选择的开播日期和试播决策日期为同一天</div>
+  </div>
+
   <form id="schedule-broadcast-form" class="recruit-form">
     <input type="hidden" name="recruit_id" value="{{ recruit_id }}"/>
     
@@ -69,6 +75,18 @@
 .back-nav { margin-bottom: 20px; }
 .title { margin-bottom: 20px; font-size: 24px; }
 .pilot-info-card { background: white; border: 1px solid var(--gray); border-radius: 8px; margin-bottom: 20px; padding: 20px; }
+.warning-card {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.warning-icon { font-size: 18px; }
+.warning-message { color: #856404; font-weight: 500; }
 .card-header { display: flex; align-items: center; gap: 16px; }
 .pilot-main-info { flex: 1; }
 .pilot-name { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
@@ -146,12 +164,41 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.title = `预约开播 - ${nickname} - Lacus-Log`;
     };
 
+    const checkSameDayWarning = (scheduledBroadcastTime, trainingDecisionTime) => {
+        const warningCard = document.getElementById('warning-card');
+
+        if (!scheduledBroadcastTime || !trainingDecisionTime) {
+            warningCard.style.display = 'none';
+            return;
+        }
+
+        // 解析日期时间字符串为Date对象
+        const scheduledDate = new Date(scheduledBroadcastTime);
+        const trainingDate = new Date(trainingDecisionTime);
+
+        // 比较日期是否为同一天（GMT+8）
+        const gmt8Offset = 8 * 60 * 60 * 1000; // GMT+8的毫秒偏移
+        const scheduledGMT8 = new Date(scheduledDate.getTime() + scheduledDate.getTimezoneOffset() * 60 * 1000 + gmt8Offset);
+        const trainingGMT8 = new Date(trainingDate.getTime() + trainingDate.getTimezoneOffset() * 60 * 1000 + gmt8Offset);
+
+        const isSameDay =
+            scheduledGMT8.getFullYear() === trainingGMT8.getFullYear() &&
+            scheduledGMT8.getMonth() === trainingGMT8.getMonth() &&
+            scheduledGMT8.getDate() === trainingGMT8.getDate();
+
+        warningCard.style.display = isSameDay ? 'flex' : 'none';
+    };
+
     const populateFormValues = (recruit) => {
         introductionFeeInput.value = recruit.introduction_fee || 0;
         remarksInput.value = recruit.remarks || '';
         const scheduledTime = recruit.effective_scheduled_broadcast_time || recruit.scheduled_broadcast_time;
         const value = toDatetimeLocal(scheduledTime) || getNext14Clock();
         scheduledTimeInput.value = value;
+
+        // 检查是否需要显示警告卡片
+        const trainingDecisionTime = recruit.effective_training_decision_time || recruit.training_decision_time;
+        checkSameDayWarning(value, trainingDecisionTime);
     };
 
     try {
@@ -163,6 +210,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const recruit = detailPayload.data;
         renderPilotInfo(recruit.pilot || {});
         populateFormValues(recruit);
+
+        // 添加日期选择监听器
+        scheduledTimeInput.addEventListener('change', function() {
+            const trainingDecisionTime = recruit.effective_training_decision_time || recruit.training_decision_time;
+            checkSameDayWarning(this.value, trainingDecisionTime);
+        });
 
     } catch (error) {
         console.error('加载预约开播页面数据失败:', error);
