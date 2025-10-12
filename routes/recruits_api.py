@@ -8,17 +8,20 @@
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, Response, jsonify, request
-from flask_security import current_user, roles_accepted
+from flask import Blueprint, Response, jsonify, request, stream_with_context
+from flask_security import current_user
 from mongoengine import DoesNotExist, Q, ValidationError
 
 from models.pilot import Pilot, Platform, Rank, Status, WorkMode
-from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitStatus, TrainingDecision)
+from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitOperationType, RecruitStatus,
+                            TrainingDecision)
 from models.user import Role, User
-from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
+from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.recruit_serializers import (create_error_response, create_success_response, serialize_change_log_list, serialize_recruit, serialize_recruit_grouped,
                                        serialize_recruit_list)
+from utils.recruit_event_stream import recruit_operation_event_stream
+from utils.recruit_operation_logger import record_recruit_operation
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('recruit')
@@ -579,6 +582,13 @@ def create_recruit():
 
         logger.info('启动招募：主播=%s，负责人=%s，预约时间=%s', pilot.nickname, recruiter.nickname or recruiter.username, appointment_time_utc)
 
+        # 记录操作日志
+        record_recruit_operation(user_id=current_user.id,
+                                 operation_type=RecruitOperationType.CREATE,
+                                 recruit_id=recruit.id,
+                                 pilot_id=pilot.id,
+                                 ip_address=_get_client_ip())
+
         serializer_data = serialize_recruit(recruit)
         meta = {'message': '招募已成功启动'}
         return jsonify(create_success_response(serializer_data, meta)), 201
@@ -705,6 +715,14 @@ def update_recruit(recruit_id):
         _record_changes(recruit, old_data, current_user, _get_client_ip())
 
         logger.info('更新招募：ID=%s，主播=%s', recruit_id, recruit.pilot.nickname)
+
+        # 记录操作日志
+        record_recruit_operation(user_id=current_user.id,
+                                 operation_type=RecruitOperationType.EDIT,
+                                 recruit_id=recruit.id,
+                                 pilot_id=recruit.pilot.id,
+                                 ip_address=_get_client_ip())
+
         serializer_data = serialize_recruit(recruit)
         meta = {'message': '招募信息已更新'}
         return jsonify(create_success_response(serializer_data, meta))
@@ -825,6 +843,13 @@ def interview_decision(recruit_id):
         from routes.pilots_api import _record_changes as record_pilot_changes
         record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
 
+        # 记录操作日志
+        record_recruit_operation(user_id=current_user.id,
+                                 operation_type=RecruitOperationType.INTERVIEW_DECISION,
+                                 recruit_id=recruit.id,
+                                 pilot_id=recruit.pilot.id,
+                                 ip_address=_get_client_ip())
+
         if interview_decision_enum == InterviewDecision.SCHEDULE_TRAINING:
             logger.info('面试决策成功：ID=%s，主播=%s，预约试播', recruit_id, recruit.pilot.nickname)
             message = '面试决策成功，主播已进入待预约试播阶段'
@@ -936,6 +961,13 @@ def schedule_training(recruit_id):
 
         logger.info('预约试播成功：ID=%s，主播=%s，试播时间=%s', recruit_id, recruit.pilot.nickname, scheduled_training_time_utc)
 
+        # 记录操作日志
+        record_recruit_operation(user_id=current_user.id,
+                                 operation_type=RecruitOperationType.SCHEDULE_TRAINING,
+                                 recruit_id=recruit.id,
+                                 pilot_id=recruit.pilot.id,
+                                 ip_address=_get_client_ip())
+
         serializer_data = serialize_recruit(recruit)
         meta = {'message': '预约试播成功，主播已进入待试播阶段'}
         return jsonify(create_success_response(serializer_data, meta))
@@ -1032,6 +1064,13 @@ def training_decision(recruit_id):
                 _record_changes as record_pilot_changes
             record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
 
+        # 记录操作日志
+        record_recruit_operation(user_id=current_user.id,
+                                 operation_type=RecruitOperationType.TRAINING_DECISION,
+                                 recruit_id=recruit.id,
+                                 pilot_id=recruit.pilot.id,
+                                 ip_address=_get_client_ip())
+
         if training_decision_enum == TrainingDecision.SCHEDULE_BROADCAST:
             logger.info('试播决策成功：ID=%s，主播=%s，预约开播', recruit_id, recruit.pilot.nickname)
             message = '试播决策成功，主播已进入待预约开播阶段'
@@ -1113,6 +1152,13 @@ def schedule_broadcast(recruit_id):
         _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
 
         logger.info('预约开播成功：ID=%s，主播=%s，开播时间=%s', recruit_id, recruit.pilot.nickname, scheduled_broadcast_time_utc)
+
+        # 记录操作日志
+        record_recruit_operation(user_id=current_user.id,
+                                 operation_type=RecruitOperationType.SCHEDULE_BROADCAST,
+                                 recruit_id=recruit.id,
+                                 pilot_id=recruit.pilot.id,
+                                 ip_address=_get_client_ip())
 
         serializer_data = serialize_recruit(recruit)
         meta = {'message': '预约开播成功，主播已进入待开播阶段'}
@@ -1240,6 +1286,13 @@ def broadcast_decision(recruit_id):
         from routes.pilots_api import _record_changes as record_pilot_changes
         record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
 
+        # 记录操作日志
+        record_recruit_operation(user_id=current_user.id,
+                                 operation_type=RecruitOperationType.BROADCAST_DECISION,
+                                 recruit_id=recruit.id,
+                                 pilot_id=recruit.pilot.id,
+                                 ip_address=_get_client_ip())
+
         if broadcast_decision_enum in [BroadcastDecision.OFFICIAL, BroadcastDecision.INTERN]:
             logger.info('开播决策成功：ID=%s，主播=%s，招募为%s', recruit_id, recruit.pilot.nickname, broadcast_decision_enum.value)
             message = f'开播决策成功，主播已被招募为{broadcast_decision_enum.value}'
@@ -1301,3 +1354,52 @@ def check_pilot_recruit_history(pilot_id):
     except Exception as e:
         logger.error('检测主播招募记录失败: %s', str(e), exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '检测招募记录失败')), 500
+
+
+@recruits_api_bp.route('/api/recruits/operations', methods=['GET'])
+@jwt_roles_accepted('gicho', 'kancho')
+def get_recruit_operations():
+    """获取最近的招募操作记录"""
+    try:
+        # 获取分页参数
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 10))
+        limit = int(request.args.get('limit', page_size))
+
+        # 获取最近的操作记录
+        from utils.recruit_operation_logger import get_recent_recruit_operations, serialize_recruit_operation_list
+
+        operations = get_recent_recruit_operations(limit=limit)
+
+        # 序列化数据
+        data = serialize_recruit_operation_list(operations)
+
+        meta = {'pagination': {'page': page, 'page_size': page_size, 'total_items': len(operations)}}
+
+        logger.info('获取招募操作记录成功：共%d条记录', len(operations))
+        return jsonify(create_success_response(data, meta))
+
+    except Exception as e:
+        logger.error('获取招募操作记录失败: %s', str(e), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '获取操作记录失败')), 500
+
+
+@recruits_api_bp.route('/api/recruits/operations/stream', methods=['GET'])
+@jwt_roles_accepted('gicho', 'kancho')
+def stream_recruit_operations_sse():
+    """实时推送招募操作记录（SSE）。"""
+
+    try:
+
+        def generate():
+            yield from recruit_operation_event_stream()
+
+        response = Response(stream_with_context(generate()), mimetype='text/event-stream')
+        response.headers['Cache-Control'] = 'no-cache'
+        response.headers['X-Accel-Buffering'] = 'no'
+        response.headers['Connection'] = 'keep-alive'
+        logger.info('建立招募操作SSE连接成功')
+        return response
+    except Exception as exc:
+        logger.error('建立招募操作SSE连接失败: %s', str(exc), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '建立实时连接失败')), 500

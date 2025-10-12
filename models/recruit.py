@@ -550,3 +550,62 @@ class RecruitChangeLog(Document):
             'final_decision_time': '结束招募决策时间 (历史)',
         }
         return mapping.get(self.field_name, self.field_name)
+
+
+class RecruitOperationType(enum.Enum):
+    """招募操作类型枚举"""
+    CREATE = "启动招募"
+    EDIT = "编辑招募"
+    INTERVIEW_DECISION = "面试决策"
+    SCHEDULE_TRAINING = "预约试播"
+    TRAINING_DECISION = "试播决策"
+    SCHEDULE_BROADCAST = "预约开播"
+    BROADCAST_DECISION = "开播决策"
+
+
+class RecruitOperationLog(Document):
+    """招募操作记录模型"""
+
+    user_id = ReferenceField(User, required=True)
+    operation_type = EnumField(RecruitOperationType, required=True)
+    recruit_id = ReferenceField(Recruit, required=True)
+    pilot_id = ReferenceField(Pilot, required=True)
+    operation_time = DateTimeField(default=get_current_utc_time)
+    ip_address = StringField()
+
+    meta = {
+        'collection': 'recruit_operation_logs',
+        'indexes': [
+            {
+                'fields': ['-operation_time']
+            },
+            {
+                'fields': ['user_id']
+            },
+            {
+                'fields': ['operation_type']
+            },
+            {
+                'fields': ['recruit_id']
+            },
+            {
+                'fields': ['pilot_id']
+            },
+        ],
+    }
+
+    @property
+    def operation_time_gmt8(self):
+        """获取GMT+8格式的操作时间"""
+        from utils.timezone_helper import utc_to_local
+        return utc_to_local(self.operation_time).strftime('%Y-%m-%d %H:%M:%S')
+
+    @property
+    def user_nickname(self):
+        """获取操作用户昵称"""
+        return self.user_id.nickname if self.user_id else '未知用户'
+
+    @property
+    def pilot_nickname(self):
+        """获取被操作主播昵称"""
+        return self.pilot_id.nickname if self.pilot_id else '未知主播'

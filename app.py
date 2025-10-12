@@ -1,3 +1,5 @@
+# pylint: disable=wrong-import-position,too-many-locals,too-many-statements
+
 import os
 from datetime import datetime, timedelta
 
@@ -274,6 +276,30 @@ def create_app() -> Flask:
         from flask import render_template
         return render_template('errors/403.html'), 403
 
+    # 临时调试端点 - 检查当前用户和cookie
+    @flask_app.route('/debug/auth')
+    def debug_auth():
+        """调试认证状态"""
+        from flask import request, jsonify
+        from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
+
+        debug_info = {
+            'cookies': dict(request.cookies),
+            'jwt_in_cookie': bool(request.cookies.get('access_token_cookie')),
+            'user_agent': request.headers.get('User-Agent'),
+        }
+
+        try:
+            verify_jwt_in_request()
+            debug_info['jwt_valid'] = True
+            debug_info['user_id'] = get_jwt_identity()
+            debug_info['jwt_claims'] = get_jwt()
+        except Exception as e:
+            debug_info['jwt_valid'] = False
+            debug_info['jwt_error'] = str(e)
+
+        return jsonify(debug_info)
+
     with flask_app.app_context():
         ensure_database_indexes()
         ensure_initial_roles_and_admin(user_datastore)
@@ -307,12 +333,11 @@ def run_dev() -> None:
     """
     port = int(os.getenv('FLASK_APP_PORT', '5080'))
     is_debug = os.getenv('LOG_LEVEL', 'DEBUG') == 'DEBUG'
-    host_ip = "127.0.0.1"
-    if is_debug:
-        host_ip = "0.0.0.0"
+    host_ip = "0.0.0.0" if is_debug else "127.0.0.1"
 
     app.logger.info('以开发模式启动，监听端口：%s，IP地址：%s', port, host_ip)
-    app.run(host=host_ip, port=port, debug=is_debug, use_reloader=True)
+
+    app.run(host=host_ip, port=port, debug=is_debug, use_reloader=is_debug)
 
 
 if __name__ == '__main__':

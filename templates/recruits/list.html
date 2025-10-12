@@ -64,6 +64,29 @@
   </button>
 </section>
 
+<!-- 招募操作记录面板 -->
+<div class="operation-panel" id="operation-panel">
+  <div class="panel-header" onclick="toggleOperationPanel()">
+    <div class="panel-title">
+      <span class="panel-icon">📊</span>
+      <span class="panel-text">招募操作记录</span>
+      <span class="panel-status" id="panel-status">
+        <span class="status-dot" id="connection-status"></span>
+        <span class="connection-text" id="connection-text">连接中...</span>
+      </span>
+    </div>
+    <div class="panel-toggle" id="panel-toggle">
+      <span id="toggle-icon">▲</span>
+    </div>
+  </div>
+
+  <div class="panel-content" id="panel-content">
+    <div class="operations-list" id="operations-list">
+      <!-- 操作记录将在这里动态加载 -->
+    </div>
+  </div>
+</div>
+
 <script>
 // --- UTILITY FUNCTIONS ---
 function toggleFilters() {
@@ -93,11 +116,11 @@ window.scrollToTop = scrollToTop;
 function formatDateTime(isoString) {
     if (!isoString) return '';
     const date = new Date(isoString);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${month}月${day}日 ${hours}:${minutes}`;
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+    const { month, day, hour, minute } = extractGmt8Parts(date);
+    return `${month}月${day}日 ${hour}:${minute}`;
 }
 
 // --- CARD & GROUP CREATION ---
@@ -349,6 +372,261 @@ async function populateFilters() {
 }
 
 
+// --- OPERATION PANEL & EVENT STREAM ---
+let eventSource = null;
+let panelExpanded = false;
+let operationsData = [];
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+const BASE_RECONNECT_DELAY = 3000;
+const MAX_RECONNECT_DELAY = 30000;
+const gmt8Formatter = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+});
+
+function extractGmt8Parts(date) {
+    const parts = gmt8Formatter.formatToParts(date);
+    const lookup = {};
+    parts.forEach((part) => {
+        lookup[part.type] = part.value;
+    });
+    return {
+        month: lookup.month || '00',
+        day: lookup.day || '00',
+        hour: lookup.hour || '00',
+        minute: lookup.minute || '00'
+    };
+}
+
+function cleanupEventSource() {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+
+    if (!eventSource) {
+        return;
+    }
+
+    try {
+        eventSource.close();
+    } catch (closeError) {
+        console.warn('关闭SSE连接失败:', closeError);
+    }
+
+    eventSource = null;
+}
+
+function scheduleStreamReconnect({ immediate = false } = {}) {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+
+    if (immediate) {
+        reconnectAttempts = 0;
+        initEventStream();
+        return;
+    }
+
+    reconnectAttempts = Math.min(reconnectAttempts + 1, 6);
+    const delay = Math.min(BASE_RECONNECT_DELAY * (2 ** (reconnectAttempts - 1)), MAX_RECONNECT_DELAY);
+    console.warn(`SSE连接将在${delay}ms后重试，第${reconnectAttempts}次尝试`);
+
+    reconnectTimer = setTimeout(() => {
+        initEventStream();
+    }, delay);
+}
+
+// 切换操作面板展开/折叠状态
+function toggleOperationPanel() {
+    const panel = document.getElementById('operation-panel');
+    const toggle = document.getElementById('toggle-icon');
+
+    panelExpanded = !panelExpanded;
+
+    if (panelExpanded) {
+        panel.classList.remove('collapsed');
+        toggle.textContent = '▲';
+        // 展开时加载更多操作记录
+        loadMoreOperations();
+    } else {
+        panel.classList.add('collapsed');
+        toggle.textContent = '▼';
+        // 折叠时只显示1条记录
+        renderOperations(1);
+    }
+}
+
+// 确保函数在全局作用域中可用
+window.toggleOperationPanel = toggleOperationPanel;
+
+// 格式化操作时间
+function formatOperationTime(operation) {
+    if (!operation) return '';
+
+    const candidates = [operation.operation_time_gmt8_iso, operation.operation_time_utc];
+
+    for (const iso of candidates) {
+        if (!iso) continue;
+        const date = new Date(iso);
+        if (!Number.isNaN(date.getTime())) {
+            const { month, day, hour, minute } = extractGmt8Parts(date);
+            return `${month}-${day} ${hour}:${minute}`;
+        }
+    }
+
+    if (operation.operation_time_gmt8) {
+        return operation.operation_time_gmt8;
+    }
+
+    return '';
+}
+
+// 渲染操作记录列表
+function renderOperations(limit = 10) {
+    const list = document.getElementById('operations-list');
+    const operationsToShow = operationsData.slice(0, limit);
+
+    if (operationsToShow.length === 0) {
+        list.innerHTML = '<div class="operation-empty">暂无操作记录</div>';
+        return;
+    }
+
+    list.innerHTML = operationsToShow.map(op => `
+        <div class="operation-item">
+            <div class="operation-time">${formatOperationTime(op)}</div>
+            <div class="operation-user">${op.user_nickname || '未知用户'}</div>
+            <div class="operation-type">${op.operation_type}</div>
+            <div class="operation-pilot">${op.pilot_nickname || '未知主播'}</div>
+        </div>
+    `).join('');
+}
+
+// 加载更多操作记录
+async function loadMoreOperations() {
+    try {
+        const response = await fetch('/api/recruits/operations?limit=10', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const payload = await response.json();
+            if (payload.success) {
+                operationsData = payload.data || [];
+                renderOperations(panelExpanded ? 10 : 1);
+            }
+        }
+    } catch (error) {
+        console.error('加载操作记录失败:', error);
+    }
+}
+
+// 初始化事件流（SSE）
+function initEventStream() {
+    cleanupEventSource();
+
+    try {
+        eventSource = new EventSource('/api/recruits/operations/stream', { withCredentials: true });
+    } catch (error) {
+        console.error('创建SSE连接失败:', error);
+        scheduleStreamReconnect();
+        return;
+    }
+
+    eventSource.onopen = () => {
+        console.log('SSE连接已建立');
+        updateConnectionStatus(true);
+        reconnectAttempts = 0;
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+    };
+
+    eventSource.onmessage = (event) => {
+        if (!event.data) {
+            return;
+        }
+
+        try {
+            const payload = JSON.parse(event.data);
+            handleNewOperation(payload);
+        } catch (parseError) {
+            console.error('解析SSE消息失败:', parseError, event.data);
+        }
+    };
+
+    eventSource.onerror = (event) => {
+        console.error('SSE连接错误:', event);
+        updateConnectionStatus(false);
+        cleanupEventSource();
+        scheduleStreamReconnect();
+    };
+}
+
+// 处理新的操作记录
+function handleNewOperation(operation) {
+    // 将新操作添加到列表开头
+    operationsData.unshift(operation);
+
+    // 限制列表长度
+    if (operationsData.length > 50) {
+        operationsData = operationsData.slice(0, 50);
+    }
+
+    // 重新渲染列表
+    renderOperations(panelExpanded ? 10 : 1);
+
+    // 如果面板是折叠的，短暂展开显示新操作
+    if (!panelExpanded) {
+        const panel = document.getElementById('operation-panel');
+        panel.classList.add('highlight');
+        setTimeout(() => {
+            panel.classList.remove('highlight');
+        }, 2000);
+    }
+}
+
+// 更新连接状态显示
+function updateConnectionStatus(connected) {
+    const statusDot = document.getElementById('connection-status');
+    const statusText = document.getElementById('connection-text');
+
+    if (connected) {
+        statusDot.className = 'status-dot connected';
+        statusText.textContent = '已连接';
+    } else {
+        statusDot.className = 'status-dot disconnected';
+        statusText.textContent = '连接中...';
+    }
+}
+
+// 页面可见性变化时的处理
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        return;
+    }
+
+    if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+        scheduleStreamReconnect({ immediate: true });
+        return;
+    }
+
+    if (eventSource.readyState === EventSource.OPEN) {
+        loadMoreOperations();
+    }
+});
+
 // --- EVENT LISTENERS & INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', function () {
     populateFilters().then(() => {
@@ -358,7 +636,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('status-filter').addEventListener('change', fetchAndRenderRecruits);
     document.getElementById('recruiter-filter').addEventListener('change', fetchAndRenderRecruits);
     document.getElementById('channel-filter').addEventListener('change', fetchAndRenderRecruits);
-    
+
     let searchTimeout;
     document.getElementById('search-input').addEventListener('input', () => {
         clearTimeout(searchTimeout);
@@ -373,6 +651,19 @@ document.addEventListener('DOMContentLoaded', function () {
             floatingBtn.style.display = 'none';
         }
     });
+
+    // 初始化操作面板
+    const panel = document.getElementById('operation-panel');
+    panel.classList.add('collapsed');
+    document.getElementById('toggle-icon').textContent = '▼';
+
+    // 初始化SSE连接
+    initEventStream();
+
+    // 加载初始操作记录
+    loadMoreOperations();
+
+    window.addEventListener('beforeunload', cleanupEventSource);
 });
 </script>
 
@@ -494,5 +785,234 @@ document.addEventListener('DOMContentLoaded', function () {
 .empty-icon { font-size: 48px; margin-bottom: 16px; }
 .empty-title { font-size: 18px; font-weight: 600; }
 .empty-description { color: var(--muted); margin-bottom: 24px; }
+
+/* 招募操作记录面板 */
+.operation-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 2px solid var(--table-header);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  z-index: 1000;
+  transition: all 0.3s ease;
+  max-height: 50vh;
+}
+
+.operation-panel.collapsed {
+  max-height: 140px;
+}
+
+.operation-panel.highlight {
+  border-top-color: var(--brand);
+  box-shadow: 0 -2px 15px rgba(0,0,0,0.2);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--table-header);
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.panel-icon {
+  font-size: 16px;
+}
+
+.panel-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.panel-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ccc;
+}
+
+.status-dot.connected {
+  background: #4caf50;
+  animation: pulse 2s infinite;
+}
+
+.status-dot.disconnected {
+  background: #f44336;
+}
+
+.connection-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+  transition: transform 0.3s ease;
+}
+
+.operation-panel.collapsed .panel-toggle {
+  transform: rotate(180deg);
+}
+
+.panel-content {
+  overflow-y: auto;
+  max-height: calc(50vh - 60px);
+  transition: all 0.3s ease;
+}
+
+.operation-panel.collapsed .panel-content {
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.operations-list {
+  padding: 0;
+}
+
+.operation-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--table-header);
+  font-size: 13px;
+  transition: background-color 0.2s ease;
+}
+
+.operation-item:hover {
+  background: #f8f9fa;
+}
+
+.operation-item:last-child {
+  border-bottom: none;
+}
+
+.operation-time {
+  flex: 0 0 120px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.operation-user {
+  flex: 0 0 80px;
+  color: var(--text);
+  font-weight: 500;
+  text-align: center;
+}
+
+.operation-type {
+  flex: 0 0 80px;
+  color: var(--brand);
+  font-weight: 500;
+  text-align: center;
+}
+
+.operation-pilot {
+  flex: 1;
+  color: var(--text);
+  text-align: right;
+}
+
+.operation-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  color: var(--muted);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--table-header);
+  border-top: 2px solid var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .operation-panel {
+    max-height: 60vh;
+  }
+
+  .operation-item {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .operation-time {
+    flex: 0 0 100px;
+  }
+
+  .operation-user {
+    flex: 0 0 70px;
+  }
+
+  .operation-type {
+    flex: 0 0 70px;
+  }
+
+  .panel-title {
+    gap: 6px;
+  }
+
+  .panel-icon {
+    font-size: 14px;
+  }
+
+  .panel-text {
+    font-size: 13px;
+  }
+}
 </style>
 {% endblock %}
