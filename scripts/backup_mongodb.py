@@ -15,7 +15,6 @@
 
 import argparse
 import gzip
-import json
 import logging
 import os
 import shutil
@@ -61,7 +60,7 @@ def setup_logging() -> logging.Logger:
 def check_mongodump() -> bool:
     """检查mongodump工具是否可用"""
     try:
-        result = subprocess.run(['mongodump', '--version'], capture_output=True, text=True, check=True)
+        _ = subprocess.run(['mongodump', '--version'], capture_output=True, text=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -71,13 +70,6 @@ def get_mongodb_uri() -> str:
     """从环境变量获取MongoDB连接URI"""
     load_dotenv()
     mongodb_uri = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017/lacus')
-
-    # 确保URI包含数据库名
-    if not mongodb_uri.endswith('/lacus'):
-        if mongodb_uri.endswith('/'):
-            mongodb_uri += 'lacus'
-        else:
-            mongodb_uri += '/lacus'
 
     return mongodb_uri
 
@@ -178,7 +170,7 @@ def compress_backup(backup_path: Path, logger: logging.Logger) -> Optional[Path]
     try:
         # 使用tar命令压缩
         cmd = ['tar', '-czf', str(compressed_path), '-C', str(backup_path.parent), backup_path.name]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        _ = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         # 删除原始备份目录
         shutil.rmtree(backup_path)
@@ -325,6 +317,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
