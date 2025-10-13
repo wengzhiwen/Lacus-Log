@@ -30,27 +30,53 @@ recruits_api_bp = Blueprint('recruits_api', __name__)
 
 def _get_overdue_recruits_query():
     """
-    构建用于查询“鸽”状态招募的查询集。
-    “鸽”定义为：处于非“已结束”状态，且超过约定时间未进入下一步。
+    构建用于查询"鸽"状态招募的查询集。
+    "鸽"定义为：处于非"已结束"状态，且超过约定时间未进入下一步。
+    
+    注意：由于MongoDB查询无法直接使用Python方法（如get_effective_*），
+    需要同时查询新旧状态枚举值和新旧时间字段，以确保历史数据兼容性。
     """
     now = get_current_utc_time()
     overdue_24h = now - timedelta(hours=24)
     overdue_7d = now - timedelta(days=7)
 
     # 1. 待面试，但预约时间已过24小时
-    q1 = Q(status=RecruitStatus.PENDING_INTERVIEW) & Q(appointment_time__lt=overdue_24h)
+    # 需要匹配新状态"待面试"和旧状态"已启动"
+    q1 = (Q(status=RecruitStatus.PENDING_INTERVIEW) | Q(status=RecruitStatus.STARTED)) & Q(appointment_time__lt=overdue_24h)
 
     # 2. 待预约试播，但面试决策已超过7天
-    q2 = Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE) & Q(interview_decision_time__lt=overdue_7d)
+    # 需要匹配新状态"待预约试播"和旧状态"待预约训练"
+    # 需要考虑历史字段降级读取：interview_decision_time 或 training_decision_time_old
+    q2 = (
+        Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE) |
+        Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE_OLD)
+    ) & (
+        Q(interview_decision_time__lt=overdue_7d) | Q(training_decision_time_old__lt=overdue_7d)
+    )
 
     # 3. 待试播，但预约的试播时间已过24小时
-    q3 = Q(status=RecruitStatus.PENDING_TRAINING) & Q(scheduled_training_time__lt=overdue_24h)
+    # 需要匹配新状态"待试播"和所有旧状态"待训练"、"试播招募中"、"训练征召中"
+    # 需要考虑历史字段降级读取：scheduled_training_time 或 training_time
+    q3 = (
+        Q(status=RecruitStatus.PENDING_TRAINING) |
+        Q(status=RecruitStatus.PENDING_TRAINING_OLD) |
+        Q(status=RecruitStatus.TRAINING_RECRUITING) | 
+        Q(status=RecruitStatus.TRAINING_RECRUITING_OLD)
+    ) & (
+        Q(scheduled_training_time__lt=overdue_24h) | Q(training_time__lt=overdue_24h)
+    )
 
     # 4. 待预约开播，但试播决策已超过7天
-    q4 = Q(status=RecruitStatus.PENDING_BROADCAST_SCHEDULE) & Q(training_decision_time__lt=overdue_7d)
+    # 需要考虑历史字段降级读取：training_decision_time 或 training_decision_time_old
+    q4 = Q(status=RecruitStatus.PENDING_BROADCAST_SCHEDULE) & (
+        Q(training_decision_time__lt=overdue_7d) | Q(training_decision_time_old__lt=overdue_7d)
+    )
 
     # 5. 待开播，但预约的开播时间已过24小时
-    q5 = Q(status=RecruitStatus.PENDING_BROADCAST) & Q(scheduled_broadcast_time__lt=overdue_24h)
+    # 需要考虑历史字段降级读取：scheduled_broadcast_time 或 training_time
+    q5 = Q(status=RecruitStatus.PENDING_BROADCAST) & (
+        Q(scheduled_broadcast_time__lt=overdue_24h) | Q(training_time__lt=overdue_24h)
+    )
 
     overdue_query = q1 | q2 | q3 | q4 | q5
 

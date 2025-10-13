@@ -1,5 +1,4 @@
 import enum
-from datetime import datetime, timedelta
 
 from mongoengine import (DateTimeField, DecimalField, Document, EnumField, ReferenceField, StringField)
 
@@ -27,6 +26,8 @@ class RecruitStatus(enum.Enum):
     ENDED = "已结束"
 
     STARTED = "已启动"  # 映射到 PENDING_INTERVIEW
+    PENDING_TRAINING_SCHEDULE_OLD = "待预约训练"  # 映射到 PENDING_TRAINING_SCHEDULE
+    PENDING_TRAINING_OLD = "待训练"  # 映射到 PENDING_TRAINING
     TRAINING_RECRUITING = "试播招募中"  # 映射到 PENDING_TRAINING
     TRAINING_RECRUITING_OLD = "训练征召中"  # 映射到 PENDING_TRAINING
 
