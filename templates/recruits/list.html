@@ -32,6 +32,12 @@
             <!-- Options will be loaded dynamically -->
           </select>
         </div>
+        <div class="filter-group">
+          <label class="filter-label" for="time-filter">时间</label>
+          <select class="filter-select" id="time-filter">
+            <!-- Options will be loaded dynamically -->
+          </select>
+        </div>
       </div>
     </div>
   </div>
@@ -46,8 +52,14 @@
     <!-- Quick nav buttons will be generated dynamically -->
   </div>
 
-  <div class="recruit-groups" id="recruit-groups-container">
-    <!-- Recruit groups will be loaded here -->
+  <div class="recruit-groups">
+    <div id="loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div id="recruit-groups-container" style="display: none;">
+      <!-- Recruit groups will be loaded here -->
+    </div>
   </div>
 
   <div class="empty-state" id="empty-state" style="display: none;">
@@ -210,6 +222,9 @@ function renderRecruits(recruits) {
     const container = document.getElementById('recruit-groups-container');
     const quickNav = document.getElementById('quick-nav');
     const emptyState = document.getElementById('empty-state');
+    const loadingState = document.getElementById('loading-state');
+
+    // 清除现有内容
     container.innerHTML = '';
     quickNav.innerHTML = '';
 
@@ -238,9 +253,14 @@ function renderRecruits(recruits) {
         }
     }
 
+    // 隐藏加载状态
+    loadingState.style.display = 'none';
+
     if (totalRecruits === 0) {
+        container.style.display = 'none';
         emptyState.style.display = 'block';
     } else {
+        container.style.display = 'block';
         emptyState.style.display = 'none';
     }
 }
@@ -249,20 +269,52 @@ function renderRecruits(recruits) {
 let allRecruitsData = [];
 
 async function fetchAndRenderRecruits() {
-    try {
-        const status = document.getElementById('status-filter').value;
-        const recruiterId = document.getElementById('recruiter-filter').value;
-        const channel = document.getElementById('channel-filter').value;
+    const loadingState = document.getElementById('loading-state');
+    const container = document.getElementById('recruit-groups-container');
+    const emptyState = document.getElementById('empty-state');
 
-        const payload = await RecruitAPI.getRecruits({
-            status: status,
-            recruiter_id: recruiterId,
-            channel: channel,
-            page_size: 500 // Fetch a large number for client-side grouping
+    // 显示加载状态
+    loadingState.style.display = 'block';
+    container.style.display = 'none';
+    emptyState.style.display = 'none';
+
+    try {
+        // 获取当前筛选器的值，确保在初始化时也能正确传递参数
+        const statusFilter = document.getElementById('status-filter');
+        const recruiterFilter = document.getElementById('recruiter-filter');
+        const channelFilter = document.getElementById('channel-filter');
+        const timeFilter = document.getElementById('time-filter');
+
+        const status = statusFilter ? statusFilter.value : '进行中';
+        const recruiterId = recruiterFilter ? recruiterFilter.value : '';
+        const channel = channelFilter ? channelFilter.value : '';
+        const time = timeFilter ? timeFilter.value : 'two_days';
+
+        // 直接使用 fetch 而不是 RecruitAPI，避免触发全局 loading
+        const url = new URL(`${window.location.origin}/api/recruits`);
+        url.searchParams.append('status', status);
+        if (recruiterId) url.searchParams.append('recruiter_id', recruiterId);
+        if (channel) url.searchParams.append('channel', channel);
+        url.searchParams.append('time', time);
+        url.searchParams.append('page_size', '500');
+
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
         });
-        
+
+        if (!response.ok) {
+            throw new Error(`HTTP 错误: ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (!payload.success) {
+            throw new Error(payload.error?.message || '加载失败');
+        }
+
         allRecruitsData = payload.data.items;
-        
+
         // 应用前端搜索过滤
         const searchTerm = document.getElementById('search-input').value;
         const filteredRecruits = applySearchFilter(allRecruitsData, searchTerm);
@@ -277,7 +329,11 @@ async function fetchAndRenderRecruits() {
 
     } catch (error) {
         console.error('Failed to load recruits:', error);
-        document.getElementById('empty-state').style.display = 'block';
+        if (window.showMessage) {
+            window.showMessage(error.message || '加载招募列表失败', 'error');
+        }
+        loadingState.style.display = 'none';
+        emptyState.style.display = 'block';
     }
 }
 
@@ -341,8 +397,34 @@ function groupAndRender(recruits) {
 
 async function populateFilters() {
     try {
-        const payload = await RecruitAPI.getOptions();
+        // 使用原生 fetch 避免触发全局 loading
+        const optionsResponse = await fetch('/api/recruits/options', {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!optionsResponse.ok) {
+            throw new Error('加载选项失败');
+        }
+        
+        const payload = await optionsResponse.json();
+        if (!payload.success) {
+            throw new Error(payload.error?.message || '加载选项失败');
+        }
+        
         const { enums, recruiter_choices } = payload.data;
+
+        // 获取时间筛选选项
+        const filterOptionsPayload = await fetch('/api/recruits/filter-options', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        const filterOptionsResponse = await filterOptionsPayload.json();
+        const timeOptions = filterOptionsResponse.success && filterOptionsResponse.data ? filterOptionsResponse.data.time_ranges : [];
 
         const statusFilter = document.getElementById('status-filter');
         statusFilter.innerHTML = `
@@ -366,8 +448,19 @@ async function populateFilters() {
             channelFilter.add(option);
         });
 
+        const timeFilter = document.getElementById('time-filter');
+        timeFilter.innerHTML = '';
+        timeOptions.forEach(option => {
+            const opt = new Option(option.label, option.value);
+            if (option.value === 'two_days') opt.selected = true; // Set default
+            timeFilter.add(opt);
+        });
+
     } catch (error) {
         console.error('Failed to populate filters:', error);
+        if (window.showMessage) {
+            window.showMessage(error.message || '加载筛选选项失败', 'error');
+        }
     }
 }
 
@@ -630,12 +723,15 @@ document.addEventListener('visibilitychange', () => {
 // --- EVENT LISTENERS & INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', function () {
     populateFilters().then(() => {
+        // 填充筛选器完成后再添加事件监听器，避免初始化时触发重复加载
+        document.getElementById('status-filter').addEventListener('change', fetchAndRenderRecruits);
+        document.getElementById('recruiter-filter').addEventListener('change', fetchAndRenderRecruits);
+        document.getElementById('channel-filter').addEventListener('change', fetchAndRenderRecruits);
+        document.getElementById('time-filter').addEventListener('change', fetchAndRenderRecruits);
+
+        // 然后进行初始加载
         fetchAndRenderRecruits();
     });
-
-    document.getElementById('status-filter').addEventListener('change', fetchAndRenderRecruits);
-    document.getElementById('recruiter-filter').addEventListener('change', fetchAndRenderRecruits);
-    document.getElementById('channel-filter').addEventListener('change', fetchAndRenderRecruits);
 
     let searchTimeout;
     document.getElementById('search-input').addEventListener('input', () => {
@@ -685,7 +781,7 @@ document.addEventListener('DOMContentLoaded', function () {
 .filter-form.is-collapsed { display: none; }
 .filter-form { margin-bottom: 12px; }
 
-.filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .filter-group { margin-bottom: 8px; }
 .filter-label { font-size: 14px; color: var(--text); display: block; margin-bottom: 4px; }
 .filter-select { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--table-header); background: #fff; }
@@ -944,28 +1040,6 @@ document.addEventListener('DOMContentLoaded', function () {
   font-size: 14px;
 }
 
-.loading-spinner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-  color: var(--muted);
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--table-header);
-  border-top: 2px solid var(--brand);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-right: 8px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
 
 @keyframes pulse {
   0% {

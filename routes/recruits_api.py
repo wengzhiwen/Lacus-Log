@@ -16,13 +16,14 @@ from models.pilot import Pilot, Platform, Rank, Status, WorkMode
 from models.recruit import (BroadcastDecision, InterviewDecision, Recruit, RecruitChangeLog, RecruitChannel, RecruitOperationType, RecruitStatus,
                             TrainingDecision)
 from models.user import Role, User
+from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.recruit_serializers import (create_error_response, create_success_response, serialize_change_log_list, serialize_recruit, serialize_recruit_grouped,
                                        serialize_recruit_list)
 from utils.recruit_event_stream import recruit_operation_event_stream
 from utils.recruit_operation_logger import record_recruit_operation
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.timezone_helper import (get_current_utc_time, get_current_local_time, local_to_utc, utc_to_local)
 
 logger = get_logger('recruit')
 recruits_api_bp = Blueprint('recruits_api', __name__)
@@ -47,36 +48,22 @@ def _get_overdue_recruits_query():
     # 2. 待预约试播，但面试决策已超过7天
     # 需要匹配新状态"待预约试播"和旧状态"待预约训练"
     # 需要考虑历史字段降级读取：interview_decision_time 或 training_decision_time_old
-    q2 = (
-        Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE) |
-        Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE_OLD)
-    ) & (
-        Q(interview_decision_time__lt=overdue_7d) | Q(training_decision_time_old__lt=overdue_7d)
-    )
+    q2 = (Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE)
+          | Q(status=RecruitStatus.PENDING_TRAINING_SCHEDULE_OLD)) & (Q(interview_decision_time__lt=overdue_7d) | Q(training_decision_time_old__lt=overdue_7d))
 
     # 3. 待试播，但预约的试播时间已过24小时
     # 需要匹配新状态"待试播"和所有旧状态"待训练"、"试播招募中"、"训练征召中"
     # 需要考虑历史字段降级读取：scheduled_training_time 或 training_time
-    q3 = (
-        Q(status=RecruitStatus.PENDING_TRAINING) |
-        Q(status=RecruitStatus.PENDING_TRAINING_OLD) |
-        Q(status=RecruitStatus.TRAINING_RECRUITING) | 
-        Q(status=RecruitStatus.TRAINING_RECRUITING_OLD)
-    ) & (
-        Q(scheduled_training_time__lt=overdue_24h) | Q(training_time__lt=overdue_24h)
-    )
+    q3 = (Q(status=RecruitStatus.PENDING_TRAINING) | Q(status=RecruitStatus.PENDING_TRAINING_OLD) | Q(status=RecruitStatus.TRAINING_RECRUITING)
+          | Q(status=RecruitStatus.TRAINING_RECRUITING_OLD)) & (Q(scheduled_training_time__lt=overdue_24h) | Q(training_time__lt=overdue_24h))
 
     # 4. 待预约开播，但试播决策已超过7天
     # 需要考虑历史字段降级读取：training_decision_time 或 training_decision_time_old
-    q4 = Q(status=RecruitStatus.PENDING_BROADCAST_SCHEDULE) & (
-        Q(training_decision_time__lt=overdue_7d) | Q(training_decision_time_old__lt=overdue_7d)
-    )
+    q4 = Q(status=RecruitStatus.PENDING_BROADCAST_SCHEDULE) & (Q(training_decision_time__lt=overdue_7d) | Q(training_decision_time_old__lt=overdue_7d))
 
     # 5. 待开播，但预约的开播时间已过24小时
     # 需要考虑历史字段降级读取：scheduled_broadcast_time 或 training_time
-    q5 = Q(status=RecruitStatus.PENDING_BROADCAST) & (
-        Q(scheduled_broadcast_time__lt=overdue_24h) | Q(training_time__lt=overdue_24h)
-    )
+    q5 = Q(status=RecruitStatus.PENDING_BROADCAST) & (Q(scheduled_broadcast_time__lt=overdue_24h) | Q(training_time__lt=overdue_24h))
 
     overdue_query = q1 | q2 | q3 | q4 | q5
 
@@ -91,6 +78,39 @@ def safe_strip(value):
         stripped = value.strip()
         return stripped if stripped else None
     return None
+
+
+def _persist_filters_from_request():
+    """从请求中获取并持久化筛选参数"""
+    return persist_and_restore_filters(
+        'recruits_list',
+        allowed_keys=['status', 'recruiter_id', 'channel', 'time'],
+        default_filters={
+            'status': '进行中',
+            'recruiter_id': '',
+            'channel': '',
+            'time': 'two_days'
+        },
+    )
+
+
+def _apply_time_filter(query, time_scope: str):
+    """应用时间筛选条件"""
+    current_local = get_current_local_time()
+    today_local_start = current_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    if time_scope == 'two_days':
+        # 前天00:00:00开始
+        day_before_yesterday_start = today_local_start - timedelta(days=2)
+        # 今天23:59:59结束
+        today_local_end = today_local_start.replace(hour=23, minute=59, second=59, microsecond=999999)
+        range_start_utc = local_to_utc(day_before_yesterday_start)
+        range_end_utc = local_to_utc(today_local_end)
+        return query.filter(updated_at__gte=range_start_utc, updated_at__lte=range_end_utc)
+    elif time_scope == 'all':
+        return query
+    else:
+        return query
 
 
 def _record_changes(recruit, old_data, user, ip_address):
@@ -155,13 +175,12 @@ def try_enum(enum_class, value, default=None):
 def get_recruits():
     """获取招募列表"""
     try:
-        # 获取筛选参数
-        status_filter = request.args.get('status', '进行中')
+        # 获取持久化的筛选参数
+        filters = _persist_filters_from_request()
+        status_filter = safe_strip(filters.get('status'))
         recruiter_ids = request.args.getlist('recruiter_id')
         channel_filters = request.args.getlist('channel')
-        created_from = request.args.get('created_from')
-        created_to = request.args.get('created_to')
-        # q参数已移至前端处理，不再在后端使用
+        time_filter = safe_strip(filters.get('time')) or 'two_days'
 
         # 分页参数
         page = int(request.args.get('page', 1))
@@ -190,6 +209,9 @@ def get_recruits():
             except ValueError:
                 pass
 
+        # 应用时间筛选（在状态筛选之后，在其他筛选之前）
+        query = _apply_time_filter(query, time_filter)
+
         # 招募负责人筛选
         recruiter_ids = [rid for rid in recruiter_ids if rid]
         if recruiter_ids:
@@ -203,24 +225,6 @@ def get_recruits():
             valid_channels = [RecruitChannel(v) for v in channel_filters if _has_enum_value(RecruitChannel, v)]
             if valid_channels:
                 query = query.filter(channel__in=valid_channels)
-
-        # 创建时间范围筛选
-        if created_from:
-            try:
-                created_from_date = datetime.fromisoformat(created_from.replace('Z', '+00:00'))
-                query = query.filter(created_at__gte=created_from_date)
-            except ValueError:
-                logger.warning('无效的创建起始时间: %s', created_from)
-
-        if created_to:
-            try:
-                created_to_date = datetime.fromisoformat(created_to.replace('Z', '+00:00'))
-                created_to_date = created_to_date.replace(hour=23, minute=59, second=59)
-                query = query.filter(created_at__lte=created_to_date)
-            except ValueError:
-                logger.warning('无效的创建结束时间: %s', created_to)
-
-        # 搜索功能已移至前端实现，后端不再处理q参数
 
         # 排序处理
         if sort_param.startswith('-'):
@@ -261,7 +265,18 @@ def get_recruits():
         # 序列化数据
         data = {'items': serialize_recruit_list(recruits), 'aggregations': stats}
 
-        meta = {'pagination': {'page': page, 'page_size': page_size, 'total_items': total_items, 'total_pages': total_pages}}
+        meta = {
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_items': total_items,
+                'total_pages': total_pages
+            },
+            'filters': {
+                'status': status_filter or '进行中',
+                'time': time_filter or 'two_days',
+            }
+        }
 
         logger.info('获取招募列表成功：第%d页，共%d条记录', page, len(recruits))
         return jsonify(create_success_response(data, meta))
@@ -428,6 +443,28 @@ def get_recruit_options():
     except Exception as e:
         logger.error('获取招募选项数据失败: %s', str(e), exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '获取选项数据失败')), 500
+
+
+@recruits_api_bp.route('/api/recruits/filter-options', methods=['GET'])
+@jwt_roles_accepted('gicho', 'kancho')
+def get_recruit_filter_options():
+    """获取招募筛选选项（统一接口）。
+
+    返回状态、时间范围等所有筛选选项。
+    """
+    try:
+        # 时间筛选选项
+        time_options = [{'value': 'all', 'label': '全部'}, {'value': 'two_days', 'label': '这两天'}]
+
+        data = {
+            'time_ranges': time_options,
+        }
+
+        return jsonify(create_success_response(data))
+
+    except Exception as e:
+        logger.error('获取筛选选项失败: %s', str(e), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '获取筛选选项失败')), 500
 
 
 @recruits_api_bp.route('/api/recruits/export', methods=['GET'])
