@@ -196,7 +196,7 @@ def create_app() -> Flask:
 
     @flask_app.context_processor
     def inject_template_vars():
-        return {'datetime': datetime, 'timedelta': timedelta}
+        return {'datetime': datetime, 'timedelta': timedelta, 'log_level': os.getenv('LOG_LEVEL', 'INFO')}
 
     @flask_app.template_filter('local_date_for_input')
     def local_date_for_input_filter(utc_dt):

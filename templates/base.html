@@ -92,7 +92,15 @@
     <div class="spinner"></div>
   </div>
   <header class="topbar">
-    <div class="brand"><img src="{{ url_for('static', filename='favicon.svg') }}" alt="Lacus-Log" style="width:28px;height:28px;vertical-align:middle;margin-right:8px;">Lacus-Log 拉克斯日志</div>
+    <div class="brand">
+      {% if log_level == 'DEBUG' %}
+        <img src="{{ url_for('static', filename='favicon.svg') }}" alt="Lacus-Log" style="width:28px;height:28px;vertical-align:middle;margin-right:8px;">
+        <img src="{{ url_for('static', filename='favicon.svg') }}" alt="Lacus-Log" style="width:28px;height:28px;vertical-align:middle;margin-right:8px;">
+      {% else %}
+        <img src="{{ url_for('static', filename='favicon.svg') }}" alt="Lacus-Log" style="width:28px;height:28px;vertical-align:middle;margin-right:8px;">
+      {% endif %}
+      Lacus-Log 拉克斯日志
+    </div>
     {% if current_user.is_authenticated %}
     <button class="menu-toggle" id="menuToggle" aria-label="打开菜单">
       <span class="hamburger"></span>
