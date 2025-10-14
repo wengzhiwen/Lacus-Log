@@ -252,7 +252,13 @@
     card.href = '#';
     card.dataset.recruitId = record.id;
 
-    const pilotDisplay = record.pilot && record.pilot.nickname ? record.pilot.nickname : '未知主播';
+    let pilotDisplay = '未知主播';
+    if (record.pilot && record.pilot.nickname) {
+      pilotDisplay = record.pilot.nickname;
+      if (record.pilot.real_name) {
+        pilotDisplay += `(${record.pilot.real_name})`;
+      }
+    }
     const recruiterDisplay = record.recruiter && (record.recruiter.nickname || record.recruiter.username);
     const recruiterText = recruiterDisplay || '未知运营';
     const channel = record.channel || '未知渠道';
