@@ -864,13 +864,28 @@ def get_local_date_from_string_safe(date_str):
 
 
 def get_battle_records_for_month(year, month, owner_id=None, mode: str = 'all'):
-    """获取指定月份开播记录。"""
+    """获取指定月份开播记录。
+    
+    特殊规则：当报告月是当前月时，筛选范围调整为"当月1日到昨天为止"。
+    """
     month_start = datetime(year, month, 1, 0, 0, 0, 0)
     if month == 12:
         next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
     else:
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
+    
+    # 检查是否为当前月
+    now_utc = get_current_utc_time()
+    now_local = utc_to_local(now_utc)
+    current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # 如果报告月是当前月，调整结束时间为昨天
+    if month_start == current_month_start:
+        yesterday_local = now_local - timedelta(days=1)
+        month_end = yesterday_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+        logger.info('当前月特殊处理：筛选范围调整为 %s 到 %s', 
+                   month_start.strftime('%Y-%m-%d'), month_end.strftime('%Y-%m-%d %H:%M:%S'))
 
     return get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
 
