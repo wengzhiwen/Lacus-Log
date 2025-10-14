@@ -7,7 +7,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from models.recruit import Recruit, RecruitChangeLog
+from models.recruit import Recruit, RecruitChangeLog, RecruitStatus
 from utils.timezone_helper import utc_to_local
 
 
@@ -56,6 +56,87 @@ def _convert_datetime_fields_in_change_log(value: str, field_name: str) -> str:
         return value
 
 
+def _calculate_sort_order(recruit: Recruit) -> float:
+    """
+    计算招募记录的排序顺序值
+    
+    根据不同状态使用不同的排序规则：
+    - 待面试：按预约时间升序（timestamp，越小越靠前）
+    - 待预约试播：按面试决策时间逆序（负timestamp，越大越靠前）
+    - 待试播：按预约试播时间升序（timestamp）
+    - 待预约开播：按试播决策时间逆序（负timestamp）
+    - 待开播：按预约开播时间升序（timestamp）
+    - 鸽：按状态顺序+最后更新时间逆序（状态值*1e15 - timestamp）
+    - 已结束：按最后更新时间逆序（负timestamp）
+    
+    Args:
+        recruit: 招募记录对象
+        
+    Returns:
+        float: 排序值，前端可以直接用这个值进行升序排序
+    """
+    effective_status = recruit.get_effective_status()
+    
+    # 状态优先级映射（用于鸽分组）
+    status_order = {
+        RecruitStatus.PENDING_INTERVIEW: 1,
+        RecruitStatus.PENDING_TRAINING_SCHEDULE: 2,
+        RecruitStatus.PENDING_TRAINING: 3,
+        RecruitStatus.PENDING_BROADCAST_SCHEDULE: 4,
+        RecruitStatus.PENDING_BROADCAST: 5,
+    }
+    
+    # 默认时间戳（用于空值处理）
+    MAX_TIMESTAMP = 9999999999.0  # 远未来时间，用于升序时空值排在最后
+    MIN_TIMESTAMP = 0.0  # 远过去时间，用于逆序时空值排在最后
+    
+    if effective_status == RecruitStatus.PENDING_INTERVIEW:
+        # 待面试：按预约时间升序
+        if recruit.appointment_time:
+            return recruit.appointment_time.timestamp()
+        return MAX_TIMESTAMP
+        
+    elif effective_status == RecruitStatus.PENDING_TRAINING_SCHEDULE:
+        # 待预约试播：按面试决策时间逆序（使用负值）
+        if recruit.interview_decision_time:
+            return -recruit.interview_decision_time.timestamp()
+        return -MIN_TIMESTAMP
+        
+    elif effective_status == RecruitStatus.PENDING_TRAINING:
+        # 待试播：按预约试播时间升序
+        scheduled_time = recruit.get_effective_scheduled_training_time()
+        if scheduled_time:
+            return scheduled_time.timestamp()
+        return MAX_TIMESTAMP
+        
+    elif effective_status == RecruitStatus.PENDING_BROADCAST_SCHEDULE:
+        # 待预约开播：按试播决策时间逆序（使用负值）
+        if recruit.training_decision_time:
+            return -recruit.training_decision_time.timestamp()
+        return -MIN_TIMESTAMP
+        
+    elif effective_status == RecruitStatus.PENDING_BROADCAST:
+        # 待开播：按预约开播时间升序
+        scheduled_time = recruit.get_effective_scheduled_broadcast_time()
+        if scheduled_time:
+            return scheduled_time.timestamp()
+        return MAX_TIMESTAMP
+        
+    elif effective_status == RecruitStatus.ENDED:
+        # 已结束：按最后更新时间逆序（使用负值）
+        if recruit.updated_at:
+            return -recruit.updated_at.timestamp()
+        return -MIN_TIMESTAMP
+        
+    else:
+        # 其他情况（包括"鸽"分组，会在超时判断后重新分类）
+        # 按状态顺序，再按最后更新时间逆序
+        status_priority = status_order.get(effective_status, 999)
+        updated_timestamp = recruit.updated_at.timestamp() if recruit.updated_at else MIN_TIMESTAMP
+        # 状态值乘以一个大数，确保状态优先，然后减去时间戳实现同状态内按时间逆序
+        return status_priority * 1e15 - updated_timestamp
+
+
 def serialize_recruit(recruit: Recruit) -> Dict[str, Any]:
     """序列化单个招募对象"""
     return {
@@ -85,6 +166,8 @@ def serialize_recruit(recruit: Recruit) -> Dict[str, Any]:
         _safe_get_enum_value(recruit.status),
         'effective_status':
         _safe_get_enum_value(recruit.get_effective_status()),
+        'sort_order':
+        _calculate_sort_order(recruit),
 
         # 面试决策相关
         'interview_decision':

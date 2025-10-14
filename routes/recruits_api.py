@@ -229,13 +229,13 @@ def get_recruits():
         if sort_param.startswith('-'):
             sort_field = sort_param[1:]
             if sort_field in ['created_at', 'updated_at', 'appointment_time']:
-                query = query.order_by('-created_at')
+                query = query.order_by(f'-{sort_field}')
             else:
                 query = query.order_by('-created_at')
         else:
             sort_field = sort_param
             if sort_field in ['created_at', 'updated_at', 'appointment_time']:
-                query = query.order_by('created_at')
+                query = query.order_by(sort_field)
             else:
                 query = query.order_by('-created_at')
 

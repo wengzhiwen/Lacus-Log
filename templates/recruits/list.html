@@ -353,9 +353,21 @@ async function fetchAndRenderRecruits() {
         const filteredRecruits = applySearchFilter(allRecruitsData, searchTerm);
 
         if (status === '鸽') {
-            renderRecruits({ overdue: filteredRecruits });
+            // 对鸽分组也按sort_order排序
+            const sorted = filteredRecruits.sort((a, b) => {
+                const orderA = a.sort_order !== undefined ? a.sort_order : 9999999999;
+                const orderB = b.sort_order !== undefined ? b.sort_order : 9999999999;
+                return orderA - orderB;
+            });
+            renderRecruits({ overdue: sorted });
         } else if (status === '已结束') {
-            renderRecruits({ ended: filteredRecruits });
+            // 对已结束分组也按sort_order排序
+            const sorted = filteredRecruits.sort((a, b) => {
+                const orderA = a.sort_order !== undefined ? a.sort_order : 9999999999;
+                const orderB = b.sort_order !== undefined ? b.sort_order : 9999999999;
+                return orderA - orderB;
+            });
+            renderRecruits({ ended: sorted });
         } else { // "进行中"
             groupAndRender(filteredRecruits);
         }
@@ -396,9 +408,21 @@ function performClientSideSearch() {
     const filteredRecruits = applySearchFilter(allRecruitsData, searchTerm);
 
     if (status === '鸽') {
-        renderRecruits({ overdue: filteredRecruits });
+        // 对鸽分组也按sort_order排序
+        const sorted = filteredRecruits.sort((a, b) => {
+            const orderA = a.sort_order !== undefined ? a.sort_order : 9999999999;
+            const orderB = b.sort_order !== undefined ? b.sort_order : 9999999999;
+            return orderA - orderB;
+        });
+        renderRecruits({ overdue: sorted });
     } else if (status === '已结束') {
-        renderRecruits({ ended: filteredRecruits });
+        // 对已结束分组也按sort_order排序
+        const sorted = filteredRecruits.sort((a, b) => {
+            const orderA = a.sort_order !== undefined ? a.sort_order : 9999999999;
+            const orderB = b.sort_order !== undefined ? b.sort_order : 9999999999;
+            return orderA - orderB;
+        });
+        renderRecruits({ ended: sorted });
     } else { // "进行中"
         groupAndRender(filteredRecruits);
     }
@@ -425,6 +449,15 @@ function groupAndRender(recruits) {
             case '待开播': grouped.pending_broadcast.push(r); break;
             case '已结束': grouped.ended.push(r); break;
         }
+    });
+
+    // 对每个分组按照后端提供的sort_order字段排序
+    Object.keys(grouped).forEach(key => {
+        grouped[key].sort((a, b) => {
+            const orderA = a.sort_order !== undefined ? a.sort_order : 9999999999;
+            const orderB = b.sort_order !== undefined ? b.sort_order : 9999999999;
+            return orderA - orderB;
+        });
     });
 
     renderRecruits(grouped);
