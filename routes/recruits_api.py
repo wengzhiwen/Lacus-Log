@@ -178,8 +178,8 @@ def get_recruits():
         # 获取持久化的筛选参数
         filters = _persist_filters_from_request()
         status_filter = safe_strip(filters.get('status'))
-        recruiter_ids = request.args.getlist('recruiter_id')
-        channel_filters = request.args.getlist('channel')
+        recruiter_ids = [x for x in request.args.getlist('recruiter_id') if x]
+        channel_filters = [x for x in request.args.getlist('channel') if x]
         time_filter = safe_strip(filters.get('time')) or 'two_days'
 
         # 分页参数
@@ -213,7 +213,6 @@ def get_recruits():
         query = _apply_time_filter(query, time_filter)
 
         # 招募负责人筛选
-        recruiter_ids = [rid for rid in recruiter_ids if rid]
         if recruiter_ids:
             try:
                 query = query.filter(recruiter__in=recruiter_ids)

@@ -34,8 +34,11 @@ def persist_and_restore_filters(page_key: str, *, allowed_keys: Iterable[str], d
     Returns:
         dict: 本次应当生效的筛选条件（只包含 allowed_keys）
     """
+    from flask import request, session
+    
     allowed_keys = list(allowed_keys)
 
+    # 检查是否有任何筛选器参数在请求中（包括空值）
     has_filter_in_request = any(key in request.args for key in allowed_keys)
 
     effective = dict(default_filters)
@@ -44,21 +47,21 @@ def persist_and_restore_filters(page_key: str, *, allowed_keys: Iterable[str], d
     saved: Dict[str, str] = bucket.get(page_key) or {}
 
     if has_filter_in_request:
-        # 保存所有筛选器状态，包括空值
+        # 用户主动设置了筛选器，保存所有筛选器状态
         to_save = {}
         for key in allowed_keys:
-            if key in request.args:
-                to_save[key] = request.args.get(key, '')
-                effective[key] = to_save[key]
-            else:
-                # 如果请求中没有这个参数，保持之前的保存值或设为空
-                to_save[key] = saved.get(key, '')
-                effective[key] = to_save[key]
+            # 获取请求中的参数值，如果没有则使用默认值
+            # 这样可以确保当用户清空某个筛选器时，该筛选器会被设置为默认值
+            to_save[key] = request.args.get(key, default_filters.get(key, ''))
+            effective[key] = to_save[key]
+        
+        # 保存到session
         bucket[page_key] = to_save
         session['filter_state'] = bucket
         session.modified = True
         return effective
 
+    # 没有筛选器参数，从session恢复
     if saved:
         for key in allowed_keys:
             if key in saved:

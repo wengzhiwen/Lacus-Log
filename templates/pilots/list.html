@@ -465,20 +465,23 @@ async function loadPilots() {
 
   try {
     const params = new URLSearchParams();
-    if (currentFilters.rank) params.append('rank', currentFilters.rank);
-    if (currentFilters.status) params.append('status', currentFilters.status);
-    if (currentFilters.owner) {
-      if (currentFilters.owner === 'none') {
-        // 无直属运营的筛选由后端处理
-      } else {
-        params.append('owner_id', currentFilters.owner);
-      }
+    // 始终发送所有筛选器参数，即使值为空，这样后端才能正确保存筛选器状态
+    params.append('rank', currentFilters.rank || '');
+    params.append('status', currentFilters.status || '');
+    if (currentFilters.owner && currentFilters.owner !== 'none') {
+      params.append('owner_id', currentFilters.owner);
+    } else {
+      params.append('owner_id', '');
     }
     if (currentFilters.days) {
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - parseInt(currentFilters.days));
       params.append('created_from', daysAgo.toISOString());
+    } else {
+      params.append('created_from', '');
+      params.append('created_to', '');
     }
+    params.append('q', currentFilters.q || '');
 
     const response = await fetch(`/api/pilots?${params.toString()}`);
     const result = await response.json();

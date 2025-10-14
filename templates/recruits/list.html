@@ -101,6 +101,38 @@
 
 <script>
 // --- UTILITY FUNCTIONS ---
+function updateFilterSummary() {
+  const summary = document.getElementById('filter-summary');
+  const selectedItems = [];
+  
+  const statusFilter = document.getElementById('status-filter');
+  const recruiterFilter = document.getElementById('recruiter-filter');
+  const channelFilter = document.getElementById('channel-filter');
+  const timeFilter = document.getElementById('time-filter');
+  
+  // 状态筛选（如果不是默认的"进行中"）
+  if (statusFilter && statusFilter.value && statusFilter.value !== '进行中') {
+    selectedItems.push(statusFilter.options[statusFilter.selectedIndex].text);
+  }
+  
+  // 负责人筛选
+  if (recruiterFilter && recruiterFilter.value) {
+    selectedItems.push(recruiterFilter.options[recruiterFilter.selectedIndex].text);
+  }
+  
+  // 渠道筛选
+  if (channelFilter && channelFilter.value) {
+    selectedItems.push(channelFilter.options[channelFilter.selectedIndex].text);
+  }
+  
+  // 时间筛选（如果不是默认值）
+  if (timeFilter && timeFilter.value && timeFilter.value !== 'two_days') {
+    selectedItems.push(timeFilter.options[timeFilter.selectedIndex].text);
+  }
+  
+  summary.textContent = selectedItems.length > 0 ? selectedItems.join(' + ') : '全部显示';
+}
+
 function toggleFilters() {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
@@ -292,9 +324,10 @@ async function fetchAndRenderRecruits() {
 
         // 直接使用 fetch 而不是 RecruitAPI，避免触发全局 loading
         const url = new URL(`${window.location.origin}/api/recruits`);
+        // 始终发送所有筛选器参数，即使值为空，这样后端才能正确保存筛选器状态
         url.searchParams.append('status', status);
-        if (recruiterId) url.searchParams.append('recruiter_id', recruiterId);
-        if (channel) url.searchParams.append('channel', channel);
+        url.searchParams.append('recruiter_id', recruiterId || '');
+        url.searchParams.append('channel', channel || '');
         url.searchParams.append('time', time);
         url.searchParams.append('page_size', '500');
 
@@ -326,6 +359,9 @@ async function fetchAndRenderRecruits() {
         } else { // "进行中"
             groupAndRender(filteredRecruits);
         }
+
+        // 更新筛选摘要
+        updateFilterSummary();
 
     } catch (error) {
         console.error('Failed to load recruits:', error);
@@ -462,6 +498,9 @@ async function populateFilters() {
             if (current_filters.channel) channelFilter.value = current_filters.channel;
             if (current_filters.time) timeFilter.value = current_filters.time;
         }
+
+        // 更新筛选摘要
+        updateFilterSummary();
 
     } catch (error) {
         console.error('Failed to populate filters:', error);

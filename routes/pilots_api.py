@@ -97,14 +97,14 @@ def get_pilots():
         current_filters = _persist_filters_from_request()
         logger.info('持久化筛选条件完成: %s', current_filters)
         
-        # 获取筛选参数
-        owner_ids = request.args.getlist('owner_id')
-        rank_filters = request.args.getlist('rank')
-        status_filters = request.args.getlist('status')
-        platform_filters = request.args.getlist('platform')
-        work_mode_filters = request.args.getlist('work_mode')
-        created_from = request.args.get('created_from')
-        created_to = request.args.get('created_to')
+        # 获取筛选参数，过滤掉空字符串
+        owner_ids = [x for x in request.args.getlist('owner_id') if x]
+        rank_filters = [x for x in request.args.getlist('rank') if x]
+        status_filters = [x for x in request.args.getlist('status') if x]
+        platform_filters = [x for x in request.args.getlist('platform') if x]
+        work_mode_filters = [x for x in request.args.getlist('work_mode') if x]
+        created_from = request.args.get('created_from') or None
+        created_to = request.args.get('created_to') or None
         q = request.args.get('q', '').strip()
 
         # 分页参数
