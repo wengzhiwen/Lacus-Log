@@ -458,6 +458,16 @@ async function fetchBattleRecords(append = false) {
     const data = result.data || {};
     const meta = result.meta || {};
     applyFilterOptions(meta.options || filterOptions);
+
+    // 应用API返回的筛选器状态
+    if (meta.filters) {
+      currentFilters.owner = meta.filters.owner || 'all';
+      currentFilters.x = meta.filters.x || '';
+      currentFilters.time = meta.filters.time || 'two_days';
+      // 重新填充筛选器选项以应用持久化状态
+      applyFilterOptions(meta.options || filterOptions);
+    }
+
     renderRecords(data.items || [], append);
 
     hasMore = Boolean(meta.has_more);

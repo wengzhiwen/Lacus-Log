@@ -279,7 +279,7 @@ async function fetchAndRenderRecruits() {
     emptyState.style.display = 'none';
 
     try {
-        // 获取当前筛选器的值，确保在初始化时也能正确传递参数
+        // 获取当前筛选器的值（这些值已经在populateFilters中从session中正确设置了）
         const statusFilter = document.getElementById('status-filter');
         const recruiterFilter = document.getElementById('recruiter-filter');
         const channelFilter = document.getElementById('channel-filter');
@@ -288,7 +288,7 @@ async function fetchAndRenderRecruits() {
         const status = statusFilter ? statusFilter.value : '进行中';
         const recruiterId = recruiterFilter ? recruiterFilter.value : '';
         const channel = channelFilter ? channelFilter.value : '';
-        const time = timeFilter ? timeFilter.value : 'two_days';
+        const time = timeFilter ? timeFilter.value : 'two_days'; // 作为安全后备
 
         // 直接使用 fetch 而不是 RecruitAPI，避免触发全局 loading
         const url = new URL(`${window.location.origin}/api/recruits`);
@@ -403,17 +403,17 @@ async function populateFilters() {
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' }
         });
-        
+
         if (!optionsResponse.ok) {
             throw new Error('加载选项失败');
         }
-        
+
         const payload = await optionsResponse.json();
         if (!payload.success) {
             throw new Error(payload.error?.message || '加载选项失败');
         }
-        
-        const { enums, recruiter_choices } = payload.data;
+
+        const { enums, recruiter_choices, current_filters } = payload.data;
 
         // 获取时间筛选选项
         const filterOptionsPayload = await fetch('/api/recruits/filter-options', {
@@ -426,13 +426,13 @@ async function populateFilters() {
         const filterOptionsResponse = await filterOptionsPayload.json();
         const timeOptions = filterOptionsResponse.success && filterOptionsResponse.data ? filterOptionsResponse.data.time_ranges : [];
 
+        // 填充筛选器选项
         const statusFilter = document.getElementById('status-filter');
         statusFilter.innerHTML = `
             <option value="进行中">进行中</option>
             <option value="鸽">鸽</option>
             <option value="已结束">已结束</option>
         `;
-        statusFilter.value = '进行中'; // Set default
 
         const recruiterFilter = document.getElementById('recruiter-filter');
         recruiterFilter.innerHTML = '<option value="">全部负责人</option>';
@@ -452,9 +452,16 @@ async function populateFilters() {
         timeFilter.innerHTML = '';
         timeOptions.forEach(option => {
             const opt = new Option(option.label, option.value);
-            if (option.value === 'two_days') opt.selected = true; // Set default
             timeFilter.add(opt);
         });
+
+        // 使用从session中恢复的筛选器状态设置UI
+        if (current_filters) {
+            if (current_filters.status) statusFilter.value = current_filters.status;
+            if (current_filters.recruiter_id) recruiterFilter.value = current_filters.recruiter_id;
+            if (current_filters.channel) channelFilter.value = current_filters.channel;
+            if (current_filters.time) timeFilter.value = current_filters.time;
+        }
 
     } catch (error) {
         console.error('Failed to populate filters:', error);

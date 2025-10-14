@@ -308,34 +308,53 @@ function getGenderIcon(gender) {
 // 加载筛选器选项
 async function loadOptions() {
   try {
+    // 构建当前筛选器参数，用于传递给options API
+    const params = new URLSearchParams();
+    if (currentFilters.rank) params.append('rank', currentFilters.rank);
+    if (currentFilters.status) params.append('status', currentFilters.status);
+    if (currentFilters.owner) {
+      if (currentFilters.owner === 'none') {
+        // 无直属运营的筛选由后端处理
+      } else {
+        params.append('owner_id', currentFilters.owner);
+      }
+    }
+    if (currentFilters.days) {
+      const daysAgo = new Date();
+      daysAgo.setDate(daysAgo.getDate() - parseInt(currentFilters.days));
+      params.append('created_from', daysAgo.toISOString());
+    }
+    if (currentFilters.q) params.append('q', currentFilters.q);
+
     // 并行加载枚举选项和运营列表
     const [enumResponse, operatorsResponse] = await Promise.all([
-      fetch('/api/pilots/options'),
+      fetch(`/api/pilots/options?${params.toString()}`),
       fetch('/api/users/operators')
     ]);
-    
+
     const enumResult = await enumResponse.json();
     const operatorsResult = await operatorsResponse.json();
-    
+
     console.log('枚举选项结果:', enumResult);
     console.log('运营列表结果:', operatorsResult);
-    
+
     if (!enumResult.success) {
       throw new Error(enumResult.error?.message || '获取枚举选项失败');
     }
-    
+
     if (!operatorsResult.success) {
       throw new Error(operatorsResult.error?.message || '获取运营列表失败');
     }
-    
+
     pilotsOptions = {
       enums: enumResult.data.enums,
-      owners: operatorsResult.data
+      owners: operatorsResult.data,
+      current_filters: enumResult.data.current_filters
     };
-    
+
     console.log('pilotsOptions:', pilotsOptions);
     console.log('owners数量:', pilotsOptions.owners ? pilotsOptions.owners.length : 0);
-    
+
     populateFilters();
   } catch (error) {
     console.error('加载选项失败:', error);
@@ -346,7 +365,7 @@ async function loadOptions() {
 // 填充筛选器
 function populateFilters() {
   if (!pilotsOptions) return;
-  
+
   // 填充主播分类
   const rankFilter = document.getElementById('rank-filter');
   Object.keys(pilotsOptions.enums.rank).forEach(key => {
@@ -359,7 +378,7 @@ function populateFilters() {
       rankFilter.appendChild(option);
     }
   });
-  
+
   // 填充状态
   const statusFilter = document.getElementById('status-filter');
   Object.keys(pilotsOptions.enums.status).forEach(key => {
@@ -372,7 +391,7 @@ function populateFilters() {
       statusFilter.appendChild(option);
     }
   });
-  
+
   // 填充直属运营
   const ownerFilter = document.getElementById('owner-filter');
   if (ownerFilter) {
@@ -391,6 +410,47 @@ function populateFilters() {
   } else {
     console.warn('找不到owner-filter元素');
   }
+
+  // 应用持久化的筛选器状态
+  if (pilotsOptions.current_filters) {
+    console.log('应用持久化筛选器状态:', pilotsOptions.current_filters);
+
+    // 应用主播分类筛选
+    if (pilotsOptions.current_filters.rank) {
+      currentFilters.rank = pilotsOptions.current_filters.rank;
+      rankFilter.value = currentFilters.rank;
+    }
+
+    // 应用状态筛选
+    if (pilotsOptions.current_filters.status) {
+      currentFilters.status = pilotsOptions.current_filters.status;
+      statusFilter.value = currentFilters.status;
+    }
+
+    // 应用直属运营筛选
+    if (pilotsOptions.current_filters.owner_id) {
+      currentFilters.owner = pilotsOptions.current_filters.owner_id;
+      ownerFilter.value = currentFilters.owner;
+    }
+
+    // 应用时间筛选 - 需要计算天数
+    if (pilotsOptions.current_filters.created_from && !pilotsOptions.current_filters.created_to) {
+      const createdFrom = new Date(pilotsOptions.current_filters.created_from);
+      const now = new Date();
+      const daysDiff = Math.floor((now - createdFrom) / (1000 * 60 * 60 * 24));
+
+      // 找到最接近的天数选项
+      const daysOptions = [7, 14, 30];
+      const closestDays = daysOptions.reduce((prev, curr) =>
+        Math.abs(curr - daysDiff) < Math.abs(prev - daysDiff) ? curr : prev
+      );
+
+      currentFilters.days = closestDays.toString();
+      document.getElementById('days-filter').value = currentFilters.days;
+    }
+
+    console.log('应用后的筛选器状态:', currentFilters);
+  }
 }
 
 // 加载主播列表
@@ -398,11 +458,11 @@ async function loadPilots() {
   const loadingState = document.getElementById('loading-state');
   const pilotsContainer = document.getElementById('pilot-cards-container');
   const emptyState = document.getElementById('empty-state');
-  
+
   loadingState.style.display = 'block';
   pilotsContainer.style.display = 'none';
   emptyState.style.display = 'none';
-  
+
   try {
     const params = new URLSearchParams();
     if (currentFilters.rank) params.append('rank', currentFilters.rank);
@@ -419,14 +479,14 @@ async function loadPilots() {
       daysAgo.setDate(daysAgo.getDate() - parseInt(currentFilters.days));
       params.append('created_from', daysAgo.toISOString());
     }
-    
+
     const response = await fetch(`/api/pilots?${params.toString()}`);
     const result = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error?.message || '加载主播列表失败');
     }
-    
+
     allPilots = result.data.items || [];
     renderPilots(allPilots);
     updateFilterSummary();
@@ -597,18 +657,26 @@ function exportPilots() {
 document.addEventListener('DOMContentLoaded', async function() {
   await loadOptions();
   await loadPilots();
-  
+
+  // 应用持久化的搜索词（在loadOptions完成后）
+  const searchInput = document.getElementById('pilot-search');
+  if (pilotsOptions && pilotsOptions.current_filters && pilotsOptions.current_filters.q) {
+    searchInput.value = pilotsOptions.current_filters.q;
+    // 同时更新currentFilters中的搜索词
+    currentFilters.q = pilotsOptions.current_filters.q;
+  }
+
   // 绑定筛选器事件
   document.getElementById('rank-filter').addEventListener('change', function(e) {
     currentFilters.rank = e.target.value;
     loadPilots();
   });
-  
+
   document.getElementById('status-filter').addEventListener('change', function(e) {
     currentFilters.status = e.target.value;
     loadPilots();
   });
-  
+
   const ownerFilter = document.getElementById('owner-filter');
   if (ownerFilter) {
     ownerFilter.addEventListener('change', function(e) {
@@ -616,14 +684,12 @@ document.addEventListener('DOMContentLoaded', async function() {
       loadPilots();
     });
   }
-  
+
   document.getElementById('days-filter').addEventListener('change', function(e) {
     currentFilters.days = e.target.value;
     loadPilots();
   });
-  
-  // 绑定搜索事件
-  const searchInput = document.getElementById('pilot-search');
+
   searchInput.addEventListener('input', performSearch);
   searchInput.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {

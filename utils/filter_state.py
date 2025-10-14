@@ -44,10 +44,15 @@ def persist_and_restore_filters(page_key: str, *, allowed_keys: Iterable[str], d
     saved: Dict[str, str] = bucket.get(page_key) or {}
 
     if has_filter_in_request:
+        # 保存所有筛选器状态，包括空值
         to_save = {}
         for key in allowed_keys:
             if key in request.args:
                 to_save[key] = request.args.get(key, '')
+                effective[key] = to_save[key]
+            else:
+                # 如果请求中没有这个参数，保持之前的保存值或设为空
+                to_save[key] = saved.get(key, '')
                 effective[key] = to_save[key]
         bucket[page_key] = to_save
         session['filter_state'] = bucket

@@ -534,7 +534,12 @@ def _calculate_month_summary(report_date, owner_id=None, mode: str = 'all'):
         if duration >= 6.0:
             effective_pilot_ids.add(pilot_id)
 
+    # 计算所有主播的返点总额
     total_rebate = Decimal('0')
+    for pilot_id in pilot_ids:
+        pilot = Pilot.objects.get(id=pilot_id)
+        rebate_info = calculate_pilot_rebate(pilot, report_date, owner_id, mode)
+        total_rebate += rebate_info['rebate_amount']
 
     operating_profit = total_company_share + total_rebate - total_base_salary
 
@@ -947,7 +952,19 @@ def _calculate_monthly_summary(year, month, owner_id=None, mode: str = 'all'):
         total_pilot_share += commission_amounts['pilot_amount']
         total_company_share += commission_amounts['company_amount']
 
+    # 计算所有主播的返点总额
     total_rebate = Decimal('0')
+    for pilot_id in pilot_ids:
+        pilot = Pilot.objects.get(id=pilot_id)
+        # 构造report_date为月份的最后一天
+        report_date = datetime(year, month, 1)
+        if month == 12:
+            next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
+        else:
+            next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
+        month_end = next_month_start - timedelta(microseconds=1)
+        rebate_info = calculate_pilot_rebate(pilot, month_end, owner_id, mode)
+        total_rebate += rebate_info['rebate_amount']
 
     operating_profit = total_company_share + total_rebate - total_base_salary
 

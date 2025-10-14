@@ -13,15 +13,12 @@ from decimal import Decimal
 from flask import Blueprint, Response, jsonify, request
 from mongoengine import DoesNotExist, Q, ValidationError
 
-from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank,
-                          Status, WorkMode)
+from models.pilot import (Gender, Pilot, PilotChangeLog, Platform, Rank, Status, WorkMode)
 from models.user import User
+from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import get_jwt_user, jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.pilot_serializers import (create_error_response,
-                                     create_success_response,
-                                     serialize_change_log_list,
-                                     serialize_pilot)
+from utils.pilot_serializers import (create_error_response, create_success_response, serialize_change_log_list, serialize_pilot)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
 
 logger = get_logger('pilot')
@@ -96,6 +93,10 @@ def try_enum(enum_class, value, default=None):
 def get_pilots():
     """获取主播列表"""
     try:
+        # 持久化筛选条件
+        current_filters = _persist_filters_from_request()
+        logger.info('持久化筛选条件完成: %s', current_filters)
+        
         # 获取筛选参数
         owner_ids = request.args.getlist('owner_id')
         rank_filters = request.args.getlist('rank')
@@ -328,10 +329,9 @@ def create_pilot():
                 pilot.owner = jwt_user
                 logger.debug('运营创建主播，自动关联owner: %s -> %s', jwt_user.username, pilot.nickname)
             else:
-                logger.debug('创建主播未设置owner: jwt_user=%s, has_kancho=%s, has_gicho=%s',
-                            jwt_user.username if jwt_user else 'None',
-                            jwt_user.has_role('kancho') if jwt_user else False,
-                            jwt_user.has_role('gicho') if jwt_user else False)
+                logger.debug('创建主播未设置owner: jwt_user=%s, has_kancho=%s, has_gicho=%s', jwt_user.username if jwt_user else 'None',
+                             jwt_user.has_role('kancho') if jwt_user else False,
+                             jwt_user.has_role('gicho') if jwt_user else False)
 
         # 保存主播
         pilot.created_at = pilot.updated_at = get_current_utc_time()
@@ -517,14 +517,34 @@ def get_pilot_changes(pilot_id):
         return jsonify(create_error_response('INTERNAL_ERROR', '获取主播变更记录失败')), 500
 
 
+def _persist_filters_from_request():
+    """从请求中获取并持久化筛选参数"""
+    return persist_and_restore_filters(
+        'pilots_list_v2',  # 使用不同的key避免冲突
+        allowed_keys=['rank', 'status', 'owner_id', 'q', 'created_from', 'created_to'],
+        default_filters={
+            'rank': '',
+            'status': '',
+            'owner_id': '',
+            'q': '',
+            'created_from': '',
+            'created_to': ''
+        },
+    )
+
+
 @pilots_api_bp.route('/api/pilots/options', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho')
 def get_pilot_options():
     """获取主播筛选器枚举选项
-    
+
     注意：直属运营列表已迁移到用户管理模块，请使用 GET /api/users/operators
     """
     try:
+        # 持久化筛选条件
+        current_filters = _persist_filters_from_request()
+        logger.info('持久化筛选条件完成: %s', current_filters)
+
         # 枚举字典
         enum_dict = {
             'gender': {
@@ -549,7 +569,8 @@ def get_pilot_options():
             }
         }
 
-        data = {'enums': enum_dict}
+        data = {'enums': enum_dict, 'current_filters': current_filters}
+        logger.info('返回主播选项数据，筛选器: %s', current_filters)
 
         return jsonify(create_success_response(data))
 

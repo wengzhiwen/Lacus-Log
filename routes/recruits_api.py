@@ -387,8 +387,11 @@ def get_recruit_changes(recruit_id):
 @recruits_api_bp.route('/api/recruits/options', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho')
 def get_recruit_options():
-    """获取招募筛选器枚举选项"""
+    """获取招募筛选器枚举选项和当前筛选器状态"""
     try:
+        # 获取当前持久化的筛选器状态
+        current_filters = _persist_filters_from_request()
+
         # 枚举字典
         enum_dict = {
             'channel': {
@@ -436,7 +439,11 @@ def get_recruit_options():
                 label = f"{label} [运营]"
             recruiter_choices.append({'value': str(user.id), 'label': label})
 
-        data = {'enums': enum_dict, 'recruiter_choices': recruiter_choices}
+        data = {
+            'enums': enum_dict,
+            'recruiter_choices': recruiter_choices,
+            'current_filters': current_filters  # 返回当前筛选器状态
+        }
 
         return jsonify(create_success_response(data))
 
