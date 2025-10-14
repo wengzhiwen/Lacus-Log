@@ -1086,6 +1086,15 @@ def training_decision(recruit_id):
 
         remarks = safe_strip(data.get('remarks'))
 
+        # 获取主播昵称和真实姓名
+        pilot_nickname = safe_strip(data.get('pilot_nickname'))
+        pilot_real_name = safe_strip(data.get('pilot_real_name'))
+
+        if not pilot_nickname:
+            return jsonify(create_error_response('VALIDATION_ERROR', '主播昵称不能为空')), 400
+        if not pilot_real_name:
+            return jsonify(create_error_response('VALIDATION_ERROR', '真实姓名不能为空')), 400
+
         # 记录修改前的数据状态
         old_recruit_data = {
             'pilot': str(recruit.pilot.id) if recruit.pilot else None,
@@ -1109,6 +1118,11 @@ def training_decision(recruit_id):
             'status': recruit.pilot.status.value if hasattr(recruit.pilot.status, 'value') else recruit.pilot.status,
         }
 
+        # 更新主播信息
+        recruit.pilot.nickname = pilot_nickname
+        recruit.pilot.real_name = pilot_real_name
+        recruit.pilot.save()
+
         # 更新招募信息
         recruit.training_decision = training_decision_enum
         recruit.training_decision_maker = current_user
@@ -1127,11 +1141,10 @@ def training_decision(recruit_id):
 
         _record_changes(recruit, old_recruit_data, current_user, _get_client_ip())
 
-        # 记录主播变更（仅在不招募时）
-        if training_decision_enum == TrainingDecision.NOT_RECRUIT:
-            from routes.pilots_api import \
-                _record_changes as record_pilot_changes
-            record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
+        # 记录主播变更
+        from routes.pilots_api import \
+            _record_changes as record_pilot_changes
+        record_pilot_changes(recruit.pilot, old_pilot_data, current_user, _get_client_ip())
 
         # 记录操作日志
         record_recruit_operation(user_id=current_user.id,

@@ -30,6 +30,20 @@
     <input type="hidden" name="recruit_id" value="{{ recruit_id }}"/>
     
     <div class="form-section">
+      <h3 class="section-title">主播信息</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="pilot_nickname">主播昵称 <span class="required">*</span></label>
+          <input type="text" name="pilot_nickname" id="pilot_nickname" required>
+        </div>
+        <div class="form-group">
+          <label for="pilot_real_name">真实姓名 <span class="required">*</span></label>
+          <input type="text" name="pilot_real_name" id="pilot_real_name" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
       <h3 class="section-title">决策信息</h3>
       <div class="form-row">
         <div class="form-group">
@@ -153,6 +167,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (recruit.training_decision) {
             decisionSelect.value = recruit.training_decision;
         }
+
+        // 填充主播信息
+        const pilotNicknameInput = document.getElementById('pilot_nickname');
+        const pilotRealNameInput = document.getElementById('pilot_real_name');
+        pilotNicknameInput.value = recruit.pilot?.nickname || '';
+        pilotRealNameInput.value = recruit.pilot?.real_name || '';
     };
 
     try {
@@ -190,11 +210,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const formData = new FormData(form);
         const payload = {
+            pilot_nickname: formData.get('pilot_nickname'),
+            pilot_real_name: formData.get('pilot_real_name'),
             training_decision: formData.get('training_decision'),
             introduction_fee: formData.get('introduction_fee'),
             remarks: formData.get('remarks')
         };
 
+        // 验证主播信息
+        if (!payload.pilot_nickname || !payload.pilot_nickname.trim()) {
+            showMessage('主播昵称不能为空', 'error');
+            return;
+        }
+        if (!payload.pilot_real_name || !payload.pilot_real_name.trim()) {
+            showMessage('真实姓名不能为空', 'error');
+            return;
+        }
         if (!payload.training_decision) {
             showMessage('请选择试播决策', 'error');
             return;
