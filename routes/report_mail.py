@@ -358,6 +358,57 @@ def _build_unstarted_markdown(items: List[dict]) -> str:
     return "\n".join(lines)
 
 
+def _build_online_pilot_unstarted_markdown(items: List[dict], report_date: str, check_day: str) -> str:
+    """将线上主播未开播提醒数据渲染为Markdown格式。
+
+    Args:
+        items: 线上主播未开播数据列表
+        report_date: 报表日期
+        check_day: 检查日期
+
+    Returns:
+        str: Markdown格式的邮件内容
+    """
+    if not items:
+        return f'# 线上主播未开播提醒\n\n**报表日期：** {report_date}\n\n检查结果显示：所有线上主播在{check_day}均有正常开播记录，无遗漏情况。\n\n---\n*本报表由 Lacus-Log 系统自动生成*'
+
+    header = ("| 主播昵称 | 真实姓名 | 直属运营-主播分类 | 最近开播日期 | 开播地点 | 开播方式 | 近3天线上次数 | 检查日 | 备注 |\n"
+              "| --- | --- | --- | --- | --- | --- | ---: | --- | --- |")
+
+    lines = [header]
+    for it in items:
+        line = (f"| {it['pilot_name']} | {it['real_name']} | {it['owner_rank']} | "
+                f"{it['latest_date']} | {it['location']} | {it['work_mode']} | "
+                f"{it['recent_online_count']} | {it['check_day']} | {it['note']} |")
+        lines.append(line)
+
+    table_content = "\n".join(lines)
+
+    summary = f"""
+**检查范围说明：**
+- 检查窗口：{report_date}前4日至{report_date}前2日（3天内）
+- 检查日：{report_date}前1日
+- 筛选条件：在检查窗口内有过线上开播记录的主播
+- 提醒条件：检查日无任何开播记录的主播
+
+**统计结果：**
+- 需要提醒的主播数量：{len(items)}人
+"""
+
+    return f"""
+# 线上主播未开播提醒
+
+**报表日期：** {report_date}
+
+{summary}
+
+{table_content}
+
+---
+*本报表由 Lacus-Log 系统自动生成*
+"""
+
+
 @report_mail_bp.route('/mail')
 @roles_required('gicho')
 def mail_reports_page():
@@ -370,6 +421,14 @@ def mail_reports_page():
         if unstarted_plan:
             fire_dt_utc = datetime.strptime(unstarted_plan.fire_minute, '%Y%m%d%H%M')
             unstarted_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
+
+        online_pilot_unstarted_plan = (JobPlan.objects(job_code='daily_online_pilot_unstarted_report',
+                                                       fire_minute__gte=now_minute).order_by('fire_minute').first()) or (JobPlan.objects(
+                                                           job_code='daily_online_pilot_unstarted_report').order_by('-fire_minute').first())
+        online_pilot_unstarted_next_local = None
+        if online_pilot_unstarted_plan:
+            fire_dt_utc = datetime.strptime(online_pilot_unstarted_plan.fire_minute, '%Y%m%d%H%M')
+            online_pilot_unstarted_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
         recruit_plan = (JobPlan.objects(job_code='daily_recruit_daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
             JobPlan.objects(job_code='daily_recruit_daily_report').order_by('-fire_minute').first())
@@ -395,12 +454,14 @@ def mail_reports_page():
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('读取任务下一次触发时间失败：%s', exc)
         unstarted_next_local = None
+        online_pilot_unstarted_next_local = None
         recruit_next_local = None
         daily_next_local = None
         monthly_mail_next_local = None
 
     next_times = {
         'unstarted': unstarted_next_local,
+        'online_pilot_unstarted': online_pilot_unstarted_next_local,
         'recruit_daily': recruit_next_local,
         'daily_report': daily_next_local,
         'monthly_mail_report': monthly_mail_next_local
@@ -500,6 +561,139 @@ def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
     return {'sent': False, 'count': len(unstarted_items)}
 
 
+def run_online_pilot_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
+    """执行"线上主播未开播提醒"邮件报表发送任务。
+
+    针对线上主播，找到报表日前4日开始的3天内有过线上开播记录的主播，
+    如果该主播在报表日的前1天没有开播记录，则发送提醒。
+
+    Args:
+        triggered_by: 触发来源
+
+    Returns:
+        dict: {"sent": bool, "count": int}
+    """
+    logger.info('触发线上主播未开播提醒邮件发送，来源：%s', triggered_by or '未知')
+
+    now_utc = get_current_utc_time()
+    now_local = utc_to_local(now_utc)
+
+    # 报表日为当前日期（GMT+8）
+    report_date_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 检查窗口：报表日前4日开始的3天（即报表日-4, 报表日-3, 报表日-2）
+    check_start_local = report_date_local - timedelta(days=4)
+    check_end_local = report_date_local - timedelta(days=1)
+
+    # 检查日：报表日前1天（即报表日-1）
+    check_day_local = report_date_local - timedelta(days=1)
+
+    # 转换为UTC时间用于数据库查询
+    check_start_utc = local_to_utc(check_start_local)
+    check_end_utc = local_to_utc(check_end_local + timedelta(days=1))
+    check_day_start_utc = local_to_utc(check_day_local)
+    check_day_end_utc = local_to_utc(check_day_local + timedelta(days=1))
+
+    logger.debug('报表日：%s（本地）', report_date_local.strftime('%Y-%m-%d'))
+    logger.debug('检查窗口：%s 至 %s（本地）', check_start_local.strftime('%Y-%m-%d'), check_end_local.strftime('%Y-%m-%d'))
+    logger.debug('检查日：%s（本地）', check_day_local.strftime('%Y-%m-%d'))
+
+    # 查询在检查窗口内有过线上开播记录的主播
+    from models.pilot import WorkMode
+    online_records_in_window = BattleRecord.objects.filter(start_time__gte=check_start_utc, start_time__lt=check_end_utc,
+                                                           work_mode=WorkMode.ONLINE).distinct('pilot')
+
+    logger.debug('检查窗口内有线上开播记录的主播数量：%d', len(online_records_in_window))
+
+    unstarted_online_pilots: List[dict] = []
+    sample_logged = 0
+
+    for pilot in online_records_in_window:
+        # 检查该主播在检查日是否有开播记录（不限线上/线下）
+        records_on_check_day = BattleRecord.objects.filter(pilot=pilot, start_time__gte=check_day_start_utc, start_time__lt=check_day_end_utc).first()
+
+        if records_on_check_day is not None:
+            # 检查日有开播记录，跳过
+            continue
+
+        # 检查日无开播记录，需要提醒
+        # 查询该主播最近的一次开播记录
+        latest_record = BattleRecord.objects.filter(pilot=pilot).order_by('-start_time').first()
+
+        if latest_record:
+            latest_date_local = utc_to_local(latest_record.start_time)
+            latest_date_str = latest_date_local.strftime('%Y-%m-%d')
+            location = latest_record.battle_location
+            work_mode = latest_record.get_work_mode_display()
+        else:
+            latest_date_str = '无记录'
+            location = '未知'
+            work_mode = '未知'
+
+        # 获取主播信息
+        owner_display = ''
+        try:
+            if getattr(pilot, 'owner', None):
+                owner_display = getattr(pilot.owner, 'nickname', None) or getattr(pilot.owner, 'username', '')
+        except Exception:
+            owner_display = ''
+
+        rank_display = ''
+        try:
+            rank_display = pilot.rank.value if getattr(pilot, 'rank', None) else ''
+        except Exception:
+            rank_display = ''
+
+        # 统计最近3天线上开播次数
+        recent_online_count = BattleRecord.objects.filter(pilot=pilot, start_time__gte=check_start_utc, start_time__lt=check_end_utc,
+                                                          work_mode=WorkMode.ONLINE).count()
+
+        item = {
+            'pilot_name': getattr(pilot, 'nickname', ''),
+            'real_name': getattr(pilot, 'real_name', ''),
+            'owner_rank': f"{owner_display}-{rank_display}".strip('-'),
+            'latest_date': latest_date_str,
+            'location': location,
+            'work_mode': work_mode,
+            'recent_online_count': recent_online_count,
+            'check_day': check_day_local.strftime('%Y-%m-%d'),
+            'note': f'{check_day_local.strftime("%m月%d日")}未登记开播记录，请确认是否漏记'
+        }
+
+        if sample_logged < 5:
+            logger.debug('线上主播未开播样例：%s', item)
+            sample_logged += 1
+
+        unstarted_online_pilots.append(item)
+
+    recipients = []
+    recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 管理员
+    recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 运营
+
+    if not recipients:
+        logger.error('收件人为空，未找到任何运营或管理员的邮箱')
+        return {'sent': False, 'count': 0}
+
+    recipients = list(set(recipients))
+
+    report_date_str = report_date_local.strftime('%Y-%m-%d')
+    subject = f"[Lacus-Log] 线上主播未开播提醒 - {report_date_str}"
+
+    if not unstarted_online_pilots:
+        logger.info('无线主播未开播情况，已跳过发送。来源：%s', triggered_by or '未知')
+        return {'sent': False, 'count': 0}
+
+    md = _build_online_pilot_unstarted_markdown(unstarted_online_pilots, report_date_str, check_day_local.strftime('%Y-%m-%d'))
+
+    ok = send_email_md(recipients, subject, md)
+    if ok:
+        logger.info('线上主播未开播提醒已发送，共%d条；收件人：%s', len(unstarted_online_pilots), ', '.join(recipients))
+        return {'sent': True, 'count': len(unstarted_online_pilots)}
+
+    logger.error('线上主播未开播提醒发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
+    return {'sent': False, 'count': len(unstarted_online_pilots)}
+
+
 @report_mail_bp.route('/mail/unstarted', methods=['POST'])
 @roles_required('gicho')
 def trigger_unstarted_report():
@@ -551,5 +745,16 @@ def trigger_monthly_mail_report():
     report_month = request.json.get('report_month') if request.is_json else None
 
     result = run_monthly_mail_report_job(report_month=report_month, triggered_by=username)
+    status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
+    return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
+
+
+@report_mail_bp.route('/mail/online-pilot-unstarted', methods=['POST'])
+@roles_required('gicho')
+def trigger_online_pilot_unstarted_report():
+    """触发线上主播未开播提醒邮件发送。"""
+    username = getattr(current_user, 'username', '未知')
+
+    result = run_online_pilot_unstarted_report_job(triggered_by=username)
     status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
     return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)

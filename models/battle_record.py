@@ -1,7 +1,6 @@
 from decimal import Decimal
 
-from mongoengine import (DateTimeField, DecimalField, Document, EnumField,
-                         ReferenceField, StringField)
+from mongoengine import (DateTimeField, DecimalField, Document, EnumField, ReferenceField, StringField)
 
 from utils.timezone_helper import get_current_utc_time
 
@@ -116,6 +115,17 @@ class BattleRecord(Document):
     def battle_location(self):
         """返回开播地点位置字符串"""
         return f"{self.x_coord}-{self.y_coord}-{self.z_coord}"
+
+    def get_work_mode_display(self):
+        """开播方式显示名称"""
+        if self.work_mode == WorkMode.OFFLINE:
+            return "线下"
+        elif self.work_mode == WorkMode.ONLINE:
+            return "线上"
+        elif self.work_mode == WorkMode.UNKNOWN:
+            return "未知"
+        else:
+            return self.work_mode.value if self.work_mode else "未知"
 
     def update_from_announcement(self, announcement):
         """从关联通告更新信息

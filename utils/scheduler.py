@@ -44,6 +44,9 @@ def init_scheduled_jobs(flask_app) -> None:
 
     unstarted_trigger = CronTrigger(hour=12, minute=0, timezone='UTC')
 
+    # 线上主播未开播提醒：每日 GMT+8 17:00 触发（UTC 09:00）
+    online_pilot_unstarted_trigger = CronTrigger(hour=9, minute=0, timezone='UTC')
+
     recruit_daily_trigger = CronTrigger(hour=16, minute=5, timezone='UTC')
 
     # 开播邮件日报：每日 GMT+8 15:00 触发（UTC 07:00）
@@ -72,6 +75,18 @@ def init_scheduled_jobs(flask_app) -> None:
             result = run_unstarted_report_job(triggered_by='scheduler@daily-20:00+08')
             logger.info('定时任务 run_unstarted_report_job 完成：%s', result)
         plan_fire('daily_unstarted_report', _next_fire_utc(unstarted_trigger))
+
+    def run_online_pilot_unstarted_wrapper():
+        from routes.report_mail import run_online_pilot_unstarted_report_job
+
+        fire_dt_utc = get_current_utc_time().replace(second=0, microsecond=0)
+        if not consume_fire('daily_online_pilot_unstarted_report', fire_dt_utc):
+            logger.info('跳过执行：daily_online_pilot_unstarted_report（计划令牌不存在）')
+            return
+        with flask_app.app_context():
+            result = run_online_pilot_unstarted_report_job(triggered_by='scheduler@daily-17:00+08')
+            logger.info('定时任务 run_online_pilot_unstarted_report_job 完成：%s', result)
+        plan_fire('daily_online_pilot_unstarted_report', _next_fire_utc(online_pilot_unstarted_trigger))
 
     def run_recruit_daily_wrapper():
         from routes.report_mail import run_recruit_daily_report_job
@@ -112,6 +127,16 @@ def init_scheduled_jobs(flask_app) -> None:
         plan_fire('daily_unstarted_report', _next_fire_utc(unstarted_trigger))
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('写入未开播提醒下一次计划失败：%s', exc)
+
+    sched.add_job(run_online_pilot_unstarted_wrapper,
+                  online_pilot_unstarted_trigger,
+                  id='daily_online_pilot_unstarted_report',
+                  replace_existing=True,
+                  max_instances=1)
+    try:
+        plan_fire('daily_online_pilot_unstarted_report', _next_fire_utc(online_pilot_unstarted_trigger))
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('写入线上主播未开播提醒下一次计划失败：%s', exc)
 
     sched.add_job(run_recruit_daily_wrapper, recruit_daily_trigger, id='daily_recruit_daily_report', replace_existing=True, max_instances=1)
     try:
