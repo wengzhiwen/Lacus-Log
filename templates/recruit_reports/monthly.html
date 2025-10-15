@@ -787,6 +787,7 @@
 
     const pilot = record.pilot || {};
     const recruiter = record.recruiter || {};
+    const owner = record.owner || {};
 
     // 性别图标（参考开播记录详情页格式）
     let genderIcon = '?';
@@ -818,7 +819,7 @@
         </div>
         <div class="meta-item">
           <span class="meta-label">直属运营</span>
-          <span class="meta-value">${recruiter.nickname || recruiter.username || '未知'}</span>
+          <span class="meta-value">${owner.nickname || owner.username || '-'}</span>
         </div>
         <div class="meta-item">
           <span class="meta-label">介绍费</span>

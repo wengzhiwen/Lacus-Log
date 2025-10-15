@@ -190,6 +190,11 @@ def serialize_monthly_detail_record(recruit_data: Dict[str, Any]) -> Dict[str, A
             'nickname': getattr(recruit.recruiter, 'nickname', None),
             'username': getattr(recruit.recruiter, 'username', None),
         } if recruit.recruiter else None,
+        'owner': {
+            'id': str(pilot.owner.id),
+            'nickname': getattr(pilot.owner, 'nickname', None),
+            'username': getattr(pilot.owner, 'username', None),
+        } if pilot and pilot.owner else None,
         'status': _enum_to_value(recruit.get_effective_status()),
         'channel': _enum_to_value(recruit.channel),
         'introduction_fee': float(recruit.introduction_fee) if recruit.introduction_fee else 0,
