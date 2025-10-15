@@ -335,12 +335,13 @@ def process_james_alert_async(battle_record, old_record=None):
                 logger.info(f"主播{pilot.nickname}不触发詹姆斯关注警告: {trigger_reason}")
                 return
 
-            from routes.pilot import _calculate_pilot_performance_stats
+            from utils.pilot_performance import calculate_pilot_performance_stats
 
             now_local = get_current_local_time()
-            month_stats = _calculate_pilot_performance_stats(pilot, now_local)
-            week_stats = _calculate_pilot_performance_stats(pilot, now_local, 7)
-            three_day_stats = _calculate_pilot_performance_stats(pilot, now_local, 3)
+            performance_data = calculate_pilot_performance_stats(pilot, now_local)
+            month_stats = performance_data['month_stats']
+            week_stats = performance_data['week_stats']
+            three_day_stats = performance_data['three_day_stats']
 
             from models.battle_record import BattleRecord
             recent_records = BattleRecord.objects.filter(pilot=pilot).order_by('-start_time').limit(30)
