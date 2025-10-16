@@ -556,6 +556,20 @@
 .error-state .btn {
   margin-top: 16px;
 }
+
+.live-indicator {
+  color: #ff4757;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 6px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
 </style>
 
 <script>
@@ -735,7 +749,10 @@ function renderRecentRecords(records, pilotInfo) {
     <a href="/battle-records/${record.id}" class="record-card">
       <div class="card-header">
         <div class="record-time">
-          <div class="start-time">${formatDateTime(record.start_time)}</div>
+          <div class="start-time">
+            ${formatDateTime(record.start_time)}
+            ${record.status === 'live' ? '<span class="live-indicator">开播中</span>' : ''}
+          </div>
           <div class="duration">${Number(record.duration_hours).toFixed(1)}小时</div>
         </div>
         <div class="record-info">

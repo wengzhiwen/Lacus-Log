@@ -96,7 +96,7 @@ def get_pilots():
         # 持久化筛选条件
         current_filters = _persist_filters_from_request()
         logger.info('持久化筛选条件完成: %s', current_filters)
-        
+
         # 获取筛选参数，过滤掉空字符串
         owner_ids = [x for x in request.args.getlist('owner_id') if x]
         rank_filters = [x for x in request.args.getlist('rank') if x]
@@ -617,7 +617,8 @@ def get_pilot_performance(pilot_id):
                 'start_time': utc_to_local(record.start_time).isoformat() if record.start_time else None,
                 'duration_hours': float(record.duration_hours) if record.duration_hours else 0,
                 'revenue_amount': float(record.revenue_amount),
-                'base_salary': float(record.base_salary) if record.base_salary else 0
+                'base_salary': float(record.base_salary) if record.base_salary else 0,
+                'status': record.current_status.value if record.current_status else 'ended'
             })
 
         # 转换Decimal为float
