@@ -24,6 +24,11 @@
       </div>
 
       <div class="filter-group">
+        <label class="filter-label">状态</label>
+        <select class="filter-select" id="filter-status"></select>
+      </div>
+
+      <div class="filter-group">
         <label class="filter-label">时间</label>
         <select class="filter-select" id="filter-time"></select>
       </div>
@@ -188,6 +193,24 @@
   color: var(--muted);
 }
 
+.live-indicator {
+  display: inline-block;
+  background: #ff4757;
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
 .record-info {
   flex: 1;
   display: flex;
@@ -307,9 +330,10 @@ const filtersFromServer = {{ filters | tojson }} || {};
 let currentFilters = {
   owner: filtersFromServer.owner || 'all',
   x: filtersFromServer.x || '',
+  status: filtersFromServer.status || 'all',
   time: filtersFromServer.time || 'two_days',
 };
-let filterOptions = { owners: [], x_coords: [], time_ranges: [] };
+let filterOptions = { owners: [], x_coords: [], statuses: [], time_ranges: [] };
 let allBattleRecords = [];
 let currentPage = 1;
 let hasMore = false;
@@ -341,6 +365,10 @@ function updateFilterSummary() {
   if (currentFilters.x) {
     parts.push(`基地:${currentFilters.x}`);
   }
+  if (currentFilters.status && currentFilters.status !== 'all') {
+    const statusOption = filterOptions.statuses.find(item => item.value === currentFilters.status);
+    if (statusOption) parts.push(`状态:${statusOption.label}`);
+  }
   if (currentFilters.time) {
     const timeOption = filterOptions.time_ranges.find(item => item.value === currentFilters.time);
     if (timeOption) parts.push(timeOption.label);
@@ -366,6 +394,7 @@ function applyFilterOptions(options) {
   filterOptions = options;
   populateFilterSelect('filter-owner', options.owners || [], currentFilters.owner);
   populateFilterSelect('filter-x', options.x_coords || [], currentFilters.x);
+  populateFilterSelect('filter-status', options.statuses || [], currentFilters.status);
   populateFilterSelect('filter-time', options.time_ranges || [], currentFilters.time);
   updateFilterSummary();
 }
@@ -380,6 +409,7 @@ function buildRecordCard(record) {
   const duration = record.duration_display || (record.duration_hours ? `${record.duration_hours}小时` : '');
   const startDisplay = record.start_time?.display || '';
   const detailUrl = record.links?.detail || `/battle-records/${record.id}`;
+  const isLive = record.status === 'live';
 
   const card = document.createElement('a');
   card.className = 'record-card';
@@ -389,7 +419,10 @@ function buildRecordCard(record) {
   card.innerHTML = `
     <div class="card-header">
       <div class="record-time">
-        <div class="start-time">${startDisplay}</div>
+        <div class="start-time">
+          ${startDisplay}
+          ${isLive ? '<span class="live-indicator">开播中</span>' : ''}
+        </div>
         <div class="duration">${duration}</div>
       </div>
       <div class="record-info">
@@ -446,6 +479,7 @@ async function fetchBattleRecords(append = false) {
     const params = new URLSearchParams();
     if (currentFilters.owner) params.append('owner', currentFilters.owner);
     if (currentFilters.x) params.append('x', currentFilters.x);
+    if (currentFilters.status) params.append('status', currentFilters.status);
     if (currentFilters.time) params.append('time', currentFilters.time);
     params.append('page', currentPage);
 
@@ -463,6 +497,7 @@ async function fetchBattleRecords(append = false) {
     if (meta.filters) {
       currentFilters.owner = meta.filters.owner || 'all';
       currentFilters.x = meta.filters.x || '';
+      currentFilters.status = meta.filters.status || 'all';
       currentFilters.time = meta.filters.time || 'two_days';
       // 重新填充筛选器选项以应用持久化状态
       applyFilterOptions(meta.options || filterOptions);
@@ -493,12 +528,13 @@ function resetAndFetch() {
 }
 
 function handleFilterListeners() {
-  ['filter-owner', 'filter-x', 'filter-time'].forEach(id => {
+  ['filter-owner', 'filter-x', 'filter-status', 'filter-time'].forEach(id => {
     const select = document.getElementById(id);
     if (!select) return;
     select.addEventListener('change', () => {
       currentFilters.owner = document.getElementById('filter-owner')?.value || 'all';
       currentFilters.x = document.getElementById('filter-x')?.value || '';
+      currentFilters.status = document.getElementById('filter-status')?.value || 'all';
       currentFilters.time = document.getElementById('filter-time')?.value || 'two_days';
       updateFilterSummary();
       resetAndFetch();
@@ -560,7 +596,7 @@ function setupLoadMore() {
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
-  if (currentFilters && (currentFilters.owner !== 'all' || currentFilters.x || currentFilters.time !== 'two_days')) {
+  if (currentFilters && (currentFilters.owner !== 'all' || currentFilters.x || currentFilters.status !== 'all' || currentFilters.time !== 'two_days')) {
     form?.classList.remove('is-collapsed');
     if (icon) icon.textContent = '▲';
   }

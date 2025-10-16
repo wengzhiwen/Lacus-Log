@@ -98,6 +98,14 @@
                             <button type="button" class="time-btn" data-target="end_time" data-minutes="60">+60</button>
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label for="status" class="required">状态：</label>
+                        <select name="status" id="status" required>
+                            <option value="live" selected>开播中</option>
+                            <option value="ended">已下播</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -1226,12 +1234,14 @@ function collectBattleRecordPayload() {
     const xSelect = document.getElementById('x_coord');
     const ySelect = document.getElementById('y_coord');
     const zSelect = document.getElementById('z_coord');
+    const statusSelect = document.getElementById('status');
 
     return {
         pilot: pilotHiddenInput ? pilotHiddenInput.value : (pilotSelect ? pilotSelect.value : ''),
         related_announcement: relatedAnnouncementHidden ? relatedAnnouncementHidden.value : (relatedAnnouncementSelect ? relatedAnnouncementSelect.value : ''),
         start_time: startTimeInput ? startTimeInput.value : '',
         end_time: endTimeInput ? endTimeInput.value : '',
+        status: statusSelect ? statusSelect.value : 'live',
         revenue_amount: revenueInput ? revenueInput.value : '',
         base_salary: baseSalaryInput ? baseSalaryInput.value : '',
         work_mode: workModeSelect ? workModeSelect.value : '',

@@ -65,6 +65,12 @@
           <div class="value">{{ battle_record.end_time|local_datetime('%Y年%m月%d日 %H:%M') }}</div>
         </div>
         <div class="detail-item">
+          <label>状态</label>
+          <div class="value {% if battle_record.current_status.value == 'live' %}live-status{% endif %}">
+            {% if battle_record.current_status.value == 'live' %}开播中{% else %}已下播{% endif %}
+          </div>
+        </div>
+        <div class="detail-item">
           <label>开播时长</label>
           <div class="value">{{ "%.1f"|format(battle_record.duration_hours) }}小时</div>
         </div>
@@ -260,6 +266,19 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--hud-green);
+}
+
+.value.live-status {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff4757;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
 }
 
 .link {

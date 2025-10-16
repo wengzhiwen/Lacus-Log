@@ -8,19 +8,19 @@ from decimal import Decimal
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, request, url_for
-from flask_security import current_user, roles_accepted
-from mongoengine import DoesNotExist
+from flask_security import current_user
+from mongoengine import DoesNotExist, Q
 
 from models.announcement import Announcement
 from models.battle_area import Availability, BattleArea
-from models.battle_record import BattleRecord, BattleRecordChangeLog
+from models.battle_record import BattleRecord, BattleRecordChangeLog, BattleRecordStatus
 from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
 from routes.battle_record import (log_battle_record_change, validate_notes_required)
 from utils.announcement_serializers import (create_error_response, create_success_response)
 from utils.filter_state import persist_and_restore_filters
 from utils.james_alert import trigger_james_alert_if_needed
-from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
+from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
@@ -32,10 +32,11 @@ battle_records_api_bp = Blueprint('battle_records_api', __name__)
 def _persist_filters_from_request() -> Dict[str, str]:
     return persist_and_restore_filters(
         'battle_records_list',
-        allowed_keys=['owner', 'x', 'time'],
+        allowed_keys=['owner', 'x', 'status', 'time'],
         default_filters={
             'owner': 'all',
             'x': '',
+            'status': 'all',
             'time': 'two_days'
         },
     )
@@ -91,6 +92,20 @@ def _apply_time_filter(queryset, time_filter: str):
     return queryset.filter(start_time__gte=start_utc, start_time__lt=end_utc)
 
 
+def _apply_status_filter(queryset, status_filter: str):
+    if status_filter and status_filter not in ('', 'all'):
+        try:
+            status_enum = BattleRecordStatus(status_filter)
+            if status_enum == BattleRecordStatus.ENDED:
+                # 已下播包括：状态为已下播的记录 + 状态为空的老数据
+                return queryset.filter(Q(status=status_enum) | Q(status__exists=False) | Q(status=None))
+            # 开播中：只查找状态明确为开播中的记录
+            return queryset.filter(status=status_enum)
+        except ValueError:
+            return queryset.none()
+    return queryset
+
+
 def _build_filter_options() -> Dict[str, List[Dict[str, str]]]:
     gicho = Role.objects(name='gicho').first()
     kancho = Role.objects(name='kancho').first()
@@ -121,7 +136,9 @@ def _build_filter_options() -> Dict[str, List[Dict[str, str]]]:
         'label': '前月'
     }]
 
-    return {'owners': owner_options, 'x_coords': x_options, 'time_ranges': time_options}
+    status_options = [{'value': 'all', 'label': '全部状态'}, {'value': 'live', 'label': '开播中'}, {'value': 'ended', 'label': '已下播'}]
+
+    return {'owners': owner_options, 'x_coords': x_options, 'statuses': status_options, 'time_ranges': time_options}
 
 
 def _serialize_pilot_basic(pilot: Optional[Pilot]) -> Dict[str, Optional[str]]:
@@ -159,6 +176,8 @@ def _serialize_battle_record_summary(record: BattleRecord) -> Dict[str, object]:
         'pilot': pilot_info,
         'owner_display': pilot_info['owner_display'],
         'work_mode': record.work_mode.value if record.work_mode else '',
+        'status': record.current_status.value,
+        'status_display': str(record.get_status_display()) if record.get_status_display() else '',
         'revenue_amount': format(record.revenue_amount or Decimal('0'), 'f'),
         'base_salary': format(record.base_salary or Decimal('0'), 'f'),
         'duration_hours': record.duration_hours or 0,
@@ -212,6 +231,8 @@ def _serialize_battle_record_detail(record: BattleRecord) -> Dict[str, object]:
         'pilot': pilot_info,
         'owner_display': pilot_info['owner_display'],
         'work_mode': record.work_mode.value if record.work_mode else '',
+        'status': record.current_status.value,
+        'status_display': str(record.get_status_display()) if record.get_status_display() else '',
         'location': {
             'x': record.x_coord or '',
             'y': record.y_coord or '',
@@ -326,7 +347,8 @@ def _collect_change_fields(record: BattleRecord) -> Dict[str, object]:
         'x_coord': record.x_coord,
         'y_coord': record.y_coord,
         'z_coord': record.z_coord,
-        'work_mode': record.work_mode,
+        'work_mode': record.work_mode.value if record.work_mode else None,
+        'status': record.status.value if record.status else None,
         'notes': record.notes,
     }
 
@@ -343,6 +365,7 @@ def list_records():
         filters = _persist_filters_from_request()
         owner_filter = filters.get('owner', 'all')
         x_filter = filters.get('x', '')
+        status_filter = filters.get('status', 'all')
         time_filter = filters.get('time', 'two_days')
 
         page = max(int(request.args.get('page', 1) or 1), 1)
@@ -352,6 +375,7 @@ def list_records():
         base_query = BattleRecord.objects.order_by('-start_time', '-revenue_amount')
         filtered_query = _apply_owner_filter(base_query, owner_filter)
         filtered_query = _apply_x_filter(filtered_query, x_filter)
+        filtered_query = _apply_status_filter(filtered_query, status_filter)
         filtered_query = _apply_time_filter(filtered_query, time_filter)
 
         total_count = filtered_query.count()
@@ -363,6 +387,7 @@ def list_records():
             'filters': {
                 'owner': owner_filter,
                 'x': x_filter,
+                'status': status_filter,
                 'time': time_filter,
             },
             'options': _build_filter_options(),
@@ -406,6 +431,7 @@ def create_record():
         related_announcement_id = (payload.get('related_announcement') or '').strip()
         start_time_str = (payload.get('start_time') or '').strip()
         end_time_str = (payload.get('end_time') or '').strip()
+        status_str = (payload.get('status') or '').strip()
         work_mode_str = (payload.get('work_mode') or '').strip()
         x_coord = (payload.get('x_coord') or '').strip()
         y_coord = (payload.get('y_coord') or '').strip()
@@ -434,6 +460,16 @@ def create_record():
             raise ValueError('时间格式错误') from exc
 
         work_mode = _ensure_work_mode(work_mode_str)
+
+        # 验证和处理状态
+        if not status_str:
+            status_enum = BattleRecordStatus.LIVE  # 默认为开播中
+        else:
+            try:
+                status_enum = BattleRecordStatus(status_str)
+            except ValueError as exc:
+                raise ValueError('状态值无效') from exc
+
         revenue_amount = _parse_decimal(payload.get('revenue_amount'), '流水金额')
         base_salary = _parse_decimal(payload.get('base_salary'), '底薪金额')
 
@@ -457,6 +493,7 @@ def create_record():
             related_announcement=related_announcement,
             start_time=start_time_utc,
             end_time=end_time_utc,
+            status=status_enum,
             revenue_amount=revenue_amount,
             base_salary=base_salary,
             x_coord=x_coord,
@@ -526,6 +563,14 @@ def update_record(record_id: str):
         work_mode_val = payload.get('work_mode')
         if work_mode_val is not None:
             record.work_mode = _ensure_work_mode(str(work_mode_val))
+
+        # 更新状态
+        status_val = payload.get('status')
+        if status_val is not None:
+            try:
+                record.status = BattleRecordStatus(str(status_val))
+            except ValueError as exc:
+                raise ValueError('状态值无效') from exc
 
         if record.work_mode == WorkMode.OFFLINE:
             x_coord = (payload.get('x_coord') or '').strip()

@@ -87,10 +87,11 @@ def list_battle_records():
 
     filters = persist_and_restore_filters(
         'battle_records_list',
-        allowed_keys=['owner', 'x', 'time'],
+        allowed_keys=['owner', 'x', 'status', 'time'],
         default_filters={
             'owner': 'all',
             'x': '',
+            'status': 'all',
             'time': 'two_days'
         },
     )

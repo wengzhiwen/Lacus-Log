@@ -1,4 +1,5 @@
 from decimal import Decimal
+from enum import Enum
 
 from mongoengine import (DateTimeField, DecimalField, Document, EnumField, ReferenceField, StringField)
 
@@ -7,6 +8,12 @@ from utils.timezone_helper import get_current_utc_time
 from .announcement import Announcement
 from .pilot import Pilot, WorkMode
 from .user import User
+
+
+class BattleRecordStatus(Enum):
+    """开播记录状态枚举"""
+    LIVE = "live"  # 开播中
+    ENDED = "ended"  # 已下播
 
 
 class BattleRecord(Document):
@@ -21,6 +28,8 @@ class BattleRecord(Document):
 
     start_time = DateTimeField(required=True)
     end_time = DateTimeField(required=True)
+
+    status = EnumField(BattleRecordStatus, required=False)
 
     revenue_amount = DecimalField(min_value=0, precision=2, default=Decimal('0.00'))
     base_salary = DecimalField(min_value=0, precision=2, default=Decimal('0.00'))
@@ -120,12 +129,28 @@ class BattleRecord(Document):
         """开播方式显示名称"""
         if self.work_mode == WorkMode.OFFLINE:
             return "线下"
-        elif self.work_mode == WorkMode.ONLINE:
+        if self.work_mode == WorkMode.ONLINE:
             return "线上"
-        elif self.work_mode == WorkMode.UNKNOWN:
+        if self.work_mode == WorkMode.UNKNOWN:
             return "未知"
-        else:
-            return self.work_mode.value if self.work_mode else "未知"
+        return self.work_mode.value if self.work_mode else "未知"
+
+    def get_status_display(self):
+        """状态显示名称"""
+        current = self.current_status
+        if current == BattleRecordStatus.LIVE:
+            return "开播中"
+        if current == BattleRecordStatus.ENDED:
+            return "已下播"
+        return "未知状态"
+
+    @property
+    def current_status(self):
+        """获取当前状态，兼容老数据"""
+        # 老数据如果status字段为空，一律认定为"已下播"
+        if not self.status or self.status.value == '':
+            return BattleRecordStatus.ENDED
+        return self.status
 
     def update_from_announcement(self, announcement):
         """从关联通告更新信息
@@ -177,6 +202,7 @@ class BattleRecordChangeLog(Document):
             'related_announcement': '关联通告',
             'start_time': '开始时间',
             'end_time': '结束时间',
+            'status': '状态',
             'revenue_amount': '流水金额',
             'base_salary': '底薪金额',
             'x_coord': 'X坐标',

@@ -77,6 +77,14 @@
                             <button type="button" class="time-btn" data-target="end_time" data-minutes="60">+60</button>
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label for="status" class="required">状态：</label>
+                        <select name="status" id="status" required>
+                            <option value="live">开播中</option>
+                            <option value="ended">已下播</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -433,6 +441,7 @@ const elements = {
   relatedDisplay: document.getElementById('related_announcement_display'),
   startTimeInput: document.getElementById('start_time'),
   endTimeInput: document.getElementById('end_time'),
+  statusSelect: document.getElementById('status'),
   workModeSelect: document.getElementById('work_mode'),
   revenueInput: document.getElementById('revenue_amount'),
   baseSalaryInput: document.getElementById('base_salary'),
@@ -461,6 +470,7 @@ const pageState = {
     zCoord: '',
     startTime: '',
     endTime: '',
+    status: 'live',
     revenueAmount: '0',
     baseSalary: '0',
     notes: '',
@@ -524,6 +534,7 @@ async function fetchRecordDetail() {
   pageState.defaults.zCoord = data.location?.z || '';
   pageState.defaults.startTime = data.time?.start_iso ? data.time.start_iso.slice(0, 16) : '';
   pageState.defaults.endTime = data.time?.end_iso ? data.time.end_iso.slice(0, 16) : '';
+  pageState.defaults.status = data.status || 'live';
   pageState.defaults.revenueAmount = data.financial?.revenue_amount || '0';
   pageState.defaults.baseSalary = data.financial?.base_salary || '0';
   pageState.defaults.notes = data.notes || '';
@@ -562,6 +573,9 @@ function applyDefaultsToForm() {
   }
   if (elements.endTimeInput) {
     elements.endTimeInput.value = pageState.defaults.endTime || '';
+  }
+  if (elements.statusSelect) {
+    elements.statusSelect.value = pageState.defaults.status || 'live';
   }
   if (elements.workModeSelect) {
     elements.workModeSelect.value = pageState.defaults.workMode || '';
@@ -726,6 +740,7 @@ function collectBattleRecordPayload() {
     related_announcement: elements.relatedHiddenInput ? elements.relatedHiddenInput.value : pageState.defaults.relatedAnnouncementId,
     start_time: elements.startTimeInput ? elements.startTimeInput.value : '',
     end_time: elements.endTimeInput ? elements.endTimeInput.value : '',
+    status: elements.statusSelect ? elements.statusSelect.value : pageState.defaults.status,
     revenue_amount: elements.revenueInput ? elements.revenueInput.value : '',
     base_salary: elements.baseSalaryInput ? elements.baseSalaryInput.value : '',
     work_mode: elements.workModeSelect ? elements.workModeSelect.value : '',
