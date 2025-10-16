@@ -85,14 +85,19 @@ def list_battle_records():
     """开播记录列表页"""
     logger.info('用户 %s 访问开播记录列表', current_user.username)
 
+    def get_today_date_string():
+        """获取GMT+8时区的今天日期字符串 YYYY-MM-DD"""
+        now_local = utc_to_local(get_current_utc_time())
+        return now_local.strftime('%Y-%m-%d')
+
     filters = persist_and_restore_filters(
         'battle_records_list',
-        allowed_keys=['owner', 'x', 'status', 'time'],
+        allowed_keys=['owner', 'x', 'status', 'date'],
         default_filters={
             'owner': 'all',
             'x': '',
             'status': 'all',
-            'time': 'two_days'
+            'date': get_today_date_string()
         },
     )
 

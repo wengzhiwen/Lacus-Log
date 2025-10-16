@@ -30,16 +30,29 @@ battle_records_api_bp = Blueprint('battle_records_api', __name__)
 
 
 def _persist_filters_from_request() -> Dict[str, str]:
-    return persist_and_restore_filters(
+    filters = persist_and_restore_filters(
         'battle_records_list',
-        allowed_keys=['owner', 'x', 'status', 'time'],
+        allowed_keys=['owner', 'x', 'status', 'date'],
         default_filters={
             'owner': 'all',
             'x': '',
             'status': 'all',
-            'time': 'two_days'
+            'date': _get_today_date_string()
         },
     )
+
+    # 如果没有传递日期参数，确保使用今天的日期作为默认值
+    if not filters.get('date'):
+        filters['date'] = _get_today_date_string()
+
+    return filters
+
+
+def _get_today_date_string() -> str:
+    """获取GMT+8时区的今天日期字符串 YYYY-MM-DD"""
+    now_utc = get_current_utc_time()
+    now_local = utc_to_local(now_utc)
+    return now_local.strftime('%Y-%m-%d')
 
 
 def _apply_owner_filter(queryset, owner_filter: str):
@@ -60,36 +73,28 @@ def _apply_x_filter(queryset, x_filter: str):
     return queryset
 
 
-def _apply_time_filter(queryset, time_filter: str):
-    now_utc = get_current_utc_time()
-    now_local = utc_to_local(now_utc)
-    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+def _apply_date_filter(queryset, date_filter: str):
+    """根据指定的日期筛选开播记录（GMT+8时区）"""
+    if not date_filter:
+        # 如果没有指定日期，使用今天的日期
+        date_filter = _get_today_date_string()
 
-    if time_filter == 'today':
-        start_utc = local_to_utc(start_local)
-        end_utc = local_to_utc(start_local + timedelta(days=1))
-    elif time_filter == 'seven_days':
-        start_utc = local_to_utc(start_local - timedelta(days=7))
-        end_utc = local_to_utc(start_local + timedelta(days=1))
-    elif time_filter == 'month_to_date':
-        month_start_local = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        tomorrow_local_start = start_local + timedelta(days=1)
-        start_utc = local_to_utc(month_start_local)
-        end_utc = local_to_utc(tomorrow_local_start)
-    elif time_filter == 'last_month':
-        if now_local.month == 1:
-            last_month_start = now_local.replace(year=now_local.year - 1, month=12, day=1, hour=0, minute=0, second=0, microsecond=0)
-            this_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            last_month_start = now_local.replace(month=now_local.month - 1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            this_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        start_utc = local_to_utc(last_month_start)
-        end_utc = local_to_utc(this_month_start)
-    else:  # 默认两天窗口：昨天-明天
-        start_utc = local_to_utc(start_local - timedelta(days=1))
-        end_utc = local_to_utc(start_local + timedelta(days=2))
+    try:
+        # 解析日期字符串 YYYY-MM-DD
+        date_obj = datetime.strptime(date_filter, '%Y-%m-%d')
+        # 设置为GMT+8时区的当天开始时间
+        date_local = date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    return queryset.filter(start_time__gte=start_utc, start_time__lt=end_utc)
+        # 转换为UTC时间进行数据库查询
+        start_utc = local_to_utc(date_local)
+        # 查询这一天的记录（从当天00:00到第二天00:00）
+        end_utc = local_to_utc(date_local + timedelta(days=1))
+
+        return queryset.filter(start_time__gte=start_utc, start_time__lt=end_utc)
+    except ValueError:
+        # 如果日期格式无效，返回空查询集
+        logger.warning('无效的日期格式：%s', date_filter)
+        return queryset.none()
 
 
 def _apply_status_filter(queryset, status_filter: str):
@@ -119,26 +124,9 @@ def _build_filter_options() -> Dict[str, List[Dict[str, str]]]:
     x_options = [{'value': '', 'label': '全部基地'}]
     x_options.extend([{'value': coord, 'label': coord} for coord in sorted(x_coords or [])])
 
-    time_options = [{
-        'value': 'two_days',
-        'label': '这两天'
-    }, {
-        'value': 'seven_days',
-        'label': '近7天'
-    }, {
-        'value': 'today',
-        'label': '今天'
-    }, {
-        'value': 'month_to_date',
-        'label': '月初以来'
-    }, {
-        'value': 'last_month',
-        'label': '前月'
-    }]
-
     status_options = [{'value': 'all', 'label': '全部状态'}, {'value': 'live', 'label': '开播中'}, {'value': 'ended', 'label': '已下播'}]
 
-    return {'owners': owner_options, 'x_coords': x_options, 'statuses': status_options, 'time_ranges': time_options}
+    return {'owners': owner_options, 'x_coords': x_options, 'statuses': status_options}
 
 
 def _serialize_pilot_basic(pilot: Optional[Pilot]) -> Dict[str, Optional[str]]:
@@ -366,7 +354,7 @@ def list_records():
         owner_filter = filters.get('owner', 'all')
         x_filter = filters.get('x', '')
         status_filter = filters.get('status', 'all')
-        time_filter = filters.get('time', 'two_days')
+        date_filter = filters.get('date', _get_today_date_string())
 
         page = max(int(request.args.get('page', 1) or 1), 1)
         per_page = 500
@@ -376,7 +364,7 @@ def list_records():
         filtered_query = _apply_owner_filter(base_query, owner_filter)
         filtered_query = _apply_x_filter(filtered_query, x_filter)
         filtered_query = _apply_status_filter(filtered_query, status_filter)
-        filtered_query = _apply_time_filter(filtered_query, time_filter)
+        filtered_query = _apply_date_filter(filtered_query, date_filter)
 
         total_count = filtered_query.count()
         records = list(filtered_query.skip(skip).limit(per_page))
@@ -388,7 +376,7 @@ def list_records():
                 'owner': owner_filter,
                 'x': x_filter,
                 'status': status_filter,
-                'time': time_filter,
+                'date': date_filter,
             },
             'options': _build_filter_options(),
             'total': total_count,

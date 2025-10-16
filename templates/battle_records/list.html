@@ -29,8 +29,8 @@
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">时间</label>
-        <select class="filter-select" id="filter-time"></select>
+        <label class="filter-label">日期</label>
+        <input type="date" class="filter-input" id="filter-date" />
       </div>
     </form>
   </div>
@@ -110,7 +110,7 @@
   font-size: 14px;
 }
 
-.filter-select {
+.filter-select, .filter-input {
   padding: 8px 12px;
   border: 1px solid var(--gray);
   border-radius: 6px;
@@ -331,13 +331,21 @@ let currentFilters = {
   owner: filtersFromServer.owner || 'all',
   x: filtersFromServer.x || '',
   status: filtersFromServer.status || 'all',
-  time: filtersFromServer.time || 'two_days',
+  date: filtersFromServer.date || getTodayDateString(),
 };
 let filterOptions = { owners: [], x_coords: [], statuses: [], time_ranges: [] };
 let allBattleRecords = [];
 let currentPage = 1;
 let hasMore = false;
 let isLoading = false;
+
+function getTodayDateString() {
+  const today = new Date();
+  // 获取GMT+8时区的今天日期
+  const gmt8Offset = 8; // GMT+8
+  const localTime = new Date(today.getTime() + (gmt8Offset * 60 * 60 * 1000));
+  return localTime.toISOString().split('T')[0];
+}
 
 function toggleFilters() {
   const form = document.getElementById('filter-form');
@@ -369,9 +377,16 @@ function updateFilterSummary() {
     const statusOption = filterOptions.statuses.find(item => item.value === currentFilters.status);
     if (statusOption) parts.push(`状态:${statusOption.label}`);
   }
-  if (currentFilters.time) {
-    const timeOption = filterOptions.time_ranges.find(item => item.value === currentFilters.time);
-    if (timeOption) parts.push(timeOption.label);
+  if (currentFilters.date) {
+    // 格式化日期显示为 YYYY-MM-DD
+    const date = new Date(currentFilters.date + 'T00:00:00+08:00');
+    const formattedDate = date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: 'Asia/Shanghai'
+    });
+    parts.push(`日期:${formattedDate}`);
   }
   summary.textContent = parts.length > 0 ? parts.join(' + ') : '全部显示';
 }
@@ -395,7 +410,11 @@ function applyFilterOptions(options) {
   populateFilterSelect('filter-owner', options.owners || [], currentFilters.owner);
   populateFilterSelect('filter-x', options.x_coords || [], currentFilters.x);
   populateFilterSelect('filter-status', options.statuses || [], currentFilters.status);
-  populateFilterSelect('filter-time', options.time_ranges || [], currentFilters.time);
+  // 设置日期输入框的值
+  const dateInput = document.getElementById('filter-date');
+  if (dateInput && currentFilters.date) {
+    dateInput.value = currentFilters.date;
+  }
   updateFilterSummary();
 }
 
@@ -480,7 +499,7 @@ async function fetchBattleRecords(append = false) {
     if (currentFilters.owner) params.append('owner', currentFilters.owner);
     if (currentFilters.x) params.append('x', currentFilters.x);
     if (currentFilters.status) params.append('status', currentFilters.status);
-    if (currentFilters.time) params.append('time', currentFilters.time);
+    if (currentFilters.date) params.append('date', currentFilters.date);
     params.append('page', currentPage);
 
     const response = await fetch(`/battle-records/api/battle-records?${params.toString()}`);
@@ -498,7 +517,7 @@ async function fetchBattleRecords(append = false) {
       currentFilters.owner = meta.filters.owner || 'all';
       currentFilters.x = meta.filters.x || '';
       currentFilters.status = meta.filters.status || 'all';
-      currentFilters.time = meta.filters.time || 'two_days';
+      currentFilters.date = meta.filters.date || getTodayDateString();
       // 重新填充筛选器选项以应用持久化状态
       applyFilterOptions(meta.options || filterOptions);
     }
@@ -528,18 +547,27 @@ function resetAndFetch() {
 }
 
 function handleFilterListeners() {
-  ['filter-owner', 'filter-x', 'filter-status', 'filter-time'].forEach(id => {
+  ['filter-owner', 'filter-x', 'filter-status'].forEach(id => {
     const select = document.getElementById(id);
     if (!select) return;
     select.addEventListener('change', () => {
       currentFilters.owner = document.getElementById('filter-owner')?.value || 'all';
       currentFilters.x = document.getElementById('filter-x')?.value || '';
       currentFilters.status = document.getElementById('filter-status')?.value || 'all';
-      currentFilters.time = document.getElementById('filter-time')?.value || 'two_days';
       updateFilterSummary();
       resetAndFetch();
     });
   });
+
+  // 日期选择器事件监听
+  const dateInput = document.getElementById('filter-date');
+  if (dateInput) {
+    dateInput.addEventListener('change', () => {
+      currentFilters.date = dateInput.value || getTodayDateString();
+      updateFilterSummary();
+      resetAndFetch();
+    });
+  }
 }
 
 function performBattleRecordSearch() {
@@ -596,7 +624,7 @@ function setupLoadMore() {
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('filter-form');
   const icon = document.getElementById('filter-toggle-icon');
-  if (currentFilters && (currentFilters.owner !== 'all' || currentFilters.x || currentFilters.status !== 'all' || currentFilters.time !== 'two_days')) {
+  if (currentFilters && (currentFilters.owner !== 'all' || currentFilters.x || currentFilters.status !== 'all' || currentFilters.date !== getTodayDateString())) {
     form?.classList.remove('is-collapsed');
     if (icon) icon.textContent = '▲';
   }
