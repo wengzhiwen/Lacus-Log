@@ -58,6 +58,7 @@
             <th>主播分类</th>
             <th>开播地点</th>
             <th>播时</th>
+            <th>状态</th>
             <th>流水</th>
             <th>当前分成比例</th>
             <th>主播分成</th>
@@ -509,6 +510,19 @@
     return rankMapping[value] || value;
   }
 
+  function formatStatus(status, statusDisplay) {
+    // 如果没有状态或状态为空，显示"已下播"
+    if (!status || status === '' || status === 'ended') {
+      return { text: '已下播', class: '' };
+    }
+    // 如果状态是"live"，显示红色"开播中"
+    if (status === 'live') {
+      return { text: '开播中', class: 'text-danger' };
+    }
+    // 优先使用statusDisplay（中文），否则使用status
+    return { text: statusDisplay || status, class: '' };
+  }
+
   function buildSummaryCards(summary) {
     const pilotCount = summary.pilot_count || 0;
     const effectiveCount = summary.effective_pilot_count || 0;
@@ -567,6 +581,7 @@
       const commissionRate = formatPercent(detail.commission_rate);
       const rebateRate = formatRate(detail.rebate_rate);
       const pilotUrl = pilotPerformanceTemplate.replace('__PID__', pilotId) + `?from=daily_report&date=${encodeURIComponent(dateStr)}&owner=${encodeURIComponent(ownerParam)}`;
+      const statusInfo = formatStatus(detail.status, detail.status_display);
       return `<tr>
         <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
         <td>${detail.gender_age || ''}</td>
@@ -574,6 +589,7 @@
         <td>${normalizeRank(detail.rank)}</td>
         <td>${detail.battle_area || ''}</td>
         <td>${formatHours(detail.duration)}</td>
+        <td class="${statusInfo.class}">${statusInfo.text}</td>
         <td>${formatMoney(detail.revenue)}</td>
         <td>${commissionRate}</td>
         <td>${formatMoney(detail.pilot_share)}</td>

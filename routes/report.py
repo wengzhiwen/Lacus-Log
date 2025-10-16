@@ -704,7 +704,9 @@ def _calculate_daily_details(report_date, owner_id=None, mode: str = 'all'):
             'three_day_avg_revenue': three_day_avg_revenue,
             'monthly_stats': monthly_stats,
             'monthly_commission_stats': monthly_commission_stats,
-            'month_rebate_amount': month_rebate_amount
+            'month_rebate_amount': month_rebate_amount,
+            'status': record.current_status.value,
+            'status_display': record.get_status_display() or ''
         }
 
         details.append(detail)
@@ -783,7 +785,7 @@ def export_daily_csv():
     output.write('\ufeff')
 
     headers = [
-        '主播', '性别年龄', '直属运营', '主播分类', '开播地点', '播时(小时)', '流水(元)', '当前分成比例(%)', '主播分成(元)', '公司分成(元)', '返点比例(%)', '产生返点(元)', '底薪(元)', '当日毛利(元)', '3日平均流水(元)',
+        '主播', '性别年龄', '直属运营', '主播分类', '开播地点', '播时(小时)', '状态', '流水(元)', '当前分成比例(%)', '主播分成(元)', '公司分成(元)', '返点比例(%)', '产生返点(元)', '底薪(元)', '当日毛利(元)', '3日平均流水(元)',
         '月累计天数', '月日均播时(小时)', '月累计流水(元)', '月累计主播分成(元)', '月累计公司分成(元)', '月累计返点(元)', '月累计底薪(元)', '月累计毛利(元)'
     ]
     writer.writerow(headers)
@@ -791,7 +793,7 @@ def export_daily_csv():
     for detail in details:
         row = [
             detail['pilot_display'], detail['gender_age'], detail['owner'], detail['rank'], detail['battle_area'], f"{detail['duration']:.1f}",
-            f"{detail['revenue']:.2f}", f"{detail['commission_rate']:.0f}", f"{detail['pilot_share']:.2f}", f"{detail['company_share']:.2f}",
+            detail['status_display'], f"{detail['revenue']:.2f}", f"{detail['commission_rate']:.0f}", f"{detail['pilot_share']:.2f}", f"{detail['company_share']:.2f}",
             f"{detail['rebate_rate'] * 100:.0f}", f"{detail['rebate_amount']:.2f}", f"{detail['base_salary']:.2f}", f"{detail['daily_profit']:.2f}",
             f"{detail['three_day_avg_revenue']:.2f}" if detail['three_day_avg_revenue'] else "", detail['monthly_stats']['month_days_count'],
             f"{detail['monthly_stats']['month_avg_duration']:.1f}", f"{detail['monthly_stats']['month_total_revenue']:.2f}",

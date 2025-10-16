@@ -24,6 +24,15 @@ def _decimal_to_float(value: Any) -> Optional[float]:
     return value
 
 
+def _enum_to_str(value: Any) -> Optional[str]:
+    """将枚举转换为字符串值，保留 None。"""
+    if value is None:
+        return None
+    if hasattr(value, 'value'):
+        return str(value.value)
+    return str(value) if value else None
+
+
 def serialize_daily_summary(raw: Dict[str, Any]) -> Dict[str, Any]:
     """序列化日报汇总数据。"""
     return {
@@ -63,7 +72,7 @@ def serialize_daily_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'pilot_display': raw.get('pilot_display', ''),
         'gender_age': raw.get('gender_age', ''),
         'owner': raw.get('owner', ''),
-        'rank': raw.get('rank', ''),
+        'rank': _enum_to_str(raw.get('rank')),
         'battle_area': raw.get('battle_area', ''),
         'duration': _decimal_to_float(raw.get('duration')),
         'revenue': _decimal_to_float(raw.get('revenue')),
@@ -78,6 +87,8 @@ def serialize_daily_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'monthly_stats': serialize_month_snapshot(raw.get('monthly_stats', {})),
         'monthly_commission_stats': serialize_month_commission_snapshot(raw.get('monthly_commission_stats', {})),
         'month_rebate_amount': _decimal_to_float(raw.get('month_rebate_amount')),
+        'status': _enum_to_str(raw.get('status')),
+        'status_display': _enum_to_str(raw.get('status_display'))
     }
 
 
