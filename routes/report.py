@@ -893,14 +893,7 @@ def get_battle_records_for_month(year, month, owner_id=None, mode: str = 'all'):
 
 def calculate_pilot_monthly_commission_stats(pilot, year, month, owner_id=None):
     """计算主播月度分成统计（按日累加）。"""
-    month_start = datetime(year, month, 1, 0, 0, 0, 0)
-    if month == 12:
-        next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
-    else:
-        next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
-    month_end = next_month_start - timedelta(microseconds=1)
-
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id)
+    month_records = get_battle_records_for_month(year, month, owner_id)
     pilot_month_records = [record for record in month_records if record.pilot.id == pilot.id]
 
     total_pilot_share = Decimal('0')
@@ -921,13 +914,25 @@ def calculate_pilot_monthly_commission_stats(pilot, year, month, owner_id=None):
 
 def calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id=None):
     """计算主播月度返点统计。"""
+    month_start = datetime(year, month, 1, 0, 0, 0, 0)
     if month == 12:
         next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
     else:
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
+    
+    # 检查是否为当前月，如果是则使用昨天作为结束时间
+    now_utc = get_current_utc_time()
+    now_local = utc_to_local(now_utc)
+    current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    if month_start == current_month_start:
+        yesterday_local = now_local - timedelta(days=1)
+        report_date = yesterday_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+    else:
+        report_date = month_end
 
-    return calculate_pilot_rebate(pilot, month_end, owner_id)
+    return calculate_pilot_rebate(pilot, report_date, owner_id)
 
 
 @cached_monthly_report()
@@ -972,14 +977,26 @@ def _calculate_monthly_summary(year, month, owner_id=None, mode: str = 'all'):
     total_rebate = Decimal('0')
     for pilot_id in pilot_ids:
         pilot = Pilot.objects.get(id=pilot_id)
-        # 构造report_date为月份的最后一天
-        report_date = datetime(year, month, 1)
+        # 使用与开播记录筛选相同的时间范围
+        month_start = datetime(year, month, 1, 0, 0, 0, 0)
         if month == 12:
             next_month_start = datetime(year + 1, 1, 1, 0, 0, 0, 0)
         else:
             next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
         month_end = next_month_start - timedelta(microseconds=1)
-        rebate_info = calculate_pilot_rebate(pilot, month_end, owner_id, mode)
+        
+        # 检查是否为当前月，如果是则使用昨天作为结束时间
+        now_utc = get_current_utc_time()
+        now_local = utc_to_local(now_utc)
+        current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        if month_start == current_month_start:
+            yesterday_local = now_local - timedelta(days=1)
+            report_date = yesterday_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+        else:
+            report_date = month_end
+            
+        rebate_info = calculate_pilot_rebate(pilot, report_date, owner_id, mode)
         total_rebate += rebate_info['rebate_amount']
 
     operating_profit = total_company_share + total_rebate - total_base_salary
