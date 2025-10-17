@@ -3,14 +3,14 @@
 主播业绩计算工具
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List
 
 from models.battle_record import BattleRecord
 from models.pilot import Pilot
 from utils.logging_setup import get_logger
-from utils.timezone_helper import get_current_local_time, utc_to_local
+from utils.timezone_helper import get_current_local_time
 
 logger = get_logger('pilot_performance')
 
@@ -32,10 +32,10 @@ def calculate_pilot_performance_stats(pilot: Pilot, report_date: datetime = None
     month_stats = _calculate_month_stats(pilot, report_date)
 
     # 计算近7日统计
-    week_stats = _calculate_week_stats(pilot, report_date)
+    week_stats = _calculate_week_stats(pilot)
 
     # 计算近3日统计
-    three_day_stats = _calculate_three_day_stats(pilot, report_date)
+    three_day_stats = _calculate_three_day_stats(pilot)
 
     # 获取最近开播记录
     recent_records = _get_recent_records(pilot, limit=30)
@@ -93,25 +93,29 @@ def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Dict[str, Any
     }
 
 
-def _calculate_week_stats(pilot: Pilot, report_date: datetime) -> Dict[str, Any]:
+def _calculate_week_stats(pilot: Pilot) -> Dict[str, Any]:
     """计算近7日统计（最近的7条开播记录）"""
     # 获取最近7条开播记录
-    records = BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(7)
+    records = list(BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(7))
 
     return _calculate_stats_from_records(records)
 
 
-def _calculate_three_day_stats(pilot: Pilot, report_date: datetime) -> Dict[str, Any]:
+def _calculate_three_day_stats(pilot: Pilot) -> Dict[str, Any]:
     """计算近3日统计（最近的3条开播记录）"""
     # 获取最近3条开播记录
-    records = BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(3)
+    records = list(BattleRecord.objects(pilot=pilot).order_by('-start_time').limit(3))
 
     return _calculate_stats_from_records(records)
 
 
 def _calculate_stats_from_records(records) -> Dict[str, Any]:
     """从开播记录计算统计数据"""
-    record_count = records.count()
+    # 如果是QuerySet，转换为列表
+    if not isinstance(records, list):
+        records = list(records)
+    
+    record_count = len(records)
     total_hours = round(sum(record.duration_hours for record in records if record.duration_hours), 1)
     avg_hours = round(total_hours / record_count, 1) if record_count > 0 else 0
 
