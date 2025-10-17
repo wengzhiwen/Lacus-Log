@@ -25,6 +25,21 @@ logger = get_logger('pilot')
 pilots_api_bp = Blueprint('pilots_api', __name__)
 
 
+def validate_pilot_id(pilot_id):
+    """验证pilot_id参数的有效性"""
+    if not pilot_id or pilot_id == 'undefined' or pilot_id == 'null':
+        return jsonify(create_error_response('INVALID_PILOT_ID', '无效的主播ID')), 400
+
+    # 验证ObjectId格式
+    from bson import ObjectId
+    try:
+        ObjectId(pilot_id)
+    except Exception:
+        return jsonify(create_error_response('INVALID_PILOT_ID', '无效的主播ID格式')), 400
+
+    return None
+
+
 def safe_strip(value):
     """安全地去除字符串两端空格，处理None值"""
     if value is None:
@@ -256,6 +271,11 @@ def get_pilots():
 def get_pilot_detail(pilot_id):
     """获取主播详情（不包含分成分数据，分成分数据通过独立的commission API获取）"""
     try:
+        # 验证pilot_id参数有效性
+        validation_error = validate_pilot_id(pilot_id)
+        if validation_error:
+            return validation_error
+
         pilot = Pilot.objects.get(id=pilot_id)
 
         # 获取最近的变更记录（不超总记录，给展示用）
@@ -368,6 +388,11 @@ def create_pilot():
 def update_pilot(pilot_id):
     """更新主播（整体更新）"""
     try:
+        # 验证pilot_id参数有效性
+        validation_error = validate_pilot_id(pilot_id)
+        if validation_error:
+            return validation_error
+
         pilot = Pilot.objects.get(id=pilot_id)
 
         # 记录修改前的数据状态
@@ -447,6 +472,11 @@ def update_pilot(pilot_id):
 def update_pilot_status(pilot_id):
     """调整主播状态"""
     try:
+        # 验证pilot_id参数有效性
+        validation_error = validate_pilot_id(pilot_id)
+        if validation_error:
+            return validation_error
+
         pilot = Pilot.objects.get(id=pilot_id)
 
         data = request.get_json()
@@ -490,6 +520,11 @@ def update_pilot_status(pilot_id):
 def get_pilot_changes(pilot_id):
     """获取主播变更记录"""
     try:
+        # 验证pilot_id参数有效性
+        validation_error = validate_pilot_id(pilot_id)
+        if validation_error:
+            return validation_error
+
         pilot = Pilot.objects.get(id=pilot_id)
 
         # 分页参数
@@ -584,6 +619,11 @@ def get_pilot_options():
 def get_pilot_performance(pilot_id):
     """获取主播业绩数据"""
     try:
+        # 验证pilot_id参数有效性
+        validation_error = validate_pilot_id(pilot_id)
+        if validation_error:
+            return validation_error
+
         pilot = Pilot.objects.get(id=pilot_id)
 
         # 计算主播业绩数据

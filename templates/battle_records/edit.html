@@ -9,7 +9,6 @@
             <span>←</span>
             返回开播记录详情
         </a>
-        <a class="btn btn-outline" href="{{ url_for('battle_record.list_battle_records') }}">返回列表</a>
     </div>
 
     <div class="form-container">
@@ -181,7 +180,6 @@
                     <span class="btn-icon">💾</span>
                     保存修改
                 </button>
-                <a href="{{ url_for('battle_record.detail_battle_record', record_id=battle_record.id|string) }}" class="btn btn-secondary">取消</a>
             </div>
         </form>
     </div>

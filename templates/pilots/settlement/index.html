@@ -7,10 +7,17 @@
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">主播结算管理 - {{ pilot.nickname }}</h1>
+      {% if from_param == 'base_salary_detail' and application_id %}
+      <a href="/reports/base-salary-applications/detail?id={{ application_id }}" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回底薪申请详情
+      </a>
+      {% else %}
       <a href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}" class="btn btn-secondary">
         <span class="btn-icon">←</span>
         返回主播详情
       </a>
+      {% endif %}
     </div>
   </div>
 

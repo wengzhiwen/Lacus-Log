@@ -527,6 +527,15 @@ function renderPilots(pilots) {
 
 // 创建主播卡片
 function createPilotCard(pilot) {
+  // 防御性检查：确保pilot和pilot.id存在
+  if (!pilot || !pilot.id) {
+    console.error('createPilotCard: pilot或pilot.id未定义', pilot);
+    const errorCard = document.createElement('div');
+    errorCard.className = 'pilot-card error-card';
+    errorCard.innerHTML = '<div class="error-message">主播信息不完整</div>';
+    return errorCard;
+  }
+  
   const card = document.createElement('a');
   card.href = `/pilots/${pilot.id}`;
   card.className = 'pilot-card';

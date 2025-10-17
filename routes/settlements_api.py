@@ -2,9 +2,8 @@
 主播结算管理 REST API 路由
 提供结算方式的读写接口，遵循统一响应结构与权限策略
 """
-
+# pylint: disable=no-member
 from datetime import datetime
-from typing import Any, Dict
 
 from flask import Blueprint, jsonify, request
 from flask_security import current_user
@@ -13,13 +12,8 @@ from mongoengine import DoesNotExist, ValidationError
 from models.pilot import Pilot, Settlement, SettlementChangeLog, SettlementType
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.settlement_serializers import (create_error_response,
-                                         create_success_response,
-                                         serialize_settlement,
-                                         serialize_settlement_change_log_list,
-                                         serialize_settlement_list)
-from utils.timezone_helper import (get_current_local_time, get_current_utc_time,
-                                   local_to_utc, utc_to_local)
+from utils.settlement_serializers import (create_error_response, create_success_response, serialize_settlement, serialize_settlement_change_log_list)
+from utils.timezone_helper import (get_current_local_time, get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('settlement')
 settlements_api_bp = Blueprint('settlements_api', __name__)
@@ -58,11 +52,7 @@ def list_settlements(pilot_id):
         current_local = get_current_local_time()
         current_local_utc = local_to_utc(current_local.replace(hour=0, minute=0, second=0, microsecond=0))
 
-        effective_settlement = Settlement.objects(
-            pilot_id=pilot,
-            effective_date__lte=current_local_utc,
-            is_active=True
-        ).order_by('-effective_date').first()
+        effective_settlement = Settlement.objects(pilot_id=pilot, effective_date__lte=current_local_utc, is_active=True).order_by('-effective_date').first()
 
         current_settlement = {
             'settlement_type': 'none',
@@ -79,10 +69,7 @@ def list_settlements(pilot_id):
             }
 
         meta = {'page': page, 'page_size': page_size, 'total': total}
-        return jsonify(create_success_response(
-            {'items': items, 'current_settlement': current_settlement},
-            meta
-        ))
+        return jsonify(create_success_response({'items': items, 'current_settlement': current_settlement}, meta))
     except DoesNotExist:
         return jsonify(create_error_response('PILOT_NOT_FOUND', '主播不存在')), 404
     except Exception as e:  # noqa: BLE001
@@ -250,6 +237,17 @@ def deactivate_settlement(record_id):
 def get_effective_settlement(pilot_id):
     """查询指定日期主播的生效结算方式"""
     try:
+        # 验证pilot_id参数有效性
+        if not pilot_id or pilot_id == 'undefined' or pilot_id == 'null':
+            return jsonify(create_error_response('INVALID_PILOT_ID', '无效的主播ID')), 400
+
+        # 验证ObjectId格式
+        from bson import ObjectId
+        try:
+            ObjectId(pilot_id)
+        except Exception:
+            return jsonify(create_error_response('INVALID_PILOT_ID', '无效的主播ID格式')), 400
+
         pilot = Pilot.objects.get(id=pilot_id)
         date_str = request.args.get('date')
 
@@ -265,11 +263,7 @@ def get_effective_settlement(pilot_id):
         query_date_utc = local_to_utc(query_date)
 
         # 查找生效日期<=查询日期的最新有效记录
-        effective_settlement = Settlement.objects(
-            pilot_id=pilot,
-            effective_date__lte=query_date_utc,
-            is_active=True
-        ).order_by('-effective_date').first()
+        effective_settlement = Settlement.objects(pilot_id=pilot, effective_date__lte=query_date_utc, is_active=True).order_by('-effective_date').first()
 
         settlement_data = {
             'settlement_type': 'none',

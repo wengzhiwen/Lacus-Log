@@ -3,10 +3,17 @@
 {% block content %}
 <div class="container">
   <div class="back-nav">
+    {% if from_param == 'base_salary_detail' and application_id %}
+    <a class="btn btn-secondary" href="/reports/base-salary-applications/detail?id={{ application_id }}">
+      <span>←</span>
+      返回底薪申请详情
+    </a>
+    {% else %}
     <a class="btn btn-secondary" href="{{ url_for('battle_record.list_battle_records') }}">
       <span>←</span>
       返回开播记录
     </a>
+    {% endif %}
   </div>
 
 <section class="battle-record-detail">
@@ -484,6 +491,7 @@
 }
 </style>
 
+<script src="{{ url_for('static', filename='js/settlement-utils.js') }}"></script>
 <script>
 const changesUrl = '{{ url_for('battle_records_api.record_changes', record_id=battle_record.id) }}';
 const deleteUrl = '{{ url_for('battle_records_api.delete_record', record_id=battle_record.id) }}';
@@ -581,34 +589,18 @@ async function loadSettlementInfo() {
   }
   
   try {
-    // UTC时间转换为GMT+8后提取日期
-    const utcDate = new Date(battleStartTime + 'Z');  // 添加Z标记为UTC
-    const localDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000);  // 加8小时转换为GMT+8
-    const year = localDate.getUTCFullYear();
-    const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(localDate.getUTCDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
+    // 使用共享的结算方式计算工具
+    const settlement = await getEffectiveSettlement('{{ battle_record.pilot.id }}', battleStartTime);
     
-    
-    const response = await fetch(`/api/settlements/{{ battle_record.pilot.id }}/effective?date=${dateStr}`, {
-      credentials: 'include'
+    // 渲染结算方式信息
+    renderSettlementInfo(settlement, {
+      settlementTypeDisplay: document.getElementById('settlement-type-display'),
+      effectiveDateDisplay: document.getElementById('settlement-effective-date-display')
     });
     
-    if (!response.ok) {
-      throw new Error('获取结算方式失败');
-    }
+    // 控制申请按钮显示
+    toggleApplyButton(settlement, document.getElementById('apply-base-salary-btn'));
     
-    const result = await response.json();
-    if (result.success && result.data) {
-      const settlement = result.data;
-      document.getElementById('settlement-type-display').textContent = settlement.settlement_type_display || '--';
-      document.getElementById('settlement-effective-date-display').textContent = settlement.effective_date || '--';
-      
-      // 仅当结算方式为日结底薪时显示申请按钮
-      if (settlement.settlement_type === 'daily_base') {
-        document.getElementById('apply-base-salary-btn').style.display = '';
-      }
-    }
   } catch (error) {
     console.error('加载结算方式失败:', error);
     document.getElementById('settlement-type-display').textContent = '加载失败';

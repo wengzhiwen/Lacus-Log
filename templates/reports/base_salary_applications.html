@@ -14,10 +14,20 @@
       <button class="btn btn-small" onclick="prevDay()">&larr; 前一天</button>
       <input type="date" id="applicationDate" class="date-input">
       <button class="btn btn-small" onclick="nextDay()">后一天 &rarr;</button>
-      <span class="date-display" id="dateDisplay"></span>
     </div>
     <div class="actions">
       <button class="btn btn-primary" onclick="exportCSV()">📥 导出CSV</button>
+    </div>
+  </div>
+
+  <!-- 统计数据卡片 -->
+  <div class="stats-section">
+    <div id="statsLoadingState" class="loading-state" style="display:none;">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载统计数据...</div>
+    </div>
+    <div id="statsCards" class="summary-cards" style="display:none;">
+      <!-- 统计数据卡片将通过JavaScript动态生成 -->
     </div>
   </div>
 
@@ -39,6 +49,7 @@
     <div id="errorMessage" class="error-message" style="display:none;"></div>
   </div>
 </section>
+<br /><span class="date-display" id="dateDisplay"></span>
 
 <!-- 详情模态框 -->
 <div id="detailModal" class="modal" style="display:none;">
@@ -395,6 +406,63 @@
   }
 }
 
+/* 统计数据卡片样式 */
+.stats-section {
+  margin: 24px 0;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.card-value.approved {
+  color: var(--hud-green);
+}
+
+.card-value.rejected {
+  color: var(--hud-red);
+}
+
+.card-value.pending {
+  color: var(--muted);
+}
+
+.card-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 </style>
 
 <script>
@@ -403,12 +471,22 @@ const dateDisplay = document.getElementById('dateDisplay');
 
 // 初始化日期
 function initDate() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  applicationDate.value = `${year}-${month}-${day}`;
+  // 从URL参数获取日期，如果没有则使用今天
+  const urlParams = new URLSearchParams(window.location.search);
+  const dateParam = urlParams.get('date');
+  
+  if (dateParam) {
+    applicationDate.value = dateParam;
+  } else {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    applicationDate.value = `${year}-${month}-${day}`;
+  }
+  
   updateDateDisplay();
+  loadStats();
   loadApplications();
 }
 
@@ -424,6 +502,7 @@ function prevDay() {
   date.setDate(date.getDate() - 1);
   applicationDate.value = date.toISOString().split('T')[0];
   updateDateDisplay();
+  loadStats();
   loadApplications();
 }
 
@@ -433,14 +512,96 @@ function nextDay() {
   date.setDate(date.getDate() + 1);
   applicationDate.value = date.toISOString().split('T')[0];
   updateDateDisplay();
+  loadStats();
   loadApplications();
 }
 
 // 日期变更
 applicationDate.addEventListener('change', () => {
   updateDateDisplay();
+  loadStats();
   loadApplications();
 });
+
+// 加载统计数据
+async function loadStats() {
+  const date = applicationDate.value;
+  const statsLoadingState = document.getElementById('statsLoadingState');
+  const statsCards = document.getElementById('statsCards');
+
+  statsLoadingState.style.display = 'block';
+  statsCards.style.display = 'none';
+
+  try {
+    const response = await fetch(`/api/base-salary-applications/stats?date=${date}`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('加载统计数据失败');
+    }
+
+    const result = await response.json();
+    if (result.success) {
+      renderStatsCards(result.data);
+    } else {
+      throw new Error(result.error?.message || '加载统计数据失败');
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error);
+    // 即使统计数据加载失败，也不影响主要功能
+  } finally {
+    statsLoadingState.style.display = 'none';
+  }
+}
+
+// 渲染统计数据卡片
+function renderStatsCards(stats) {
+  const statsCards = document.getElementById('statsCards');
+  
+  const cards = [
+    {
+      label: '总申请金额',
+      value: formatMoney(stats.total_amount),
+      class: ''
+    },
+    {
+      label: '已发放金额',
+      value: formatMoney(stats.approved_amount),
+      class: 'approved'
+    },
+    {
+      label: '已拒绝金额',
+      value: formatMoney(stats.rejected_amount),
+      class: 'rejected'
+    },
+    {
+      label: '未处理金额',
+      value: formatMoney(stats.pending_amount),
+      class: 'pending'
+    }
+  ];
+
+  statsCards.innerHTML = cards.map(card => `
+    <div class="summary-card">
+      <div class="card-label">${card.label}</div>
+      <div class="card-value ${card.class}">${card.value}</div>
+    </div>
+  `).join('');
+
+  statsCards.style.display = 'grid';
+}
+
+// 格式化金额
+function formatMoney(amount) {
+  if (amount === null || amount === undefined) {
+    return '¥0.00';
+  }
+  return '¥' + parseFloat(amount).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
 
 // 加载申请列表
 async function loadApplications() {
@@ -486,7 +647,7 @@ async function loadApplications() {
 function renderApplications(applications) {
   const list = document.getElementById('applicationsList');
   list.innerHTML = applications.map(app => `
-    <div class="application-card" onclick="showDetail('${app.id}')">
+    <div class="application-card" onclick="goToDetail('${app.id}')">
       <div class="card-header">
         <div class="pilot-info">${app.pilot?.nickname || '未知'}（${app.pilot?.real_name || '未知'}）</div>
         <span class="status-badge status-${app.status}">${app.status_display}</span>
@@ -511,6 +672,12 @@ function renderApplications(applications) {
       </div>
     </div>
   `).join('');
+}
+
+// 跳转到详情页面
+function goToDetail(appId) {
+  const currentDate = applicationDate.value;
+  window.location.href = `/reports/base-salary-applications/detail?id=${appId}&date=${currentDate}`;
 }
 
 // 显示详情

@@ -166,10 +166,16 @@ def detail_battle_record(record_id):
             related_announcement_deleted = True
             logger.warning(f"开播记录 {record_id} 的关联通告不存在，显示已删除占位。原因: {e}", exc_info=True)
 
+        # 获取来源参数
+        from_param = request.args.get('from')
+        application_id = request.args.get('application_id')
+
         return render_template('battle_records/detail.html',
                                battle_record=battle_record,
                                related_announcement=related_announcement,
-                               related_announcement_deleted=related_announcement_deleted)
+                               related_announcement_deleted=related_announcement_deleted,
+                               from_param=from_param,
+                               application_id=application_id)
     except BattleRecord.DoesNotExist:
         flash('开播记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))
@@ -196,6 +202,24 @@ def edit_battle_record(record_id):
                                battle_record=battle_record,
                                related_announcement=related_announcement,
                                related_announcement_deleted=related_announcement_deleted)
+    except BattleRecord.DoesNotExist:
+        flash('开播记录不存在', 'error')
+        return redirect(url_for('battle_record.list_battle_records'))
+
+
+@battle_record_bp.route('/<record_id>/base_salary_application')
+@roles_accepted('gicho', 'kancho')
+def base_salary_application(record_id):
+    """申请底薪页面"""
+    try:
+        battle_record = BattleRecord.objects.get(id=record_id)
+        logger.info(f"用户 {current_user.username} 访问申请底薪页面 {record_id}")
+
+        # 检查是否已存在底薪申请
+        from models.battle_record import BaseSalaryApplication
+        existing_application = BaseSalaryApplication.objects(battle_record_id=battle_record).first()
+
+        return render_template('battle_records/base_salary_application.html', battle_record=battle_record, existing_application=existing_application)
     except BattleRecord.DoesNotExist:
         flash('开播记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))

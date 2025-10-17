@@ -793,13 +793,13 @@ def export_daily_csv():
     for detail in details:
         row = [
             detail['pilot_display'], detail['gender_age'], detail['owner'], detail['rank'], detail['battle_area'], f"{detail['duration']:.1f}",
-            detail['status_display'], f"{detail['revenue']:.2f}", f"{detail['commission_rate']:.0f}", f"{detail['pilot_share']:.2f}", f"{detail['company_share']:.2f}",
-            f"{detail['rebate_rate'] * 100:.0f}", f"{detail['rebate_amount']:.2f}", f"{detail['base_salary']:.2f}", f"{detail['daily_profit']:.2f}",
-            f"{detail['three_day_avg_revenue']:.2f}" if detail['three_day_avg_revenue'] else "", detail['monthly_stats']['month_days_count'],
-            f"{detail['monthly_stats']['month_avg_duration']:.1f}", f"{detail['monthly_stats']['month_total_revenue']:.2f}",
-            f"{detail['monthly_commission_stats']['month_total_pilot_share']:.2f}", f"{detail['monthly_commission_stats']['month_total_company_share']:.2f}",
-            f"{detail['month_rebate_amount']:.2f}", f"{detail['monthly_stats']['month_total_base_salary']:.2f}",
-            f"{detail['monthly_commission_stats']['month_total_profit']:.2f}"
+            detail['status_display'], f"{detail['revenue']:.2f}", f"{detail['commission_rate']:.0f}", f"{detail['pilot_share']:.2f}",
+            f"{detail['company_share']:.2f}", f"{detail['rebate_rate'] * 100:.0f}", f"{detail['rebate_amount']:.2f}", f"{detail['base_salary']:.2f}",
+            f"{detail['daily_profit']:.2f}", f"{detail['three_day_avg_revenue']:.2f}" if detail['three_day_avg_revenue'] else "",
+            detail['monthly_stats']['month_days_count'], f"{detail['monthly_stats']['month_avg_duration']:.1f}",
+            f"{detail['monthly_stats']['month_total_revenue']:.2f}", f"{detail['monthly_commission_stats']['month_total_pilot_share']:.2f}",
+            f"{detail['monthly_commission_stats']['month_total_company_share']:.2f}", f"{detail['month_rebate_amount']:.2f}",
+            f"{detail['monthly_stats']['month_total_base_salary']:.2f}", f"{detail['monthly_commission_stats']['month_total_profit']:.2f}"
         ]
         writer.writerow(row)
 
@@ -876,18 +876,17 @@ def get_battle_records_for_month(year, month, owner_id=None, mode: str = 'all'):
     else:
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
-    
+
     # 检查是否为当前月
     now_utc = get_current_utc_time()
     now_local = utc_to_local(now_utc)
     current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
+
     # 如果报告月是当前月，调整结束时间为昨天
     if month_start == current_month_start:
         yesterday_local = now_local - timedelta(days=1)
         month_end = yesterday_local.replace(hour=23, minute=59, second=59, microsecond=999999)
-        logger.info('当前月特殊处理：筛选范围调整为 %s 到 %s', 
-                   month_start.strftime('%Y-%m-%d'), month_end.strftime('%Y-%m-%d %H:%M:%S'))
+        logger.info('当前月特殊处理：筛选范围调整为 %s 到 %s', month_start.strftime('%Y-%m-%d'), month_end.strftime('%Y-%m-%d %H:%M:%S'))
 
     return get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
 
@@ -1465,3 +1464,10 @@ def base_salary_applications_list():
     }
 
     return render_template('reports/base_salary_applications.html', pagination=pagination)
+
+
+@report_bp.route('/base-salary-applications/detail')
+@roles_accepted('gicho', 'kancho')
+def base_salary_application_detail():
+    """底薪申请详情页面"""
+    return render_template('reports/base_salary_application_detail.html')

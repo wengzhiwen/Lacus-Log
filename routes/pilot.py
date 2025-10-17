@@ -148,9 +148,15 @@ def pilot_settlement_index(pilot_id):
         flash('主播不存在', 'error')
         return redirect(url_for('pilot.list_pilots'))
 
+    # 获取来源参数
+    from_param = request.args.get('from')
+    application_id = request.args.get('application_id')
+
     return render_template(
         'pilots/settlement/index.html',
         pilot=pilot,
+        from_param=from_param,
+        application_id=application_id,
     )
 
 

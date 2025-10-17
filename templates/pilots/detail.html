@@ -470,7 +470,8 @@ function getUrlParams() {
     from: params.get('from'),
     recruit_id: params.get('recruit_id'),
     announcement_id: params.get('announcement_id'),
-    record_id: params.get('record_id')
+    record_id: params.get('record_id'),
+    application_id: params.get('application_id')
   };
 }
 
@@ -541,6 +542,8 @@ function renderBackNav(params) {
   let backUrl = '/pilots';
   let backText = '返回';
   
+  console.log('主播详情页面 - 渲染返回按钮，参数:', params);
+  
   if (params.from === 'recruit_detail' && params.recruit_id) {
     backUrl = `/recruit/${params.recruit_id}`;
   } else if (params.from === 'announcement_detail' && params.announcement_id) {
@@ -549,6 +552,10 @@ function renderBackNav(params) {
     backUrl = `/battle-records/${params.record_id}`;
   } else if (params.from === 'performance') {
     backUrl = `/pilots/${currentPilot.id}/performance`;
+  } else if (params.from === 'base_salary_detail' && params.application_id) {
+    backUrl = `/reports/base-salary-applications/detail?id=${params.application_id}`;
+    backText = '返回底薪申请详情';
+    console.log('主播详情页面 - 设置返回URL:', backUrl);
   }
   
   backNav.innerHTML = `
@@ -735,6 +742,20 @@ function renderPilotInfo(pilot, commission = null, settlement = null) {
 // 渲染操作按钮
 function renderActionButtons(pilot) {
   const footbarContainer = document.getElementById('footbarContainer');
+  
+  // 防御性检查：确保pilot和pilot.id存在
+  if (!pilot || !pilot.id) {
+    console.error('renderActionButtons: pilot或pilot.id未定义', pilot);
+    footbarContainer.innerHTML = `
+      <div class="footbar">
+        <div class="inner">
+          <span class="error-message">无法加载操作按钮：主播信息不完整</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
   const normalizedStatus = normalizeStatus(pilot.status || '');
   
   footbarContainer.innerHTML = `
