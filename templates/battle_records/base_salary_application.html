@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block title %}申请底薪 - Lacus-Log{% endblock %}
+
+{% block content %}
+<section class="application-form-page">
+  <div class="form-container">
+    <div class="form-header">
+      <h1 class="form-title">申请底薪</h1>
+      <a href="javascript:history.back()" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回
+      </a>
+    </div>
+
+    <!-- 主播信息卡片 -->
+    <div class="info-card">
+      <h3 class="card-title">主播信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">昵称</span>
+          <span id="pilotNickname" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">真实姓名</span>
+          <span id="pilotRealName" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">直属运营</span>
+          <span id="pilotOwner" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">当前结算方式</span>
+          <span id="currentSettlement" class="info-value">加载中...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 开播记录概要卡片 -->
+    <div class="info-card">
+      <h3 class="card-title">开播记录概要</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">开始时间</span>
+          <span id="battleStartTime" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">时长</span>
+          <span id="battleDuration" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item full-width">
+          <span class="info-label">流水金额</span>
+          <span id="battleRevenue" class="info-value revenue">加载中...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 申请表单 -->
+    <form id="applicationForm" class="settlement-form">
+      <h3 class="form-section-title">申请信息</h3>
+
+      <div class="form-group">
+        <label for="settlementType" class="form-label">结算方式（快照）</label>
+        <input type="text" id="settlementType" class="form-input" disabled readonly>
+        <small class="form-help">仅供参考，显示申请时的结算方式</small>
+      </div>
+
+      <div class="form-group">
+        <label for="revenueAmount" class="form-label">流水金额（只读）</label>
+        <input type="text" id="revenueAmount" class="form-input" disabled readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="baseSalaryAmount" class="form-label">底薪金额 <span class="required">*</span></label>
+        <input type="number" id="baseSalaryAmount" name="base_salary_amount" class="form-input" required step="0.01" min="0" placeholder="0.00">
+        <small class="form-help">请输入要申请的底薪金额（保留两位小数）</small>
+      </div>
+
+      <div class="form-group">
+        <label for="remark" class="form-label">备注（选填）</label>
+        <textarea id="remark" name="remark" class="form-input" rows="3" maxlength="200" placeholder="可选：输入申请说明"></textarea>
+        <small class="form-help"><span id="charCount">0</span>/200</small>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">提交申请</button>
+        <a href="javascript:history.back()" class="btn btn-secondary">取消</a>
+      </div>
+    </form>
+
+    <div id="errorMessage" class="error-message" style="display:none;"></div>
+  </div>
+</section>
+
+<style>
+
+.application-form-page {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.form-container {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.form-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.info-card {
+  background: #f9f9f9;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.info-value.revenue {
+  color: #8B0000;
+  font-size: 16px;
+}
+
+.form-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 20px 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.required {
+  color: #f5222d;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  box-sizing: border-box;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.form-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+textarea.form-input {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+
+.form-help {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.btn {
+  padding: 10px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: #1890ff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1570cc;
+}
+
+.btn-primary:disabled {
+  background: #bfbfbf;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: #e8e8e8;
+}
+
+.error-message {
+  background: #fff2e6;
+  border: 1px solid #ffbb96;
+  border-radius: 4px;
+  padding: 12px;
+  color: #c6001a;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+.success-message {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 4px;
+  padding: 12px;
+  color: #52c41a;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+  .application-form-page {
+    padding: 12px;
+  }
+
+  .form-container {
+    padding: 16px;
+  }
+
+  .form-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-item.full-width {
+    grid-column: 1;
+  }
+
+  .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+}
+
+</style>
+
+<script>
+const BATTLE_RECORD_ID = new URLSearchParams(window.location.search).get('record_id');
+const form = document.getElementById('applicationForm');
+const charCount = document.getElementById('charCount');
+const remark = document.getElementById('remark');
+const baseSalaryAmount = document.getElementById('baseSalaryAmount');
+
+let battleRecordData = null;
+let pilotData = null;
+let settlementData = null;
+
+// 初始化表单
+async function initForm() {
+  try {
+    if (!BATTLE_RECORD_ID) {
+      throw new Error('缺少开播记录ID参数');
+    }
+
+    // 获取开播记录详情
+    const brResponse = await fetch(`/api/battle-records/${BATTLE_RECORD_ID}`, {
+      credentials: 'include'
+    });
+
+    if (!brResponse.ok) {
+      throw new Error('无法获取开播记录信息');
+    }
+
+    const brResult = await brResponse.json();
+    if (!brResult.success) {
+      throw new Error(brResult.error?.message || '开播记录不存在');
+    }
+
+    battleRecordData = brResult.data;
+    const pilotId = battleRecordData.pilot_id;
+
+    // 获取主播详情
+    const pilotResponse = await fetch(`/api/pilots/${pilotId}`, {
+      credentials: 'include'
+    });
+
+    if (!pilotResponse.ok) {
+      throw new Error('无法获取主播信息');
+    }
+
+    const pilotResult = await pilotResponse.json();
+    pilotData = pilotResult.data;
+
+    // 获取当前生效的结算方式
+    const startTime = new Date(battleRecordData.start_time);
+    const dateStr = startTime.toISOString().split('T')[0];
+
+    const settlementResponse = await fetch(`/api/settlements/${pilotId}/effective?date=${dateStr}`, {
+      credentials: 'include'
+    });
+
+    if (!settlementResponse.ok) {
+      throw new Error('无法获取结算方式信息');
+    }
+
+    const settlementResult = await settlementResponse.json();
+    settlementData = settlementResult.data;
+
+    // 填充表单数据
+    renderFormData();
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+function renderFormData() {
+  // 主播信息
+  document.getElementById('pilotNickname').textContent = pilotData.nickname || '--';
+  document.getElementById('pilotRealName').textContent = pilotData.real_name || '--';
+  document.getElementById('pilotOwner').textContent = pilotData.owner?.nickname || '--';
+  document.getElementById('currentSettlement').textContent = settlementData.settlement_type_display || '无底薪';
+
+  // 开播记录信息
+  const startTime = new Date(battleRecordData.start_time);
+  document.getElementById('battleStartTime').textContent = startTime.toLocaleString('zh-CN');
+  document.getElementById('battleDuration').textContent = (battleRecordData.duration_hours || 0) + ' 小时';
+  document.getElementById('battleRevenue').textContent = '¥' + (parseFloat(battleRecordData.revenue_amount) || 0).toFixed(2);
+
+  // 表单字段
+  document.getElementById('settlementType').value = settlementData.settlement_type_display || '未知';
+  document.getElementById('revenueAmount').value = '¥' + (parseFloat(battleRecordData.revenue_amount) || 0).toFixed(2);
+  baseSalaryAmount.focus();
+}
+
+// 字符计数
+remark.addEventListener('input', (e) => {
+  charCount.textContent = e.target.value.length;
+});
+
+// 表单提交
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+
+  try {
+    const amount = parseFloat(baseSalaryAmount.value);
+    if (isNaN(amount) || amount < 0) {
+      throw new Error('底薪金额必须为有效的非负数字');
+    }
+
+    if (amount === 0) {
+      if (!confirm('底薪金额为0，确认继续提交吗？')) {
+        submitBtn.disabled = false;
+        return;
+      }
+    }
+
+    const response = await fetch('/api/base-salary-applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        pilot_id: pilotData.id,
+        battle_record_id: BATTLE_RECORD_ID,
+        settlement_type: settlementData.settlement_type,
+        base_salary_amount: amount.toFixed(2),
+        remark: remark.value.trim() || null
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || '提交申请失败');
+    }
+
+    showSuccess('底薪申请提交成功！');
+    setTimeout(() => {
+      window.history.back();
+    }, 1500);
+  } catch (error) {
+    showError(error.message);
+    submitBtn.disabled = false;
+  }
+});
+
+function showError(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  errorDiv.classList.remove('success-message');
+}
+
+function showSuccess(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  errorDiv.classList.add('success-message');
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', initForm);
+</script>
+{% endblock %}

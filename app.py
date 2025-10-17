@@ -31,6 +31,8 @@ from routes.report import report_bp
 from routes.reports_api import reports_api_bp
 from routes.report_mail import report_mail_bp
 from routes.users_api import users_api_bp
+from routes.base_salary_applications_api import base_salary_applications_api_bp
+from routes.settlements_api import settlements_api_bp
 from utils.bootstrap import (ensure_database_indexes, ensure_initial_roles_and_admin)
 from utils.logging_setup import init_logging
 from utils.scheduler import init_scheduled_jobs
@@ -140,6 +142,8 @@ def create_app() -> Flask:
     flask_app.register_blueprint(users_api_bp)
     flask_app.register_blueprint(pilots_api_bp)
     flask_app.register_blueprint(commissions_api_bp)
+    flask_app.register_blueprint(settlements_api_bp)
+    flask_app.register_blueprint(base_salary_applications_api_bp)
     flask_app.register_blueprint(recruits_api_bp)
     flask_app.register_blueprint(recruit_reports_api_bp)
     flask_app.register_blueprint(recruit_monthly_reports_bp, url_prefix='/recruit-reports')

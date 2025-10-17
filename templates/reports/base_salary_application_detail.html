@@ -1,0 +1,715 @@
+{% extends "base.html" %}
+
+{% block title %}底薪申请详情 - Lacus-Log{% endblock %}
+
+{% block content %}
+<section class="detail-page">
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">底薪申请详情</h1>
+      <a href="javascript:history.back()" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回
+      </a>
+    </div>
+
+    <!-- 主播信息卡片 -->
+    <div class="info-card">
+      <h3 class="card-title">主播信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">昵称</span>
+          <span id="pilotNickname" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">真实姓名</span>
+          <span id="pilotRealName" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">直属运营</span>
+          <span id="pilotOwner" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">当前结算方式</span>
+          <span id="currentSettlement" class="info-value">加载中...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 开播记录卡片 -->
+    <div class="info-card">
+      <h3 class="card-title">开播记录信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">开始时间</span>
+          <span id="battleStartTime" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">时长</span>
+          <span id="battleDuration" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item full-width">
+          <span class="info-label">流水金额</span>
+          <span id="battleRevenue" class="info-value amount">加载中...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 申请信息卡片 -->
+    <div class="info-card">
+      <h3 class="card-title">申请信息</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">结算方式（快照）</span>
+          <span id="settlementType" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">申请底薪金额</span>
+          <span id="baseSalaryAmount" class="info-value amount">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">申请人</span>
+          <span id="applicant" class="info-value">加载中...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">申请时间</span>
+          <span id="createdAt" class="info-value">加载中...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 发放状态卡片 -->
+    <div class="info-card status-card">
+      <h3 class="card-title">发放状态</h3>
+      <div class="status-display">
+        <div class="status-value" id="statusDisplay">加载中...</div>
+        <div id="statusDetails" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e8e8e8;">
+          <div class="status-detail">
+            <span class="detail-label">最近操作人:</span>
+            <span id="lastOperator" class="detail-value">未操作</span>
+          </div>
+          <div class="status-detail">
+            <span class="detail-label">操作时间:</span>
+            <span id="lastOperatedAt" class="detail-value">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 状态变更操作 -->
+    <div class="info-card action-card">
+      <h3 class="card-title">状态管理</h3>
+      <div class="action-buttons" id="actionButtons"></div>
+    </div>
+
+    <!-- 变更记录 -->
+    <div class="info-card">
+      <h3 class="card-title">变更记录</h3>
+      <div id="changeLogList"></div>
+      <div id="noChanges" class="empty-message">暂无变更记录</div>
+    </div>
+
+    <div id="errorMessage" class="error-message" style="display:none;"></div>
+  </div>
+</section>
+
+<!-- 状态变更模态框 -->
+<div id="statusChangeModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>变更申请状态</h3>
+      <button class="modal-close" onclick="closeStatusChangeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">新状态</label>
+        <div id="newStatusDisplay" class="status-preview"></div>
+      </div>
+      <div class="form-group">
+        <label for="remarkInput" class="form-label">操作备注（选填）</label>
+        <textarea id="remarkInput" class="form-input" rows="3" maxlength="200" placeholder="输入操作说明"></textarea>
+        <small style="color: #999;">
+          <span id="charCount">0</span>/200
+        </small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeStatusChangeModal()">取消</button>
+      <button type="button" class="btn btn-primary" id="confirmStatusChangeBtn" onclick="confirmStatusChange()">确认变更</button>
+    </div>
+  </div>
+</div>
+
+<style>
+
+.detail-page {
+  padding: 16px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.page-container {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.info-card {
+  background: #f9f9f9;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.info-value.amount {
+  color: #8B0000;
+  font-size: 16px;
+}
+
+.status-card {
+  background: #f0fafe;
+  border-color: #b3e5fc;
+}
+
+.status-display {
+  padding: 8px 0;
+}
+
+.status-value {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.status-value.pending {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.status-value.approved {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-value.rejected {
+  background: #fff2e6;
+  color: #fa541c;
+}
+
+.status-detail {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.detail-value {
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
+}
+
+.action-card {
+  background: #fafafa;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: #e8e8e8;
+}
+
+.btn-primary {
+  background: #1890ff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1570cc;
+}
+
+.btn-success {
+  background: #52c41a;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #45a513;
+}
+
+.btn-danger {
+  background: #fa541c;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #d4380d;
+}
+
+.btn:disabled {
+  background: #bfbfbf;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-icon {
+  margin-right: 4px;
+}
+
+#changeLogList {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.change-log-item {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.change-field {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.change-detail {
+  color: #666;
+  margin-left: 12px;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-size: 12px;
+}
+
+.error-message {
+  background: #fff2e6;
+  border: 1px solid #ffbb96;
+  border-radius: 4px;
+  padding: 12px;
+  color: #c6001a;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  overflow: auto;
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #888;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.modal-body {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.status-preview {
+  font-size: 14px;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  color: #333;
+}
+
+@media (max-width: 600px) {
+  .detail-page {
+    padding: 12px;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-item.full-width {
+    grid-column: 1;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}
+
+</style>
+
+<script>
+const APPLICATION_ID = new URLSearchParams(window.location.search).get('id');
+let applicationData = null;
+
+async function initPage() {
+  if (!APPLICATION_ID) {
+    showError('缺少申请ID参数');
+    return;
+  }
+
+  try {
+    await loadApplicationDetail();
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+async function loadApplicationDetail() {
+  try {
+    const response = await fetch(`/api/base-salary-applications/${APPLICATION_ID}`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('加载申请详情失败');
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error?.message || '申请不存在');
+    }
+
+    applicationData = result.data;
+    renderDetail();
+    renderChangeLog();
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+function renderDetail() {
+  document.getElementById('pilotNickname').textContent = applicationData.pilot?.nickname || '--';
+  document.getElementById('pilotRealName').textContent = applicationData.pilot?.real_name || '--';
+  document.getElementById('pilotOwner').textContent = applicationData.pilot?.owner?.nickname || '--';
+  document.getElementById('currentSettlement').textContent = applicationData.settlement_type;
+
+  document.getElementById('battleStartTime').textContent = formatDateTime(applicationData.battle_record?.start_time) || '--';
+  document.getElementById('battleDuration').textContent = (applicationData.battle_record?.duration_hours || 0) + ' 小时';
+  document.getElementById('battleRevenue').textContent = '¥' + (parseFloat(applicationData.battle_record?.revenue_amount || 0).toFixed(2));
+
+  document.getElementById('settlementType').textContent = applicationData.settlement_type;
+  document.getElementById('baseSalaryAmount').textContent = '¥' + (parseFloat(applicationData.base_salary_amount || 0).toFixed(2));
+  document.getElementById('applicant').textContent = applicationData.applicant?.nickname || '--';
+  document.getElementById('createdAt').textContent = formatDateTime(applicationData.created_at) || '--';
+
+  // 状态显示
+  const statusDisplay = document.getElementById('statusDisplay');
+  statusDisplay.textContent = applicationData.status_display;
+  statusDisplay.className = `status-value ${applicationData.status}`;
+
+  // 渲染操作按钮
+  renderActionButtons();
+}
+
+function renderActionButtons() {
+  const actionsDiv = document.getElementById('actionButtons');
+  const status = applicationData.status;
+
+  let buttons = [];
+
+  if (status === 'pending' || status === 'rejected') {
+    buttons.push(`<button class="btn btn-success" onclick="prepareStatusChange('approved')">✓ 确认发放</button>`);
+  }
+
+  if (status === 'pending' || status === 'approved') {
+    buttons.push(`<button class="btn btn-danger" onclick="prepareStatusChange('rejected')">✗ 拒绝发放</button>`);
+  }
+
+  if (status === 'approved' || status === 'rejected') {
+    buttons.push(`<button class="btn btn-secondary" onclick="prepareStatusChange('pending')">↺ 回到未处理</button>`);
+  }
+
+  buttons.push(`<button class="btn btn-secondary" onclick="loadChangeLog()">📋 变更记录详情</button>`);
+
+  if (buttons.length === 0) {
+    actionsDiv.innerHTML = '<p style="color: #999;">无可用操作</p>';
+  } else {
+    actionsDiv.innerHTML = buttons.join('');
+  }
+}
+
+function prepareStatusChange(newStatus) {
+  const statusMap = {
+    'pending': '未处理',
+    'approved': '已发放',
+    'rejected': '拒绝发放'
+  };
+
+  document.getElementById('newStatusDisplay').textContent = statusMap[newStatus] || '未知';
+  document.getElementById('remarkInput').value = '';
+  document.getElementById('charCount').textContent = '0';
+  document.getElementById('confirmStatusChangeBtn').setAttribute('data-new-status', newStatus);
+  document.getElementById('statusChangeModal').style.display = 'block';
+}
+
+document.getElementById('remarkInput').addEventListener('input', (e) => {
+  document.getElementById('charCount').textContent = e.target.value.length;
+});
+
+async function confirmStatusChange() {
+  const newStatus = document.getElementById('confirmStatusChangeBtn').getAttribute('data-new-status');
+  const remark = document.getElementById('remarkInput').value.trim();
+  const btn = document.getElementById('confirmStatusChangeBtn');
+
+  btn.disabled = true;
+
+  try {
+    const response = await fetch(`/api/base-salary-applications/${APPLICATION_ID}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        status: newStatus,
+        remark: remark || null
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || '状态变更失败');
+    }
+
+    closeStatusChangeModal();
+    await loadApplicationDetail();
+    alert('✅ 状态变更成功');
+  } catch (error) {
+    alert('❌ ' + error.message);
+    btn.disabled = false;
+  }
+}
+
+function closeStatusChangeModal() {
+  document.getElementById('statusChangeModal').style.display = 'none';
+}
+
+async function renderChangeLog() {
+  try {
+    const response = await fetch(`/api/base-salary-applications/${APPLICATION_ID}/changes`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const result = await response.json();
+    if (result.success && result.data.items && result.data.items.length > 0) {
+      const logs = result.data.items;
+      const listDiv = document.getElementById('changeLogList');
+      const noChanges = document.getElementById('noChanges');
+
+      listDiv.innerHTML = logs.map(log => `
+        <div class="change-log-item">
+          <div class="change-field">${log.field_display_name}</div>
+          <div class="change-detail">旧值: ${log.old_value || '(无)'}</div>
+          <div class="change-detail">新值: ${log.new_value || '(无)'}</div>
+          ${log.remark ? `<div class="change-detail">备注: ${log.remark}</div>` : ''}
+          <div class="change-detail" style="color: #999; margin-top: 4px;">
+            ${log.user?.nickname || '未知'} - ${formatDateTime(log.change_time) || '--'}
+          </div>
+        </div>
+      `).join('');
+
+      noChanges.style.display = 'none';
+    }
+  } catch (error) {
+    console.error('加载变更记录失败:', error);
+  }
+}
+
+function loadChangeLog() {
+  alert('变更记录已在下方展示');
+}
+
+function formatDateTime(isoString) {
+  if (!isoString) return '--';
+  try {
+    const date = new Date(isoString);
+    return date.toLocaleString('zh-CN');
+  } catch {
+    return '--';
+  }
+}
+
+function showError(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+}
+
+window.onclick = function(event) {
+  const modal = document.getElementById('statusChangeModal');
+  if (event.target === modal) {
+    modal.style.display = 'none';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initPage);
+</script>
+{% endblock %}

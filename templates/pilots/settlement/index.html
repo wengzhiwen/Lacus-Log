@@ -1,0 +1,671 @@
+{% extends "base.html" %}
+
+{% block title %}主播结算管理 - {{ pilot.nickname }}{% endblock %}
+
+{% block content %}
+<section class="settlement-management">
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">主播结算管理 - {{ pilot.nickname }}</h1>
+      <a href="{{ url_for('pilot.pilot_detail', pilot_id=pilot.id) }}" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回主播详情
+      </a>
+    </div>
+  </div>
+
+  <div class="settlement-info-card">
+    <div class="card-header">
+      <h3 class="card-title">当前结算信息</h3>
+    </div>
+    <div class="settlement-summary">
+      <div class="summary-item">
+        <div id="current-settlement-type" class="summary-value">--</div>
+        <div class="summary-label">结算方式</div>
+      </div>
+      <div class="summary-item">
+        <div id="effective-date-display" class="summary-value">--</div>
+        <div class="summary-label">生效日期</div>
+      </div>
+    </div>
+    <div class="settlement-details">
+      <div class="detail-item">
+        <span class="detail-label">说明：</span>
+        <span id="settlement-description" class="detail-value">加载中...</span>
+      </div>
+      <div class="detail-item" id="remark-item" style="display: none;">
+        <span class="detail-label">备注：</span>
+        <span id="remark-value" class="detail-value">--</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-section">
+    <div class="action-header">
+      <h3 class="section-title">结算方式记录</h3>
+      <a href="{{ url_for('pilot.pilot_settlement_new', pilot_id=pilot.id) }}" id="createRecordBtn" class="btn btn-primary">
+        <span class="btn-icon">+</span>
+        新增结算方式
+      </a>
+    </div>
+  </div>
+
+  <div class="records-section">
+    <div id="records-list" class="records-list"></div>
+    <div id="records-empty" class="empty-state" style="display:none;">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title">暂无结算方式记录</div>
+      <div class="empty-description">当前结算方式为"无底薪"（默认）。点击上方"新增结算方式"按钮创建第一条记录</div>
+    </div>
+  </div>
+</section>
+
+<div id="changesModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>变更记录</h3>
+      <button class="modal-close" onclick="hideChangesModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="changesContent">
+        <div class="loading-state">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">加载中...</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="hideChangesModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<style>
+
+.settlement-management {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-header {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.settlement-info-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #A9A9A9;
+}
+
+.card-header {
+  margin-bottom: 16px;
+  border-bottom: 1px solid #E8E8E8;
+  padding-bottom: 8px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.settlement-summary {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.summary-item {
+  text-align: center;
+  flex: 1;
+}
+
+.summary-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: #8B0000;
+  margin-bottom: 4px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #666666;
+}
+
+.settlement-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid #E8E8E8;
+  padding-top: 12px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #666666;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 12px;
+  color: #333;
+  text-align: right;
+  word-break: break-word;
+}
+
+.action-section {
+  margin-bottom: 16px;
+}
+
+.action-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.records-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.record-card {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.record-info {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  font-size: 12px;
+}
+
+.record-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.record-label {
+  color: #999;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.record-value {
+  color: #333;
+  font-weight: 500;
+}
+
+.record-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.btn-small {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.2s;
+}
+
+.btn-small:hover {
+  background: #e0e0e0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-active {
+  background: #e6f7ed;
+  color: #13873d;
+}
+
+.status-inactive {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.empty-description {
+  font-size: 12px;
+  color: #999;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  overflow: auto;
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #888;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.modal-body {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+  font-size: 12px;
+  color: #333;
+}
+
+.modal-footer {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-primary {
+  background: #1890ff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1570cc;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+  background: #e8e8e8;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 20px;
+}
+
+.loading-spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1890ff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: #666;
+  font-size: 12px;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+}
+
+@media (max-width: 600px) {
+  .record-info {
+    grid-template-columns: 1fr;
+  }
+  
+  .settlement-summary {
+    flex-direction: column;
+  }
+}
+
+</style>
+
+<script>
+const PILOT_ID = '{{ pilot.id }}';
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettlements();
+});
+
+async function loadSettlements() {
+  try {
+    const response = await fetch(`/api/settlements/${PILOT_ID}?page=1&page_size=100`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.success) {
+      const items = result.data.items || [];
+      const currentSettlement = result.data.current_settlement || {};
+
+      // 更新当前结算信息
+      updateCurrentSettlementInfo(currentSettlement);
+
+      // 更新记录列表
+      if (items.length === 0) {
+        document.getElementById('records-empty').style.display = 'block';
+        document.getElementById('records-list').innerHTML = '';
+      } else {
+        document.getElementById('records-empty').style.display = 'none';
+        renderRecords(items);
+      }
+    }
+  } catch (error) {
+    console.error('Error loading settlements:', error);
+    showError('加载结算方式失败');
+  }
+}
+
+function updateCurrentSettlementInfo(currentSettlement) {
+  const settlementType = currentSettlement.settlement_type_display || '无底薪';
+  const effectiveDate = currentSettlement.effective_date || '未设置';
+  const remark = currentSettlement.remark || '';
+
+  document.getElementById('current-settlement-type').textContent = settlementType;
+  document.getElementById('effective-date-display').textContent = effectiveDate;
+
+  const descriptionMap = {
+    '日结底薪': '按自然日周期核算底薪，可申请每日底薪支出',
+    '月结底薪': '按自然月周期核算底薪，仅在月末统一发放',
+    '无底薪': '无底薪保障，仅保留流水与分成'
+  };
+
+  document.getElementById('settlement-description').textContent =
+    descriptionMap[settlementType] || '未知结算方式';
+
+  if (remark) {
+    document.getElementById('remark-item').style.display = 'flex';
+    document.getElementById('remark-value').textContent = remark;
+  } else {
+    document.getElementById('remark-item').style.display = 'none';
+  }
+}
+
+function renderRecords(records) {
+  const recordsList = document.getElementById('records-list');
+  recordsList.innerHTML = records.map(record => `
+    <div class="record-card">
+      <div class="record-info">
+        <div class="record-field">
+          <div class="record-label">生效日期</div>
+          <div class="record-value">${formatDate(record.effective_date)}</div>
+        </div>
+        <div class="record-field">
+          <div class="record-label">结算方式</div>
+          <div class="record-value">${record.settlement_type_display}</div>
+        </div>
+        <div class="record-field">
+          <div class="record-label">状态</div>
+          <div class="record-value">
+            <span class="status-badge ${record.is_active ? 'status-active' : 'status-inactive'}">
+              ${record.is_active ? '有效' : '已删除'}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="record-actions">
+        <button class="btn-small" onclick="editRecord('${record.id}')">编辑</button>
+        <button class="btn-small" onclick="showChanges('${record.id}')">变更记录</button>
+        <button class="btn-small" onclick="toggleRecordStatus('${record.id}', ${record.is_active})">${record.is_active ? '删除' : '恢复'}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function formatDate(isoString) {
+  if (!isoString) return '--';
+  try {
+    const date = new Date(isoString);
+    return date.toLocaleDateString('zh-CN');
+  } catch {
+    return '--';
+  }
+}
+
+function editRecord(recordId) {
+  window.location.href = `{{ url_for('pilot.pilot_settlement_edit', pilot_id=pilot.id, record_id='__RECORD_ID__') }}`.replace('__RECORD_ID__', recordId);
+}
+
+async function showChangesModal(recordId) {
+  const changesContent = document.getElementById('changesContent');
+  
+  try {
+    const response = await fetch(`/api/settlements/${recordId}/changes`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.success && result.data.items) {
+      renderChanges(result.data.items);
+    } else {
+      throw new Error('无效的响应数据');
+    }
+  } catch (error) {
+    console.error('Error loading changes:', error);
+    document.getElementById('changesContent').innerHTML = '<div class="error-message">加载变更记录失败</div>';
+  }
+}
+
+function renderChanges(changes) {
+  const content = changes.map(change => `
+    <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e0e0e0;">
+      <div><strong>${change.field_display_name}</strong></div>
+      <div>旧值: ${change.old_value || '（无）'}</div>
+      <div>新值: ${change.new_value || '（无）'}</div>
+      <div style="color: #999; font-size: 11px;">
+        操作人: ${change.user?.nickname || '未知'} | 
+        时间: ${formatDateTime(change.change_time)}
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('changesContent').innerHTML = content || '<div class="empty-message">暂无变更记录</div>';
+}
+
+function formatDateTime(isoString) {
+  if (!isoString) return '--';
+  try {
+    const date = new Date(isoString);
+    return date.toLocaleString('zh-CN');
+  } catch {
+    return '--';
+  }
+}
+
+async function toggleRecordStatus(recordId, isActive) {
+  if (isActive) {
+    if (!confirm('确认删除该结算方式记录吗？')) return;
+  } else {
+    if (!confirm('确认恢复该结算方式记录吗？')) return;
+  }
+
+  try {
+    const method = isActive ? 'DELETE' : 'PUT';
+    const body = isActive ? undefined : JSON.stringify({ is_active: true });
+    
+    const response = await fetch(`/api/settlements/${recordId}`, {
+      method: method,
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: body
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.success) {
+      showSuccess(`${isActive ? '删除' : '恢复'}成功`);
+      loadSettlements();
+    } else {
+      showError(result.error?.message || '操作失败');
+    }
+  } catch (error) {
+    console.error('Error toggling status:', error);
+    showError('操作失败');
+  }
+}
+
+function hideChangesModal() {
+  document.getElementById('changesModal').style.display = 'none';
+}
+
+function showError(message) {
+  alert('❌ ' + message);
+}
+
+function showSuccess(message) {
+  alert('✅ ' + message);
+}
+
+// 点击模态框外部时关闭
+window.onclick = function(event) {
+  const modal = document.getElementById('changesModal');
+  if (event.target === modal) {
+    modal.style.display = 'none';
+  }
+}
+</script>
+{% endblock %}

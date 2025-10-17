@@ -1,0 +1,598 @@
+{% extends "base.html" %}
+
+{% block title %}底薪申请列表 - Lacus-Log{% endblock %}
+
+{% block content %}
+<section class="applications-list-page">
+  <div class="page-header">
+    <h1 class="page-title">底薪申请列表</h1>
+  </div>
+
+  <!-- 日期选择器和操作栏 -->
+  <div class="toolbar">
+    <div class="date-picker-section">
+      <button class="btn btn-small" onclick="prevDay()">&larr; 前一天</button>
+      <input type="date" id="applicationDate" class="date-input">
+      <button class="btn btn-small" onclick="nextDay()">后一天 &rarr;</button>
+      <span class="date-display" id="dateDisplay"></span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="exportCSV()">📥 导出CSV</button>
+    </div>
+  </div>
+
+  <!-- 列表容器 -->
+  <div class="applications-section">
+    <div id="loadingState" class="loading-state" style="display:none;">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+
+    <div id="applicationsList" class="applications-list"></div>
+
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title">暂无底薪申请</div>
+      <div class="empty-description">该日期没有底薪申请记录</div>
+    </div>
+
+    <div id="errorMessage" class="error-message" style="display:none;"></div>
+  </div>
+</section>
+
+<!-- 详情模态框 -->
+<div id="detailModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>申请详情</h3>
+      <button class="modal-close" onclick="closeDetail()">&times;</button>
+    </div>
+    <div class="modal-body" id="detailContent">
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<style>
+
+.applications-list-page {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.toolbar {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.date-picker-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-input {
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.date-display {
+  font-size: 14px;
+  color: #666;
+  min-width: 100px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-small {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.btn-small:hover {
+  background: #e8e8e8;
+}
+
+.btn-primary {
+  background: #1890ff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1570cc;
+}
+
+.applications-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.applications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.application-card {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.application-card:hover {
+  background: #f5f5f5;
+  border-color: #1890ff;
+  box-shadow: 0 2px 4px rgba(24, 144, 255, 0.15);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pilot-info {
+  font-weight: 500;
+  color: #333;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-pending {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.status-approved {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-rejected {
+  background: #fff2e6;
+  color: #fa541c;
+}
+
+.card-content {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  font-size: 12px;
+}
+
+.card-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-label {
+  color: #999;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.field-value {
+  color: #333;
+  font-weight: 500;
+}
+
+.field-value.amount {
+  color: #8B0000;
+  font-size: 13px;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.loading-spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1890ff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: #666;
+  font-size: 14px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.empty-description {
+  font-size: 12px;
+  color: #999;
+}
+
+.error-message {
+  background: #fff2e6;
+  border: 1px solid #ffbb96;
+  border-radius: 4px;
+  padding: 12px;
+  color: #c6001a;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  overflow: auto;
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #888;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.modal-body {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+  font-size: 12px;
+  color: #333;
+}
+
+.modal-footer {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+  background: #e8e8e8;
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .date-picker-section {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .card-content {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+</style>
+
+<script>
+const applicationDate = document.getElementById('applicationDate');
+const dateDisplay = document.getElementById('dateDisplay');
+
+// 初始化日期
+function initDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  applicationDate.value = `${year}-${month}-${day}`;
+  updateDateDisplay();
+  loadApplications();
+}
+
+// 更新日期显示
+function updateDateDisplay() {
+  const date = new Date(applicationDate.value);
+  dateDisplay.textContent = date.toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// 前一天
+function prevDay() {
+  const date = new Date(applicationDate.value);
+  date.setDate(date.getDate() - 1);
+  applicationDate.value = date.toISOString().split('T')[0];
+  updateDateDisplay();
+  loadApplications();
+}
+
+// 后一天
+function nextDay() {
+  const date = new Date(applicationDate.value);
+  date.setDate(date.getDate() + 1);
+  applicationDate.value = date.toISOString().split('T')[0];
+  updateDateDisplay();
+  loadApplications();
+}
+
+// 日期变更
+applicationDate.addEventListener('change', () => {
+  updateDateDisplay();
+  loadApplications();
+});
+
+// 加载申请列表
+async function loadApplications() {
+  const date = applicationDate.value;
+  const loadingState = document.getElementById('loadingState');
+  const applicationsList = document.getElementById('applicationsList');
+  const emptyState = document.getElementById('emptyState');
+  const errorMessage = document.getElementById('errorMessage');
+
+  loadingState.style.display = 'block';
+  applicationsList.innerHTML = '';
+  emptyState.style.display = 'none';
+  errorMessage.style.display = 'none';
+
+  try {
+    const response = await fetch(`/api/base-salary-applications?date=${date}&page_size=100`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('加载数据失败');
+    }
+
+    const result = await response.json();
+    if (result.success) {
+      const items = result.data.items || [];
+      if (items.length === 0) {
+        emptyState.style.display = 'block';
+      } else {
+        renderApplications(items);
+      }
+    } else {
+      throw new Error(result.error?.message || '加载失败');
+    }
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    loadingState.style.display = 'none';
+  }
+}
+
+// 渲染申请卡片
+function renderApplications(applications) {
+  const list = document.getElementById('applicationsList');
+  list.innerHTML = applications.map(app => `
+    <div class="application-card" onclick="showDetail('${app.id}')">
+      <div class="card-header">
+        <div class="pilot-info">${app.pilot?.nickname || '未知'}（${app.pilot?.real_name || '未知'}）</div>
+        <span class="status-badge status-${app.status}">${app.status_display}</span>
+      </div>
+      <div class="card-content">
+        <div class="card-field">
+          <div class="field-label">开播时间</div>
+          <div class="field-value">${formatDateTime(app.battle_record?.start_time) || '未知'}</div>
+        </div>
+        <div class="card-field">
+          <div class="field-label">运营</div>
+          <div class="field-value">${app.pilot?.owner?.nickname || '未知'}</div>
+        </div>
+        <div class="card-field">
+          <div class="field-label">流水金额</div>
+          <div class="field-value amount">¥${parseFloat(app.battle_record?.revenue_amount || 0).toFixed(2)}</div>
+        </div>
+        <div class="card-field">
+          <div class="field-label">底薪金额</div>
+          <div class="field-value amount">¥${parseFloat(app.base_salary_amount || 0).toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// 显示详情
+async function showDetail(appId) {
+  const modal = document.getElementById('detailModal');
+  const detailContent = document.getElementById('detailContent');
+  modal.style.display = 'block';
+
+  try {
+    const response = await fetch(`/api/base-salary-applications/${appId}`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('加载详情失败');
+    }
+
+    const result = await response.json();
+    if (result.success) {
+      const app = result.data;
+      detailContent.innerHTML = `
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 13px;">
+          <div><strong>主播昵称</strong><br>${app.pilot?.nickname || '--'}</div>
+          <div><strong>真实姓名</strong><br>${app.pilot?.real_name || '--'}</div>
+          <div><strong>直属运营</strong><br>${app.pilot?.owner?.nickname || '--'}</div>
+          <div><strong>开播时间</strong><br>${formatDateTime(app.battle_record?.start_time) || '--'}</div>
+          <div><strong>时长</strong><br>${app.battle_record?.duration_hours || 0} 小时</div>
+          <div><strong>流水金额</strong><br>¥${parseFloat(app.battle_record?.revenue_amount || 0).toFixed(2)}</div>
+          <div><strong>结算方式</strong><br>${app.settlement_type}</div>
+          <div><strong>底薪金额</strong><br>¥${parseFloat(app.base_salary_amount || 0).toFixed(2)}</div>
+          <div><strong>申请人</strong><br>${app.applicant?.nickname || '--'}</div>
+          <div><strong>状态</strong><br>${app.status_display}</div>
+          <div><strong>创建时间</strong><br>${formatDateTime(app.created_at) || '--'}</div>
+          <div><strong>更新时间</strong><br>${formatDateTime(app.updated_at) || '--'}</div>
+        </div>
+      `;
+    } else {
+      throw new Error(result.error?.message || '加载失败');
+    }
+  } catch (error) {
+    detailContent.innerHTML = `<div style="color: #c6001a;">加载失败：${error.message}</div>`;
+  }
+}
+
+// 关闭详情
+function closeDetail() {
+  document.getElementById('detailModal').style.display = 'none';
+}
+
+// 导出CSV
+async function exportCSV() {
+  const date = applicationDate.value;
+  window.location.href = `/api/base-salary-applications/export?date=${date}`;
+}
+
+// 格式化日期时间
+function formatDateTime(isoString) {
+  if (!isoString) return '--';
+  try {
+    const date = new Date(isoString);
+    return date.toLocaleString('zh-CN');
+  } catch {
+    return '--';
+  }
+}
+
+// 显示错误
+function showError(message) {
+  const errorMessage = document.getElementById('errorMessage');
+  errorMessage.textContent = message;
+  errorMessage.style.display = 'block';
+}
+
+// 点击模态框外部时关闭
+window.onclick = function(event) {
+  const modal = document.getElementById('detailModal');
+  if (event.target === modal) {
+    modal.style.display = 'none';
+  }
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', initDate);
+</script>
+{% endblock %}

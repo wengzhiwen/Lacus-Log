@@ -274,6 +274,21 @@
   box-sizing: border-box;
 }
 
+.back-nav {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.back-nav .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+}
+
 .btn-hud {
   background: var(--hud-green);
   color: #fff;
@@ -541,11 +556,12 @@ function renderBackNav(params) {
       <span>←</span>
       ${backText}
     </a>
+    <a class="btn btn-primary" href="/pilots/${currentPilot.id}/performance?from=pilot_detail">业绩查看</a>
   `;
 }
 
 // 渲染主播信息卡片
-function renderPilotInfo(pilot, commission = null) {
+function renderPilotInfo(pilot, commission = null, settlement = null) {
   const infoCard = document.getElementById('pilotInfoCard');
   const normalizedRank = normalizeRank(pilot.rank || '');
   const normalizedStatus = normalizeStatus(pilot.status || '');
@@ -611,6 +627,32 @@ function renderPilotInfo(pilot, commission = null) {
       </div>
     </div>`;
   }
+
+  // 结算方式信息渲染部分
+  let settlementHtml = '';
+  if (settlement) {
+    settlementHtml = `
+    <div class="info-section">
+      <h3 class="section-title">结算方式</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">当前结算方式</div>
+          <div class="info-value">${settlement.settlement_type_display}</div>
+        </div>
+      </div>
+    </div>`;
+  } else {
+    settlementHtml = `
+    <div class="info-section">
+      <h3 class="section-title">结算方式</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">当前结算方式</div>
+          <div class="info-value">无底薪</div>
+        </div>
+      </div>
+    </div>`;
+  }
   
   infoCard.innerHTML = `
     <div class="card-header">
@@ -672,6 +714,7 @@ function renderPilotInfo(pilot, commission = null) {
     </div>
 
     ${commissionHtml}
+    ${settlementHtml}
 
     <div class="info-section">
       <h3 class="section-title">系统信息</h3>
@@ -702,7 +745,7 @@ function renderActionButtons(pilot) {
         <a class="btn btn-hud" href="/recruits/start/${pilot.id}">启动招募</a>
         ` : ''}
         <a class="btn btn-outline" href="/pilots/${pilot.id}/commission/">分成管理</a>
-        <a class="btn btn-primary" href="/pilots/${pilot.id}/performance?from=pilot_detail">业绩查看</a>
+        <a class="btn btn-outline" href="/pilots/${pilot.id}/settlement/">结算管理</a>
         <button class="btn btn-outline" onclick="showChanges()">变更记录</button>
       </div>
     </div>
@@ -726,6 +769,28 @@ async function loadPilotCommission(pilotId) {
   }
 }
 
+// 加载主播结算方式信息
+async function loadPilotSettlement(pilotId) {
+  try {
+    // 获取当前生效的结算方式
+    const response = await fetch(`/api/settlements/${pilotId}/effective?date=${new Date().toISOString().split('T')[0]}`);
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载结算方式失败');
+    }
+    
+    return result.data;
+  } catch (error) {
+    console.error('加载结算方式失败:', error);
+    return {
+      settlement_type: 'none',
+      settlement_type_display: '无底薪',
+      effective_date: null
+    };
+  }
+}
+
 // 加载主播详情
 async function loadPilotDetail() {
   const loadingState = document.getElementById('loadingState');
@@ -737,10 +802,11 @@ async function loadPilotDetail() {
   try {
     const pilotId = getPilotIdFromUrl();
     
-    // 并行加载主播基本信息和分成信息
-    const [pilotResponse, commission] = await Promise.all([
+    // 并行加载主播基本信息、分成信息和结算方式信息
+    const [pilotResponse, commission, settlement] = await Promise.all([
       fetch(`/api/pilots/${pilotId}`),
-      loadPilotCommission(pilotId)
+      loadPilotCommission(pilotId),
+      loadPilotSettlement(pilotId)
     ]);
     
     const pilotResult = await pilotResponse.json();
@@ -754,7 +820,7 @@ async function loadPilotDetail() {
     
     const params = getUrlParams();
     renderBackNav(params);
-    renderPilotInfo(currentPilot, commission);
+    renderPilotInfo(currentPilot, commission, settlement);
     renderActionButtons(currentPilot);
     
     loadingState.style.display = 'none';

@@ -212,3 +212,110 @@ class BattleRecordChangeLog(Document):
             'notes': '备注',
         }
         return mapping.get(self.field_name, self.field_name)
+
+
+class BaseSalaryApplicationStatus(Enum):
+    """底薪申请状态枚举"""
+    PENDING = "pending"  # 未处理
+    APPROVED = "approved"  # 已发放
+    REJECTED = "rejected"  # 拒绝发放
+
+
+class BaseSalaryApplication(Document):
+    """底薪申请记录模型"""
+
+    pilot_id = ReferenceField(Pilot, required=True)
+    battle_record_id = ReferenceField(BattleRecord, required=True)
+
+    settlement_type = StringField(required=True)  # 申请时生效的结算方式快照（daily_base/monthly_base/none）
+    base_salary_amount = DecimalField(min_value=0, precision=2, required=True)  # 底薪金额
+
+    applicant_id = ReferenceField(User, required=True)  # 申请人
+
+    status = EnumField(BaseSalaryApplicationStatus, default=BaseSalaryApplicationStatus.PENDING, required=True)
+
+    created_at = DateTimeField(default=get_current_utc_time)
+    updated_at = DateTimeField(default=get_current_utc_time)
+
+    meta = {
+        'collection': 'base_salary_applications',
+        'indexes': [
+            {
+                'fields': ['pilot_id', '-created_at']
+            },
+            {
+                'fields': ['battle_record_id']
+            },
+            {
+                'fields': ['applicant_id']
+            },
+            {
+                'fields': ['status']
+            },
+            {
+                'fields': ['-created_at']
+            },
+            {
+                'fields': ['pilot_id', 'status']
+            },
+        ],
+    }
+
+    def clean(self):
+        """数据验证和业务规则检查"""
+        super().clean()
+
+        if self.base_salary_amount < 0:
+            raise ValueError("底薪金额不能为负数")
+
+    def save(self, *args, **kwargs):
+        """保存时更新修改时间"""
+        self.updated_at = get_current_utc_time()
+        return super().save(*args, **kwargs)
+
+    @property
+    def status_display(self):
+        """状态显示名称"""
+        mapping = {
+            BaseSalaryApplicationStatus.PENDING: "未处理",
+            BaseSalaryApplicationStatus.APPROVED: "已发放",
+            BaseSalaryApplicationStatus.REJECTED: "拒绝发放",
+        }
+        return mapping.get(self.status, "未知")
+
+
+class BaseSalaryApplicationChangeLog(Document):
+    """底薪申请状态变更记录模型"""
+
+    application_id = ReferenceField(BaseSalaryApplication, required=True)
+    user_id = ReferenceField(User, required=True)
+    field_name = StringField(required=True)
+    old_value = StringField()
+    new_value = StringField()
+    remark = StringField(max_length=200)  # 操作备注
+    change_time = DateTimeField(default=get_current_utc_time)
+    ip_address = StringField()
+
+    meta = {
+        'collection': 'base_salary_application_change_logs',
+        'indexes': [
+            {
+                'fields': ['application_id', '-change_time']
+            },
+            {
+                'fields': ['user_id']
+            },
+            {
+                'fields': ['-change_time']
+            },
+        ],
+    }
+
+    @property
+    def field_display_name(self):
+        """字段显示名称"""
+        mapping = {
+            'status': '状态',
+            'created': '创建',
+        }
+        return mapping.get(self.field_name, self.field_name)

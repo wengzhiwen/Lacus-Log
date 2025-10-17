@@ -133,3 +133,50 @@ def pilot_export():
     if query:
         target = f"{target}?{query}"
     return redirect(target)
+
+
+# ============ 结算管理相关路由 ============
+
+
+@pilot_bp.route('/<pilot_id>/settlement/')
+@roles_accepted('gicho', 'kancho')
+def pilot_settlement_index(pilot_id):
+    """主播结算管理首页"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)  # pylint: disable=no-member
+    except DoesNotExist:
+        flash('主播不存在', 'error')
+        return redirect(url_for('pilot.list_pilots'))
+
+    return render_template(
+        'pilots/settlement/index.html',
+        pilot=pilot,
+    )
+
+
+@pilot_bp.route('/<pilot_id>/settlement/new', methods=['GET', 'POST'])
+@roles_accepted('gicho', 'kancho')
+def pilot_settlement_new(pilot_id):
+    """新增结算方式"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)  # pylint: disable=no-member
+    except DoesNotExist:
+        flash('主播不存在', 'error')
+        return redirect(url_for('pilot.list_pilots'))
+
+    return render_template('pilots/settlement/new.html', pilot=pilot)
+
+
+@pilot_bp.route('/<pilot_id>/settlement/<record_id>/edit', methods=['GET', 'POST'])
+@roles_accepted('gicho', 'kancho')
+def pilot_settlement_edit(pilot_id, record_id):
+    """编辑结算方式记录"""
+    try:
+        pilot = Pilot.objects.get(id=pilot_id)  # pylint: disable=no-member
+        from models.pilot import Settlement
+        settlement = Settlement.objects.get(id=record_id, pilot_id=pilot_id)  # pylint: disable=no-member
+    except DoesNotExist:
+        flash('主播或结算方式记录不存在', 'error')
+        return redirect(url_for('pilot.pilot_settlement_index', pilot_id=pilot_id))
+
+    return render_template('pilots/settlement/edit.html', pilot=pilot, settlement=settlement)

@@ -1435,3 +1435,33 @@ def export_weekly_csv():
 
     response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}"})
     return response
+
+
+# ============ 底薪申请管理路由 ============
+
+
+@report_bp.route('/base-salary-applications')
+@roles_accepted('gicho', 'kancho')
+def base_salary_applications_list():
+    """底薪申请列表页面"""
+    date_str = request.args.get('date')
+    if not date_str:
+        now_utc = get_current_utc_time()
+        today_local = utc_to_local(now_utc)
+        app_date = today_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        app_date = get_local_date_from_string(date_str)
+        if not app_date:
+            logger.error('无效的日期参数：%s', date_str)
+            return '无效的日期格式', 400
+        app_date = app_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    logger.info('生成底薪申请列表，查询日期：%s', app_date.strftime('%Y-%m-%d'))
+
+    pagination = {
+        'date': app_date.strftime('%Y-%m-%d'),
+        'prev_date': (app_date - timedelta(days=1)).strftime('%Y-%m-%d'),
+        'next_date': (app_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    }
+
+    return render_template('reports/base_salary_applications.html', pagination=pagination)

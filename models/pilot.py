@@ -402,3 +402,118 @@ class PilotCommissionChangeLog(Document):
             'is_active': '状态',
         }
         return mapping.get(self.field_name, self.field_name)
+
+
+class SettlementType(enum.Enum):
+    """结算方式枚举"""
+    DAILY_BASE = "daily_base"  # 日结底薪
+    MONTHLY_BASE = "monthly_base"  # 月结底薪
+    NONE = "none"  # 无底薪
+
+
+class Settlement(Document):
+    """主播结算方式记录模型"""
+
+    pilot_id = ReferenceField(Pilot, required=True)
+
+    effective_date = DateTimeField(required=True)  # 生效日期（UTC存储，按自然日界定）
+    settlement_type = EnumField(SettlementType, required=True)  # 结算方式
+    remark = StringField(max_length=200)  # 备注说明
+
+    is_active = BooleanField(default=True)  # 是否有效（用于软删除）
+
+    created_at = DateTimeField(default=get_current_utc_time)
+    updated_at = DateTimeField(default=get_current_utc_time)
+
+    meta = {
+        'collection': 'settlements',
+        'indexes': [
+            {
+                'fields': ['pilot_id', 'effective_date']
+            },
+            {
+                'fields': ['pilot_id', 'is_active']
+            },
+            {
+                'fields': ['effective_date']
+            },
+            {
+                'fields': ['is_active']
+            },
+            {
+                'fields': ['-created_at']
+            },
+        ],
+    }
+
+    def clean(self):
+        """数据验证和业务规则检查"""
+        super().clean()
+
+        if self.is_active:
+            existing = Settlement.objects(
+                pilot_id=self.pilot_id,
+                effective_date=self.effective_date,
+                is_active=True
+            ).first()
+            if existing and existing.id != self.id:
+                raise ValueError("同一主播同一生效日期只能有一条有效记录")
+
+    def save(self, *args, **kwargs):
+        """保存时更新修改时间"""
+        self.updated_at = get_current_utc_time()
+        return super().save(*args, **kwargs)
+
+    @property
+    def settlement_type_display(self):
+        """结算方式显示名称"""
+        mapping = {
+            SettlementType.DAILY_BASE: "日结底薪",
+            SettlementType.MONTHLY_BASE: "月结底薪",
+            SettlementType.NONE: "无底薪",
+        }
+        return mapping.get(self.settlement_type, "未知")
+
+    @property
+    def effective_date_local(self):
+        """生效日期的本地时间显示"""
+        from utils.timezone_helper import format_local_date
+        return format_local_date(self.effective_date, '%Y-%m-%d')
+
+
+class SettlementChangeLog(Document):
+    """主播结算方式记录变更日志模型"""
+
+    settlement_id = ReferenceField(Settlement, required=True)
+    user_id = ReferenceField(User, required=True)
+    field_name = StringField(required=True)
+    old_value = StringField()
+    new_value = StringField()
+    change_time = DateTimeField(default=get_current_utc_time)
+    ip_address = StringField()
+
+    meta = {
+        'collection': 'settlement_change_logs',
+        'indexes': [
+            {
+                'fields': ['settlement_id', '-change_time']
+            },
+            {
+                'fields': ['user_id']
+            },
+            {
+                'fields': ['-change_time']
+            },
+        ],
+    }
+
+    @property
+    def field_display_name(self):
+        """字段显示名称"""
+        mapping = {
+            'effective_date': '生效日期',
+            'settlement_type': '结算方式',
+            'remark': '备注',
+            'is_active': '状态',
+        }
+        return mapping.get(self.field_name, self.field_name)

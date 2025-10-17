@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+
+{% block title %}编辑结算方式 - Lacus-Log{% endblock %}
+
+{% block content %}
+<section class="settlement-form-page">
+  <div class="form-container">
+    <div class="form-header">
+      <h1 class="form-title">编辑结算方式</h1>
+      <a href="{{ url_for('pilot.pilot_settlement_index', pilot_id=pilot.id) }}" class="btn btn-secondary">
+        <span class="btn-icon">←</span>
+        返回
+      </a>
+    </div>
+
+    <form id="settlementForm" class="settlement-form">
+      <div class="form-group">
+        <label for="effectiveDate" class="form-label">生效日期 <span class="required">*</span></label>
+        <input type="date" id="effectiveDate" name="effective_date" class="form-input" disabled readonly>
+        <small class="form-help">生效日期不可修改</small>
+      </div>
+
+      <div class="form-group">
+        <label for="settlementType" class="form-label">结算方式 <span class="required">*</span></label>
+        <select id="settlementType" name="settlement_type" class="form-input" required>
+          <option value="daily_base">日结底薪</option>
+          <option value="monthly_base">月结底薪</option>
+          <option value="none">无底薪</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="remark" class="form-label">备注</label>
+        <textarea id="remark" name="remark" class="form-input" rows="4" maxlength="200" placeholder="可选：输入结算调整说明"></textarea>
+        <small class="form-help"><span id="charCount">0</span>/200</small>
+      </div>
+
+      <div class="form-group">
+        <label for="isActive" class="form-label">状态</label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="isActive" name="is_active" class="toggle-input">
+          <label for="isActive" class="toggle-label">
+            <span class="toggle-on">有效</span>
+            <span class="toggle-off">无效（已删除）</span>
+          </label>
+        </div>
+        <small class="form-help">切换此开关可软删除或恢复该记录</small>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <a href="{{ url_for('pilot.pilot_settlement_index', pilot_id=pilot.id) }}" class="btn btn-secondary">取消</a>
+      </div>
+    </form>
+
+    <div id="errorMessage" class="error-message" style="display:none;"></div>
+  </div>
+</section>
+
+<style>
+
+.settlement-form-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.form-container {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.form-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.required {
+  color: #f5222d;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  box-sizing: border-box;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.form-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+textarea.form-input {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.form-help {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-input {
+  display: none;
+}
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  width: 60px;
+  height: 28px;
+  background-color: #f0f0f0;
+  border-radius: 14px;
+  padding: 2px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.toggle-input:checked + .toggle-label {
+  background-color: #52c41a;
+}
+
+.toggle-label::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 24px;
+  background-color: white;
+  border-radius: 12px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.toggle-input:checked + .toggle-label::before {
+  transform: translateX(32px);
+}
+
+.toggle-on,
+.toggle-off {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 500;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.toggle-on {
+  color: white;
+  left: 6px;
+  display: none;
+}
+
+.toggle-off {
+  color: #999;
+  right: 6px;
+}
+
+.toggle-input:checked ~ .toggle-on {
+  display: inline;
+}
+
+.toggle-input:checked ~ .toggle-off {
+  display: none;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.btn {
+  padding: 10px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: #1890ff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1570cc;
+}
+
+.btn-primary:disabled {
+  background: #bfbfbf;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: #e8e8e8;
+}
+
+.error-message {
+  background: #fff2e6;
+  border: 1px solid #ffbb96;
+  border-radius: 4px;
+  padding: 12px;
+  color: #c6001a;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+.success-message {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 4px;
+  padding: 12px;
+  color: #52c41a;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+  .settlement-form-page {
+    padding: 12px;
+  }
+
+  .form-container {
+    padding: 16px;
+  }
+
+  .form-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+}
+
+</style>
+
+<script>
+const PILOT_ID = '{{ pilot.id }}';
+const RECORD_ID = '{{ settlement.id }}';
+const form = document.getElementById('settlementForm');
+const effectiveDate = document.getElementById('effectiveDate');
+const charCount = document.getElementById('charCount');
+const remark = document.getElementById('remark');
+const settlementType = document.getElementById('settlementType');
+const isActive = document.getElementById('isActive');
+
+// 初始化表单数据
+function initForm() {
+  const localDate = new Date('{{ settlement.effective_date }}');
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getDate()).padStart(2, '0');
+  effectiveDate.value = `${year}-${month}-${day}`;
+
+  settlementType.value = '{{ settlement.settlement_type }}';
+  remark.value = '{{ settlement.remark or "" }}' || '';
+  charCount.textContent = remark.value.length;
+  isActive.checked = {{ 'true' if settlement.is_active else 'false' }};
+}
+
+// 字符计数
+remark.addEventListener('input', (e) => {
+  charCount.textContent = e.target.value.length;
+});
+
+// 表单提交
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+
+  try {
+    const settlementTypeValue = settlementType.value;
+    const remarkValue = remark.value.trim();
+    const isActiveValue = isActive.checked;
+
+    if (!settlementTypeValue) {
+      throw new Error('结算方式为必填项');
+    }
+
+    const response = await fetch(`/api/settlements/${RECORD_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        settlement_type: settlementTypeValue,
+        remark: remarkValue || null,
+        is_active: isActiveValue
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || '更新失败');
+    }
+
+    showSuccess('结算方式更新成功');
+    setTimeout(() => {
+      window.location.href = `{{ url_for('pilot.pilot_settlement_index', pilot_id=pilot.id) }}`;
+    }, 1000);
+  } catch (error) {
+    showError(error.message);
+    submitBtn.disabled = false;
+  }
+});
+
+function showError(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  errorDiv.classList.remove('success-message');
+}
+
+function showSuccess(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  errorDiv.classList.add('success-message');
+}
+
+document.addEventListener('DOMContentLoaded', initForm);
+</script>
+{% endblock %}
