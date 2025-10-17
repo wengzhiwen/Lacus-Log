@@ -263,6 +263,69 @@
   - `user_id` 索引
   - `change_time` 索引
 
+### base_salary_applications
+- 字段：
+  - `pilot_id` 关联主播（关联到pilots集合，必填）
+  - `battle_record_id` 关联开播记录（关联到battle_records集合，必填）
+  - `settlement_type` 结算方式快照（字符串：daily_base/monthly_base/none，必填）
+  - `base_salary_amount` 底薪金额（Decimal，精度2，必填）
+  - `applicant_id` 申请人（关联到users集合，必填）
+  - `status` 申请状态枚举（pending/approved/rejected，默认pending）
+  - `created_at` 创建时间（UTC）
+  - `updated_at` 最后修改时间（UTC）
+- 索引：
+  - `pilot_id + -created_at` 复合索引（查询特定主播的历史申请）
+  - `battle_record_id` 索引（关键：支持与battle_records的$lookup关联）
+  - `applicant_id` 索引
+  - `status` 索引
+  - `-created_at` 降序索引（最新优先）
+  - `pilot_id + status` 复合索引（主播按状态查询）
+  - `battle_record_id + status` 复合索引（优化按申请状态的关联查询）
+  - `-updated_at` 降序索引（界面排序用）
+- 重要设计说明：
+  - 使用 `settlement_type` 快照记录申请时的结算方式，与主播当时的设置状态对应
+  - 与battle_records通过 `battle_record_id` 建立关联；查询时需使用MongoDB的 `$lookup` 聚合管道
+  - **MongoEngine限制**：MongoEngine的 `aggregate()` 方法对ReferenceField的 `$lookup` 处理有限制，建议使用原生MongoDB aggregation API（`db.base_salary_applications.aggregate()`）
+  - 聚合查询示例（按开播日期筛选）：
+    ```python
+    pipeline = [{
+        '$lookup': {
+            'from': 'battle_records',
+            'localField': 'battle_record_id',
+            'foreignField': '_id',
+            'as': 'battle_record'
+        }
+    }, {
+        '$unwind': {
+            'path': '$battle_record',
+            'preserveNullAndEmptyArrays': False
+        }
+    }, {
+        '$match': {
+            'battle_record.start_time': {
+                '$gte': start_of_day_utc,
+                '$lte': end_of_day_utc
+            }
+        }
+    }]
+    db.base_salary_applications.aggregate(pipeline)
+    ```
+
+### base_salary_application_change_logs
+- 字段：
+  - `application_id` 关联底薪申请ID（关联到base_salary_applications集合，必填）
+  - `user_id` 操作用户ID（关联到users集合，必填）
+  - `field_name` 变更字段名
+  - `old_value` 变更前值
+  - `new_value` 变更后值
+  - `remark` 操作备注（最大200字符）
+  - `change_time` 变更时间（UTC）
+  - `ip_address` 操作IP地址
+- 索引：
+  - `application_id + -change_time` 复合索引（降序，查询申请的变更历史）
+  - `user_id` 索引
+  - `-change_time` 降序索引
+
 ### job_plans（新增：任务计划令牌）
 - 用途：调度“计划令牌”，保证同一分钟的同名任务只执行一次（多进程/多实例下防重）。
 - 字段：
@@ -290,3 +353,38 @@
 - 招募管理系统支持六步制招募流程：待面试→待预约试播→待试播→待预约开播→待开播→已结束
 - 招募系统包含完整的决策记录、决策人追踪、变更记录和历史数据兼容性
 - 预计后续将为审计日志、登录日志、业务数据增加索引
+
+### 聚合查询与关联查询的最佳实践
+
+#### MongoEngine的 `aggregate()` 限制
+MongoEngine的 `aggregate()` 方法对ReferenceField的处理有限制。使用MongoEngine时：
+```python
+# ❌ 可能不工作
+applications_data = BaseSalaryApplication.objects.aggregate(pipeline)
+```
+
+应改用原生MongoDB API：
+```python
+# ✓ 正确做法
+from mongoengine import get_db
+db = get_db()
+applications_data = list(db.base_salary_applications.aggregate(pipeline))
+```
+
+#### 时间范围查询的注意事项
+- 所有时间字段在数据库中存储为UTC
+- 界面显示和输入采用GMT+8（中国标准时间）
+- 进行日期范围查询时，必须先将本地时间转换为UTC：
+  ```python
+  from utils.timezone_helper import local_to_utc
+  
+  query_date = datetime.strptime('2025-10-17', '%Y-%m-%d')
+  start_of_day_utc = local_to_utc(query_date.replace(hour=0, minute=0, second=0))
+  end_of_day_utc = local_to_utc(query_date.replace(hour=23, minute=59, second=59))
+  ```
+
+#### 底薪申请查询的最佳实践
+- 优先使用底薪申请的索引（特别是 `battle_record_id`）来优化关联性能
+- 进行日期范围查询时，聚合管道应放在Python代码中执行，不依赖ORM
+- 聚合结果返回ObjectId，需重新查询关联的对象以获取完整数据
+- 查询使用 `db.base_salary_applications` 而不是 `BaseSalaryApplication.objects.aggregate()`

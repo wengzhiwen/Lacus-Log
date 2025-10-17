@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 from flask import Blueprint, jsonify, request, Response
 from flask_security import current_user
-from mongoengine import DoesNotExist, ValidationError
+from mongoengine import DoesNotExist, ValidationError, get_db
 
 from models.battle_record import (BaseSalaryApplication, BaseSalaryApplicationChangeLog, BaseSalaryApplicationStatus, BattleRecord)
 from models.pilot import Pilot
@@ -43,11 +43,9 @@ def _get_client_ip() -> str:
 @base_salary_applications_api_bp.route('/api/base-salary-applications/stats', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho')
 def get_base_salary_applications_stats():
-    """获取底薪申请统计数据（按日期筛选）"""
+    """获取底薪申请统计数据（按日期筛选，按结算方式分组）"""
     try:
         date_str = request.args.get('date')
-
-        query_filter = {}
 
         if date_str:
             try:
@@ -55,36 +53,77 @@ def get_base_salary_applications_stats():
             except ValueError:
                 return jsonify(create_error_response('VALIDATION_ERROR', '日期格式应为YYYY-MM-DD')), 400
 
-            # 查询该天创建的申请
+            # 查询关联开播记录在该日期(GMT+8)的申请
             start_of_day = local_to_utc(query_date.replace(hour=0, minute=0, second=0, microsecond=0))
             end_of_day = local_to_utc(query_date.replace(hour=23, minute=59, second=59, microsecond=999999))
 
-            query_filter['created_at__gte'] = start_of_day
-            query_filter['created_at__lte'] = end_of_day
+            # 使用聚合管道进行关联查询
+            pipeline = [{
+                '$lookup': {
+                    'from': 'battle_records',
+                    'localField': 'battle_record_id',
+                    'foreignField': '_id',
+                    'as': 'battle_record'
+                }
+            }, {
+                '$unwind': {
+                    'path': '$battle_record',
+                    'preserveNullAndEmptyArrays': False
+                }
+            }, {
+                '$match': {
+                    'battle_record.start_time': {
+                        '$gte': start_of_day,
+                        '$lte': end_of_day
+                    }
+                }
+            }]
 
-        # 获取所有符合条件的申请
-        applications = BaseSalaryApplication.objects(**query_filter)
+            # 获取聚合查询结果
+            db = get_db()
+            applications_data = list(db.base_salary_applications.aggregate(pipeline))
+            application_ids = [app['_id'] for app in applications_data]
 
-        # 统计数据
-        total_amount = 0
-        approved_amount = 0
-        rejected_amount = 0
-        pending_amount = 0
+            if application_ids:
+                applications = BaseSalaryApplication.objects(id__in=application_ids)
+            else:
+                applications = BaseSalaryApplication.objects.none()
+        else:
+            applications = BaseSalaryApplication.objects()
+
+        # 按结算方式分组统计
+        daily_stats = {'total_amount': 0, 'approved_amount': 0, 'rejected_amount': 0, 'pending_amount': 0, 'count': 0}
+
+        monthly_stats = {'total_amount': 0, 'approved_amount': 0, 'rejected_amount': 0, 'pending_amount': 0, 'count': 0}
+
+        none_stats = {'total_amount': 0, 'approved_amount': 0, 'rejected_amount': 0, 'pending_amount': 0, 'count': 0}
 
         for app in applications:
             amount = float(app.base_salary_amount or 0)
-            total_amount += amount
+
+            # 根据结算方式分组
+            if app.settlement_type == 'daily_base':
+                stats_dict = daily_stats
+            elif app.settlement_type == 'monthly_base':
+                stats_dict = monthly_stats
+            else:
+                stats_dict = none_stats
+
+            stats_dict['total_amount'] += amount
+            stats_dict['count'] += 1
 
             if app.status == BaseSalaryApplicationStatus.APPROVED:
-                approved_amount += amount
+                stats_dict['approved_amount'] += amount
             elif app.status == BaseSalaryApplicationStatus.REJECTED:
-                rejected_amount += amount
+                stats_dict['rejected_amount'] += amount
             elif app.status == BaseSalaryApplicationStatus.PENDING:
-                pending_amount += amount
+                stats_dict['pending_amount'] += amount
 
-        stats = {'total_amount': total_amount, 'approved_amount': approved_amount, 'rejected_amount': rejected_amount, 'pending_amount': pending_amount}
+        stats = {'daily_base': daily_stats, 'monthly_base': monthly_stats, 'none': none_stats}
 
-        return jsonify(create_success_response(stats))
+        response = jsonify(create_success_response(stats))
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
     except Exception as e:  # noqa: BLE001
         logger.error('获取底薪申请统计失败: %s', str(e), exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '获取底薪申请统计失败')), 500
@@ -93,13 +132,9 @@ def get_base_salary_applications_stats():
 @base_salary_applications_api_bp.route('/api/base-salary-applications', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho')
 def list_base_salary_applications():
-    """获取底薪申请列表（按日期筛选）"""
+    """获取底薪申请列表（按日期筛选，按结算方式分组）"""
     try:
         date_str = request.args.get('date')
-        page = max(int(request.args.get('page', 1) or 1), 1)
-        page_size = min(max(int(request.args.get('page_size', 20) or 20), 1), 100)
-
-        query_filter = {}
 
         if date_str:
             try:
@@ -107,19 +142,63 @@ def list_base_salary_applications():
             except ValueError:
                 return jsonify(create_error_response('VALIDATION_ERROR', '日期格式应为YYYY-MM-DD')), 400
 
-            # 查询该天创建的申请
+            # 查询关联开播记录在该日期(GMT+8)的申请
             start_of_day = local_to_utc(query_date.replace(hour=0, minute=0, second=0, microsecond=0))
             end_of_day = local_to_utc(query_date.replace(hour=23, minute=59, second=59, microsecond=999999))
 
-            query_filter['created_at__gte'] = start_of_day
-            query_filter['created_at__lte'] = end_of_day
+            # 使用聚合管道进行关联查询
+            pipeline = [{
+                '$lookup': {
+                    'from': 'battle_records',
+                    'localField': 'battle_record_id',
+                    'foreignField': '_id',
+                    'as': 'battle_record'
+                }
+            }, {
+                '$unwind': {
+                    'path': '$battle_record',
+                    'preserveNullAndEmptyArrays': False
+                }
+            }, {
+                '$match': {
+                    'battle_record.start_time': {
+                        '$gte': start_of_day,
+                        '$lte': end_of_day
+                    }
+                }
+            }]
 
-        qs = BaseSalaryApplication.objects(**query_filter).order_by('-created_at')
-        total = qs.count()
-        items = [serialize_base_salary_application(app) for app in qs.skip((page - 1) * page_size).limit(page_size)]
+            # 获取聚合查询结果
+            db = get_db()
+            applications_data = list(db.base_salary_applications.aggregate(pipeline))
+            application_ids = [app['_id'] for app in applications_data]
 
-        meta = {'page': page, 'page_size': page_size, 'total': total}
-        return jsonify(create_success_response({'items': items}, meta))
+            if application_ids:
+                applications = BaseSalaryApplication.objects(id__in=application_ids).order_by('-updated_at')
+            else:
+                applications = BaseSalaryApplication.objects.none()
+        else:
+            applications = BaseSalaryApplication.objects().order_by('-updated_at')
+
+        # 按结算方式分组
+        daily_applications = []
+        monthly_applications = []
+        none_applications = []
+
+        for app in applications:
+            serialized_app = serialize_base_salary_application(app)
+            if app.settlement_type == 'daily_base':
+                daily_applications.append(serialized_app)
+            elif app.settlement_type == 'monthly_base':
+                monthly_applications.append(serialized_app)
+            else:
+                none_applications.append(serialized_app)
+
+        grouped_data = {'daily_base': daily_applications, 'monthly_base': monthly_applications, 'none': none_applications}
+
+        response = jsonify(create_success_response(grouped_data))
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
     except Exception as e:  # noqa: BLE001
         logger.error('获取底薪申请列表失败: %s', str(e), exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '获取底薪申请列表失败')), 500
@@ -283,8 +362,6 @@ def export_base_salary_applications():
     try:
         date_str = request.args.get('date')
 
-        query_filter = {}
-
         if date_str:
             try:
                 query_date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -294,10 +371,39 @@ def export_base_salary_applications():
             start_of_day = local_to_utc(query_date.replace(hour=0, minute=0, second=0, microsecond=0))
             end_of_day = local_to_utc(query_date.replace(hour=23, minute=59, second=59, microsecond=999999))
 
-            query_filter['created_at__gte'] = start_of_day
-            query_filter['created_at__lte'] = end_of_day
+            # 使用聚合管道进行关联查询
+            pipeline = [{
+                '$lookup': {
+                    'from': 'battle_records',
+                    'localField': 'battle_record_id',
+                    'foreignField': '_id',
+                    'as': 'battle_record'
+                }
+            }, {
+                '$unwind': {
+                    'path': '$battle_record',
+                    'preserveNullAndEmptyArrays': False
+                }
+            }, {
+                '$match': {
+                    'battle_record.start_time': {
+                        '$gte': start_of_day,
+                        '$lte': end_of_day
+                    }
+                }
+            }]
 
-        applications = BaseSalaryApplication.objects(**query_filter).order_by('-created_at')
+            # 获取聚合查询结果
+            db = get_db()
+            applications_data = list(db.base_salary_applications.aggregate(pipeline))
+            application_ids = [app['_id'] for app in applications_data]
+
+            if application_ids:
+                applications = BaseSalaryApplication.objects(id__in=application_ids).order_by('-created_at')
+            else:
+                applications = BaseSalaryApplication.objects.none()
+        else:
+            applications = BaseSalaryApplication.objects().order_by('-created_at')
 
         # 生成CSV
         output = io.StringIO()
@@ -333,7 +439,8 @@ def export_base_salary_applications():
                 settlement_type_display = app.settlement_type_display
 
                 row = [
-                    pilot_nickname, pilot_real_name, owner_nickname, applicant_nickname, start_time_str, duration_hours, settlement_type_display, revenue_amount,
+                    pilot_nickname, pilot_real_name, owner_nickname, applicant_nickname, start_time_str, duration_hours, settlement_type_display,
+                    revenue_amount,
                     str(app.base_salary_amount), created_at_str, status_display
                 ]
                 writer.writerow(row)
@@ -348,7 +455,8 @@ def export_base_salary_applications():
 
         response = Response(csv_content,
                             mimetype='text/csv; charset=utf-8',
-                            headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
+                            headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}',
+                                     'Cache-Control': 'no-cache'})
 
         return response
     except Exception as e:  # noqa: BLE001

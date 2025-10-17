@@ -584,13 +584,26 @@ function renderDetail() {
   
   // 使用API返回的settlement_type_display
   const settlementTypeDisplay = applicationData.settlement_type_display || getSettlementTypeDisplay(applicationData.settlement_type);
+  const isMonthlyBase = applicationData.settlement_type === 'monthly_base';
+
   const currentSettlement = document.getElementById('currentSettlement');
   if (applicationData.pilot?.id) {
-    currentSettlement.innerHTML = `<a href="/pilots/${applicationData.pilot.id}/settlement/?from=base_salary_detail&application_id=${APPLICATION_ID}" class="link">${settlementTypeDisplay}</a>`;
+    const linkHtml = `<a href="/pilots/${applicationData.pilot.id}/settlement/?from=base_salary_detail&application_id=${APPLICATION_ID}" class="link" style="${isMonthlyBase ? 'color: #d32f2f; font-weight: 600;' : ''}">${settlementTypeDisplay}</a>`;
+    currentSettlement.innerHTML = linkHtml;
   } else {
     currentSettlement.textContent = settlementTypeDisplay;
+    if (isMonthlyBase) {
+      currentSettlement.style.color = '#d32f2f';
+      currentSettlement.style.fontWeight = '600';
+    }
   }
-  document.getElementById('settlementType').textContent = settlementTypeDisplay;
+
+  const settlementTypeElement = document.getElementById('settlementType');
+  settlementTypeElement.textContent = settlementTypeDisplay;
+  if (isMonthlyBase) {
+    settlementTypeElement.style.color = '#d32f2f';
+    settlementTypeElement.style.fontWeight = '600';
+  }
 
   // 开始时间 - 添加超链接
   const battleStartTime = document.getElementById('battleStartTime');
@@ -615,6 +628,14 @@ function renderDetail() {
 
   // 操作时间显示
   document.getElementById('lastOperatedAt').textContent = formatDateTime(applicationData.updated_at) || '--';
+
+  // 最近操作人显示
+  const lastOperatorElement = document.getElementById('lastOperator');
+  if (applicationData.last_operator?.nickname) {
+    lastOperatorElement.textContent = applicationData.last_operator.nickname;
+  } else {
+    lastOperatorElement.textContent = '未操作';
+  }
 
   // 渲染操作按钮到footbar
   renderActionButtons();

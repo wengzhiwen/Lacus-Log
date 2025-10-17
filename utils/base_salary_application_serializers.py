@@ -46,6 +46,24 @@ def serialize_base_salary_application(application: BaseSalaryApplication) -> Dic
             'nickname': applicant.nickname,
         }
 
+    # 获取最后一次操作人信息
+    last_operator_data = None
+    try:
+        # 查询最新的变更记录（排除创建记录）
+        latest_change = BaseSalaryApplicationChangeLog.objects(  # pylint: disable=no-member
+            application_id=application,
+            field_name__ne='created'  # 排除创建记录
+        ).order_by('-change_time').first()
+        
+        if latest_change and latest_change.user_id:
+            last_operator_data = {
+                'id': str(latest_change.user_id.id),
+                'nickname': latest_change.user_id.nickname,
+            }
+    except Exception:  # noqa: BLE001
+        # 如果查询失败，忽略错误
+        pass
+
     return {
         'id': str(application.id),
         'pilot': pilot_data,
@@ -59,6 +77,7 @@ def serialize_base_salary_application(application: BaseSalaryApplication) -> Dic
         'applicant_id': str(application.applicant_id.id) if application.applicant_id else None,
         'status': application.status.value if application.status else None,
         'status_display': application.status_display,
+        'last_operator': last_operator_data,
         'created_at': utc_to_local(application.created_at).isoformat() if application.created_at else None,
         'updated_at': utc_to_local(application.updated_at).isoformat() if application.updated_at else None,
     }

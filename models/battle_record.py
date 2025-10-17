@@ -80,6 +80,9 @@ class BattleRecord(Document):
             {
                 'fields': ['start_time', 'pilot', 'revenue_amount']
             },
+            {
+                'fields': ['-start_time']
+            },
         ],
     }
 
@@ -257,6 +260,12 @@ class BaseSalaryApplication(Document):
             },
             {
                 'fields': ['pilot_id', 'status']
+            },
+            {
+                'fields': ['battle_record_id', 'status']
+            },
+            {
+                'fields': ['-updated_at']
             },
         ],
     }

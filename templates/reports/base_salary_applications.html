@@ -463,6 +463,48 @@
   color: var(--muted);
 }
 
+/* 分组显示样式 */
+.settlement-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand);
+}
+
+.monthly-title {
+  color: #d32f2f;
+  border-bottom-color: #d32f2f;
+}
+
+.settlement-group {
+  margin-bottom: 32px;
+}
+
+.group-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--table-header);
+}
+
+.monthly-title {
+  color: #d32f2f;
+  border-bottom-color: #d32f2f;
+}
+
+.monthly-settlement {
+  color: #d32f2f !important;
+  font-weight: 600;
+}
+
 </style>
 
 <script>
@@ -486,8 +528,17 @@ function initDate() {
   }
   
   updateDateDisplay();
-  loadStats();
-  loadApplications();
+  loadDataSequentially();
+}
+
+// 顺序加载数据：先加载统计，再加载列表，确保window.currentStats已更新
+async function loadDataSequentially() {
+  try {
+    await loadStats();
+    await loadApplications();
+  } catch (error) {
+    console.error('加载数据失败:', error);
+  }
 }
 
 // 更新日期显示
@@ -502,8 +553,7 @@ function prevDay() {
   date.setDate(date.getDate() - 1);
   applicationDate.value = date.toISOString().split('T')[0];
   updateDateDisplay();
-  loadStats();
-  loadApplications();
+  loadDataSequentially();
 }
 
 // 后一天
@@ -512,15 +562,13 @@ function nextDay() {
   date.setDate(date.getDate() + 1);
   applicationDate.value = date.toISOString().split('T')[0];
   updateDateDisplay();
-  loadStats();
-  loadApplications();
+  loadDataSequentially();
 }
 
 // 日期变更
 applicationDate.addEventListener('change', () => {
   updateDateDisplay();
-  loadStats();
-  loadApplications();
+  loadDataSequentially();
 });
 
 // 加载统计数据
@@ -543,6 +591,8 @@ async function loadStats() {
 
     const result = await response.json();
     if (result.success) {
+      // 保存统计数据到全局变量
+      window.currentStats = result.data;
       renderStatsCards(result.data);
     } else {
       throw new Error(result.error?.message || '加载统计数据失败');
@@ -558,39 +608,75 @@ async function loadStats() {
 // 渲染统计数据卡片
 function renderStatsCards(stats) {
   const statsCards = document.getElementById('statsCards');
-  
-  const cards = [
+
+  // 渲染日结底薪统计
+  const dailyStats = stats.daily_base || {};
+  const dailyCards = [
     {
       label: '总申请金额',
-      value: formatMoney(stats.total_amount),
+      value: formatMoney(dailyStats.total_amount),
       class: ''
     },
     {
       label: '已发放金额',
-      value: formatMoney(stats.approved_amount),
+      value: formatMoney(dailyStats.approved_amount),
       class: 'approved'
     },
     {
       label: '已拒绝金额',
-      value: formatMoney(stats.rejected_amount),
+      value: formatMoney(dailyStats.rejected_amount),
       class: 'rejected'
     },
     {
       label: '未处理金额',
-      value: formatMoney(stats.pending_amount),
+      value: formatMoney(dailyStats.pending_amount),
       class: 'pending'
     }
   ];
 
-  statsCards.innerHTML = cards.map(card => `
-    <div class="summary-card">
-      <div class="card-label">${card.label}</div>
-      <div class="card-value ${card.class}">${card.value}</div>
-    </div>
-  `).join('');
+  // 渲染月结底薪统计
+  const monthlyStats = stats.monthly_base || {};
+  const monthlyCards = [
+    {
+      label: '总申请金额',
+      value: formatMoney(monthlyStats.total_amount),
+      class: ''
+    },
+    {
+      label: '已发放金额',
+      value: formatMoney(monthlyStats.approved_amount),
+      class: 'approved'
+    },
+    {
+      label: '已拒绝金额',
+      value: formatMoney(monthlyStats.rejected_amount),
+      class: 'rejected'
+    },
+    {
+      label: '未处理金额',
+      value: formatMoney(monthlyStats.pending_amount),
+      class: 'pending'
+    }
+  ];
 
-  statsCards.style.display = 'grid';
+  statsCards.innerHTML = `
+    <!-- 日结底薪统计 -->
+    <div class="settlement-section">
+      <h3 class="section-title">日结底薪</h3>
+      <div class="summary-cards">
+        ${dailyCards.map(card => `
+          <div class="summary-card">
+            <div class="card-label">${card.label}</div>
+            <div class="card-value ${card.class}">${card.value}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  statsCards.style.display = 'block';
 }
+
 
 // 格式化金额
 function formatMoney(amount) {
@@ -627,12 +713,9 @@ async function loadApplications() {
 
     const result = await response.json();
     if (result.success) {
-      const items = result.data.items || [];
-      if (items.length === 0) {
-        emptyState.style.display = 'block';
-      } else {
-        renderApplications(items);
-      }
+      const groupedData = result.data || {};
+      // 总是渲染申请列表（包含占位符空状态）
+      renderApplications(groupedData);
     } else {
       throw new Error(result.error?.message || '加载失败');
     }
@@ -644,9 +727,101 @@ async function loadApplications() {
 }
 
 // 渲染申请卡片
-function renderApplications(applications) {
+function renderApplications(groupedData) {
   const list = document.getElementById('applicationsList');
-  list.innerHTML = applications.map(app => `
+
+  const dailyApps = groupedData.daily_base || [];
+  const monthlyApps = groupedData.monthly_base || [];
+  const noneApps = groupedData.none || [];
+
+  let html = '';
+
+  // 渲染日结底薪申请（总是显示）
+  html += `
+    <div class="settlement-group">
+      <h3 class="group-title">日结底薪明细</h3>
+      <div class="applications-list">
+        ${dailyApps.length > 0 ? dailyApps.map(app => renderApplicationCard(app)).join('') : '<div class="empty-state"><div class="empty-title">暂无日结底薪申请</div></div>'}
+      </div>
+    </div>
+  `;
+
+  // 使用window.currentStats中最新的月结统计数据
+  const monthlyStats = (window.currentStats && window.currentStats.monthly_base) || {
+    total_amount: 0,
+    approved_amount: 0,
+    rejected_amount: 0,
+    pending_amount: 0
+  };
+
+  const monthlyCards = [
+    {
+      label: '总申请金额',
+      value: formatMoney(monthlyStats.total_amount),
+      class: ''
+    },
+    {
+      label: '已发放金额',
+      value: formatMoney(monthlyStats.approved_amount),
+      class: 'approved'
+    },
+    {
+      label: '已拒绝金额',
+      value: formatMoney(monthlyStats.rejected_amount),
+      class: 'rejected'
+    },
+    {
+      label: '未处理金额',
+      value: formatMoney(monthlyStats.pending_amount),
+      class: 'pending'
+    }
+  ];
+
+  html += `
+    <!-- 月结底薪统计 -->
+    <div class="settlement-section">
+      <h3 class="section-title monthly-title">月结底薪</h3>
+      <div class="summary-cards">
+        ${monthlyCards.map(card => `
+          <div class="summary-card">
+            <div class="card-label">${card.label}</div>
+            <div class="card-value ${card.class}">${card.value}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  // 渲染月结底薪申请（总是显示）
+  html += `
+    <div class="settlement-group">
+      <h3 class="group-title monthly-title">月结底薪明细</h3>
+      <div class="applications-list">
+        ${monthlyApps.length > 0 ? monthlyApps.map(app => renderApplicationCard(app)).join('') : '<div class="empty-state"><div class="empty-title">暂无月结底薪申请</div></div>'}
+      </div>
+    </div>
+  `;
+
+  // 渲染无底薪申请
+  if (noneApps.length > 0) {
+    html += `
+      <div class="settlement-group">
+        <h3 class="group-title">无底薪明细</h3>
+        <div class="applications-list">
+          ${noneApps.map(app => renderApplicationCard(app)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  list.innerHTML = html;
+}
+
+// 渲染单个申请卡片
+function renderApplicationCard(app) {
+  const isMonthlyBase = app.settlement_type === 'monthly_base';
+
+  return `
     <div class="application-card" onclick="goToDetail('${app.id}')">
       <div class="card-header">
         <div class="pilot-info">${app.pilot?.nickname || '未知'}（${app.pilot?.real_name || '未知'}）</div>
@@ -667,7 +842,7 @@ function renderApplications(applications) {
         </div>
         <div class="card-field">
           <div class="field-label">结算方式</div>
-          <div class="field-value">${app.settlement_type_display || '未知'}</div>
+          <div class="field-value ${isMonthlyBase ? 'monthly-settlement' : ''}">${app.settlement_type_display || '未知'}</div>
         </div>
         <div class="card-field">
           <div class="field-label">流水金额</div>
@@ -679,7 +854,7 @@ function renderApplications(applications) {
         </div>
       </div>
     </div>
-  `).join('');
+  `;
 }
 
 // 跳转到详情页面
@@ -769,5 +944,13 @@ window.onclick = function(event) {
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', initDate);
+
+// 监听页面可见性，从其他页面返回时刷新数据
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    // 页面变为可见时，刷新统计数据和列表
+    loadDataSequentially();
+  }
+});
 </script>
 {% endblock %}

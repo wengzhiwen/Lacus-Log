@@ -95,27 +95,42 @@ function renderSettlementInfo(settlementData, elements) {
     console.warn('结算方式数据为空');
     return;
   }
-  
+
+  const settlementTypeDisplay = settlementData.settlement_type_display || '无底薪';
+  const isMonthlyBase = settlementData.settlement_type === 'monthly_base';
+
   // 更新结算方式显示
   if (elements.settlementTypeDisplay) {
-    elements.settlementTypeDisplay.textContent = settlementData.settlement_type_display || '无底薪';
+    elements.settlementTypeDisplay.textContent = settlementTypeDisplay;
+    if (isMonthlyBase) {
+      elements.settlementTypeDisplay.style.color = '#d32f2f';
+      elements.settlementTypeDisplay.style.fontWeight = '600';
+    }
   }
-  
+
   // 更新生效日期显示
   if (elements.effectiveDateDisplay) {
     elements.effectiveDateDisplay.textContent = settlementData.effective_date || '--';
   }
-  
+
   // 更新当前结算方式显示（用于底薪申请页）
   if (elements.currentSettlement) {
-    elements.currentSettlement.textContent = settlementData.settlement_type_display || '无底薪';
+    elements.currentSettlement.textContent = settlementTypeDisplay;
+    if (isMonthlyBase) {
+      elements.currentSettlement.style.color = '#d32f2f';
+      elements.currentSettlement.style.fontWeight = '600';
+    }
   }
-  
+
   // 更新结算方式快照（用于底薪申请页）
   if (elements.settlementTypeSnapshot) {
-    elements.settlementTypeSnapshot.value = settlementData.settlement_type_display || '未知';
+    elements.settlementTypeSnapshot.value = settlementTypeDisplay;
+    if (isMonthlyBase) {
+      elements.settlementTypeSnapshot.style.color = '#d32f2f';
+      elements.settlementTypeSnapshot.style.fontWeight = '600';
+    }
   }
-  
+
   console.log('结算方式信息渲染完成:', settlementData);
 }
 
@@ -125,7 +140,7 @@ function renderSettlementInfo(settlementData, elements) {
  * @returns {boolean} 是否应该显示申请按钮
  */
 function shouldShowApplyButton(settlementData) {
-  return settlementData && settlementData.settlement_type === 'daily_base';
+  return settlementData && (settlementData.settlement_type === 'daily_base' || settlementData.settlement_type === 'monthly_base');
 }
 
 /**
