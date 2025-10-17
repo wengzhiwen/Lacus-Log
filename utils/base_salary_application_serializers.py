@@ -53,6 +53,7 @@ def serialize_base_salary_application(application: BaseSalaryApplication) -> Dic
         'battle_record': battle_record_data,
         'battle_record_id': str(application.battle_record_id.id) if application.battle_record_id else None,
         'settlement_type': application.settlement_type,
+        'settlement_type_display': application.settlement_type_display,
         'base_salary_amount': str(application.base_salary_amount),
         'applicant': applicant_data,
         'applicant_id': str(application.applicant_id.id) if application.applicant_id else None,

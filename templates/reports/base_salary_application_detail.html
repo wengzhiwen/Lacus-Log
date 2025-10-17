@@ -482,7 +482,7 @@
   text-decoration: underline;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .container {
     padding: 12px;
   }
@@ -496,11 +496,16 @@
   }
 
   .footbar .inner {
-    flex-direction: column;
+    flex-direction: row;
+    gap: 8px;
   }
 
   .btn {
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 60px;
+    max-width: none;
+    font-size: 14px;
+    padding: 12px 8px;
   }
 }
 </style>
@@ -577,15 +582,14 @@ function renderDetail() {
   document.getElementById('pilotRealName').textContent = applicationData.pilot?.real_name || '--';
   document.getElementById('pilotOwner').textContent = applicationData.pilot?.owner?.nickname || '--';
   
-  // 当前结算方式 - 添加超链接
+  // 使用API返回的settlement_type_display
+  const settlementTypeDisplay = applicationData.settlement_type_display || getSettlementTypeDisplay(applicationData.settlement_type);
   const currentSettlement = document.getElementById('currentSettlement');
-  const settlementTypeDisplay = getSettlementTypeDisplay(applicationData.settlement_type);
   if (applicationData.pilot?.id) {
     currentSettlement.innerHTML = `<a href="/pilots/${applicationData.pilot.id}/settlement/?from=base_salary_detail&application_id=${APPLICATION_ID}" class="link">${settlementTypeDisplay}</a>`;
   } else {
     currentSettlement.textContent = settlementTypeDisplay;
   }
-  
   document.getElementById('settlementType').textContent = settlementTypeDisplay;
 
   // 开始时间 - 添加超链接

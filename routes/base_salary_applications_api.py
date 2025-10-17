@@ -307,7 +307,7 @@ def export_base_salary_applications():
         output.write('\ufeff')
 
         # 写入表头
-        headers = ['主播昵称', '真实姓名', '直属运营', '开播时间', '时长', '流水金额', '底薪申请人', '底薪金额', '申请时间', '状态']
+        headers = ['主播昵称', '真实姓名', '直属运营', '申请人', '开播时间', '时长', '结算方式', '流水金额', '申请底薪', '申请时间', '状态']
         writer.writerow(headers)
 
         for app in applications:
@@ -330,9 +330,10 @@ def export_base_salary_applications():
                 applicant_nickname = app.applicant_id.nickname if app.applicant_id else '未知'
                 created_at_str = utc_to_local(app.created_at).strftime('%Y-%m-%d %H:%M')
                 status_display = app.status_display
+                settlement_type_display = app.settlement_type_display
 
                 row = [
-                    pilot_nickname, pilot_real_name, owner_nickname, start_time_str, duration_hours, revenue_amount, applicant_nickname,
+                    pilot_nickname, pilot_real_name, owner_nickname, applicant_nickname, start_time_str, duration_hours, settlement_type_display, revenue_amount,
                     str(app.base_salary_amount), created_at_str, status_display
                 ]
                 writer.writerow(row)

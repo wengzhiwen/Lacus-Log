@@ -220,7 +220,7 @@
 
 .card-content {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
   font-size: 12px;
 }
@@ -654,19 +654,27 @@ function renderApplications(applications) {
       </div>
       <div class="card-content">
         <div class="card-field">
+          <div class="field-label">直属运营</div>
+          <div class="field-value">${app.pilot?.owner?.nickname || '未知'}</div>
+        </div>
+        <div class="card-field">
+          <div class="field-label">申请人</div>
+          <div class="field-value">${app.applicant?.nickname || '未知'}</div>
+        </div>
+        <div class="card-field">
           <div class="field-label">开播时间</div>
           <div class="field-value">${formatDateTime(app.battle_record?.start_time) || '未知'}</div>
         </div>
         <div class="card-field">
-          <div class="field-label">运营</div>
-          <div class="field-value">${app.pilot?.owner?.nickname || '未知'}</div>
+          <div class="field-label">结算方式</div>
+          <div class="field-value">${app.settlement_type_display || '未知'}</div>
         </div>
         <div class="card-field">
           <div class="field-label">流水金额</div>
           <div class="field-value amount">¥${parseFloat(app.battle_record?.revenue_amount || 0).toFixed(2)}</div>
         </div>
         <div class="card-field">
-          <div class="field-label">底薪金额</div>
+          <div class="field-label">申请底薪</div>
           <div class="field-value amount">¥${parseFloat(app.base_salary_amount || 0).toFixed(2)}</div>
         </div>
       </div>
@@ -706,7 +714,7 @@ async function showDetail(appId) {
           <div><strong>开播时间</strong><br>${formatDateTime(app.battle_record?.start_time) || '--'}</div>
           <div><strong>时长</strong><br>${app.battle_record?.duration_hours || 0} 小时</div>
           <div><strong>流水金额</strong><br>¥${parseFloat(app.battle_record?.revenue_amount || 0).toFixed(2)}</div>
-          <div><strong>结算方式</strong><br>${app.settlement_type}</div>
+          <div><strong>结算方式</strong><br>${app.settlement_type_display}</div>
           <div><strong>底薪金额</strong><br>¥${parseFloat(app.base_salary_amount || 0).toFixed(2)}</div>
           <div><strong>申请人</strong><br>${app.applicant?.nickname || '--'}</div>
           <div><strong>状态</strong><br>${app.status_display}</div>

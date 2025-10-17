@@ -283,6 +283,16 @@ class BaseSalaryApplication(Document):
         }
         return mapping.get(self.status, "未知")
 
+    @property
+    def settlement_type_display(self):
+        """结算方式显示名称"""
+        mapping = {
+            'daily_base': '日结底薪',
+            'monthly_base': '月结底薪',
+            'none': '无底薪',
+        }
+        return mapping.get(self.settlement_type, self.settlement_type or '未知')
+
 
 class BaseSalaryApplicationChangeLog(Document):
     """底薪申请状态变更记录模型"""
