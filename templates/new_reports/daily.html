@@ -1,0 +1,742 @@
+{% extends "base.html" %}
+
+{% block title %}开播新日报 - {{ pagination.date }}{% endblock %}
+
+{% block content %}
+<div id="dailyReportApp" data-report-date="{{ pagination.date }}" data-selected-owner="{{ selected_owner }}" data-selected-mode="{{ selected_mode }}">
+  <div class="page-header">
+    <h1 class="page-title">📒 开播新日报</h1>
+  </div>
+
+  <div class="date-navigation">
+    <div class="date-controls">
+      <a href="{{ url_for('new_report.daily_report', date=pagination.prev_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 前一日</a>
+      <input type="date" id="dateSelector" value="{{ pagination.date }}" class="date-input">
+      <a href="{{ url_for('new_report.daily_report', date=pagination.next_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">后一日 →</a>
+    </div>
+    <div class="export-actions">
+      <a href="{{ url_for('new_report.export_daily_csv', date=pagination.date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <div class="filter-controls">
+      <label for="ownerSelector" class="filter-label">直属运营：</label>
+      <select id="ownerSelector" class="filter-select" data-selected-owner="{{ selected_owner }}">
+        <option value="all">全部</option>
+      </select>
+
+      <label for="modeSelector" class="filter-label">开播方式：</label>
+      <select id="modeSelector" class="filter-select">
+        <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
+        <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
+        <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="summary-section">
+    <div id="daily-loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div style="display: none;" id="daily-content">
+      <h2 class="section-title" id="daily-summary-title"></h2>
+      <div class="summary-cards epic-intro" data-animate-group="day" id="daily-summary-cards"></div>
+    </div>
+  </div>
+
+  <div class="details-section">
+    <h2 class="section-title">日报明细</h2>
+    <div class="table-container" id="daily-table-container" style="display: none;">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="fixed-col">主播</th>
+            <th>性别年龄</th>
+            <th>直属运营</th>
+            <th>主播分类</th>
+            <th>开播地点</th>
+            <th>播时</th>
+            <th>状态</th>
+            <th>流水</th>
+            <th>当前分成比例</th>
+            <th>主播分成</th>
+            <th>公司分成</th>
+            <th>返点比例</th>
+            <th>产生返点</th>
+            <th>底薪</th>
+            <th>当日毛利</th>
+            <th>3日平均流水</th>
+          </tr>
+        </thead>
+        <tbody id="daily-details-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="daily-empty-state" style="display: none;">
+      <p>今日暂无开播记录</p>
+    </div>
+  </div>
+</div>
+
+<style>
+
+.date-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--table-header);
+  border-radius: 8px;
+}
+
+.date-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.export-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-section {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+.filter-select {
+  padding: 6px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+  min-width: 120px;
+}
+
+.summary-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.epic-intro {
+  perspective: 1000px;
+  perspective-origin: 50% 40%;
+}
+
+.epic-intro .summary-card {
+  transform: translateZ(240px) translateY(30px) scale(0.85) rotateX(-12deg);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.epic-intro.play .summary-card {
+  animation: epicFlyIn 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.epic-intro.play .summary-card:nth-child(1) { animation-delay: 0ms; }
+.epic-intro.play .summary-card:nth-child(2) { animation-delay: 90ms; }
+.epic-intro.play .summary-card:nth-child(3) { animation-delay: 180ms; }
+.epic-intro.play .summary-card:nth-child(4) { animation-delay: 270ms; }
+.epic-intro.play .summary-card:nth-child(5) { animation-delay: 360ms; }
+.epic-intro.play .summary-card:nth-child(6) { animation-delay: 450ms; }
+.epic-intro.play .summary-card:nth-child(7) { animation-delay: 540ms; }
+.epic-intro.play .summary-card:nth-child(8) { animation-delay: 630ms; }
+
+@keyframes epicFlyIn {
+  0%   { transform: translateZ(240px) translateY(30px) scale(0.85) rotateX(-12deg); opacity: 0; }
+  60%  { transform: translateZ(-20px) translateY(-6px) scale(1.02) rotateX(2deg); opacity: 1; }
+  85%  { transform: translateZ(10px) translateY(0px) scale(0.995) rotateX(0deg); opacity: 1; }
+  100% { transform: translateZ(0) translateY(0) scale(1) rotateX(0); opacity: 1; }
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.summary-card.danger-outline {
+  border-color: #dc3545;
+}
+
+.card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.card-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.details-section {
+  margin: 24px 0;
+}
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 2000px;
+}
+
+.report-table th,
+.report-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.report-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.report-table th.fixed-col,
+.report-table td.fixed-col {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  background-clip: padding-box;
+  min-width: 120px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-table td.fixed-col { z-index: 4; box-shadow: 2px 0 0 #eee; }
+.report-table th.fixed-col { z-index: 5; box-shadow: 2px 0 0 #ddd; }
+
+.report-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+.pilot-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pilot-link:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
+.text-danger {
+  color: #dc3545 !important;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .date-navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .filter-select {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .summary-card {
+    padding: 12px;
+  }
+
+  .card-value {
+    font-size: 20px;
+  }
+
+  .report-table {
+    font-size: 12px;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 8px 6px;
+  }
+}
+</style>
+
+<script>
+(function() {
+  const app = document.getElementById('dailyReportApp');
+  if (!app) {
+    return;
+  }
+
+  const ownerSelector = document.getElementById('ownerSelector');
+  const modeSelector = document.getElementById('modeSelector');
+  const dateSelector = document.getElementById('dateSelector');
+  const summaryTitle = document.getElementById('daily-summary-title');
+  const summaryCards = document.getElementById('daily-summary-cards');
+  const tableContainer = document.getElementById('daily-table-container');
+  const detailsBody = document.getElementById('daily-details-body');
+  const emptyState = document.getElementById('daily-empty-state');
+  const emptyStateText = emptyState.querySelector('p');
+  const operatorsApi = '{{ url_for('users_api.get_operators') }}';
+  const dailyApi = '{{ url_for('new_reports_api.daily_report_data') }}';
+  const reportPageUrl = '{{ url_for('new_report.daily_report') }}';
+  const pilotPerformanceTemplate = '{{ url_for('pilot.pilot_performance', pilot_id='__PID__') }}';
+  const refreshCacheApi = '{{ url_for('new_reports_api.refresh_daily_report_cache') }}';
+  const pageTitle = document.querySelector('.page-title');
+  const originalTitleText = pageTitle ? pageTitle.textContent.trim() : '📒 开播新日报';
+  const SHORT_TITLE_TEXT = '📒 开播日';
+  const SECRET_TAP_THRESHOLD = 9;
+  const SECRET_RESET_MS = 1500;
+  let secretClickCount = 0;
+  let secretTimer = null;
+  let refreshReady = false;
+  let isRefreshingCache = false;
+
+  function resetSecretState(restoreTitle = true) {
+    refreshReady = false;
+    secretClickCount = 0;
+    if (secretTimer) {
+      clearTimeout(secretTimer);
+      secretTimer = null;
+    }
+    if (restoreTitle && pageTitle) {
+      pageTitle.textContent = originalTitleText;
+    }
+  }
+
+  function scheduleSecretReset() {
+    if (!pageTitle) {
+      return;
+    }
+    if (secretTimer) {
+      clearTimeout(secretTimer);
+    }
+    secretTimer = setTimeout(() => {
+      if (!isRefreshingCache) {
+        resetSecretState(true);
+      }
+    }, SECRET_RESET_MS);
+  }
+
+  async function triggerCacheRefresh() {
+    if (!pageTitle || !refreshCacheApi) {
+      return;
+    }
+    isRefreshingCache = true;
+    resetSecretState(false);
+    pageTitle.textContent = '缓存刷新中...';
+
+    try {
+      const response = await fetch(refreshCacheApi, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      });
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (parseError) {
+        console.error('解析刷新缓存响应失败：', parseError);
+      }
+
+      if (!response.ok || !payload || !payload.success) {
+        const errorMessage = payload && payload.error ? payload.error.message : '刷新缓存失败';
+        throw new Error(errorMessage);
+      }
+
+      pageTitle.textContent = '缓存已刷新，正在重新加载...';
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    } catch (error) {
+      console.error('刷新开播新日报缓存失败：', error);
+      pageTitle.textContent = '刷新失败，请稍后重试';
+      setTimeout(() => {
+        isRefreshingCache = false;
+        resetSecretState(true);
+      }, 2000);
+    }
+  }
+
+  if (pageTitle) {
+    pageTitle.addEventListener('click', () => {
+      if (isRefreshingCache) {
+        return;
+      }
+
+      secretClickCount += 1;
+      scheduleSecretReset();
+
+      if (!refreshReady && secretClickCount >= SECRET_TAP_THRESHOLD) {
+        refreshReady = true;
+        secretClickCount = 0;
+        pageTitle.textContent = SHORT_TITLE_TEXT;
+        return;
+      }
+
+      if (refreshReady && secretClickCount >= SECRET_TAP_THRESHOLD) {
+        triggerCacheRefresh();
+      }
+    });
+  }
+
+  const rankMapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+
+  let currentDate = app.dataset.reportDate;
+  let currentOwner = app.dataset.selectedOwner || 'all';
+  let currentMode = app.dataset.selectedMode || 'all';
+  const emptyFallbackText = emptyStateText ? emptyStateText.textContent : '';
+
+  function formatMoney(value) {
+    if (value === null || value === undefined) {
+      return '¥0.00';
+    }
+    return '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatHours(value) {
+    if (value === null || value === undefined) {
+      return '0.0小时';
+    }
+    return Number(value).toFixed(1) + '小时';
+  }
+
+  function formatPercent(value) {
+    if (value === null || value === undefined) {
+      return '--';
+    }
+    return Math.round(Number(value)) + '%';
+  }
+
+  function formatRate(value) {
+    if (value === null || value === undefined) {
+      return '--';
+    }
+    return Math.round(Number(value) * 100) + '%';
+  }
+
+  function normalizeRank(value) {
+    if (!value) {
+      return '';
+    }
+    return rankMapping[value] || value;
+  }
+
+  function formatStatus(status, statusDisplay) {
+    // 如果没有状态或状态为空，显示"已下播"
+    if (!status || status === '' || status === 'ended') {
+      return { text: '已下播', class: '' };
+    }
+    // 如果状态是"live"，显示红色"开播中"
+    if (status === 'live') {
+      return { text: '开播中', class: 'text-danger' };
+    }
+    // 优先使用statusDisplay（中文），否则使用status
+    return { text: statusDisplay || status, class: '' };
+  }
+
+  function buildSummaryCards(summary) {
+    const pilotCount = summary.pilot_count || 0;
+    const effectiveCount = summary.effective_pilot_count || 0;
+    const revenueSum = summary.revenue_sum || 0;
+    const basepaySum = summary.basepay_sum || 0;
+    const pilotShare = summary.pilot_share_sum || 0;
+    const companyShare = summary.company_share_sum || 0;
+    const profit = companyShare - basepaySum;
+
+    const items = [
+      { label: '总主播数量', value: pilotCount.toLocaleString('zh-CN') },
+      { label: '有效主播数量', value: effectiveCount.toLocaleString('zh-CN') },
+      { label: '累计流水', value: formatMoney(revenueSum) },
+      {
+        label: '累计底薪支出',
+        value: formatMoney(basepaySum),
+        sub: summary.conversion_rate !== null && summary.conversion_rate !== undefined ? `转换率${summary.conversion_rate}%` : ''
+      },
+      { label: '累计主播分成', value: formatMoney(pilotShare) },
+      { label: '累计公司分成', value: formatMoney(companyShare) },
+      { label: '今日盈亏（不计返点）', value: formatMoney(profit), danger: profit < 0 }
+    ];
+
+    const html = items.map(item => {
+      const dangerClass = item.danger ? ' danger-outline' : '';
+      const subHtml = item.sub ? `<div class="card-sub">${item.sub}</div>` : '';
+      return `<div class="summary-card${dangerClass}">
+        <div class="card-label">${item.label}</div>
+        <div class="card-value">${item.value}</div>
+        ${subHtml}
+      </div>`;
+    }).join('');
+
+    summaryCards.innerHTML = html;
+    summaryCards.classList.remove('play');
+    void summaryCards.offsetWidth;
+    summaryCards.classList.add('play');
+  }
+
+  function renderDetails(details, filters, dateStr) {
+    if (!details || details.length == 0) {
+      detailsBody.innerHTML = '';
+      tableContainer.style.display = 'none';
+      if (emptyStateText) {
+        emptyStateText.textContent = emptyFallbackText;
+      }
+      emptyState.style.display = 'block';
+      return;
+    }
+
+    const ownerParam = filters && filters.owner ? filters.owner : 'all';
+    const rows = details.map(detail => {
+      const pilotId = detail.pilot_id;
+      const profitClass = detail.daily_profit !== null && detail.daily_profit < 0 ? 'text-danger' : '';
+      const avgRevenue = detail.three_day_avg_revenue !== null && detail.three_day_avg_revenue !== undefined ? formatMoney(detail.three_day_avg_revenue) : '';
+      const commissionRate = formatPercent(detail.commission_rate);
+      const rebateRate = formatRate(detail.rebate_rate);
+      const pilotUrl = pilotPerformanceTemplate.replace('__PID__', pilotId) + `?from=daily_report&date=${encodeURIComponent(dateStr)}&owner=${encodeURIComponent(ownerParam)}`;
+      const statusInfo = formatStatus(detail.status, detail.status_display);
+      return `<tr>
+        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td>${detail.gender_age || ''}</td>
+        <td>${detail.owner || ''}</td>
+        <td>${normalizeRank(detail.rank)}</td>
+        <td>${detail.battle_area || ''}</td>
+        <td>${formatHours(detail.duration)}</td>
+        <td class="${statusInfo.class}">${statusInfo.text}</td>
+        <td>${formatMoney(detail.revenue)}</td>
+        <td>${commissionRate}</td>
+        <td>${formatMoney(detail.pilot_share)}</td>
+        <td>${formatMoney(detail.company_share)}</td>
+        <td>${rebateRate}</td>
+        <td>${formatMoney(detail.rebate_amount)}</td>
+        <td>${formatMoney(detail.base_salary)}</td>
+        <td class="${profitClass}">${formatMoney(detail.daily_profit)}</td>
+        <td>${avgRevenue}</td>
+      </tr>`;
+    }).join('');
+
+    detailsBody.innerHTML = rows;
+    emptyState.style.display = 'none';
+    tableContainer.style.display = 'block';
+  }
+
+  function showLoading() {
+    const loadingState = document.getElementById('daily-loading-state');
+    const content = document.getElementById('daily-content');
+    const tableContainer = document.getElementById('daily-table-container');
+    const emptyState = document.getElementById('daily-empty-state');
+
+    loadingState.style.display = 'block';
+    content.style.display = 'none';
+    tableContainer.style.display = 'none';
+    emptyState.style.display = 'none';
+  }
+
+  function showError(message) {
+    const loadingState = document.getElementById('daily-loading-state');
+    const content = document.getElementById('daily-content');
+    const tableContainer = document.getElementById('daily-table-container');
+    const emptyState = document.getElementById('daily-empty-state');
+    const emptyStateText = emptyState.querySelector('p');
+
+    loadingState.style.display = 'none';
+    content.style.display = 'block';
+    summaryTitle.textContent = '加载失败';
+    summaryCards.innerHTML = '';
+    detailsBody.innerHTML = '';
+    tableContainer.style.display = 'none';
+    if (emptyStateText) {
+      emptyStateText.textContent = message;
+    }
+    emptyState.style.display = 'block';
+  }
+
+  async function loadOwnerOptions() {
+    try {
+      const response = await fetch(operatorsApi);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载运营失败');
+      }
+      const operators = payload.data || [];
+      operators.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.nickname || user.username || user.id;
+        ownerSelector.appendChild(option);
+      });
+      ownerSelector.value = currentOwner;
+    } catch (error) {
+      console.error('加载直属运营列表失败：', error);
+      ownerSelector.value = currentOwner;
+    }
+  }
+
+  function buildDailyApiUrl() {
+    const params = new URLSearchParams();
+    if (currentDate) {
+      params.set('date', currentDate);
+    }
+    if (currentOwner && currentOwner !== 'all') {
+      params.set('owner', currentOwner);
+    }
+    if (currentMode && currentMode !== 'all') {
+      params.set('mode', currentMode);
+    }
+    return `${dailyApi}?${params.toString()}`;
+  }
+
+  async function loadDailyReport() {
+    showLoading();
+    try {
+      const response = await fetch(buildDailyApiUrl());
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data;
+      const filters = payload.meta ? payload.meta.filters : null;
+      currentDate = data.date;
+      if (filters) {
+        currentOwner = filters.owner || 'all';
+        currentMode = filters.mode || 'all';
+      }
+      dateSelector.value = data.date;
+      ownerSelector.value = currentOwner;
+      modeSelector.value = currentMode;
+      // 隐藏loading状态，显示内容
+      const loadingState = document.getElementById('daily-loading-state');
+      const content = document.getElementById('daily-content');
+      loadingState.style.display = 'none';
+      content.style.display = 'block';
+
+      summaryTitle.textContent = `${data.date} 日报汇总`;
+      buildSummaryCards(data.summary || {});
+      renderDetails(data.details || [], filters || {}, data.date);
+    } catch (error) {
+      console.error('加载开播新日报失败：', error);
+      showError('报表加载失败，请稍后再试');
+    }
+  }
+
+  function navigate(params) {
+    const url = new URL(reportPageUrl, window.location.origin);
+    const targetDate = params.date || currentDate;
+    const targetOwner = params.owner !== undefined ? params.owner : currentOwner;
+    const targetMode = params.mode !== undefined ? params.mode : currentMode;
+    if (targetDate) {
+      url.searchParams.set('date', targetDate);
+    }
+    url.searchParams.set('owner', targetOwner || 'all');
+    url.searchParams.set('mode', targetMode || 'all');
+    window.location.href = url.toString();
+  }
+
+  dateSelector.addEventListener('change', function() {
+    if (this.value) {
+      navigate({ date: this.value });
+    }
+  });
+
+  ownerSelector.addEventListener('change', function() {
+    navigate({ owner: this.value || 'all' });
+  });
+
+  modeSelector.addEventListener('change', function() {
+    navigate({ mode: this.value || 'all' });
+  });
+
+  (async function init() {
+    await loadOwnerOptions();
+    await loadDailyReport();
+  })();
+})();
+</script>
+{% endblock %}
