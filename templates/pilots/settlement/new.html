@@ -17,7 +17,7 @@
       <div class="form-group">
         <label for="effectiveDate" class="form-label">生效日期 <span class="required">*</span></label>
         <input type="date" id="effectiveDate" name="effective_date" class="form-input" required>
-        <small class="form-help">生效日期不能早于当前日期</small>
+        <small class="form-help">可选择任意生效日期</small>
       </div>
 
       <div class="form-group">
@@ -228,15 +228,6 @@ const effectiveDate = document.getElementById('effectiveDate');
 const charCount = document.getElementById('charCount');
 const remark = document.getElementById('remark');
 
-// 初始化日期选择器的最小值为今天
-function initMinDate() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  effectiveDate.value = `${year}-${month}-${day}`;
-}
-
 // 字符计数
 remark.addEventListener('input', (e) => {
   charCount.textContent = e.target.value.length;
@@ -300,7 +291,5 @@ function showSuccess(message) {
   errorDiv.style.display = 'block';
   errorDiv.classList.add('success-message');
 }
-
-document.addEventListener('DOMContentLoaded', initMinDate);
 </script>
 {% endblock %}
