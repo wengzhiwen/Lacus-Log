@@ -17,6 +17,7 @@ from models.battle_record import (BaseSalaryApplication, BaseSalaryApplicationCh
 from models.pilot import Pilot
 from utils.base_salary_application_serializers import (create_error_response, create_success_response, serialize_base_salary_application,
                                                        serialize_base_salary_application_change_log_list, serialize_base_salary_application_list)
+from utils.james_alert import trigger_james_alert_for_application
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
@@ -344,6 +345,10 @@ def update_base_salary_application_status(application_id):
         change_log.save()
 
         logger.info('更新底薪申请状态成功，application_id=%s, old_status=%s, new_status=%s', application_id, old_status.value, new_status.value)
+
+        if new_status == BaseSalaryApplicationStatus.APPROVED:
+            trigger_james_alert_for_application(application, old_status)
+
         return jsonify(create_success_response(serialize_base_salary_application(application)))
     except DoesNotExist:
         return jsonify(create_error_response('APPLICATION_NOT_FOUND', '底薪申请不存在')), 404

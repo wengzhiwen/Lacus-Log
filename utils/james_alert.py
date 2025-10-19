@@ -3,15 +3,17 @@
 """
 詹姆斯的关注 - 低业绩不努力主播告警模块
 
-当开播记录保存时，自动检查主播业绩情况，
+当底薪申请被确认发放时，自动检查主播业绩情况，
 如果满足特定条件则发送警告邮件。
 """
+# pylint: disable=no-member,too-many-return-statements
 
 import threading
 from datetime import datetime
 from decimal import Decimal
 
 # pylint: disable=no-member
+from models.battle_record import BaseSalaryApplicationStatus
 from models.pilot import Gender
 from models.recruit import Recruit
 from models.user import User
@@ -23,35 +25,36 @@ from utils.timezone_helper import get_current_local_time, utc_to_local
 logger = get_logger('james_alert')
 
 
-def check_james_alert_trigger_conditions(battle_record, old_record=None):
+def check_james_alert_trigger_conditions(application):
     """
     检查是否满足詹姆斯关注的触发条件
     
     Args:
-        battle_record: 开播记录对象
-        old_record: 编辑前的记录对象（仅编辑时提供）
+        application: 底薪申请对象
         
     Returns:
         bool: 是否满足触发条件
         str: 跳过原因（如果不满足条件）
     """
     try:
-        if battle_record.revenue_amount <= 0:
-            return False, f"流水为{battle_record.revenue_amount}元，不符合触发条件（需要>0）"
+        battle_record = application.battle_record_id
+        if not battle_record:
+            return False, "底薪申请未关联开播记录"
 
-        if old_record is not None:
-            if battle_record.revenue_amount == old_record.revenue_amount:
-                return False, f"编辑未改变流水金额（{battle_record.revenue_amount}元），不触发告警"
+        revenue_amount = battle_record.revenue_amount or Decimal('0')
+        if revenue_amount <= 0:
+            return False, f"流水为{revenue_amount}元，不符合触发条件（需要>0）"
 
-        if battle_record.revenue_amount >= 250:
-            return False, f"流水为{battle_record.revenue_amount}元，不符合触发条件（需要<250）"
+        if revenue_amount >= 250:
+            return False, f"流水为{revenue_amount}元，不符合触发条件（需要<250）"
 
         duration_hours = battle_record.duration_hours or 0
         if duration_hours >= 7:
             return False, f"播时为{duration_hours}小时，不符合触发条件（需要<7）"
 
-        if battle_record.base_salary < 100:
-            return False, f"底薪为{battle_record.base_salary}元，不符合触发条件（需要>=100）"
+        base_salary_amount = application.base_salary_amount or Decimal('0')
+        if base_salary_amount < 100:
+            return False, f"底薪申请金额为{base_salary_amount}元，不符合触发条件（需要>=100）"
 
         return True, "所有触发条件均满足"
 
@@ -175,6 +178,30 @@ def format_duration(value):
     return str(value)
 
 
+def render_record_base_salary(record):
+    """渲染开播记录的底薪信息"""
+    approved_amount = getattr(record, '_approved_base_salary', None)
+    application = getattr(record, '_latest_base_salary_application', None)
+
+    try:
+        if approved_amount and Decimal(approved_amount) > 0:
+            return f"{format_number(approved_amount)}元"
+    except Exception:  # noqa: BLE001
+        pass
+
+    if application:
+        if application.status == BaseSalaryApplicationStatus.APPROVED:
+            amount = approved_amount or application.base_salary_amount or Decimal('0')
+            return f"{format_number(amount)}元"
+        return application.status_display or application.status.value or '未知状态'
+
+    fallback_base_salary = getattr(record, 'base_salary', None)
+    if fallback_base_salary:
+        return f"{format_number(fallback_base_salary)}元"
+
+    return '未申请'
+
+
 def build_james_alert_email_content(pilot_info, pilot_stats):
     """
     构建詹姆斯关注警告邮件内容
@@ -244,10 +271,10 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
             end_time = utc_to_local(record.end_time).strftime('%Y-%m-%d %H:%M') if record.end_time else '-'
             duration = format_duration(record.duration_hours) if record.duration_hours else '0.0'
             revenue = format_number(record.revenue_amount)
-            base_salary = format_number(record.base_salary)
+            base_salary_display = render_record_base_salary(record)
             notes = record.notes or '-'
 
-            content += f"\n| {start_time} | {end_time} | {duration}小时 | {revenue}元 | {base_salary}元 | {notes} |"
+            content += f"\n| {start_time} | {end_time} | {duration}小时 | {revenue}元 | {base_salary_display} | {notes} |"
 
         return content
 
@@ -316,75 +343,91 @@ def send_james_alert_email(pilot_info, pilot_stats):
         return False
 
 
-def process_james_alert_async(battle_record, old_record=None):
+def process_james_alert_async(application):
     """
     异步处理詹姆斯关注警告逻辑
     
     Args:
-        battle_record: 开播记录对象
-        old_record: 编辑前的记录对象（仅编辑时提供）
+        application: 底薪申请对象
     """
 
     def _process():
         try:
-            pilot = battle_record.pilot
-            logger.debug(f"开始处理主播{pilot.nickname}的詹姆斯关注警告检查")
+            try:
+                application.reload()
+            except Exception:  # noqa: BLE001
+                pass
 
-            trigger_ok, trigger_reason = check_james_alert_trigger_conditions(battle_record, old_record)
+            battle_record = application.battle_record_id
+            if not battle_record:
+                logger.info("底薪申请%s未关联开播记录，跳过詹姆斯关注检查", getattr(application, 'id', '未知'))
+                return
+
+            pilot = application.pilot_id or battle_record.pilot
+            if not pilot:
+                logger.info("底薪申请%s未关联主播，跳过詹姆斯关注检查", getattr(application, 'id', '未知'))
+                return
+
+            trigger_ok, trigger_reason = check_james_alert_trigger_conditions(application)
             if not trigger_ok:
-                logger.info(f"主播{pilot.nickname}不触发詹姆斯关注警告: {trigger_reason}")
+                logger.info("主播%s不触发詹姆斯关注警告：%s", pilot.nickname if pilot else '未知', trigger_reason)
                 return
 
             from utils.pilot_performance import calculate_pilot_performance_stats
 
             now_local = get_current_local_time()
             performance_data = calculate_pilot_performance_stats(pilot, now_local)
-            month_stats = performance_data['month_stats']
-            week_stats = performance_data['week_stats']
-            three_day_stats = performance_data['three_day_stats']
 
-            from models.battle_record import BattleRecord
-            recent_records = BattleRecord.objects.filter(pilot=pilot).order_by('-start_time').limit(30)
-
-            pilot_stats = {'month_stats': month_stats, 'week_stats': week_stats, 'three_day_stats': three_day_stats, 'recent_records': list(recent_records)}
-
-            calc_ok, calc_reason = check_james_alert_calculation_conditions(pilot_stats)
+            calc_ok, calc_reason = check_james_alert_calculation_conditions(performance_data)
             if not calc_ok:
-                logger.info(f"主播{pilot.nickname}不触发詹姆斯关注告警邮件: {calc_reason}")
+                logger.info("主播%s不触发詹姆斯关注告警邮件：%s", pilot.nickname if pilot else '未知', calc_reason)
                 return
 
             pilot_info = get_pilot_basic_info(pilot)
+            pilot_stats = {
+                'month_stats': performance_data['month_stats'],
+                'week_stats': performance_data['week_stats'],
+                'three_day_stats': performance_data['three_day_stats'],
+                'recent_records': performance_data['recent_records'],
+            }
 
             success = send_james_alert_email(pilot_info, pilot_stats)
+            application_id = getattr(application, 'id', '未知')
             if success:
-                logger.info(f"主播{pilot.nickname}的詹姆斯关注警告邮件已发送")
+                logger.info("底薪申请%s触发的詹姆斯关注警告邮件已发送", application_id)
             else:
-                logger.error(f"主播{pilot.nickname}的詹姆斯关注警告邮件发送失败")
+                logger.error("底薪申请%s触发的詹姆斯关注警告邮件发送失败", application_id)
 
         except Exception as e:
-            logger.error(f"处理詹姆斯关注警告时发生异常: {e}", exc_info=True)
+            logger.error("处理詹姆斯关注警告时发生异常: %s", e, exc_info=True)
 
     thread = threading.Thread(target=_process)
     thread.daemon = True
     thread.start()
 
 
-def trigger_james_alert_if_needed(battle_record, old_record=None):
+def trigger_james_alert_for_application(application, old_status=None):
     """
-    如果需要，触发詹姆斯关注警告检查
-    
-    这是外部调用的主要接口，在开播记录保存时调用
+    当底薪申请确认发放后，触发詹姆斯关注检查。
     
     Args:
-        battle_record: 开播记录对象
-        old_record: 编辑前的记录对象（仅编辑时提供）
+        application: 底薪申请对象
+        old_status: 状态变更前的状态
     """
     try:
-        if not battle_record or not battle_record.pilot:
-            logger.debug("开播记录或主播信息不完整，跳过詹姆斯关注警告检查")
+        if not application:
+            logger.debug("底薪申请对象为空，跳过詹姆斯关注检查")
             return
 
-        process_james_alert_async(battle_record, old_record)
+        if application.status != BaseSalaryApplicationStatus.APPROVED:
+            logger.debug("底薪申请%s状态为%s，非已发放，跳过告警检查", getattr(application, 'id', '未知'), application.status)
+            return
+
+        if old_status == BaseSalaryApplicationStatus.APPROVED:
+            logger.debug("底薪申请%s状态未发生变化，跳过告警检查", getattr(application, 'id', '未知'))
+            return
+
+        process_james_alert_async(application)
 
     except Exception as e:
-        logger.error(f"触发詹姆斯关注警告检查时发生异常: {e}", exc_info=True)
+        logger.error("触发詹姆斯关注警告检查时发生异常: %s", e, exc_info=True)

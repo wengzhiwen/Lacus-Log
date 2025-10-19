@@ -19,7 +19,6 @@ from models.user import Role, User
 from routes.battle_record import (log_battle_record_change, validate_notes_required)
 from utils.announcement_serializers import (create_error_response, create_success_response)
 from utils.filter_state import persist_and_restore_filters
-from utils.james_alert import trigger_james_alert_if_needed
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
@@ -306,24 +305,6 @@ def _serialize_change_logs(change_logs: Iterable[BattleRecordChangeLog]) -> List
     return items
 
 
-def _build_old_record_snapshot(record: BattleRecord) -> object:
-
-    class _Snapshot:  # pylint: disable=too-few-public-methods
-
-        def __init__(self, src: BattleRecord):
-            self.revenue_amount = src.revenue_amount
-            self.base_salary = src.base_salary
-            self.start_time = src.start_time
-            self.end_time = src.end_time
-            duration_hours = 0
-            if src.start_time and src.end_time:
-                delta = src.end_time - src.start_time
-                duration_hours = round(delta.total_seconds() / 3600, 1)
-            self.duration_hours = duration_hours
-
-    return _Snapshot(record)
-
-
 def _parse_decimal(value: Optional[object], field_name: str) -> Decimal:
     if value is None or value == '':
         return Decimal('0')
@@ -533,8 +514,6 @@ def create_record():
         )
         record.save()
 
-        trigger_james_alert_if_needed(record)
-
         data = _serialize_battle_record_detail(record)
         meta = {'message': '开播记录创建成功'}
         return jsonify(create_success_response(data, meta)), 201
@@ -559,7 +538,6 @@ def update_record(record_id: str):
         return jsonify(create_error_response('BATTLE_RECORD_NOT_FOUND', '开播记录不存在')), 404
 
     try:
-        old_snapshot = _build_old_record_snapshot(record)
         old_values = _collect_change_fields(record)
 
         pilot_id = (payload.get('pilot') or '').strip()
@@ -628,8 +606,6 @@ def update_record(record_id: str):
             new_value = getattr(record, field_name)
             if old_value != new_value:
                 log_battle_record_change(record, field_name, old_value, new_value, current_user, client_ip)
-
-        trigger_james_alert_if_needed(record, old_snapshot)
 
         data = _serialize_battle_record_detail(record)
         meta = {'message': '开播记录更新成功'}
