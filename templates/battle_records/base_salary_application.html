@@ -471,7 +471,7 @@ function renderFormData() {
   document.getElementById('revenueAmount').value = '¥' + (parseFloat(battleRecordData.financial?.revenue_amount || battleRecordData.revenue_amount) || 0).toFixed(2);
   
   // 从开播记录读取底薪金额
-  const baseSalaryFromRecord = parseFloat(battleRecordData.financial?.base_salary || battleRecordData.base_salary) || 0;
+  const baseSalaryFromRecord = parseFloat(battleRecordData.financial?.base_salary) || 0;
   baseSalaryAmount.value = baseSalaryFromRecord.toFixed(2);
   
   // 检查初始底薪金额是否需要显示警告

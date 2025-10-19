@@ -195,10 +195,6 @@ def render_record_base_salary(record):
             return f"{format_number(amount)}元"
         return application.status_display or application.status.value or '未知状态'
 
-    fallback_base_salary = getattr(record, 'base_salary', None)
-    if fallback_base_salary:
-        return f"{format_number(fallback_base_salary)}元"
-
     return '未申请'
 
 

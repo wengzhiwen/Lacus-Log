@@ -774,15 +774,12 @@ function renderRecentRecords(records, pilotInfo) {
 function buildBaseSalaryBadge(record) {
   const application = record.base_salary_application;
   if (application && application.status === 'approved') {
-    const amount = application.amount !== undefined ? application.amount : record.base_salary;
+    const amount = application.amount !== undefined ? application.amount : 0;
     return `<span class="base-salary">底薪${formatCurrency(amount)}</span>`;
   }
   if (application && application.status) {
     const statusText = application.status_display || '';
     return `<span class="base-salary">底薪${statusText}</span>`;
-  }
-  if (record.base_salary && record.base_salary > 0) {
-    return `<span class="base-salary">底薪${formatCurrency(record.base_salary)}</span>`;
   }
   return `<span class="base-salary">未申请</span>`;
 }

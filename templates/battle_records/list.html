@@ -470,9 +470,6 @@ function buildBaseSalaryLabel(record) {
     const statusDisplay = summary.status_display || '';
     return `<span class="base-salary">底薪${statusDisplay}</span>`;
   }
-  if (record.base_salary && parseFloat(record.base_salary) > 0) {
-    return `<span class="base-salary">底薪¥${record.base_salary}</span>`;
-  }
   return `<span class="base-salary">未申请</span>`;
 }
 

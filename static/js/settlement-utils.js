@@ -139,8 +139,21 @@ function renderSettlementInfo(settlementData, elements) {
  * @param {Object} settlementData - 结算方式数据
  * @returns {boolean} 是否应该显示申请按钮
  */
-function shouldShowApplyButton(settlementData) {
-  return settlementData && (settlementData.settlement_type === 'daily_base' || settlementData.settlement_type === 'monthly_base');
+function shouldShowApplyButton(settlementData, options = {}) {
+  if (!settlementData) {
+    return false;
+  }
+
+  const isEligibleSettlement = settlementData.settlement_type === 'daily_base' || settlementData.settlement_type === 'monthly_base';
+  if (!isEligibleSettlement) {
+    return false;
+  }
+
+  if (options.recordStatus && options.recordStatus !== 'ended') {
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -148,12 +161,12 @@ function shouldShowApplyButton(settlementData) {
  * @param {Object} settlementData - 结算方式数据
  * @param {HTMLElement} applyButton - 申请按钮元素
  */
-function toggleApplyButton(settlementData, applyButton) {
+function toggleApplyButton(settlementData, applyButton, options = {}) {
   if (!applyButton) {
     return;
   }
-  
-  if (shouldShowApplyButton(settlementData)) {
+
+  if (shouldShowApplyButton(settlementData, options)) {
     applyButton.style.display = '';
   } else {
     applyButton.style.display = 'none';

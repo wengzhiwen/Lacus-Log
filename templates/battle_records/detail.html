@@ -184,7 +184,7 @@
       <span class="btn-icon">📋</span>
       变更记录
     </button>
-    <a class="btn btn-primary" id="apply-base-salary-btn" href="/battle-records/{{ battle_record.id }}/base_salary_application" style="display: none;">
+    <a class="btn btn-primary" id="apply-base-salary-btn" href="/battle-records/{{ battle_record.id }}/base_salary_application" style="display: none;" data-record-status="{{ battle_record.current_status.value }}">
       <span class="btn-icon">💰</span>
       申请底薪
     </a>
@@ -608,7 +608,9 @@ async function loadSettlementInfo() {
     });
     
     // 控制申请按钮显示
-    toggleApplyButton(settlement, document.getElementById('apply-base-salary-btn'));
+    const applyBtn = document.getElementById('apply-base-salary-btn');
+    const recordStatus = applyBtn ? applyBtn.dataset.recordStatus : null;
+    toggleApplyButton(settlement, applyBtn, {recordStatus});
     
   } catch (error) {
     console.error('加载结算方式失败:', error);
@@ -645,6 +647,7 @@ async function loadBaseSalaryApplication() {
     }
 
     const application = items[0];
+
     const applicantName = application.applicant?.nickname || '未知';
     const operatorName = application.last_operator?.nickname || '未操作';
     const detailLink = application.id ? `/reports/base-salary-applications/detail?id=${application.id}` : null;
