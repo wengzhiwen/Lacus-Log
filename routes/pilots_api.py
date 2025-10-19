@@ -652,13 +652,27 @@ def get_pilot_performance(pilot_id):
         # 序列化最近开播记录
         recent_records = []
         for record in performance_data['recent_records']:
+            approved_base_salary = getattr(record, '_approved_base_salary', Decimal('0')) or Decimal('0')
+            application = getattr(record, '_latest_base_salary_application', None)
+            if application:
+                application_amount = application.base_salary_amount or Decimal('0')
+                application_data = {
+                    'id': str(application.id),
+                    'amount': float(application_amount),
+                    'status': application.status.value if application.status else None,
+                    'status_display': application.status_display
+                }
+            else:
+                application_data = None
+
             recent_records.append({
                 'id': str(record.id),
                 'start_time': utc_to_local(record.start_time).isoformat() if record.start_time else None,
                 'duration_hours': float(record.duration_hours) if record.duration_hours else 0,
                 'revenue_amount': float(record.revenue_amount),
-                'base_salary': float(record.base_salary) if record.base_salary else 0,
-                'status': record.current_status.value if record.current_status else 'ended'
+                'base_salary': float(approved_base_salary),
+                'status': record.current_status.value if record.current_status else 'ended',
+                'base_salary_application': application_data
             })
 
         # 转换Decimal为float
@@ -684,7 +698,7 @@ def get_pilot_performance(pilot_id):
         }
 
         logger.info('获取主播业绩数据成功：%s', pilot.nickname)
-        return jsonify(create_success_response(response_data))
+        return jsonify(create_success_response(response_data, {'base_salary_source': 'application'}))
 
     except DoesNotExist:
         return jsonify(create_error_response('PILOT_NOT_FOUND', '主播不存在')), 404

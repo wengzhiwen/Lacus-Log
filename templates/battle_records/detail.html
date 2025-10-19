@@ -125,6 +125,15 @@
     </div>
 
     <div class="card-section">
+      <h3 class="section-title">关联底薪申请</h3>
+      <div class="detail-grid" id="base-salary-application-content">
+        <div class="detail-item full-width">
+          <div class="value">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-section">
       <h3 class="section-title">结算方式</h3>
       <div class="detail-grid">
         <div class="detail-item">
@@ -608,12 +617,80 @@ async function loadSettlementInfo() {
 }
 
 
+async function loadBaseSalaryApplication() {
+  const container = document.getElementById('base-salary-application-content');
+  if (!container) {
+    return;
+  }
+  const recordId = '{{ battle_record.id }}';
+
+  try {
+    const response = await fetch(`/api/base-salary-applications?battle_record_id=${recordId}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error?.message || '获取底薪申请失败');
+    }
+
+    const items = (result.data && result.data.items) || [];
+    if (!items.length) {
+      container.innerHTML = `
+        <div class="detail-item full-width">
+          <div class="value">未申请</div>
+        </div>
+      `;
+      return;
+    }
+
+    const application = items[0];
+    const applicantName = application.applicant?.nickname || '未知';
+    const operatorName = application.last_operator?.nickname || '未操作';
+    const detailLink = application.id ? `/reports/base-salary-applications/detail?id=${application.id}` : null;
+
+    container.innerHTML = `
+      <div class="detail-item">
+        <label>申请金额</label>
+        <div class="value">¥${application.base_salary_amount}</div>
+      </div>
+      <div class="detail-item">
+        <label>发放状态</label>
+        <div class="value">${application.status_display || '-'}</div>
+      </div>
+      <div class="detail-item">
+        <label>申请人</label>
+        <div class="value">${applicantName}</div>
+      </div>
+      <div class="detail-item">
+        <label>最后处理人</label>
+        <div class="value">${operatorName}</div>
+      </div>
+      <div class="detail-item full-width">
+        <label>详情</label>
+        <div class="value">
+          ${detailLink ? `<a class="link" href="${detailLink}">查看底薪申请</a>` : '暂无详情'}
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    console.error('加载底薪申请失败:', error);
+    container.innerHTML = `
+      <div class="detail-item full-width">
+        <div class="value">加载失败</div>
+      </div>
+    `;
+  }
+}
+
+
 document.addEventListener('DOMContentLoaded', function() {
   const confirmBtn = document.getElementById('confirmDeleteBtn');
   if (confirmBtn) {
     confirmBtn.addEventListener('click', deleteBattleRecord);
   }
   loadSettlementInfo();
+  loadBaseSalaryApplication();
 });
 </script>
 </div>

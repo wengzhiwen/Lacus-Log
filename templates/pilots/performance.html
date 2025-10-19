@@ -763,12 +763,28 @@ function renderRecentRecords(records, pilotInfo) {
       <div class="card-footer">
         <div class="revenue">
           <span class="amount">${formatCurrency(record.revenue_amount)}</span>
-          ${record.base_salary > 0 ? `<span class="base-salary">底薪${formatCurrency(record.base_salary)}</span>` : ''}
+          ${buildBaseSalaryBadge(record)}
         </div>
         <div class="card-arrow">→</div>
       </div>
     </a>
   `).join('');
+}
+
+function buildBaseSalaryBadge(record) {
+  const application = record.base_salary_application;
+  if (application && application.status === 'approved') {
+    const amount = application.amount !== undefined ? application.amount : record.base_salary;
+    return `<span class="base-salary">底薪${formatCurrency(amount)}</span>`;
+  }
+  if (application && application.status) {
+    const statusText = application.status_display || '';
+    return `<span class="base-salary">底薪${statusText}</span>`;
+  }
+  if (record.base_salary && record.base_salary > 0) {
+    return `<span class="base-salary">底薪${formatCurrency(record.base_salary)}</span>`;
+  }
+  return `<span class="base-salary">未申请</span>`;
 }
 
 // 加载业绩数据

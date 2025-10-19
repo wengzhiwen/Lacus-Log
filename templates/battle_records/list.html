@@ -423,7 +423,6 @@ function buildRecordCard(record) {
   const agePart = record.pilot.age ? `(${record.pilot.age})` : '';
   const status = record.pilot.status || '';
   const rank = record.pilot.rank || '';
-  const baseSalary = parseFloat(record.base_salary || '0');
   const revenue = record.revenue_amount || '0';
   const duration = record.duration_display || (record.duration_hours ? `${record.duration_hours}小时` : '');
   const startDisplay = record.start_time?.display || '';
@@ -453,13 +452,28 @@ function buildRecordCard(record) {
     <div class="card-footer">
       <div class="revenue">
         <span class="amount">¥${revenue}</span>
-        ${baseSalary > 0 ? `<span class="base-salary">底薪¥${record.base_salary}</span>` : ''}
+        ${buildBaseSalaryLabel(record)}
       </div>
       <div class="card-arrow">→</div>
     </div>
   `;
 
   return card;
+}
+
+function buildBaseSalaryLabel(record) {
+  const summary = record.base_salary_summary;
+  if (summary) {
+    if (summary.status === 'approved') {
+      return `<span class="base-salary">底薪¥${summary.amount}</span>`;
+    }
+    const statusDisplay = summary.status_display || '';
+    return `<span class="base-salary">底薪${statusDisplay}</span>`;
+  }
+  if (record.base_salary && parseFloat(record.base_salary) > 0) {
+    return `<span class="base-salary">底薪¥${record.base_salary}</span>`;
+  }
+  return `<span class="base-salary">未申请</span>`;
 }
 
 function renderRecords(items, append = false) {

@@ -16,7 +16,7 @@ from mongoengine import DoesNotExist, ValidationError, get_db
 from models.battle_record import (BaseSalaryApplication, BaseSalaryApplicationChangeLog, BaseSalaryApplicationStatus, BattleRecord)
 from models.pilot import Pilot
 from utils.base_salary_application_serializers import (create_error_response, create_success_response, serialize_base_salary_application,
-                                                       serialize_base_salary_application_change_log_list)
+                                                       serialize_base_salary_application_change_log_list, serialize_base_salary_application_list)
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
@@ -134,6 +134,19 @@ def get_base_salary_applications_stats():
 def list_base_salary_applications():
     """获取底薪申请列表（按日期筛选，按结算方式分组）"""
     try:
+        battle_record_id = _safe_strip(request.args.get('battle_record_id'))
+        if battle_record_id:
+            try:
+                battle_record = BattleRecord.objects.get(id=battle_record_id)
+            except DoesNotExist:
+                return jsonify(create_error_response('BATTLE_RECORD_NOT_FOUND', '开播记录不存在')), 404
+
+            applications = BaseSalaryApplication.objects(battle_record_id=battle_record).order_by('-updated_at')
+            serialized = serialize_base_salary_application_list(applications)
+            response = jsonify(create_success_response({'items': serialized, 'total': len(serialized)}))
+            response.headers['Cache-Control'] = 'no-cache'
+            return response
+
         date_str = request.args.get('date')
 
         if date_str:
@@ -455,8 +468,10 @@ def export_base_salary_applications():
 
         response = Response(csv_content,
                             mimetype='text/csv; charset=utf-8',
-                            headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}',
-                                     'Cache-Control': 'no-cache'})
+                            headers={
+                                'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}',
+                                'Cache-Control': 'no-cache'
+                            })
 
         return response
     except Exception as e:  # noqa: BLE001

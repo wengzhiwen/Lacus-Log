@@ -13,7 +13,7 @@ from mongoengine import DoesNotExist, Q
 
 from models.announcement import Announcement
 from models.battle_area import Availability, BattleArea
-from models.battle_record import BattleRecord, BattleRecordChangeLog, BattleRecordStatus
+from models.battle_record import (BaseSalaryApplication, BattleRecord, BattleRecordChangeLog, BattleRecordStatus)
 from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
 from routes.battle_record import (log_battle_record_change, validate_notes_required)
@@ -155,11 +155,11 @@ def _serialize_pilot_basic(pilot: Optional[Pilot]) -> Dict[str, Optional[str]]:
     }
 
 
-def _serialize_battle_record_summary(record: BattleRecord) -> Dict[str, object]:
+def _serialize_battle_record_summary(record: BattleRecord, base_salary_summary: Optional[Dict[str, object]] = None) -> Dict[str, object]:
     pilot_info = _serialize_pilot_basic(record.pilot)
     start_local = utc_to_local(record.start_time) if record.start_time else None
 
-    return {
+    data = {
         'id': str(record.id),
         'pilot': pilot_info,
         'owner_display': pilot_info['owner_display'],
@@ -182,6 +182,44 @@ def _serialize_battle_record_summary(record: BattleRecord) -> Dict[str, object]:
             'real_name': pilot_info['real_name']
         }
     }
+    data['base_salary_summary'] = base_salary_summary
+    return data
+
+
+def _build_base_salary_summary(records: List[BattleRecord]) -> Dict[str, Dict[str, object]]:
+    """批量构建开播记录对应的底薪申请摘要"""
+    record_ids = [record.id for record in records if record.id]
+    if not record_ids:
+        return {}
+
+    applications = BaseSalaryApplication.objects.filter(battle_record_id__in=record_ids).order_by('-updated_at')
+    summary_map: Dict[str, Dict[str, object]] = {}
+
+    for application in applications:
+        battle_record = application.battle_record_id
+        if not battle_record:
+            continue
+
+        record_key = str(battle_record.id)
+        latest_entry = summary_map.get(record_key)
+        latest_updated_at = latest_entry.get('_updated_at') if latest_entry else None
+        application_updated_at = application.updated_at or application.created_at
+
+        if latest_updated_at and application_updated_at and application_updated_at < latest_updated_at:
+            continue
+
+        summary_map[record_key] = {
+            'amount': format(application.base_salary_amount or Decimal('0'), 'f'),
+            'status': application.status.value if application.status else None,
+            'status_display': application.status_display,
+            'application_id': str(application.id),
+            '_updated_at': application_updated_at,
+        }
+
+    for value in summary_map.values():
+        value.pop('_updated_at', None)
+
+    return summary_map
 
 
 def _serialize_related_announcement(record: BattleRecord) -> Tuple[Optional[Dict[str, str]], bool]:
@@ -369,7 +407,8 @@ def list_records():
         total_count = filtered_query.count()
         records = list(filtered_query.skip(skip).limit(per_page))
 
-        items = [_serialize_battle_record_summary(record) for record in records]
+        base_salary_summaries = _build_base_salary_summary(records)
+        items = [_serialize_battle_record_summary(record, base_salary_summaries.get(str(record.id))) for record in records]
 
         meta = {
             'filters': {
