@@ -15,6 +15,7 @@ from models.pilot import Pilot, Rank, Status, WorkMode
 from utils.cache_helper import cached_monthly_report
 from utils.commission_helper import (calculate_commission_amounts, get_pilot_commission_rate_for_date)
 from utils.logging_setup import get_logger
+from utils.new_report_calculations import (calculate_daily_summary, calculate_monthly_summary, calculate_weekly_summary)
 from utils.recruit_stats import calculate_recruit_today_stats
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
@@ -195,64 +196,34 @@ def calculate_dashboard_conversion_rate_metrics():
 
 def _calculate_month_conversion_rate(report_date):
     """计算月度底薪流水转化率（截至报表日所在月）。"""
-    month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-    month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id=None, mode='offline')
-
-    total_revenue = Decimal('0')
-    total_base_salary = Decimal('0')
-
-    for record in month_records:
-        total_revenue += record.revenue_amount or Decimal('0')
-        total_base_salary += record.base_salary or Decimal('0')
-
-    if total_base_salary > 0:
-        return int((total_revenue / total_base_salary) * 100)
-    return None
+    summary = calculate_monthly_summary(report_date.year, report_date.month, owner_id=None, mode='offline')
+    return _calculate_conversion_rate(summary.get('revenue_sum'), summary.get('basepay_sum'))
 
 
 def _calculate_day_conversion_rate(report_date):
     """计算日度底薪流水转化率（报表日当天）。"""
-    day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-    day_records = get_battle_records_for_date_range(day_start, day_end + timedelta(microseconds=1), owner_id=None, mode='offline')
-
-    total_revenue = Decimal('0')
-    total_base_salary = Decimal('0')
-
-    for record in day_records:
-        total_revenue += record.revenue_amount or Decimal('0')
-        total_base_salary += record.base_salary or Decimal('0')
-
-    if total_base_salary > 0:
-        return int((total_revenue / total_base_salary) * 100)
-    return None
+    summary = calculate_daily_summary(report_date, owner_id=None, mode='offline')
+    return _calculate_conversion_rate(summary.get('revenue_sum'), summary.get('basepay_sum'))
 
 
 def _calculate_week_conversion_rate(report_date):
     """计算周度底薪流水转化率（报表日所在周的上一周，周二至次周一）。"""
-    current_weekday = report_date.weekday()
-    days_since_tuesday = (current_weekday - 1) % 7
-    this_week_tuesday = report_date - timedelta(days=days_since_tuesday)
-    last_week_tuesday = this_week_tuesday - timedelta(days=7)
+    this_week_start = get_week_start_tuesday(report_date)
+    last_week_start = this_week_start - timedelta(days=7)
+    summary = calculate_weekly_summary(last_week_start, owner_id=None, mode='offline')
+    return _calculate_conversion_rate(summary.get('revenue_sum'), summary.get('basepay_sum'))
 
-    week_start = last_week_tuesday.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_end = (last_week_tuesday + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
 
-    week_records = get_battle_records_for_date_range(week_start, week_end + timedelta(microseconds=1), owner_id=None, mode='offline')
+def _calculate_conversion_rate(total_revenue, total_base_salary):
+    """统一按照新报表口径计算底薪流水转化率。"""
+    if total_revenue is None and total_base_salary is None:
+        return None
 
-    total_revenue = Decimal('0')
-    total_base_salary = Decimal('0')
-
-    for record in week_records:
-        total_revenue += record.revenue_amount or Decimal('0')
-        total_base_salary += record.base_salary or Decimal('0')
-
-    if total_base_salary > 0:
-        return int((total_revenue / total_base_salary) * 100)
-    return None
+    revenue = Decimal(total_revenue or 0)
+    base_salary = Decimal(total_base_salary or 0)
+    if base_salary == 0:
+        return None
+    return int((revenue / base_salary) * 100)
 
 
 def calculate_dashboard_pilot_ranking_metrics():
@@ -920,12 +891,12 @@ def calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id=None):
     else:
         next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
     month_end = next_month_start - timedelta(microseconds=1)
-    
+
     # 检查是否为当前月，如果是则使用昨天作为结束时间
     now_utc = get_current_utc_time()
     now_local = utc_to_local(now_utc)
     current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
+
     if month_start == current_month_start:
         yesterday_local = now_local - timedelta(days=1)
         report_date = yesterday_local.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -984,18 +955,18 @@ def _calculate_monthly_summary(year, month, owner_id=None, mode: str = 'all'):
         else:
             next_month_start = datetime(year, month + 1, 1, 0, 0, 0, 0)
         month_end = next_month_start - timedelta(microseconds=1)
-        
+
         # 检查是否为当前月，如果是则使用昨天作为结束时间
         now_utc = get_current_utc_time()
         now_local = utc_to_local(now_utc)
         current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
         if month_start == current_month_start:
             yesterday_local = now_local - timedelta(days=1)
             report_date = yesterday_local.replace(hour=23, minute=59, second=59, microsecond=999999)
         else:
             report_date = month_end
-            
+
         rebate_info = calculate_pilot_rebate(pilot, report_date, owner_id, mode)
         total_rebate += rebate_info['rebate_amount']
 
