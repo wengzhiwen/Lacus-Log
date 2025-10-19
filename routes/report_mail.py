@@ -17,6 +17,8 @@ from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
+from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, calculate_monthly_details, calculate_monthly_summary)
+from utils.new_report_serializers import (serialize_daily_details, serialize_daily_summary, serialize_monthly_details, serialize_monthly_summary)
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('report_mail')
@@ -207,10 +209,11 @@ def run_daily_report_job(report_date: str = None, triggered_by: str = 'scheduler
         logger.error('报表日期格式错误：%s', report_date)
         return {'sent': False, 'count': 0}
 
-    from routes.report import _calculate_daily_details, _calculate_day_summary
+    day_summary_raw = calculate_daily_summary(report_date_obj)
+    details_raw = calculate_daily_details(report_date_obj)
 
-    day_summary = _calculate_day_summary(report_date_obj)
-    details = _calculate_daily_details(report_date_obj)
+    day_summary = serialize_daily_summary(day_summary_raw)
+    details = serialize_daily_details(details_raw)
 
     md_content = _build_daily_report_markdown(day_summary, details)
 
@@ -305,10 +308,11 @@ def run_monthly_mail_report_job(report_month: str = None, triggered_by: str = 's
             logger.error('月份参数格式错误：%s', report_month)
             return {'sent': False, 'count': 0}
 
-    from routes.report import (_calculate_monthly_details, _calculate_monthly_summary)
+    month_summary_raw = calculate_monthly_summary(year, month)
+    details_raw = calculate_monthly_details(year, month)
 
-    month_summary = _calculate_monthly_summary(year, month)
-    details = _calculate_monthly_details(year, month)
+    month_summary = serialize_monthly_summary(month_summary_raw)
+    details = serialize_monthly_details(details_raw)
 
     md_content = _build_monthly_mail_markdown(month_summary, details)
 
