@@ -44,6 +44,8 @@ def init_scheduled_jobs(flask_app) -> None:
 
     unstarted_trigger = CronTrigger(hour=12, minute=0, timezone='UTC')
 
+    live_overtime_trigger = CronTrigger(hour=4, minute=0, timezone='UTC')
+
     # 线上主播未开播提醒：每日 GMT+8 17:00 触发（UTC 09:00）
     online_pilot_unstarted_trigger = CronTrigger(hour=9, minute=0, timezone='UTC')
 
@@ -75,6 +77,18 @@ def init_scheduled_jobs(flask_app) -> None:
             result = run_unstarted_report_job(triggered_by='scheduler@daily-20:00+08')
             logger.info('定时任务 run_unstarted_report_job 完成：%s', result)
         plan_fire('daily_unstarted_report', _next_fire_utc(unstarted_trigger))
+
+    def run_live_overtime_wrapper():
+        from routes.report_mail import run_live_overtime_report_job
+
+        fire_dt_utc = get_current_utc_time().replace(second=0, microsecond=0)
+        if not consume_fire('daily_live_overtime_report', fire_dt_utc):
+            logger.info('跳过执行：daily_live_overtime_report（计划令牌不存在）')
+            return
+        with flask_app.app_context():
+            result = run_live_overtime_report_job(triggered_by='scheduler@daily-12:00+08')
+            logger.info('定时任务 run_live_overtime_report_job 完成：%s', result)
+        plan_fire('daily_live_overtime_report', _next_fire_utc(live_overtime_trigger))
 
     def run_online_pilot_unstarted_wrapper():
         from routes.report_mail import run_online_pilot_unstarted_report_job
@@ -127,6 +141,12 @@ def init_scheduled_jobs(flask_app) -> None:
         plan_fire('daily_unstarted_report', _next_fire_utc(unstarted_trigger))
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('写入未开播提醒下一次计划失败：%s', exc)
+
+    sched.add_job(run_live_overtime_wrapper, live_overtime_trigger, id='daily_live_overtime_report', replace_existing=True, max_instances=1)
+    try:
+        plan_fire('daily_live_overtime_report', _next_fire_utc(live_overtime_trigger))
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('写入未下播提醒下一次计划失败：%s', exc)
 
     sched.add_job(run_online_pilot_unstarted_wrapper,
                   online_pilot_unstarted_trigger,

@@ -22,6 +22,22 @@
 
 <div class="card">
   <div class="card-header">
+    <h2 class="card-title">未下播提醒</h2>
+    <div class="card-icon">📡</div>
+  </div>
+  <div class="card-body">
+    {% if next_times and next_times.live_overtime %}
+    <div class="text-muted" style="margin-bottom:8px;">下次触发（GMT+8）：{{ next_times.live_overtime }}</div>
+    {% endif %}
+    <div class="text-muted" style="margin-bottom:8px; font-size: 12px;">
+      说明：每日检查开播中且已持续超过8小时的记录，提醒确认是否已下播
+    </div>
+    <button id="btnLiveOvertime" class="btn btn-primary" style="width:100%" type="button" aria-label="触发未下播提醒邮件发送">开始发送</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
     <h2 class="card-title">线上主播未开播提醒</h2>
     <div class="card-icon">🌐</div>
   </div>
@@ -93,6 +109,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const btnUnstarted = document.getElementById('btnUnstarted');
+  const btnLiveOvertime = document.getElementById('btnLiveOvertime');
   const btnOnlinePilotUnstarted = document.getElementById('btnOnlinePilotUnstarted');
   const btnRecruitDaily = document.getElementById('btnRecruitDaily');
   const btnDailyReport = document.getElementById('btnDailyReport');
@@ -119,6 +136,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       } else {
         result.textContent = `未开播提醒触发失败：${data && data.error ? data.error : '未知错误'}`;
+      }
+    } catch (e) {
+      result.textContent = '网络异常或服务器错误。';
+    }
+  }
+
+  async function postLiveOvertime() {
+    result.textContent = '未下播提醒已开始运算...';
+    try {
+      const resp = await fetch("{{ url_for('report_mail.trigger_live_overtime_report') }}", {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        if (data.sent) {
+          result.textContent = `未下播提醒已触发发送，共 ${data.count} 条。`;
+        } else {
+          result.textContent = `未下播提醒无可发送内容（或未配置收件人）。`;
+        }
+      } else {
+        result.textContent = `未下播提醒触发失败：${data && data.error ? data.error : '未知错误'}`;
       }
     } catch (e) {
       result.textContent = '网络异常或服务器错误。';
@@ -245,6 +288,10 @@ document.addEventListener('DOMContentLoaded', function() {
     btnUnstarted.addEventListener('click', postUnstarted);
   }
 
+  if (btnLiveOvertime) {
+    btnLiveOvertime.addEventListener('click', postLiveOvertime);
+  }
+
   if (btnOnlinePilotUnstarted) {
     btnOnlinePilotUnstarted.addEventListener('click', postOnlinePilotUnstarted);
   }
@@ -263,5 +310,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-
-

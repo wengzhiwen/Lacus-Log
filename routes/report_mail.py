@@ -6,13 +6,13 @@
 # pylint: disable=no-member,consider-using-f-string
 from datetime import datetime, timedelta
 from math import floor
-from typing import List
+from typing import Dict, List
 
 from flask import (Blueprint, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_required
 
 from models.announcement import Announcement
-from models.battle_record import BattleRecord
+from models.battle_record import BattleRecord, BattleRecordStatus
 from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
@@ -362,6 +362,23 @@ def _build_unstarted_markdown(items: List[dict]) -> str:
     return "\n".join(lines)
 
 
+def _build_live_overtime_markdown(items: List[Dict[str, str]]) -> str:
+    if not items:
+        return ''
+
+    header = ("| 主播昵称 | 真实姓名 | 直属运营-主播分类 | 开播方式 | 开播地点 | 开播开始时间（GMT+8） | 当前持续时长（小时） | 备注 |\n"
+              "| --- | --- | --- | --- | --- | --- | ---: | --- |")
+
+    lines = [header]
+    for it in items:
+        line = (f"| {it['pilot_name']} | {it['real_name']} | {it['owner_rank']} | "
+                f"{it['work_mode']} | {it['location']} | {it['start_local']} | "
+                f"{it['duration_hours']} | {it['note']} |")
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
 def _build_online_pilot_unstarted_markdown(items: List[dict], report_date: str, check_day: str) -> str:
     """将线上主播未开播提醒数据渲染为Markdown格式。
 
@@ -426,6 +443,13 @@ def mail_reports_page():
             fire_dt_utc = datetime.strptime(unstarted_plan.fire_minute, '%Y%m%d%H%M')
             unstarted_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
+        live_overtime_plan = (JobPlan.objects(job_code='daily_live_overtime_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
+            JobPlan.objects(job_code='daily_live_overtime_report').order_by('-fire_minute').first())
+        live_overtime_next_local = None
+        if live_overtime_plan:
+            fire_dt_utc = datetime.strptime(live_overtime_plan.fire_minute, '%Y%m%d%H%M')
+            live_overtime_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
+
         online_pilot_unstarted_plan = (JobPlan.objects(job_code='daily_online_pilot_unstarted_report',
                                                        fire_minute__gte=now_minute).order_by('fire_minute').first()) or (JobPlan.objects(
                                                            job_code='daily_online_pilot_unstarted_report').order_by('-fire_minute').first())
@@ -458,6 +482,7 @@ def mail_reports_page():
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('读取任务下一次触发时间失败：%s', exc)
         unstarted_next_local = None
+        live_overtime_next_local = None
         online_pilot_unstarted_next_local = None
         recruit_next_local = None
         daily_next_local = None
@@ -465,12 +490,86 @@ def mail_reports_page():
 
     next_times = {
         'unstarted': unstarted_next_local,
+        'live_overtime': live_overtime_next_local,
         'online_pilot_unstarted': online_pilot_unstarted_next_local,
         'recruit_daily': recruit_next_local,
         'daily_report': daily_next_local,
         'monthly_mail_report': monthly_mail_next_local
     }
     return render_template('reports/mail_reports.html', next_times=next_times)
+
+
+def run_live_overtime_report_job(triggered_by: str = 'scheduler') -> dict:
+    """执行"未下播提醒"报表计算与邮件发送。"""
+    logger.info('触发未下播提醒报表，来源：%s', triggered_by or '未知')
+
+    now_utc = get_current_utc_time()
+    threshold_utc = now_utc - timedelta(hours=8)
+
+    live_records = BattleRecord.objects.filter(status=BattleRecordStatus.LIVE, start_time__lte=threshold_utc).order_by('-start_time')
+
+    try:
+        logger.debug('候选开播中记录数量（超过8小时）：%d', live_records.count())
+    except Exception:  # pylint: disable=broad-except
+        logger.debug('候选开播中记录数量（超过8小时）：统计失败')
+
+    overtime_items: List[Dict[str, str]] = []
+
+    for record in live_records:
+        start_utc = record.start_time
+        if start_utc is None:
+            continue
+
+        duration_hours = (now_utc - start_utc).total_seconds() / 3600
+        if duration_hours <= 8:
+            continue
+
+        start_local = utc_to_local(start_utc)
+        pilot = record.pilot
+
+        owner_display = ''
+        try:
+            if getattr(pilot, 'owner', None):
+                owner_display = getattr(pilot.owner, 'nickname', None) or getattr(pilot.owner, 'username', '')
+        except Exception:  # pylint: disable=broad-except
+            owner_display = ''
+
+        rank_display = ''
+        try:
+            rank_display = pilot.rank.value if getattr(pilot, 'rank', None) else ''
+        except Exception:  # pylint: disable=broad-except
+            rank_display = ''
+
+        item = {
+            'pilot_name': getattr(pilot, 'nickname', ''),
+            'real_name': getattr(pilot, 'real_name', ''),
+            'owner_rank': f"{owner_display}-{rank_display}".strip('-'),
+            'work_mode': record.get_work_mode_display(),
+            'location': record.battle_location,
+            'start_local': start_local.strftime('%Y-%m-%d %H:%M') if start_local else '未知',
+            'duration_hours': f"{duration_hours:.1f}",
+            'note': f'开播已经超过{duration_hours:.1f}小时，请确认是否已下播'
+        }
+
+        overtime_items.append(item)
+
+    recipients = User.get_emails_by_role(role_name=None, only_active=True)
+    subject = f"[Lacus-Log] 未下播提醒 - {utc_to_local(now_utc).strftime('%Y-%m-%d %H:%M')}"
+
+    if not overtime_items:
+        logger.info('未发现超过8小时的开播中记录，已跳过发送。来源：%s', triggered_by or '未知')
+        return {'sent': False, 'count': 0}
+
+    if not recipients:
+        logger.error('收件人为空，用户模块未取得任何有效邮箱，无法发送未下播提醒邮件')
+        return {'sent': False, 'count': len(overtime_items)}
+
+    if send_email_md(recipients, subject, _build_live_overtime_markdown(overtime_items)):
+        logger.info('未下播提醒已发送，共%d条；收件人：%s', len(overtime_items), ', '.join(recipients))
+        return {'sent': True, 'count': len(overtime_items)}
+
+    logger.error('未下播提醒发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
+    return {'sent': False, 'count': len(overtime_items)}
 
 
 def run_unstarted_report_job(triggered_by: str = 'scheduler') -> dict:
@@ -704,6 +803,16 @@ def trigger_unstarted_report():
     """触发"未开播提醒"报表计算与邮件发送（异步最小实现：请求内完成）。"""
     username = getattr(current_user, 'username', '未知')
     result = run_unstarted_report_job(triggered_by=username)
+    status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
+    return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
+
+
+@report_mail_bp.route('/mail/live-overtime', methods=['POST'])
+@roles_required('gicho')
+def trigger_live_overtime_report():
+    """触发"未下播提醒"邮件发送。"""
+    username = getattr(current_user, 'username', '未知')
+    result = run_live_overtime_report_job(triggered_by=username)
     status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
     return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
 
