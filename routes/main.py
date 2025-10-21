@@ -8,8 +8,7 @@ from flask_security import current_user
 from flask_security.utils import hash_password
 
 from routes.report import (build_dashboard_feature_banner, calculate_dashboard_announcement_metrics, calculate_dashboard_battle_metrics,
-                           calculate_dashboard_candidate_metrics, calculate_dashboard_conversion_rate_metrics, calculate_dashboard_pilot_metrics,
-                           calculate_dashboard_pilot_ranking_metrics, calculate_dashboard_recruit_metrics)
+                           calculate_dashboard_conversion_rate_metrics, calculate_dashboard_pilot_ranking_metrics, calculate_dashboard_recruit_metrics)
 from utils.dashboard_serializers import create_success_response
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
@@ -56,24 +55,6 @@ def dashboard_battle_data():
     """仪表盘开播记录统计接口。"""
     data = calculate_dashboard_battle_metrics()
     meta = {'segment': 'battle', 'link': url_for('report.daily_report')}
-    return jsonify(create_success_response(data, meta))
-
-
-@main_bp.route('/api/dashboard/pilots', methods=['GET'])
-@jwt_roles_accepted("gicho", "kancho")
-def dashboard_pilot_data():
-    """仪表盘主播统计接口。"""
-    data = calculate_dashboard_pilot_metrics()
-    meta = {'segment': 'pilot'}
-    return jsonify(create_success_response(data, meta))
-
-
-@main_bp.route('/api/dashboard/candidates', methods=['GET'])
-@jwt_roles_accepted("gicho", "kancho")
-def dashboard_candidate_data():
-    """仪表盘候选人统计接口。"""
-    data = calculate_dashboard_candidate_metrics()
-    meta = {'segment': 'candidate'}
     return jsonify(create_success_response(data, meta))
 
 

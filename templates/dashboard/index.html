@@ -148,47 +148,6 @@
       </div>
     </div>
 
-    <div class="card" data-card-id="pilot">
-      <div class="card-header">
-        <div class="card-title">主播统计</div>
-        <div class="card-icon">👩‍✈️</div>
-      </div>
-      <div class="card-body">
-        <div class="main-data">
-          <div class="main-value" data-field="pilot_serving_count">--</div>
-          <div class="main-label">服役人数</div>
-        </div>
-        <div class="sub-data">
-          <div class="sub-item">
-            <div class="sub-value" data-field="pilot_intern_serving_count">--</div>
-            <div class="sub-label">实习主播</div>
-          </div>
-          <div class="sub-item">
-            <div class="sub-value" data-field="pilot_official_serving_count">--</div>
-            <div class="sub-label">正式主播</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" data-card-id="candidate">
-      <div class="card-header">
-        <div class="card-title">候选人统计</div>
-        <div class="card-icon">🧑‍🚀</div>
-      </div>
-      <div class="card-body">
-        <div class="main-data">
-          <div class="main-value" data-field="candidate_not_recruited_count">--</div>
-          <div class="main-label">候补人数</div>
-        </div>
-        <div class="sub-data">
-          <div class="sub-item">
-            <div class="sub-value" data-field="trainee_serving_count">--</div>
-            <div class="sub-label">试播主播</div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
   <div class="dashboard-meta" id="dashboardMeta" style="display:none;"></div>
 </section>
@@ -223,8 +182,6 @@
     { url: "{{ url_for('main.dashboard_pilot_ranking_data') }}", handler: applyPilotRanking },
     { url: "{{ url_for('main.dashboard_announcement_data') }}", handler: applyAnnouncement },
     { url: "{{ url_for('main.dashboard_battle_data') }}", handler: applyBattle },
-    { url: "{{ url_for('main.dashboard_pilot_data') }}", handler: applyPilot },
-    { url: "{{ url_for('main.dashboard_candidate_data') }}", handler: applyCandidate },
     { url: "{{ url_for('main.dashboard_feature_data') }}", handler: applyFeature },
   ];
 
@@ -387,29 +344,6 @@
     }
     if (meta && meta.link) {
       setCardLink('battle', meta.link);
-    }
-  }
-
-  function applyPilot(data, meta) {
-    updateMeta(data.generated_at);
-    if (fieldMap.pilot_serving_count) {
-      fieldMap.pilot_serving_count.textContent = formatInteger(data.pilot_serving_count);
-    }
-    if (fieldMap.pilot_intern_serving_count) {
-      fieldMap.pilot_intern_serving_count.textContent = formatInteger(data.pilot_intern_serving_count);
-    }
-    if (fieldMap.pilot_official_serving_count) {
-      fieldMap.pilot_official_serving_count.textContent = formatInteger(data.pilot_official_serving_count);
-    }
-  }
-
-  function applyCandidate(data, meta) {
-    updateMeta(data.generated_at);
-    if (fieldMap.candidate_not_recruited_count) {
-      fieldMap.candidate_not_recruited_count.textContent = formatInteger(data.candidate_not_recruited_count);
-    }
-    if (fieldMap.trainee_serving_count) {
-      fieldMap.trainee_serving_count.textContent = formatInteger(data.trainee_serving_count);
     }
   }
 
