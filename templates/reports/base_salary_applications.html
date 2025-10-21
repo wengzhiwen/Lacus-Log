@@ -945,12 +945,5 @@ window.onclick = function(event) {
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', initDate);
 
-// 监听页面可见性，从其他页面返回时刷新数据
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    // 页面变为可见时，刷新统计数据和列表
-    loadDataSequentially();
-  }
-});
 </script>
 {% endblock %}
