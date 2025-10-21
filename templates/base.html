@@ -109,6 +109,7 @@
     </button>
     <nav class="topnav" id="topNav">
       <a class="navlink" href="{{ url_for('main.home') }}">🏠首页</a>
+      <a class="navlink" href="{{ url_for('bbs.bbs_index') }}">🗂️运营-BBS</a>
       {% if current_user.roles | selectattr('name', 'equalto', 'gicho') | list | length > 0 %}
       <a class="navlink" href="{{ url_for('admin.users_list') }}">✈️基础-运营管理</a>
       {% endif %}

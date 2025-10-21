@@ -1,0 +1,47 @@
+<div id="bbs-post-modal" class="bbs-modal hidden">
+  <div class="bbs-modal-dialog">
+    <div class="bbs-modal-header">
+      <h2 id="bbs-modal-title">帖子详情</h2>
+      <button class="bbs-modal-close" id="bbs-modal-close" aria-label="关闭帖子详情">×</button>
+    </div>
+    <div class="bbs-modal-meta" id="bbs-modal-meta"></div>
+    <div class="bbs-modal-toolbar" id="bbs-modal-actions"></div>
+    <div class="bbs-modal-body">
+      <div id="bbs-modal-message" class="bbs-modal-message" style="display:none;"></div>
+
+      <div id="bbs-post-view">
+        <pre id="bbs-post-content" class="bbs-post-content"></pre>
+      </div>
+
+      <div id="bbs-post-edit-form" class="bbs-post-edit hidden">
+        <label class="form-label">标题</label>
+        <input type="text" id="bbs-edit-title" class="form-input" maxlength="200" />
+        <label class="form-label">内容</label>
+        <textarea id="bbs-edit-content" class="form-textarea" rows="8"></textarea>
+        <div class="bbs-edit-actions">
+          <button class="btn btn-secondary" id="bbs-edit-cancel">取消</button>
+          <button class="btn btn-primary" id="bbs-edit-save">保存</button>
+        </div>
+      </div>
+
+      <div id="bbs-related-pilots" class="bbs-related-pilots"></div>
+
+      <div class="bbs-replies-section">
+        <h3>回复</h3>
+        <div id="bbs-replies-container" class="bbs-replies"></div>
+      </div>
+
+      <div id="bbs-reply-editor" class="bbs-reply-editor">
+        <h4 id="bbs-reply-editor-title">发表回复</h4>
+        <textarea id="bbs-reply-content" rows="4" class="form-textarea" placeholder="请输入回复内容"></textarea>
+        <div class="bbs-reply-actions">
+          <div class="hint" id="bbs-reply-hint" style="display:none;"></div>
+          <div class="actions">
+            <button class="btn btn-secondary" id="bbs-reply-reset" style="display:none;">取消引用</button>
+            <button class="btn btn-primary" id="bbs-reply-submit">提交回复</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

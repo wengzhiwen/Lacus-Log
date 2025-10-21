@@ -28,6 +28,18 @@
   </div>
 </div>
 
+<div class="summary-section" id="bbs-related-section" style="display: none;">
+  <h2 class="section-title">相关讨论</h2>
+  <div class="bbs-related-list" id="bbs-related-list">
+    <!-- BBS帖子动态加载 -->
+  </div>
+  <div class="bbs-related-footer">
+    <button class="btn btn-secondary" id="bbs-view-more">前往内部BBS</button>
+  </div>
+</div>
+
+{% include 'bbs/post_detail_modal.html' %}
+
 <div class="loading-state" id="loading-state">
   <div class="loading-spinner"></div>
   <div class="loading-text">正在加载业绩数据...</div>
@@ -384,6 +396,26 @@
   border-color: var(--brand);
 }
 
+.bbs-related-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bbs-related-empty {
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px dashed #ced4da;
+  border-radius: 8px;
+  color: #868e96;
+  text-align: center;
+  font-size: 14px;
+}
+
+.bbs-related-footer {
+  margin-top: 12px;
+}
+
 .record-card .card-header {
   display: flex;
   justify-content: space-between;
@@ -572,6 +604,18 @@
 }
 </style>
 
+{% set role_names = current_user.roles | map(attribute='name') | list %}
+<script>
+  window.BBS_CONFIG = Object.assign(window.BBS_CONFIG || {}, {
+    csrfToken: {{ csrf_token|tojson }},
+    currentUser: {
+      id: {{ (current_user.id|string)|tojson }},
+      displayName: {{ (current_user.nickname or current_user.username)|tojson }},
+      roles: {{ role_names|tojson }}
+    }
+  });
+</script>
+<script src="{{ url_for('static', filename='js/bbs_post_detail.js') }}"></script>
 <script>
 // 主播业绩页面JavaScript - 完全REST化版本
 // 从URL中获取pilot_id
@@ -784,6 +828,76 @@ function buildBaseSalaryBadge(record) {
   return `<span class="base-salary">未申请</span>`;
 }
 
+function renderBBSRelatedPosts(items) {
+  const section = document.getElementById('bbs-related-section');
+  const list = document.getElementById('bbs-related-list');
+  const viewMoreBtn = document.getElementById('bbs-view-more');
+  if (!section || !list) return;
+
+  list.innerHTML = '';
+  if (!items || items.length === 0) {
+    list.innerHTML = '<div class="bbs-related-empty">暂无相关讨论</div>';
+  } else {
+    items.forEach((item) => {
+      const card = document.createElement('div');
+      card.className = 'bbs-post-card';
+      const tags = [];
+      if (item.is_pinned) tags.push('<span class="tag tag-info">置顶</span>');
+      if (item.status === 'hidden') tags.push('<span class="tag tag-warning">隐藏</span>');
+      const lastReplyText = item.last_reply ? `${item.last_reply.author?.display_name || '-'} · ${item.last_reply.time?.display || '-'}` : '暂无回复';
+
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="title">${item.title}</div>
+          <div class="tags">${tags.join(' ')}</div>
+        </div>
+        <div class="card-meta">
+          <span>板块：${item.board?.name || '-'}</span>
+          <span>作者：${item.author?.display_name || '-'}</span>
+        </div>
+        <div class="card-meta">
+          <span>最后活跃：${item.last_active_at?.display || '-'}</span>
+          <span>${lastReplyText}</span>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        if (window.BBSModal) {
+          window.BBSModal.open(item.id);
+        }
+      });
+      list.appendChild(card);
+    });
+  }
+
+  section.style.display = 'block';
+  if (viewMoreBtn) {
+    viewMoreBtn.style.display = 'inline-flex';
+  }
+}
+
+async function loadRecentBBSPosts() {
+  const section = document.getElementById('bbs-related-section');
+  if (!section) return;
+  try {
+    const response = await fetch(`/api/bbs/pilots/${pilotId}/recent`, { credentials: 'include' });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error?.message || '加载帖子失败');
+    }
+    renderBBSRelatedPosts(result.data.items || []);
+  } catch (error) {
+    console.error('加载相关BBS帖子失败:', error);
+    const list = document.getElementById('bbs-related-list');
+    if (list) {
+      list.innerHTML = '<div class="bbs-related-empty">加载相关讨论失败</div>';
+    }
+    section.style.display = 'block';
+  }
+}
+
 // 加载业绩数据
 async function loadPerformanceData() {
   try {
@@ -792,6 +906,7 @@ async function loadPerformanceData() {
     document.getElementById('error-state').style.display = 'none';
     document.getElementById('stats-section').style.display = 'none';
     document.getElementById('recent-records-section').style.display = 'none';
+    document.getElementById('bbs-related-section').style.display = 'none';
     
     const response = await fetch(`/api/pilots/${pilotId}/performance`);
     if (!response.ok) {
@@ -825,6 +940,7 @@ async function loadPerformanceData() {
     
     // 渲染最近开播记录
     renderRecentRecords(data.recent_records, data.pilot_info);
+    loadRecentBBSPosts();
     
   } catch (error) {
     console.error('加载业绩数据失败:', error);
@@ -834,6 +950,7 @@ async function loadPerformanceData() {
     document.getElementById('error-state').style.display = 'block';
     document.getElementById('stats-section').style.display = 'none';
     document.getElementById('recent-records-section').style.display = 'none';
+    document.getElementById('bbs-related-section').style.display = 'none';
   }
 }
 
@@ -844,6 +961,16 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 加载业绩数据
   loadPerformanceData();
+
+  const viewMoreBtn = document.getElementById('bbs-view-more');
+  if (viewMoreBtn) {
+    viewMoreBtn.addEventListener('click', () => {
+      window.open('/bbs/', '_blank');
+    });
+  }
 });
 </script>
 {% endblock %}
+.bbs-related-footer .btn {
+  padding: 8px 16px;
+}

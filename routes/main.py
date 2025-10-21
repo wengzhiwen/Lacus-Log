@@ -1,5 +1,7 @@
 # pylint: disable=no-member
 
+from datetime import datetime
+
 from flask import (Blueprint, flash, jsonify, redirect, render_template, request, url_for)
 from flask_login import login_required
 from flask_security import current_user
@@ -11,6 +13,7 @@ from routes.report import (build_dashboard_feature_banner, calculate_dashboard_a
 from utils.dashboard_serializers import create_success_response
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
+from models.bbs import BBSPost, BBSPostStatus
 
 logger = get_logger('main')
 
@@ -80,6 +83,41 @@ def dashboard_feature_data():
     """仪表盘横幅展示接口。"""
     data = build_dashboard_feature_banner()
     meta = {'segment': 'feature'}
+    return jsonify(create_success_response(data, meta))
+
+
+def _dashboard_user_can_view_post(user, post: BBSPost) -> bool:
+    if post.status == BBSPostStatus.PUBLISHED:
+        return True
+    if not user:
+        return False
+    if user.has_role('gicho'):
+        return True
+    if post.author and str(post.author.id) == str(user.id):
+        return True
+    return False
+
+
+@main_bp.route('/api/dashboard/bbs-latest', methods=['GET'])
+@jwt_roles_accepted("gicho", "kancho")
+def dashboard_bbs_latest_data():
+    """仪表盘内部BBS最新主贴。"""
+    query = BBSPost.objects.only('title', 'board', 'status', 'author', 'last_active_at').order_by('-last_active_at')  # type: ignore[attr-defined]
+    items = []
+    for post in query[:50]:
+        if not _dashboard_user_can_view_post(current_user, post):
+            continue
+        board_name = post.board.name if getattr(post, 'board', None) else ''
+        items.append({
+            'id': str(post.id),
+            'title': post.title or '',
+            'board': board_name,
+        })
+        if len(items) >= 5:
+            break
+
+    data = {'items': items, 'generated_at': datetime.utcnow().isoformat()}
+    meta = {'segment': 'bbs_latest', 'link': url_for('bbs.bbs_index')}
     return jsonify(create_success_response(data, meta))
 
 

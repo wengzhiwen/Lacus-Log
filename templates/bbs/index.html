@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}内部BBS - Lacus-Log{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-content">
+    <h1 class="page-title">🗂️ BBS</h1>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="bbs-create-post-btn">发布主贴</button>
+    </div>
+  </div>
+</div>
+
+<div class="bbs-page" data-csrf="{{ csrf_token }}">
+  <div class="bbs-layout">
+    <aside class="bbs-sidebar">
+      <div class="bbs-search">
+        <input type="search" id="bbs-search-input" placeholder="搜索标题或内容" />
+        <button id="bbs-search-btn" class="btn btn-secondary">搜索</button>
+      </div>
+      <div class="bbs-filter">
+        <label>
+          <input type="checkbox" id="bbs-filter-mine" />
+          仅看我的帖子
+        </label>
+      </div>
+      <div class="bbs-board-list">
+        <h3>板块</h3>
+        <ul id="bbs-board-list"></ul>
+      </div>
+    </aside>
+
+    <section class="bbs-main">
+      <div id="bbs-status-bar" class="bbs-status-bar"></div>
+      <div id="bbs-post-list" class="bbs-post-list"></div>
+      <div id="bbs-pagination" class="bbs-pagination"></div>
+    </section>
+  </div>
+</div>
+
+<div id="bbs-editor-panel" class="bbs-editor hidden">
+  <div class="bbs-editor-dialog">
+    <div class="bbs-editor-header">
+      <h2 id="bbs-editor-title">发布主贴</h2>
+      <button class="bbs-editor-close" id="bbs-editor-close">×</button>
+    </div>
+    <div id="bbs-editor-message" class="bbs-modal-message" style="display:none;"></div>
+    <form id="bbs-editor-form">
+      <label class="form-label">板块</label>
+      <select id="bbs-editor-board" class="form-select"></select>
+
+      <label class="form-label">标题</label>
+      <input type="text" id="bbs-editor-title-input" class="form-input" maxlength="200" required />
+
+      <label class="form-label">内容</label>
+      <textarea id="bbs-editor-content" class="form-textarea" rows="10" required></textarea>
+
+      <div class="bbs-editor-actions">
+        <button type="button" class="btn btn-secondary" id="bbs-editor-cancel">取消</button>
+        <button type="submit" class="btn btn-primary" id="bbs-editor-submit">提交</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% include 'bbs/post_detail_modal.html' %}
+{% endblock %}
+
+{% block scripts %}
+{% set role_names = current_user.roles | map(attribute='name') | list %}
+<script>
+  window.BBS_CONFIG = {
+    csrfToken: {{ csrf_token|tojson }},
+    initialPostId: {{ (initial_post_id or '')|tojson }},
+    currentUser: {
+      id: {{ (current_user.id|string)|tojson }},
+      displayName: {{ (current_user.nickname or current_user.username)|tojson }},
+      roles: {{ role_names|tojson }}
+    }
+  };
+</script>
+<script src="{{ url_for('static', filename='js/bbs_post_detail.js') }}"></script>
+<script src="{{ url_for('static', filename='js/bbs_index.js') }}"></script>
+{% endblock %}

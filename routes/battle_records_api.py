@@ -17,6 +17,7 @@ from models.battle_record import (BaseSalaryApplication, BattleRecord, BattleRec
 from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
 from routes.battle_record import (log_battle_record_change, validate_notes_required)
+from utils.bbs_service import create_post_for_battle_record
 from utils.announcement_serializers import (create_error_response, create_success_response)
 from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import jwt_roles_accepted
@@ -600,6 +601,11 @@ def update_record(record_id: str):
             return jsonify(create_error_response('VALIDATION_FAILED', validation_error)), 400
 
         record.save()
+
+        try:
+            create_post_for_battle_record(record)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error('自动创建BBS帖子失败：record=%s error=%s', record.id, exc, exc_info=True)
 
         client_ip = _get_client_ip()
         for field_name, old_value in old_values.items():

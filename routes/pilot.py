@@ -9,6 +9,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_security import roles_accepted
 from mongoengine import DoesNotExist
 from models.pilot import Pilot, PilotChangeLog  # pylint: disable=no-member
+from utils.csrf_helper import ensure_csrf_token
 from utils.logging_setup import get_logger
 
 logger = get_logger('pilot')
@@ -121,7 +122,8 @@ def pilot_performance(pilot_id):
         return redirect(url_for('pilot.list_pilots'))
 
     # 只返回空模板，数据由前端通过API获取
-    return render_template('pilots/performance.html')
+    csrf_token = ensure_csrf_token()
+    return render_template('pilots/performance.html', csrf_token=csrf_token)
 
 
 @pilot_bp.route('/export')
