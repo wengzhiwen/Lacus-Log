@@ -41,6 +41,22 @@ def _get_client_ip() -> str:
     return request.headers.get('X-Forwarded-For') or request.remote_addr or '未知'
 
 
+def _get_pilot_nickname_for_sort(application: BaseSalaryApplication) -> str:
+    """获取用于排序的主播昵称"""
+    pilot = getattr(application, 'pilot_id', None)
+    nickname = getattr(pilot, 'nickname', None) if pilot else None
+    return nickname or ''
+
+
+def _sort_applications_by_pilot_and_updated(applications):
+    """按主播昵称和最后更新时间进行排序"""
+    if not applications:
+        return []
+
+    apps_by_updated = sorted(applications, key=lambda app: app.updated_at or datetime.min, reverse=True)
+    return sorted(apps_by_updated, key=lambda app: _get_pilot_nickname_for_sort(app))
+
+
 @base_salary_applications_api_bp.route('/api/base-salary-applications/stats', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho')
 def get_base_salary_applications_stats():
@@ -194,21 +210,30 @@ def list_base_salary_applications():
         else:
             applications = BaseSalaryApplication.objects().order_by('-updated_at')
 
+        applications_list = list(applications)
+
         # 按结算方式分组
         daily_applications = []
         monthly_applications = []
         none_applications = []
 
-        for app in applications:
-            serialized_app = serialize_base_salary_application(app)
+        for app in applications_list:
             if app.settlement_type == 'daily_base':
-                daily_applications.append(serialized_app)
+                daily_applications.append(app)
             elif app.settlement_type == 'monthly_base':
-                monthly_applications.append(serialized_app)
+                monthly_applications.append(app)
             else:
-                none_applications.append(serialized_app)
+                none_applications.append(app)
 
-        grouped_data = {'daily_base': daily_applications, 'monthly_base': monthly_applications, 'none': none_applications}
+        daily_applications = _sort_applications_by_pilot_and_updated(daily_applications)
+        monthly_applications = _sort_applications_by_pilot_and_updated(monthly_applications)
+        none_applications = _sort_applications_by_pilot_and_updated(none_applications)
+
+        grouped_data = {
+            'daily_base': [serialize_base_salary_application(app) for app in daily_applications],
+            'monthly_base': [serialize_base_salary_application(app) for app in monthly_applications],
+            'none': [serialize_base_salary_application(app) for app in none_applications],
+        }
 
         response = jsonify(create_success_response(grouped_data))
         response.headers['Cache-Control'] = 'no-cache'
