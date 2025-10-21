@@ -567,6 +567,21 @@ function editRecord(recordId) {
   window.location.href = `{{ url_for('pilot.pilot_settlement_edit', pilot_id=pilot.id, record_id='__RECORD_ID__') }}`.replace('__RECORD_ID__', recordId);
 }
 
+function showChanges(recordId) {
+  const changesModal = document.getElementById('changesModal');
+  const changesContent = document.getElementById('changesContent');
+
+  changesContent.innerHTML = `
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+  `;
+
+  changesModal.style.display = 'block';
+  showChangesModal(recordId);
+}
+
 async function showChangesModal(recordId) {
   const changesContent = document.getElementById('changesContent');
   

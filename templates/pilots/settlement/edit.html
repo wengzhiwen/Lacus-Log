@@ -39,10 +39,8 @@
         <label for="isActive" class="form-label">状态</label>
         <div class="toggle-switch">
           <input type="checkbox" id="isActive" name="is_active" class="toggle-input">
-          <label for="isActive" class="toggle-label">
-            <span class="toggle-on">有效</span>
-            <span class="toggle-off">无效（已删除）</span>
-          </label>
+          <label for="isActive" class="toggle-label"></label>
+          <span id="statusText" class="toggle-status-text{% if not settlement.is_active %} inactive{% endif %}">{{ '有效' if settlement.is_active else '无效（已删除）' }}</span>
         </div>
         <small class="form-help">切换此开关可软删除或恢复该记录</small>
       </div>
@@ -182,32 +180,14 @@ textarea.form-input {
   transform: translateX(32px);
 }
 
-.toggle-on,
-.toggle-off {
-  position: absolute;
-  font-size: 11px;
+.toggle-status-text {
+  font-size: 13px;
+  color: #13873d;
   font-weight: 500;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
-.toggle-on {
-  color: white;
-  left: 6px;
-  display: none;
-}
-
-.toggle-off {
+.toggle-status-text.inactive {
   color: #999;
-  right: 6px;
-}
-
-.toggle-input:checked ~ .toggle-on {
-  display: inline;
-}
-
-.toggle-input:checked ~ .toggle-off {
-  display: none;
 }
 
 .form-actions {
@@ -311,6 +291,7 @@ const charCount = document.getElementById('charCount');
 const remark = document.getElementById('remark');
 const settlementType = document.getElementById('settlementType');
 const isActive = document.getElementById('isActive');
+const statusText = document.getElementById('statusText');
 
 // 初始化表单数据
 function initForm() {
@@ -320,16 +301,33 @@ function initForm() {
   const day = String(localDate.getDate()).padStart(2, '0');
   effectiveDate.value = `${year}-${month}-${day}`;
 
-  settlementType.value = '{{ settlement.settlement_type }}';
+  settlementType.value = '{{ settlement.settlement_type.value }}';
   remark.value = '{{ settlement.remark or "" }}' || '';
   charCount.textContent = remark.value.length;
   isActive.checked = {{ 'true' if settlement.is_active else 'false' }};
+  updateStatusDisplay();
 }
 
 // 字符计数
 remark.addEventListener('input', (e) => {
   charCount.textContent = e.target.value.length;
 });
+
+function updateStatusDisplay() {
+  if (!statusText) {
+    return;
+  }
+
+  if (isActive.checked) {
+    statusText.textContent = '有效';
+    statusText.classList.remove('inactive');
+  } else {
+    statusText.textContent = '无效（已删除）';
+    statusText.classList.add('inactive');
+  }
+}
+
+isActive.addEventListener('change', updateStatusDisplay);
 
 // 表单提交
 form.addEventListener('submit', async (e) => {
