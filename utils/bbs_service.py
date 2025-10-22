@@ -6,15 +6,15 @@ import re
 from decimal import Decimal
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+from bson import ObjectId, errors as bson_errors
 from mongoengine.queryset.visitor import Q
 
 from models.battle_area import BattleArea
-from models.bbs import (BBSBoard, BBSBoardType, BBSPost, BBSPostStatus, BBSReply, BBSReplyStatus, BBSPostPilotRef, PilotRelevance)
-from bson import ObjectId, errors as bson_errors
-
 from models.battle_record import BattleRecord, BattleRecordStatus
+from models.bbs import (BBSBoard, BBSBoardType, BBSPost, BBSPostStatus, BBSReply, BBSReplyStatus, BBSPostPilotRef, PilotRelevance)
 from models.pilot import Pilot
 from models.user import User
+from utils.bbs_notifications import notify_direct_operator_auto_post
 from utils.logging_setup import get_logger
 from utils.timezone_helper import format_local_datetime, get_current_utc_time
 
@@ -192,6 +192,19 @@ def _get_system_user() -> Optional[User]:
 
 def create_post_for_battle_record(record: BattleRecord) -> Optional[BBSPost]:
     """在满足条件时自动为开播记录生成主贴。"""
+    status_value = record.current_status.value if record.current_status else 'unknown'
+    revenue_value = str(record.revenue_amount or Decimal('0'))
+    notes_length = len(record.notes or '')
+    base_name = record.x_coord or ''
+    logger.debug(
+        '自动建贴前记录状态：record=%s status=%s revenue=%s notes_len=%d base=%s announcement=%s',
+        record.id,
+        status_value,
+        revenue_value,
+        notes_length,
+        base_name,
+        getattr(getattr(record, 'related_announcement', None), 'id', None),
+    )
     if record.current_status != BattleRecordStatus.ENDED:
         logger.debug('开播记录状态未结束，跳过自动建贴：%s', record.id)
         return None
@@ -212,9 +225,10 @@ def create_post_for_battle_record(record: BattleRecord) -> Optional[BBSPost]:
         return existing
 
     board = ensure_board_for_base(base_name)
-    author = _get_system_user() or record.registered_by
+    pilot_owner = getattr(record.pilot, 'owner', None) if record.pilot else None
+    author = pilot_owner or _get_system_user() or record.registered_by
     display_name = '系统自动投稿' if author and author.username == 'system' else None
-    snapshot = build_author_snapshot(author, display_name=display_name or '系统自动投稿')
+    snapshot = build_author_snapshot(author, display_name=display_name)
     title, content = build_battle_record_content(record)
 
     post = BBSPost(
@@ -234,6 +248,7 @@ def create_post_for_battle_record(record: BattleRecord) -> Optional[BBSPost]:
         ref = BBSPostPilotRef(post=post, pilot=record.pilot, relevance=PilotRelevance.AUTO)
         ref.save()
         logger.debug('自动关联帖子与主播：post=%s pilot=%s', post.id, record.pilot.id)
+    notify_direct_operator_auto_post(record, post)
     return post
 
 

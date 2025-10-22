@@ -9,7 +9,6 @@ Lacus-Log主播管理系统 - 邮件发送工具
 import os
 import smtplib
 import ssl
-from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List, Optional
@@ -19,6 +18,7 @@ import markdown
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from utils.logging_setup import get_logger
+from utils.timezone_helper import get_current_local_time
 
 load_dotenv()
 
@@ -97,7 +97,7 @@ def _create_html_template(content: str) -> str:
     Returns:
         完整的HTML邮件内容
     """
-    send_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    send_time = get_current_local_time().strftime('%Y-%m-%d %H:%M:%S')
 
     content = _apply_inline_table_styles(content)
 
@@ -138,7 +138,7 @@ def _create_text_template(content: str) -> str:
     Returns:
         完整的纯文本邮件内容
     """
-    send_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    send_time = get_current_local_time().strftime('%Y-%m-%d %H:%M:%S')
 
     return f"""
 Lacus-Log主播管理系统
@@ -194,7 +194,7 @@ def send_email(recipients: List[str], subject: str, content: str, html_content: 
         if MAIL_DEBUG:
             try:
                 os.makedirs('log/mail', exist_ok=True)
-                ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+                ts = get_current_local_time().strftime('%Y%m%d_%H%M%S')
                 safe_subject = ''.join(ch if ch.isalnum() else '_' for ch in subject)[:60]
                 filename = os.path.join('log', 'mail', f"{safe_subject}_{ts}.html")
                 with open(filename, 'w', encoding='utf-8') as f:

@@ -14,6 +14,7 @@ from models.pilot import Pilot
 from utils.bbs_serializers import (create_error_response, create_success_response, serialize_board_list, serialize_post_detail, serialize_post_summary)
 from utils.bbs_service import (build_author_snapshot, ensure_base_boards_from_battle_areas, ensure_manual_pilot_refs, fetch_recent_posts_for_pilot,
                                filter_posts_for_user, filter_replies_for_user, get_last_reply_info, logger, user_can_view_post)
+from utils.bbs_notifications import notify_parent_reply_author, notify_post_author_new_reply
 from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.jwt_roles import get_jwt_user, jwt_roles_accepted, jwt_roles_required
 
@@ -373,6 +374,9 @@ def add_reply(post_id: str):
         return jsonify(create_error_response('VALIDATION_FAILED', str(exc))), 400
 
     post.touch()
+    notify_post_author_new_reply(post, reply)
+    if parent_reply:
+        notify_parent_reply_author(post, parent_reply, reply)
 
     replies_query = filter_replies_for_user(BBSReply.objects(post=post).order_by('created_at'), current_user)  # type: ignore[attr-defined]
     pilot_refs = list(BBSPostPilotRef.objects(post=post))  # type: ignore[attr-defined]

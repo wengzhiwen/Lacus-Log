@@ -515,6 +515,22 @@ def create_record():
         )
         record.save()
 
+        logger.debug(
+            '创建开播记录后准备自动BBS发帖：record=%s status=%s revenue=%s notes_len=%d base=%s announcement=%s work_mode=%s',
+            record.id,
+            record.current_status.value,
+            str(record.revenue_amount or Decimal('0')),
+            len(record.notes or ''),
+            record.x_coord or '',
+            getattr(getattr(record, 'related_announcement', None), 'id', None),
+            record.work_mode.value if record.work_mode else None,
+        )
+
+        try:
+            create_post_for_battle_record(record)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error('自动创建BBS帖子失败（创建）：record=%s error=%s', record.id, exc, exc_info=True)
+
         data = _serialize_battle_record_detail(record)
         meta = {'message': '开播记录创建成功'}
         return jsonify(create_success_response(data, meta)), 201
@@ -601,6 +617,17 @@ def update_record(record_id: str):
             return jsonify(create_error_response('VALIDATION_FAILED', validation_error)), 400
 
         record.save()
+
+        logger.debug(
+            '更新开播记录后准备自动BBS发帖：record=%s status=%s revenue=%s notes_len=%d base=%s announcement=%s work_mode=%s',
+            record.id,
+            record.current_status.value,
+            str(record.revenue_amount or Decimal('0')),
+            len(record.notes or ''),
+            record.x_coord or '',
+            getattr(getattr(record, 'related_announcement', None), 'id', None),
+            record.work_mode.value if record.work_mode else None,
+        )
 
         try:
             create_post_for_battle_record(record)
