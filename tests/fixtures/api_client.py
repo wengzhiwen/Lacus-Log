@@ -3,9 +3,10 @@ API 测试客户端
 
 提供统一的API调用接口，自动处理认证、CSRF等
 """
-import httpx
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
+
+import httpx
 
 
 class ApiClient:
@@ -86,13 +87,25 @@ class ApiClient:
                 json_data['_status_code'] = response.status_code
                 return json_data
             else:
-                # 非JSON响应（如HTML重定向）
+                # 非JSON响应（如HTML）
+                html_content = response.get_data(as_text=True) if response.get_data() else ""
+
+                # 尝试从HTML中提取CSRF token
+                if html_content and not self.csrf_token:
+                    import re
+                    # 查找 data-csrf 属性
+                    csrf_match = re.search(r'data-csrf="([^"]+)"', html_content)
+                    if csrf_match:
+                        self.csrf_token = csrf_match.group(1)
+                    else:
+                        # 查找 JavaScript 中的 csrfToken
+                        csrf_match = re.search(r'csrfToken:\s*["\']([^"\']+)["\']', html_content)
+                        if csrf_match:
+                            self.csrf_token = csrf_match.group(1)
+
                 return {
-                    'success': False,
-                    'error': {
-                        'code': 'NON_JSON_RESPONSE',
-                        'message': f'HTTP {response.status_code}'
-                    },
+                    'success': response.status_code < 400,
+                    'data': html_content,
                     '_status_code': response.status_code
                 }
         else:
@@ -160,6 +173,38 @@ class ApiClient:
         self.cookies.clear()
 
         return response
+
+    def refresh_token(self) -> Dict:
+        """
+        刷新 Access Token
+        
+        注意：此方法不发送 Authorization header，仅依赖 cookie 中的 refresh_token。
+        这是为了正确模拟生产环境中的 refresh token 行为。
+        
+        技术背景：
+        - Flask-JWT-Extended 要求刷新接口必须使用 refresh token 而非 access token
+        - 配置中 JWT_TOKEN_LOCATION=['headers', 'cookies'] 会优先读取 header
+        - 如果在 header 中发送 access token，会导致 422 错误
+        - 生产环境中前端不会在刷新接口发送 Authorization header
+        
+        Returns:
+            刷新响应数据
+        """
+        original_token = self.access_token
+        self.access_token = None
+
+        try:
+            response = self.post('/api/auth/refresh')
+
+            if response.get('success'):
+                self.access_token = response['data'].get('access_token')
+            else:
+                self.access_token = original_token
+
+            return response
+        except Exception as exc:
+            self.access_token = original_token
+            raise exc
 
     def get_csrf_token(self) -> str:
         """获取CSRF token（用于匿名请求）"""

@@ -77,6 +77,67 @@
   - REST API 蓝图（`routes/<module>s_api.py`）：用于数据接口
 - 优先使用 REST API 实现前后端分离，减少传统模板渲染的使用
 
+### 🧪 Test-Driven API 开发要求
+
+**所有 REST API 的创建或修改都必须采用测试驱动开发（TDD）方式**，确保API的可靠性和稳定性。
+
+#### 开发流程
+1. **先写测试**：在修改或创建API之前，先编写或修改相应的集成测试
+2. **运行测试**：测试应该失败（因为API还不存在或功能不完整）
+3. **实现API**：编写最少的代码使测试通过
+4. **重构优化**：在测试保护下重构和优化代码
+5. **验证通过**：确保所有相关测试都通过
+
+#### 测试要求
+- **新增API**：必须在对应的S1-S9测试套件中添加测试用例
+  - 认证相关API：修改 `tests/integration/test_suite_s1_auth_security.py`
+  - 用户管理API：修改 `tests/integration/test_suite_s2_user_role_management.py`
+  - 招募流程API：修改 `tests/integration/test_suite_s3_recruitment_pipeline.py`
+  - 主播/开播API：修改 `tests/integration/test_suite_s4_pilot_broadcast_salary.py`
+  - 通告/日历API：修改 `tests/integration/test_suite_s5_announcement_calendar.py`
+  - 结算/佣金API：修改 `tests/integration/test_suite_s6_settlement_commission.py`
+  - BBS相关API：修改 `tests/integration/test_suite_s7_bbs_operations.py`
+  - 仪表盘/计算API：修改 `tests/integration/test_suite_s8_calculation_accuracy.py` 或 `test_suite_s8_dashboard_reports.py`
+  - 告警/邮件API：修改 `tests/integration/test_suite_s9_alerts_notifications.py` 或 `test_suite_s9_mail_generation.py`
+
+- **修改现有API**：确保所有依赖该API的测试用例仍然通过
+- **测试覆盖**：API测试应覆盖：
+  - 正常流程（成功响应）
+  - 错误处理（各种错误情况）
+  - 权限验证（认证和授权）
+  - 参数验证（必需参数、格式验证等）
+  - 边界情况（空值、极值等）
+
+#### 测试命名规范
+```python
+def test_sX_tcY_<feature>_<scenario>(self, admin_client):
+    """
+    测试描述：测试某个功能在特定场景下的行为
+
+    示例：
+    def test_s4_tc5_complaint_reply_chain(self, admin_client, kancho_client):
+        # 测试S4套件中的BBS回复链路功能
+    """
+```
+
+#### 测试工具使用
+- 使用现有的fixtures：`admin_client`, `kancho_client`
+- 使用数据工厂：`pilot_factory`, `battle_record_factory`等
+- 参考现有测试的CSRF token处理方式
+- 遵循现有的断言和验证模式
+
+#### 运行和验证
+```bash
+# 运行特定测试套件
+pytest tests/integration/test_suite_s4_pilot_broadcast_salary.py -v
+
+# 运行特定测试用例
+pytest tests/integration/test_suite_s4_pilot_broadcast_salary.py::TestS4PilotBroadcastSalary::test_s4_tc5_complaint_reply_chain -v
+
+# 显示详细输出用于调试
+pytest tests/integration/test_suite_s4_pilot_broadcast_salary.py -s -v
+```
+
 ### 统一响应格式
 
 所有 REST API 必须遵循以下统一的响应格式：

@@ -73,6 +73,7 @@ def ensure_initial_roles_and_admin(user_datastore) -> None:
                 username='zala',
                 password=hash_password('plant4ever'),
                 nickname='ZAFT 议长',
+                email='james@wengs.net',
                 roles=[gicho_role],
                 active=True,
             )

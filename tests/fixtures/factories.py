@@ -309,8 +309,186 @@ class AnnouncementFactory:
         return data
 
 
+class RecruitFactory:
+    """招募数据工厂"""
+
+    @staticmethod
+    def generate_appointment_time() -> str:
+        """生成预约时间（未来24小时内）"""
+        from datetime import datetime, timedelta
+        future_time = datetime.now() + timedelta(hours=random.randint(1, 24))
+        return future_time.strftime('%Y-%m-%d %H:%M:%S')
+
+    @staticmethod
+    def create_recruit_data(pilot_id: str = None, kancho_id: str = None, **kwargs) -> dict:
+        """
+        生成完整的招募数据
+
+        Args:
+            pilot_id: 主播ID
+            kancho_id: 招募负责人ID
+            **kwargs: 覆盖默认值的字段
+
+        Returns:
+            招募数据字典
+        """
+        data = {
+            'pilot_id': pilot_id,
+            'recruiter_id': kancho_id,
+            'appointment_time': RecruitFactory.generate_appointment_time(),
+            'channel': random.choice(['BOSS', '51', '介绍', '其他']),
+            'introduction_fee': random.randint(0, 1000),
+            'remarks': fake.sentence(),
+        }
+        data.update(kwargs)
+        return data
+
+
+class BattleRecordFactory:
+    """开播记录数据工厂"""
+
+    @staticmethod
+    def create_battle_record_data(pilot_id: str = None, **kwargs) -> dict:
+        """
+        生成完整的开播记录数据
+
+        Args:
+            pilot_id: 主播ID
+            **kwargs: 覆盖默认值的字段
+
+        Returns:
+            开播记录数据字典
+        """
+        from datetime import datetime, timedelta
+
+        data = {
+            'pilot_id': pilot_id,
+            'battle_date': (datetime.now() - timedelta(days=random.randint(1, 30))).strftime('%Y-%m-%d'),
+            'platform': random.choice(['快手', '抖音', '其他', '未知']),
+            'work_mode': random.choice(['线下', '线上', '未知']),
+            'duration_hours': random.randint(1, 8),
+            'salary_amount': random.randint(0, 5000),
+        }
+        data.update(kwargs)
+        return data
+
+
+class BaseSalaryApplicationFactory:
+    """底薪申请数据工厂"""
+
+    @staticmethod
+    def create_base_salary_application_data(pilot_id: str = None, **kwargs) -> dict:
+        """
+        生成完整的底薪申请数据
+
+        Args:
+            pilot_id: 主播ID
+            **kwargs: 覆盖默认值的字段
+
+        Returns:
+            底薪申请数据字典
+        """
+        data = {
+            'pilot_id': pilot_id,
+            'base_salary': random.randint(2000, 8000),
+            'reason': fake.sentence(),
+            'start_date': fake.date_between(start_date='-30d', end_date='today').strftime('%Y-%m-%d'),
+        }
+        data.update(kwargs)
+        return data
+
+
+class BbsPostFactory:
+    """BBS帖子数据工厂"""
+
+    @staticmethod
+    def create_bbs_post_data(user_id: str = None, **kwargs) -> dict:
+        """
+        生成完整的BBS帖子数据
+
+        Args:
+            user_id: 用户ID
+            **kwargs: 覆盖默认值的字段
+
+        Returns:
+            BBS帖子数据字典
+        """
+        data = {
+            'user_id': user_id,
+            'title': fake.sentence(),
+            'content': fake.text(max_nb_chars=200),
+            'category': random.choice(['其他', '通知', '讨论']),
+            'is_pinned': False,
+        }
+        data.update(kwargs)
+        return data
+
+
+class JamesAlertFactory:
+    """警报通知数据工厂"""
+
+    @staticmethod
+    def create_alert_data(user_id: str = None, **kwargs) -> dict:
+        """
+        生成完整的警报通知数据
+
+        Args:
+            user_id: 用户ID
+            **kwargs: 覆盖默认值的字段
+
+        Returns:
+            警报通知数据字典
+        """
+        data = {
+            'user_id': user_id,
+            'type': random.choice(['系统警报', '业务通知', '异常提醒']),
+            'title': fake.sentence(),
+            'message': fake.text(max_nb_chars=200),
+            'is_read': False,
+        }
+        data.update(kwargs)
+        return data
+
+
+class SettlementFactory:
+    """结算数据工厂"""
+
+    @staticmethod
+    def create_settlement_data(pilot_id: str = None, **kwargs) -> dict:
+        """
+        生成完整的结算数据
+
+        Args:
+            pilot_id: 主播ID
+            **kwargs: 覆盖默认值的字段
+
+        Returns:
+            结算数据字典
+        """
+        from datetime import datetime, timedelta
+        data = {
+            'pilot_id': pilot_id,
+            'settlement_date': (datetime.now() - timedelta(days=random.randint(1, 30))).strftime('%Y-%m-%d'),
+            'total_days': random.randint(20, 31),
+            'working_days': random.randint(15, 30),
+            'total_salary': random.randint(2000, 10000),
+            'base_salary': random.randint(2000, 5000),
+            'commission': random.randint(0, 3000),
+            'deduction': random.randint(0, 500),
+            'net_salary': random.randint(1500, 8000),
+        }
+        data.update(kwargs)
+        return data
+
+
 # 创建便捷实例
 user_factory = UserFactory()
 pilot_factory = PilotFactory()
 battle_area_factory = BattleAreaFactory()
 announcement_factory = AnnouncementFactory()
+recruit_factory = RecruitFactory()
+battle_record_factory = BattleRecordFactory()
+base_salary_application_factory = BaseSalaryApplicationFactory()
+bbs_post_factory = BbsPostFactory()
+james_alert_factory = JamesAlertFactory()
+settlement_factory = SettlementFactory()
