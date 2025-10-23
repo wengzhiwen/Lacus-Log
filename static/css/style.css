@@ -207,6 +207,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   background: #fff;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   transition: all 0.2s ease;
+  min-width: 0;
 }
 
 .card:hover {
@@ -273,11 +274,12 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 }
 
 .bbs-latest-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 14px;
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   padding-bottom: 4px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
@@ -285,6 +287,28 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 .bbs-latest-list li:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+.bbs-latest-title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bbs-latest-meta {
+  display: block;
+  flex: 0 1 120px;
+  min-width: 0;
+  max-width: 120px;
+  font-size: 12px;
+  color: #1E88E5;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 图片仪表：等比缩放、不变形，圆角与卡片统一 */

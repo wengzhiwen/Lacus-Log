@@ -12,11 +12,26 @@
       </div>
       <div class="card-body">
         <ul class="bbs-latest-list">
-          <li data-field="bbs_latest_0">加载中...</li>
-          <li data-field="bbs_latest_1">加载中...</li>
-          <li data-field="bbs_latest_2">加载中...</li>
-          <li data-field="bbs_latest_3">加载中...</li>
-          <li data-field="bbs_latest_4">加载中...</li>
+          <li>
+            <span class="bbs-latest-title" data-field="bbs_latest_0_title">加载中...</span>
+            <span class="bbs-latest-meta" data-field="bbs_latest_0_meta">加载中...</span>
+          </li>
+          <li>
+            <span class="bbs-latest-title" data-field="bbs_latest_1_title">加载中...</span>
+            <span class="bbs-latest-meta" data-field="bbs_latest_1_meta">加载中...</span>
+          </li>
+          <li>
+            <span class="bbs-latest-title" data-field="bbs_latest_2_title">加载中...</span>
+            <span class="bbs-latest-meta" data-field="bbs_latest_2_meta">加载中...</span>
+          </li>
+          <li>
+            <span class="bbs-latest-title" data-field="bbs_latest_3_title">加载中...</span>
+            <span class="bbs-latest-meta" data-field="bbs_latest_3_meta">加载中...</span>
+          </li>
+          <li>
+            <span class="bbs-latest-title" data-field="bbs_latest_4_title">加载中...</span>
+            <span class="bbs-latest-meta" data-field="bbs_latest_4_meta">加载中...</span>
+          </li>
         </ul>
       </div>
     </div>
@@ -237,8 +252,9 @@
     }
     const items = (data.items || []).slice(0, 5);
     for (let i = 0; i < 5; i += 1) {
-      const el = fieldMap[`bbs_latest_${i}`];
-      if (!el) {
+      const titleEl = fieldMap[`bbs_latest_${i}_title`];
+      const metaEl = fieldMap[`bbs_latest_${i}_meta`];
+      if (!titleEl || !metaEl) {
         continue;
       }
       const item = items[i];
@@ -246,11 +262,18 @@
         const board = item.board ? `[${item.board}] ` : '';
         const title = item.title || '--';
         const text = `${board}${title}`;
-        el.textContent = text;
-        el.title = text;
+        titleEl.textContent = text;
+        titleEl.title = text;
+
+        const lastActivity = item.last_activity || {};
+        const lastDisplay = lastActivity.display || '--';
+        metaEl.textContent = lastDisplay;
+        metaEl.title = lastDisplay;
       } else {
-        el.textContent = i === 0 ? '暂无主贴' : '--';
-        el.title = '';
+        titleEl.textContent = i === 0 ? '暂无主贴' : '--';
+        titleEl.title = '';
+        metaEl.textContent = '--';
+        metaEl.title = '';
       }
     }
   }

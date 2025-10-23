@@ -1,6 +1,7 @@
 # pylint: disable=no-member
 
 from datetime import datetime
+from typing import Dict, Optional, Tuple
 
 from flask import (Blueprint, flash, jsonify, redirect, render_template, request, url_for)
 from flask_login import login_required
@@ -12,7 +13,8 @@ from routes.report import (build_dashboard_feature_banner, calculate_dashboard_a
 from utils.dashboard_serializers import create_success_response
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from models.bbs import BBSPost, BBSPostStatus
+from utils.timezone_helper import format_local_datetime
+from models.bbs import BBSPost, BBSPostStatus, BBSReply, BBSReplyStatus
 
 logger = get_logger('main')
 
@@ -79,21 +81,61 @@ def _dashboard_user_can_view_post(user, post: BBSPost) -> bool:
     return False
 
 
+def _resolve_last_activity(post: BBSPost) -> Tuple[str, Optional[datetime]]:
+    """获取帖子最后一次活跃的作者昵称与时间。"""
+    reply = (BBSReply.objects(post=post, status=BBSReplyStatus.PUBLISHED).only('author_snapshot',
+                                                                               'created_at').order_by('-created_at').first())  # type: ignore[attr-defined]
+    if reply:
+        snapshot = reply.author_snapshot or {}
+        display_name = snapshot.get('nickname') or snapshot.get('display_name') or snapshot.get('username') or '--'
+        return display_name, reply.created_at
+
+    snapshot = post.author_snapshot or {}
+    display_name = snapshot.get('nickname') or snapshot.get('display_name') or snapshot.get('username') or '--'
+    return display_name, post.created_at or post.last_active_at
+
+
+def _build_last_activity_meta(post: BBSPost) -> Dict[str, Optional[str]]:
+    """构建最后更新展示信息。"""
+    operator_name, timestamp = _resolve_last_activity(post)
+    operator_display = operator_name if operator_name and operator_name != '--' else ''
+    display_time = format_local_datetime(timestamp, '%Y-%m-%d %H:%M') if timestamp else ''
+    time_iso = timestamp.isoformat() if timestamp else None
+    if operator_display and display_time:
+        display_text = f"{operator_display}（{display_time}）"
+    elif operator_display:
+        display_text = operator_display
+    elif display_time:
+        display_text = display_time
+    else:
+        display_text = '--'
+    return {
+        'operator': operator_name,
+        'time': time_iso,
+        'time_display': display_time,
+        'display': display_text,
+    }
+
+
 @main_bp.route('/api/dashboard/bbs-latest', methods=['GET'])
 @jwt_roles_accepted("gicho", "kancho")
 def dashboard_bbs_latest_data():
     """仪表盘内部BBS最新主贴。"""
-    query = BBSPost.objects.only('title', 'board', 'status', 'author', 'last_active_at').order_by('-last_active_at')  # type: ignore[attr-defined]
+    query = (BBSPost.objects.only('title', 'board', 'status', 'author', 'author_snapshot', 'created_at',
+                                  'last_active_at').order_by('-last_active_at'))  # type: ignore[attr-defined]
     items = []
     for post in query[:50]:
         if not _dashboard_user_can_view_post(current_user, post):
             continue
         board_name = post.board.name if getattr(post, 'board', None) else ''
-        items.append({
+        item = {
             'id': str(post.id),
             'title': post.title or '',
             'board': board_name,
-        })
+        }
+        last_activity = _build_last_activity_meta(post)
+        item['last_activity'] = last_activity
+        items.append(item)
         if len(items) >= 5:
             break
 
