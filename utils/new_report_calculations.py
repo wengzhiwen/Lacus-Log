@@ -423,7 +423,6 @@ def calculate_daily_details(report_date: datetime, owner_id: Optional[str] = Non
     month_records = get_battle_records_for_date_range(month_start, month_end + timedelta(microseconds=1), owner_id, mode)
     month_base_salary_map = _fetch_approved_base_salary_map(month_records)
 
-    rebate_cache: Dict[str, Dict[str, Any]] = {}
     monthly_stats_cache: Dict[str, Dict[str, Any]] = {}
     pilot_month_records_cache: Dict[str, List[BattleRecord]] = {}
     monthly_commission_cache: Dict[str, Dict[str, Decimal]] = {}
@@ -454,26 +453,27 @@ def calculate_daily_details(report_date: datetime, owner_id: Optional[str] = Non
         commission_rate, _, _ = get_pilot_commission_rate_for_date(pilot.id, record_date)
         commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
 
-        if pilot_id not in rebate_cache:
-            rebate_cache[pilot_id] = calculate_pilot_rebate(pilot, report_date, owner_id, mode)
-        rebate_info = rebate_cache[pilot_id]
-
         record_base_salary = _get_record_base_salary(record, base_salary_map)
-        daily_profit = commission_amounts['company_amount'] + rebate_info['rebate_amount'] - record_base_salary
+        daily_profit = commission_amounts['company_amount'] - record_base_salary
 
-        if pilot_id not in monthly_stats_cache:
-            monthly_stats_cache[pilot_id] = calculate_pilot_monthly_stats(pilot, report_date, owner_id, mode)
-        monthly_stats = monthly_stats_cache[pilot_id]
-
-        if pilot_id not in monthly_commission_cache:
+        if pilot_id not in monthly_commission_cache or pilot_id not in monthly_stats_cache:
             pilot_month_records = pilot_month_records_cache.setdefault(pilot_id, [item for item in month_records if item.pilot.id == pilot.id])
 
             month_total_pilot_share = Decimal('0')
             month_total_company_share = Decimal('0')
             month_total_base_salary = Decimal('0')
+            month_total_revenue = Decimal('0')
+            month_total_duration = 0.0
+            month_dates: set[datetime.date] = set()
 
             for month_record in pilot_month_records:
-                month_record_date = utc_to_local(month_record.start_time).date()
+                local_month_start = utc_to_local(month_record.start_time)
+                month_dates.add(local_month_start.date())
+                if month_record.duration_hours:
+                    month_total_duration += month_record.duration_hours
+                month_total_revenue += month_record.revenue_amount
+
+                month_record_date = local_month_start.date()
                 commission_rate_month, _, _ = get_pilot_commission_rate_for_date(pilot.id, month_record_date)
                 commission_amounts_month = calculate_commission_amounts(month_record.revenue_amount, commission_rate_month)
                 month_total_pilot_share += commission_amounts_month['pilot_amount']
@@ -486,11 +486,21 @@ def calculate_daily_details(report_date: datetime, owner_id: Optional[str] = Non
                 'total_base_salary': month_total_base_salary,
             }
 
+            month_days_count = len(month_dates)
+            month_avg_duration = round((month_total_duration / month_days_count) if month_days_count > 0 else 0.0, 1)
+            monthly_stats_cache[pilot_id] = {
+                'month_days_count': month_days_count,
+                'month_avg_duration': month_avg_duration,
+                'month_total_revenue': month_total_revenue,
+                'month_total_base_salary': month_total_base_salary
+            }
+
         monthly_commission_raw = monthly_commission_cache[pilot_id]
+        monthly_stats = monthly_stats_cache[pilot_id]
         month_total_pilot_share = monthly_commission_raw['total_pilot_share']
         month_total_company_share = monthly_commission_raw['total_company_share']
         month_total_base_salary = monthly_commission_raw['total_base_salary']
-        month_total_profit = month_total_company_share + rebate_info['rebate_amount'] - month_total_base_salary
+        month_total_profit = month_total_company_share - month_total_base_salary
 
         monthly_commission_stats = {
             'month_total_pilot_share': month_total_pilot_share,
@@ -514,14 +524,11 @@ def calculate_daily_details(report_date: datetime, owner_id: Optional[str] = Non
             'commission_rate': commission_rate,
             'pilot_share': commission_amounts['pilot_amount'],
             'company_share': commission_amounts['company_amount'],
-            'rebate_rate': rebate_info['rebate_rate'],
-            'rebate_amount': rebate_info['rebate_amount'],
             'base_salary': record_base_salary,
             'daily_profit': daily_profit,
             'three_day_avg_revenue': three_day_avg,
             'monthly_stats': monthly_stats,
             'monthly_commission_stats': monthly_commission_stats,
-            'month_rebate_amount': rebate_info['rebate_amount'],
             'status': record.current_status.value,
             'status_display': record.get_status_display() or ''
         }

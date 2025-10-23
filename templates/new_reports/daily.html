@@ -63,8 +63,6 @@
             <th>当前分成比例</th>
             <th>主播分成</th>
             <th>公司分成</th>
-            <th>返点比例</th>
-            <th>产生返点</th>
             <th>底薪</th>
             <th>当日毛利</th>
             <th>3日平均流水</th>
@@ -579,7 +577,6 @@
       const profitClass = detail.daily_profit !== null && detail.daily_profit < 0 ? 'text-danger' : '';
       const avgRevenue = detail.three_day_avg_revenue !== null && detail.three_day_avg_revenue !== undefined ? formatMoney(detail.three_day_avg_revenue) : '';
       const commissionRate = formatPercent(detail.commission_rate);
-      const rebateRate = formatRate(detail.rebate_rate);
       const pilotUrl = pilotPerformanceTemplate.replace('__PID__', pilotId) + `?from=daily_report&date=${encodeURIComponent(dateStr)}&owner=${encodeURIComponent(ownerParam)}`;
       const statusInfo = formatStatus(detail.status, detail.status_display);
       return `<tr>
@@ -594,8 +591,6 @@
         <td>${commissionRate}</td>
         <td>${formatMoney(detail.pilot_share)}</td>
         <td>${formatMoney(detail.company_share)}</td>
-        <td>${rebateRate}</td>
-        <td>${formatMoney(detail.rebate_amount)}</td>
         <td>${formatMoney(detail.base_salary)}</td>
         <td class="${profitClass}">${formatMoney(detail.daily_profit)}</td>
         <td>${avgRevenue}</td>

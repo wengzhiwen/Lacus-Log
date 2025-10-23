@@ -79,14 +79,11 @@ def serialize_daily_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'commission_rate': _decimal_to_float(raw.get('commission_rate')),
         'pilot_share': _decimal_to_float(raw.get('pilot_share')),
         'company_share': _decimal_to_float(raw.get('company_share')),
-        'rebate_rate': _decimal_to_float(raw.get('rebate_rate')),
-        'rebate_amount': _decimal_to_float(raw.get('rebate_amount')),
         'base_salary': _decimal_to_float(raw.get('base_salary')),
         'daily_profit': _decimal_to_float(raw.get('daily_profit')),
         'three_day_avg_revenue': _decimal_to_float(raw.get('three_day_avg_revenue')),
         'monthly_stats': serialize_month_snapshot(raw.get('monthly_stats', {})),
         'monthly_commission_stats': serialize_month_commission_snapshot(raw.get('monthly_commission_stats', {})),
-        'month_rebate_amount': _decimal_to_float(raw.get('month_rebate_amount')),
         'status': _enum_to_str(raw.get('status')),
         'status_display': _enum_to_str(raw.get('status_display'))
     }
