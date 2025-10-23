@@ -17,8 +17,9 @@ from models.battle_record import (BaseSalaryApplication, BattleRecord, BattleRec
 from models.pilot import Pilot, Rank, WorkMode
 from models.user import Role, User
 from routes.battle_record import (log_battle_record_change, validate_notes_required)
-from utils.bbs_service import create_post_for_battle_record
+from utils.bbs_service import add_rant_reply, create_post_for_battle_record, ensure_battle_record_post_for_rant
 from utils.announcement_serializers import (create_error_response, create_success_response)
+from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
@@ -667,6 +668,40 @@ def delete_record(record_id: str):
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('删除开播记录失败：%s', exc, exc_info=True)
         return jsonify(create_error_response('INTERNAL_ERROR', '删除开播记录失败')), 500
+
+
+@battle_records_api_bp.route('/battle-records/<record_id>/rant', methods=['POST'])
+@jwt_roles_accepted('gicho', 'kancho')
+def rant_record(record_id: str):
+    """吐槽：强制创建帖子并追加回复。"""
+    try:
+        validate_csrf_header()
+    except CSRFError as exc:
+        return jsonify(create_error_response(exc.code, exc.message)), 401
+
+    try:
+        record = BattleRecord.objects.get(id=record_id)
+    except DoesNotExist:
+        return jsonify(create_error_response('BATTLE_RECORD_NOT_FOUND', '开播记录不存在')), 404
+
+    operator = current_user
+    if not operator or not getattr(operator, 'is_authenticated', False):
+        return jsonify(create_error_response('UNAUTHORIZED', '未认证')), 401
+
+    try:
+        post = ensure_battle_record_post_for_rant(record, operator)
+        operator_name = operator.nickname or operator.username or '未知运营'
+        message = f"{operator_name}表示要吐槽一下"
+        add_rant_reply(post, operator, message)
+    except ValueError as exc:
+        return jsonify(create_error_response('INVALID_OPERATION', str(exc))), 400
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('吐槽操作失败：record=%s error=%s', record_id, exc, exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '吐槽失败，请稍后重试')), 500
+
+    data = {'post_id': str(post.id)}
+    meta = {'redirect': url_for('bbs.bbs_index')}
+    return jsonify(create_success_response(data, meta))
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>/changes', methods=['GET'])

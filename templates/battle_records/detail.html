@@ -184,6 +184,10 @@
       <span class="btn-icon">📋</span>
       变更记录
     </button>
+    <button class="btn btn-secondary" id="rantButton">
+      <span class="btn-icon">💬</span>
+      吐槽
+    </button>
     <a class="btn btn-primary" id="apply-base-salary-btn" href="/battle-records/{{ battle_record.id }}/base_salary_application" style="display: none;" data-record-status="{{ battle_record.current_status.value }}">
       <span class="btn-icon">💰</span>
       申请底薪
@@ -505,6 +509,8 @@
 const changesUrl = '{{ url_for('battle_records_api.record_changes', record_id=battle_record.id) }}';
 const deleteUrl = '{{ url_for('battle_records_api.delete_record', record_id=battle_record.id) }}';
 const listUrl = '{{ url_for('battle_record.list_battle_records') }}';
+const rantUrl = '{{ url_for('battle_records_api.rant_record', record_id=battle_record.id) }}';
+const csrfToken = '{{ csrf_token }}';
 
 function showChangeLog() {
   const modal = document.getElementById('changeLogModal');
@@ -692,9 +698,45 @@ document.addEventListener('DOMContentLoaded', function() {
   if (confirmBtn) {
     confirmBtn.addEventListener('click', deleteBattleRecord);
   }
+  const rantBtn = document.getElementById('rantButton');
+  if (rantBtn) {
+    rantBtn.addEventListener('click', handleRant);
+  }
   loadSettlementInfo();
   loadBaseSalaryApplication();
 });
+
+async function handleRant() {
+  const rantBtn = document.getElementById('rantButton');
+  if (!rantBtn) {
+    return;
+  }
+  rantBtn.disabled = true;
+  try {
+    const response = await fetch(rantUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken
+      },
+      credentials: 'include'
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      const errorMessage = (result && result.error && result.error.message) ? result.error.message : `请求失败：${response.status}`;
+      throw new Error(errorMessage);
+    }
+    const meta = result.meta || {};
+    const redirectUrl = meta.redirect || '{{ url_for('bbs.bbs_index') }}';
+    showMessage('吐槽成功，正在跳转...', 'success', 1500);
+    window.location.href = redirectUrl;
+  } catch (error) {
+    console.error('吐槽失败:', error);
+    showMessage(error.message || '吐槽失败，请稍后重试', 'error');
+  } finally {
+    rantBtn.disabled = false;
+  }
+}
 </script>
 </div>
 {% endblock %}

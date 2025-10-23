@@ -9,6 +9,7 @@ from flask_security import current_user, roles_accepted
 from models.announcement import Announcement
 from models.battle_record import BattleRecord, BattleRecordChangeLog
 from models.pilot import WorkMode
+from utils.csrf_helper import ensure_csrf_token
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
 from utils.timezone_helper import get_current_utc_time, utc_to_local
@@ -169,13 +170,15 @@ def detail_battle_record(record_id):
         # 获取来源参数
         from_param = request.args.get('from')
         application_id = request.args.get('application_id')
+        csrf_token = ensure_csrf_token()
 
         return render_template('battle_records/detail.html',
                                battle_record=battle_record,
                                related_announcement=related_announcement,
                                related_announcement_deleted=related_announcement_deleted,
                                from_param=from_param,
-                               application_id=application_id)
+                               application_id=application_id,
+                               csrf_token=csrf_token)
     except BattleRecord.DoesNotExist:
         flash('开播记录不存在', 'error')
         return redirect(url_for('battle_record.list_battle_records'))

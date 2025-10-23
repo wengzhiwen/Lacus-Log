@@ -252,6 +252,66 @@ def create_post_for_battle_record(record: BattleRecord) -> Optional[BBSPost]:
     return post
 
 
+def ensure_battle_record_post_for_rant(record: BattleRecord, operator: User) -> BBSPost:
+    """确保存在用于吐槽的关联帖子。"""
+    if operator is None:
+        raise ValueError('缺少有效的操作用户')
+
+    existing = BBSPost.objects(related_battle_record=record).first()  # type: ignore[attr-defined]
+    if existing:
+        return existing
+
+    base_name = (record.x_coord or '').strip() or '吐槽专用基地'
+    board = ensure_board_for_base(base_name)
+
+    author = getattr(record.pilot, 'owner', None) if record.pilot else None
+    if not author:
+        author = operator
+    snapshot = build_author_snapshot(author)
+    title, content = build_battle_record_content(record)
+
+    post = BBSPost(
+        board=board,
+        title=title,
+        content=content,
+        author=author,
+        author_snapshot=snapshot,
+        status=BBSPostStatus.PUBLISHED,
+        related_battle_record=record,
+        last_active_at=get_current_utc_time(),
+    )
+    post.save()
+    logger.info('吐槽触发创建开播记录帖子：record=%s post=%s board=%s', record.id, post.id, board.code)
+
+    if record.pilot:
+        ref = BBSPostPilotRef(post=post, pilot=record.pilot, relevance=PilotRelevance.AUTO)
+        ref.save()
+        logger.debug('吐槽自动关联帖子与主播：post=%s pilot=%s', post.id, record.pilot.id)
+
+    return post
+
+
+def add_rant_reply(post: BBSPost, operator: User, content: str) -> BBSReply:
+    """为帖子新增吐槽回复。"""
+    if not operator:
+        raise ValueError('缺少有效的操作用户')
+    message = (content or '').strip()
+    if not message:
+        raise ValueError('回复内容不能为空')
+
+    reply = BBSReply(
+        post=post,
+        content=message,
+        author=operator,
+        author_snapshot=build_author_snapshot(operator),
+        status=BBSReplyStatus.PUBLISHED,
+    )
+    reply.save()
+    post.touch()
+    logger.info('吐槽新增回复：post=%s reply=%s operator=%s', post.id, reply.id, operator.username)
+    return reply
+
+
 def get_last_reply_info(post: BBSPost) -> Tuple[Optional[BBSReply], Optional[Dict[str, object]]]:
     """获取最新回复及其作者快照。"""
     latest = BBSReply.objects(post=post).order_by('-created_at').first()  # type: ignore[attr-defined]
