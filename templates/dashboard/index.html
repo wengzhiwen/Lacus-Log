@@ -71,7 +71,7 @@
       </div>
     </div>
 
-    <div class="card" data-card-id="conversion-rate" data-default-link="{{ url_for('new_report.monthly_report') }}">
+    <div class="card" data-card-id="conversion-rate" data-default-link="{{ url_for('new_report_fast.monthly_report_fast', mode='offline') }}">
       <div class="card-header">
         <div class="card-title">线下底薪流水转化率</div>
         <div class="card-icon">💰</div>
@@ -401,83 +401,50 @@
     }
   }
 
+  function bindCardNavigation(card, linkResolver) {
+    if (!card) {
+      return;
+    }
+    card.classList.add('is-clickable');
+    card.style.cursor = 'pointer';
+    if (card.dataset.navBound) {
+      return;
+    }
+    card.addEventListener('click', () => {
+      const target = (linkResolver() || '').trim();
+      if (target) {
+        window.location.href = target;
+      }
+    });
+    card.dataset.navBound = 'true';
+  }
+
   function setupCardNavigation() {
     const bbsCard = app.querySelector('.card[data-card-id="bbs-latest"]');
-    if (bbsCard) {
-      const link = bbsCard.dataset.link || bbsCard.dataset.defaultLink;
-      if (link) {
-        bbsCard.classList.add('is-clickable');
-        bbsCard.style.cursor = 'pointer';
-        if (!bbsCard.dataset.navBound) {
-          bbsCard.addEventListener('click', () => {
-            window.location.href = link;
-          });
-          bbsCard.dataset.navBound = 'true';
-        }
-      }
-    }
+    bindCardNavigation(bbsCard, () => bbsCard.dataset.link || bbsCard.dataset.defaultLink || '');
 
     const recruitCard = app.querySelector('.card[data-card-id="recruit"]');
-    if (recruitCard) {
-      const link = recruitCard.dataset.link || recruitCard.dataset.defaultLink;
-      if (link) {
-        recruitCard.classList.add('is-clickable');
-        recruitCard.style.cursor = 'pointer';
-        if (!recruitCard.dataset.navBound) {
-          recruitCard.addEventListener('click', () => {
-            window.location.href = link;
-          });
-          recruitCard.dataset.navBound = 'true';
-        }
-      }
-    }
+    bindCardNavigation(recruitCard, () => recruitCard.dataset.link || recruitCard.dataset.defaultLink || '');
 
     const conversionRateCard = app.querySelector('.card[data-card-id="conversion-rate"]');
-    if (conversionRateCard) {
-      const link = conversionRateCard.dataset.link || conversionRateCard.dataset.defaultLink;
-      if (link) {
-        conversionRateCard.classList.add('is-clickable');
-        conversionRateCard.style.cursor = 'pointer';
-        if (!conversionRateCard.dataset.navBound) {
-          conversionRateCard.addEventListener('click', () => {
-            window.location.href = link;
-          });
-          conversionRateCard.dataset.navBound = 'true';
-        }
-      }
-    }
+    bindCardNavigation(
+      conversionRateCard,
+      () => conversionRateCard.dataset.link || conversionRateCard.dataset.defaultLink || ''
+    );
 
     const announcementCard = app.querySelector('.card[data-card-id="announcement"]');
-    if (announcementCard) {
-      const baseLink = announcementLinkBase || announcementCard.dataset.link || announcementCard.dataset.defaultLink;
-      if (baseLink) {
-        announcementCard.classList.add('is-clickable');
-        announcementCard.style.cursor = 'pointer';
-        if (!announcementCard.dataset.navBound) {
-          announcementCard.addEventListener('click', () => {
-            const today = new Date().toISOString().split('T')[0];
-            const separator = baseLink.includes('?') ? '&' : '?';
-            window.location.href = `${baseLink}${separator}date=${today}`;
-          });
-          announcementCard.dataset.navBound = 'true';
-        }
+    bindCardNavigation(announcementCard, () => {
+      const baseLink = announcementLinkBase || announcementCard.dataset.link || announcementCard.dataset.defaultLink || '';
+      if (!baseLink) {
+        return '';
       }
-    }
+      const today = new Date().toISOString().split('T')[0];
+      const separator = baseLink.includes('?') ? '&' : '?';
+      return `${baseLink}${separator}date=${today}`;
+    });
 
     const battleCard = app.querySelector('.card[data-card-id="battle"]');
-    if (battleCard) {
-      const link = battleCard.dataset.link || battleCard.dataset.defaultLink;
-      if (link) {
-        battleCard.classList.add('is-clickable');
-        battleCard.style.cursor = 'pointer';
-        if (!battleCard.dataset.navBound) {
-          battleCard.addEventListener('click', () => {
-            window.location.href = link;
-          });
-          battleCard.dataset.navBound = 'true';
-        }
-      }
-    }
+    bindCardNavigation(battleCard, () => battleCard.dataset.link || battleCard.dataset.defaultLink || '');
   }
 
   function fetchEndpoint(endpoint) {
@@ -505,6 +472,8 @@
       endpoint.handler(data, meta);
     });
   }
+
+  setupCardNavigation();
 
   Promise.all(endpoints.map(fetchEndpoint))
     .then(() => {

@@ -149,7 +149,7 @@ def dashboard_bbs_latest_data():
 def dashboard_conversion_rate_data():
     """仪表盘底薪流水转化率统计接口。"""
     data = calculate_dashboard_conversion_rate_metrics()
-    meta = {'segment': 'conversion_rate', 'link': url_for('new_report.monthly_report')}
+    meta = {'segment': 'conversion_rate', 'link': url_for('new_report_fast.monthly_report_fast', mode='offline')}
     return jsonify(create_success_response(data, meta))
 
 
