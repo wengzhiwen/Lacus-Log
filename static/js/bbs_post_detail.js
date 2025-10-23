@@ -33,6 +33,7 @@
     parentReplyId: null,
     replyingToName: '',
     loading: false,
+    submittingReply: false,
     editingReplyId: null,
     editingDraft: ''
   };
@@ -78,6 +79,16 @@
   function resetEditingContext() {
     state.editingReplyId = null;
     state.editingDraft = '';
+  }
+
+  function setReplySubmitting(isSubmitting) {
+    if (!replySubmitBtn) return;
+    if (!replySubmitBtn.dataset.defaultText) {
+      replySubmitBtn.dataset.defaultText = replySubmitBtn.textContent || '提交回复';
+    }
+    state.submittingReply = isSubmitting;
+    replySubmitBtn.disabled = isSubmitting;
+    replySubmitBtn.textContent = isSubmitting ? '提交中...' : replySubmitBtn.dataset.defaultText;
   }
 
   async function request(url, options = {}) {
@@ -179,8 +190,9 @@
     relatedPilotsEl.innerHTML = '';
     const actionBar = document.createElement('div');
     actionBar.className = 'bbs-related-actions';
+    const recordMissing = Boolean(state.postData?.post?.related_battle_record_missing);
 
-    if (state.postData?.post?.related_battle_record_id) {
+    if (state.postData?.post?.related_battle_record_id && !recordMissing) {
       const recordBtn = document.createElement('button');
       recordBtn.className = 'btn btn-primary btn-compact';
       recordBtn.textContent = '查看开播记录';
@@ -214,6 +226,13 @@
 
     if (actionBar.children.length > 0) {
       relatedPilotsEl.appendChild(actionBar);
+    }
+
+    if (recordMissing) {
+      const warning = document.createElement('div');
+      warning.className = 'hint';
+      warning.textContent = '关联的开播记录已被删除，无法跳转。';
+      relatedPilotsEl.appendChild(warning);
     }
   }
 
@@ -421,11 +440,13 @@
 
   async function submitReply() {
     if (!state.postId) return;
+    if (state.submittingReply) return;
     const content = replyTextarea.value.trim();
     if (!content) {
       setMessage('error', '回复内容不能为空');
       return;
     }
+    setReplySubmitting(true);
     try {
       await request(`/api/bbs/posts/${state.postId}/replies`, {
         method: 'POST',
@@ -439,6 +460,8 @@
       await loadPost(state.postId);
     } catch (error) {
       setMessage('error', error.message || '回复失败');
+    } finally {
+      setReplySubmitting(false);
     }
   }
 

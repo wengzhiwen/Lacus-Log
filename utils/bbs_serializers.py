@@ -2,11 +2,16 @@ from __future__ import annotations
 
 # pylint: disable=no-member
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
+from mongoengine.errors import DoesNotExist
+
 from models.bbs import (BBSBoard, BBSPost, BBSReply, BBSReplyStatus, BBSPostStatus, BBSPostPilotRef, PilotRelevance)
 from utils.timezone_helper import format_local_datetime, utc_to_local
+
+logger = logging.getLogger('bbs')
 
 
 def create_success_response(data: Any = None, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -43,6 +48,25 @@ def _serialize_author(snapshot: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _safe_related_record(post: BBSPost) -> Dict[str, Any]:
+    """安全获取关联开播记录信息，防止脏数据导致异常。"""
+    dbref = getattr(post, '_data', {}).get('related_battle_record')
+    record_id = None
+    if dbref is not None:
+        record_id = str(dbref.id)
+    try:
+        related = post.related_battle_record
+    except DoesNotExist:
+        if record_id:
+            logger.warning('BBS帖子关联的开播记录已被删除：post=%s record=%s', post.id, record_id)
+        else:
+            logger.warning('BBS帖子关联的开播记录已被删除：post=%s record=未知', post.id)
+        return {'id': record_id, 'missing': True}
+    if not related:
+        return {'id': None, 'missing': False}
+    return {'id': str(related.id), 'missing': False}
+
+
 def serialize_board(board: BBSBoard) -> Dict[str, Any]:
     """序列化板块信息。"""
     return {
@@ -68,6 +92,7 @@ def serialize_post_summary(post: BBSPost,
                            last_reply_user: Optional[Dict[str, Any]] = None,
                            last_reply_time: Optional[datetime] = None) -> Dict[str, Any]:
     """序列化用于列表展示的帖子摘要。"""
+    record_info = _safe_related_record(post)
     return {
         'id': str(post.id),
         'board_id': str(post.board.id) if post.board else None,
@@ -80,7 +105,8 @@ def serialize_post_summary(post: BBSPost,
         'is_pinned': bool(post.is_pinned),
         'reply_count': reply_count,
         'author': _serialize_author(post.author_snapshot),
-        'related_battle_record_id': str(post.related_battle_record.id) if post.related_battle_record else None,
+        'related_battle_record_id': record_info['id'],
+        'related_battle_record_missing': record_info['missing'],
         'created_at': _format_timestamp(post.created_at),
         'updated_at': _format_timestamp(post.updated_at),
         'last_active_at': _format_timestamp(post.last_active_at),
@@ -112,6 +138,7 @@ def serialize_post_detail(post: BBSPost,
                           latest_reply_time: Optional[datetime] = None,
                           latest_reply_author: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """序列化帖子详情（包含回复树与关联主播）。"""
+    record_info = _safe_related_record(post)
     top_level: Dict[str, Dict[str, Any]] = {}
     for reply in replies:
         if reply.parent_reply:
@@ -150,7 +177,8 @@ def serialize_post_detail(post: BBSPost,
             'content': post.content,
             'status': post.status.value if post.status else BBSPostStatus.PUBLISHED.value,
             'is_pinned': bool(post.is_pinned),
-            'related_battle_record_id': str(post.related_battle_record.id) if post.related_battle_record else None,
+            'related_battle_record_id': record_info['id'],
+            'related_battle_record_missing': record_info['missing'],
             'author': _serialize_author(post.author_snapshot),
             'created_at': _format_timestamp(post.created_at),
             'updated_at': _format_timestamp(post.updated_at),

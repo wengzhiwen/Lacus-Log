@@ -120,6 +120,9 @@
       const tags = [];
       if (item.is_pinned) tags.push('<span class="tag tag-info">置顶</span>');
       if (item.status === 'hidden') tags.push('<span class="tag tag-warning">隐藏</span>');
+      if (item.related_battle_record_missing) {
+        tags.push('<span class="tag tag-warning">关联记录丢失</span>');
+      }
 
       const lastReply = item.last_reply
         ? `<span>最后回复：${item.last_reply.author?.display_name || '-'} · ${item.last_reply.time?.display || '-'}</span>`
