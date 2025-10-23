@@ -465,10 +465,10 @@ function buildBaseSalaryLabel(record) {
   const summary = record.base_salary_summary;
   if (summary) {
     if (summary.status === 'approved') {
-      return `<span class="base-salary">底薪¥${summary.amount}</span>`;
+      return `<span class="base-salary">预计底薪¥${summary.amount}</span>`;
     }
     const statusDisplay = summary.status_display || '';
-    return `<span class="base-salary">底薪${statusDisplay}</span>`;
+    return `<span class="base-salary">预计底薪${statusDisplay}</span>`;
   }
   return `<span class="base-salary">未申请</span>`;
 }
