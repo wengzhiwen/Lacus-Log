@@ -388,28 +388,6 @@
     }
   }
 
-  function runCardAnimation() {
-    const cards = app.querySelectorAll('.cards .card');
-    cards.forEach(card => {
-      card.classList.add('flip-enter');
-    });
-
-    requestAnimationFrame(() => {
-      const baseDelay = 200;
-      cards.forEach((card, idx) => {
-        setTimeout(() => {
-          card.classList.remove('flip-enter');
-          card.classList.add('flip-in');
-          const handler = () => {
-            card.classList.remove('flip-in');
-            card.removeEventListener('animationend', handler);
-          };
-          card.addEventListener('animationend', handler);
-        }, idx * baseDelay);
-      });
-    });
-  }
-
   function showError(message) {
     if (errorEl) {
       errorEl.textContent = message;
@@ -532,7 +510,6 @@
     .then(() => {
       hideError();
       setupCardNavigation();
-      runCardAnimation();
     })
     .catch(error => {
       console.error('加载仪表盘失败：', error);
