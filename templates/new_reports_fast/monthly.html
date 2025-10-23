@@ -1,0 +1,612 @@
+{% extends "base.html" %}
+
+{% block title %}开播新月报 - {{ pagination.month }}{% endblock %}
+
+{% block content %}
+<div id="monthlyReportApp" data-report-month="{{ pagination.month }}" data-selected-owner="{{ selected_owner }}" data-selected-mode="{{ selected_mode }}">
+  <div class="page-header">
+    <h1 class="page-title">📒 开播新月报</h1>
+  </div>
+
+  <div class="date-navigation">
+    <div class="date-controls">
+      <a href="{{ url_for('new_report_fast.monthly_report_fast', month=pagination.prev_month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 上个月</a>
+      <input type="month" id="monthSelector" value="{{ pagination.month }}" class="date-input">
+      <a href="{{ url_for('new_report_fast.monthly_report_fast', month=pagination.next_month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">下个月 →</a>
+    </div>
+    <div class="export-actions">
+      <a href="{{ url_for('new_report_fast.export_monthly_fast_csv', month=pagination.month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <div class="filter-controls">
+      <label for="ownerSelector" class="filter-label">直属运营：</label>
+      <select id="ownerSelector" class="filter-select" data-selected-owner="{{ selected_owner }}">
+        <option value="all">全部</option>
+      </select>
+
+      <label for="modeSelector" class="filter-label">开播方式：</label>
+      <select id="modeSelector" class="filter-select">
+        <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
+        <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
+        <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="summary-section">
+    <div id="monthly-loading-state" class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+    <div style="display: none;" id="monthly-content">
+      <h2 class="section-title" id="monthly-summary-title"></h2>
+      <div class="summary-cards blast-intro" data-animate-group="month" id="monthly-summary-cards"></div>
+    </div>
+  </div>
+
+  <div class="details-section">
+    <h2 class="section-title">月报明细</h2>
+    <div class="table-container" id="monthly-table-container" style="display: none;">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="fixed-col">主播</th>
+            <th>性别年龄</th>
+            <th>直属运营</th>
+            <th>主播分类</th>
+            <th>月累计开播记录数</th>
+            <th>月均播时(小时)</th>
+            <th>月累计流水(元)</th>
+            <th>月累计主播分成(元)</th>
+            <th>月累计公司分成(元)</th>
+            <th>月最新返点比例(%)</th>
+            <th>月累计返点(元)</th>
+            <th>月累计底薪(元)</th>
+            <th>月累计毛利(元)</th>
+          </tr>
+        </thead>
+        <tbody id="monthly-details-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="monthly-empty-state" style="display: none;">
+      <p>本月暂无开播记录</p>
+    </div>
+  </div>
+</div>
+
+<style>
+
+.date-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--table-header);
+  border-radius: 8px;
+}
+
+.date-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.export-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-section {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+.filter-select {
+  padding: 6px 12px;
+  border: 1px solid var(--gray);
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+  min-width: 120px;
+}
+
+.summary-section {
+  margin: 24px 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.blast-intro {
+  perspective: 800px;
+  perspective-origin: 50% 35%;
+}
+
+.blast-intro .summary-card {
+  transform: translateY(40px) translateZ(-120px) rotateZ(-8deg) rotateX(8deg) scale(0.6);
+  opacity: 0;
+  filter: blur(8px) saturate(0.9);
+  will-change: transform, opacity, filter, box-shadow;
+}
+
+.blast-intro.play .summary-card {
+  animation: blastIn 900ms cubic-bezier(0.2, 0.8, 0.2, 1.1) forwards;
+}
+
+.blast-intro.play .summary-card:nth-child(1) { animation-delay: 0ms; }
+.blast-intro.play .summary-card:nth-child(2) { animation-delay: 80ms; }
+.blast-intro.play .summary-card:nth-child(3) { animation-delay: 160ms; }
+.blast-intro.play .summary-card:nth-child(4) { animation-delay: 240ms; }
+.blast-intro.play .summary-card:nth-child(5) { animation-delay: 320ms; }
+.blast-intro.play .summary-card:nth-child(6) { animation-delay: 400ms; }
+.blast-intro.play .summary-card:nth-child(7) { animation-delay: 480ms; }
+
+@keyframes blastIn {
+  0%   { transform: translateY(40px) translateZ(-120px) rotateZ(-8deg) rotateX(8deg) scale(0.6); opacity: 0; filter: blur(8px) saturate(0.9); }
+  60%  { transform: translateY(-6px) translateZ(20px) rotateZ(2deg) rotateX(-3deg) scale(1.04); opacity: 1; filter: blur(0) saturate(1); }
+  85%  { transform: translateY(3px) translateZ(-10px) rotateZ(-1deg) rotateX(1deg) scale(0.99); opacity: 1; filter: blur(0) saturate(1); }
+  100% { transform: translateY(0) translateZ(0) rotateZ(0) rotateX(0) scale(1); opacity: 1; filter: blur(0) saturate(1); }
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  transition: box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.summary-card.danger-outline {
+  border-color: #dc3545;
+}
+
+.card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+
+.details-section {
+  margin: 24px 0;
+}
+
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1600px;
+}
+
+.report-table th,
+.report-table td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.report-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.report-table th.fixed-col,
+.report-table td.fixed-col {
+  position: sticky;
+  left: 0;
+  background: #fff; 
+  background-clip: padding-box;
+  min-width: 120px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-table td.fixed-col { z-index: 4; }
+.report-table th.fixed-col { z-index: 5; }
+
+.report-table td.fixed-col { box-shadow: 2px 0 0 #eee; }
+.report-table th.fixed-col { box-shadow: 2px 0 0 #ddd; }
+
+.report-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+
+.pilot-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pilot-link:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
+.text-danger {
+  color: #dc3545 !important;
+  font-weight: 600;
+}
+
+
+@media (max-width: 768px) {
+  .date-navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .filter-select {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .summary-card {
+    padding: 12px;
+  }
+
+  .card-value {
+    font-size: 20px;
+  }
+
+  .report-table {
+    font-size: 12px;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 8px 6px;
+  }
+}
+</style>
+
+<script>
+(function() {
+  const app = document.getElementById('monthlyReportApp');
+  if (!app) {
+    return;
+  }
+
+  const ownerSelector = document.getElementById('ownerSelector');
+  const modeSelector = document.getElementById('modeSelector');
+  const monthSelector = document.getElementById('monthSelector');
+  const summaryTitle = document.getElementById('monthly-summary-title');
+  const summaryCards = document.getElementById('monthly-summary-cards');
+  const tableContainer = document.getElementById('monthly-table-container');
+  const detailsBody = document.getElementById('monthly-details-body');
+  const emptyState = document.getElementById('monthly-empty-state');
+  const emptyStateText = emptyState.querySelector('p');
+  const operatorsApi = '{{ url_for('users_api.get_operators') }}';
+  const monthlyApi = '{{ url_for('new_reports_fast_api.monthly_report_data_fast') }}';
+  const reportPageUrl = '{{ url_for('new_report_fast.monthly_report_fast') }}';
+  const pilotPerformanceTemplate = '{{ url_for('pilot.pilot_performance', pilot_id='__PID__') }}';
+
+  const rankMapping = {
+    '候补机师': '候选人',
+    '训练机师': '试播主播',
+    '实习机师': '实习主播',
+    '正式机师': '正式主播'
+  };
+
+  let currentMonth = app.dataset.reportMonth;
+  let currentOwner = app.dataset.selectedOwner || 'all';
+  let currentMode = app.dataset.selectedMode || 'all';
+  const emptyFallbackText = emptyStateText ? emptyStateText.textContent : '';
+
+  function formatMoney(value) {
+    if (value === null || value === undefined) {
+      return '¥0.00';
+    }
+    return '¥' + Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatHours(value) {
+    if (value === null || value === undefined) {
+      return '0.0小时';
+    }
+    return Number(value).toFixed(1) + '小时';
+  }
+
+  function formatRate(value) {
+    if (value === null || value === undefined) {
+      return '0%';
+    }
+    return Math.round(Number(value) * 100) + '%';
+  }
+
+  function normalizeRank(value) {
+    if (!value) {
+      return '';
+    }
+    return rankMapping[value] || value;
+  }
+
+  function formatMonthDisplay(monthStr) {
+    if (!monthStr) {
+      return '';
+    }
+    const parts = monthStr.split('-');
+    if (parts.length !== 2) {
+      return monthStr;
+    }
+    return `${parts[0]}年${parts[1]}月`;
+  }
+
+  function buildSummaryCards(summary) {
+    const rebateSum = summary.rebate_sum || 0;
+    const operatingProfit = summary.operating_profit || 0;
+
+    const items = [
+      { label: '总主播数量', value: (summary.pilot_count || 0).toLocaleString('zh-CN') },
+      { label: '累计流水', value: formatMoney(summary.revenue_sum || 0) },
+      {
+        label: '累计底薪支出',
+        value: formatMoney(summary.basepay_sum || 0),
+        sub: summary.conversion_rate !== null && summary.conversion_rate !== undefined ? `转换率${summary.conversion_rate}%` : ''
+      },
+      { label: '累计返点', value: formatMoney(rebateSum) },
+      { label: '累计主播分成', value: formatMoney(summary.pilot_share_sum || 0) },
+      { label: '累计公司分成', value: formatMoney(summary.company_share_sum || 0) },
+      { label: '运营利润估算', value: formatMoney(operatingProfit), danger: operatingProfit < 0 }
+    ];
+
+    summaryCards.innerHTML = items.map(item => {
+      const dangerClass = item.danger ? ' danger-outline' : '';
+      const subHtml = item.sub ? `<div class="card-sub">${item.sub}</div>` : '';
+      return `<div class="summary-card${dangerClass}">
+        <div class="card-label">${item.label}</div>
+        <div class="card-value">${item.value}</div>
+        ${subHtml}
+      </div>`;
+    }).join('');
+
+    summaryCards.classList.remove('play');
+    void summaryCards.offsetWidth;
+    summaryCards.classList.add('play');
+  }
+
+  function renderDetails(details, monthStr) {
+    if (!details || details.length === 0) {
+      detailsBody.innerHTML = '';
+      tableContainer.style.display = 'none';
+      if (emptyStateText) {
+        emptyStateText.textContent = emptyFallbackText;
+      }
+      emptyState.style.display = 'block';
+      return;
+    }
+
+    const rows = details.map(detail => {
+      const profitClass = detail.total_profit !== null && detail.total_profit < 0 ? 'text-danger' : '';
+      const pilotUrl = pilotPerformanceTemplate.replace('__PID__', detail.pilot_id) + `?from=monthly_report&month=${encodeURIComponent(monthStr)}`;
+      return `<tr>
+        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td>${detail.gender_age || ''}</td>
+        <td>${detail.owner || ''}</td>
+        <td>${normalizeRank(detail.rank)}</td>
+        <td>${detail.records_count || 0}</td>
+        <td>${formatHours(detail.avg_duration)}</td>
+        <td>${formatMoney(detail.total_revenue)}</td>
+        <td>${formatMoney(detail.total_pilot_share)}</td>
+        <td>${formatMoney(detail.total_company_share)}</td>
+        <td>${formatRate(detail.rebate_rate)}</td>
+        <td>${formatMoney(detail.rebate_amount)}</td>
+        <td>${formatMoney(detail.total_base_salary)}</td>
+        <td class="${profitClass}">${formatMoney(detail.total_profit)}</td>
+      </tr>`;
+    }).join('');
+
+    detailsBody.innerHTML = rows;
+    emptyState.style.display = 'none';
+    tableContainer.style.display = 'block';
+  }
+
+  function showLoading() {
+    const loadingState = document.getElementById('monthly-loading-state');
+    const content = document.getElementById('monthly-content');
+    const tableContainer = document.getElementById('monthly-table-container');
+    const emptyState = document.getElementById('monthly-empty-state');
+
+    loadingState.style.display = 'block';
+    content.style.display = 'none';
+    tableContainer.style.display = 'none';
+    emptyState.style.display = 'none';
+  }
+
+  function showError(message) {
+    const loadingState = document.getElementById('monthly-loading-state');
+    const content = document.getElementById('monthly-content');
+    const tableContainer = document.getElementById('monthly-table-container');
+    const emptyState = document.getElementById('monthly-empty-state');
+    const emptyStateText = emptyState.querySelector('p');
+
+    loadingState.style.display = 'none';
+    content.style.display = 'block';
+    summaryTitle.textContent = '加载失败';
+    summaryCards.innerHTML = '';
+    detailsBody.innerHTML = '';
+    tableContainer.style.display = 'none';
+    if (emptyStateText) {
+      emptyStateText.textContent = message;
+    }
+    emptyState.style.display = 'block';
+  }
+
+  async function loadOwnerOptions() {
+    try {
+      const response = await fetch(operatorsApi);
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载运营失败');
+      }
+      const operators = payload.data || [];
+      operators.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.nickname || user.username || user.id;
+        ownerSelector.appendChild(option);
+      });
+      ownerSelector.value = currentOwner;
+    } catch (error) {
+      console.error('加载直属运营列表失败：', error);
+      ownerSelector.value = currentOwner;
+    }
+  }
+
+  function buildMonthlyApiUrl() {
+    const params = new URLSearchParams();
+    if (currentMonth) {
+      params.set('month', currentMonth);
+    }
+    if (currentOwner && currentOwner !== 'all') {
+      params.set('owner', currentOwner);
+    }
+    if (currentMode && currentMode !== 'all') {
+      params.set('mode', currentMode);
+    }
+    return `${monthlyApi}?${params.toString()}`;
+  }
+
+  async function loadMonthlyReport() {
+    showLoading();
+    try {
+      const response = await fetch(buildMonthlyApiUrl());
+      const payload = await response.json();
+      if (!payload.success) {
+        throw new Error(payload.error ? payload.error.message : '加载失败');
+      }
+      const data = payload.data;
+      const filters = payload.meta ? payload.meta.filters : null;
+      currentMonth = data.month;
+      if (filters) {
+        currentOwner = filters.owner || 'all';
+        currentMode = filters.mode || 'all';
+      }
+      monthSelector.value = currentMonth;
+      ownerSelector.value = currentOwner;
+      modeSelector.value = currentMode;
+      // 隐藏loading状态，显示内容
+      const loadingState = document.getElementById('monthly-loading-state');
+      const content = document.getElementById('monthly-content');
+      loadingState.style.display = 'none';
+      content.style.display = 'block';
+
+      summaryTitle.textContent = `${formatMonthDisplay(currentMonth)} 月度汇总`;
+      buildSummaryCards(data.summary || {});
+      renderDetails(data.details || [], currentMonth);
+    } catch (error) {
+      console.error('加载开播新月报失败：', error);
+      showError('报表加载失败，请稍后再试');
+    }
+  }
+
+  function navigate(params) {
+    const url = new URL(reportPageUrl, window.location.origin);
+    const targetMonth = params.month || currentMonth;
+    const targetOwner = params.owner !== undefined ? params.owner : currentOwner;
+    const targetMode = params.mode !== undefined ? params.mode : currentMode;
+    if (targetMonth) {
+      url.searchParams.set('month', targetMonth);
+    }
+    url.searchParams.set('owner', targetOwner || 'all');
+    url.searchParams.set('mode', targetMode || 'all');
+    window.location.href = url.toString();
+  }
+
+  monthSelector.addEventListener('change', function() {
+    if (this.value) {
+      navigate({ month: this.value });
+    }
+  });
+
+  ownerSelector.addEventListener('change', function() {
+    navigate({ owner: this.value || 'all' });
+  });
+
+  modeSelector.addEventListener('change', function() {
+    navigate({ mode: this.value || 'all' });
+  });
+
+  (async function init() {
+    await loadOwnerOptions();
+    await loadMonthlyReport();
+  })();
+})();
+</script>
+{% endblock %}

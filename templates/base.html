@@ -128,6 +128,7 @@
       <a class="navlink" href="{{ url_for('new_report.daily_report') }}">📒新-开播日报</a>
       <a class="navlink" href="{{ url_for('new_report.weekly_report') }}">📒新-开播周报</a>
       <a class="navlink" href="{{ url_for('new_report.monthly_report') }}">📒新-开播月报</a>
+      <a class="navlink" href="{{ url_for('new_report_fast.monthly_report_fast') }}">📒快！-开播月报</a>
       <a class="navlink" href="{{ url_for('report.base_salary_applications_list') }}">💰财务-底薪管理</a>
       {% if current_user.has_role('gicho') %}
       <a class="navlink" href="{{ url_for('report_mail.mail_reports_page') }}">📧邮件报告</a>
