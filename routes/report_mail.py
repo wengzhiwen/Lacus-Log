@@ -366,13 +366,13 @@ def _build_live_overtime_markdown(items: List[Dict[str, str]]) -> str:
     if not items:
         return ''
 
-    header = ("| 主播昵称 | 真实姓名 | 直属运营-主播分类 | 开播方式 | 开播地点 | 开播开始时间（GMT+8） | 当前持续时长（小时） | 备注 |\n"
-              "| --- | --- | --- | --- | --- | --- | ---: | --- |")
+    header = ("| 主播昵称 | 真实姓名 | 直属运营-主播分类 | 开播地点 | 开播开始时间（GMT+8） | 当前持续时长（小时） | 备注 |\n"
+              "| --- | --- | --- | --- | --- | ---: | --- |")
 
     lines = [header]
     for it in items:
         line = (f"| {it['pilot_name']} | {it['real_name']} | {it['owner_rank']} | "
-                f"{it['work_mode']} | {it['location']} | {it['start_local']} | "
+                f"{it['location']} | {it['start_local']} | "
                 f"{it['duration_hours']} | {it['note']} |")
         lines.append(line)
 
