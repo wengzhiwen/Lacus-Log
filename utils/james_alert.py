@@ -296,6 +296,7 @@ def build_new_pilot_warning_email_content(pilot_info, pilot_stats, milestone):
 
     content = f"""# {pilot_info['nickname']}（{pilot_info['real_name']}）正在接受新主播生存警告
 
+> 拉科斯判定：这是一个活到了第{milestone}天的新主播
 > 第{milestone}笔底薪确认发放，詹姆斯建议运营重点关注该新主播的近7日表现
 
 ## 基本信息
