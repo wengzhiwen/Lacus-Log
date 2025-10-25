@@ -52,19 +52,45 @@
       <table class="report-table">
         <thead>
           <tr>
-            <th class="fixed-col">主播</th>
-            <th>性别年龄</th>
-            <th>直属运营</th>
-            <th>主播分类</th>
-            <th>月累计开播记录数</th>
-            <th>月均播时(小时)</th>
-            <th>月累计流水(元)</th>
-            <th>月累计主播分成(元)</th>
-            <th>月累计公司分成(元)</th>
-            <th>月最新返点比例(%)</th>
-            <th>月累计返点(元)</th>
-            <th>月累计底薪(元)</th>
-            <th>月累计毛利(元)</th>
+            <th class="fixed-col sortable-header" data-sort-key="pilot_display" data-sort-type="string" tabindex="0" aria-sort="none">主播
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="gender_age" data-sort-type="string" tabindex="0" aria-sort="none">性别年龄
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="owner" data-sort-type="string" tabindex="0" aria-sort="none">直属运营
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="rank" data-sort-type="string" tabindex="0" aria-sort="none">主播分类
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="records_count" data-sort-type="number" tabindex="0" aria-sort="none">月累计开播记录数
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="avg_duration" data-sort-type="number" tabindex="0" aria-sort="none">月均播时(小时)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="total_revenue" data-sort-type="number" tabindex="0" aria-sort="none">月累计流水(元)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="total_pilot_share" data-sort-type="number" tabindex="0" aria-sort="none">月累计主播分成(元)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="total_company_share" data-sort-type="number" tabindex="0" aria-sort="none">月累计公司分成(元)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="rebate_rate" data-sort-type="number" tabindex="0" aria-sort="none">月最新返点比例(%)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="rebate_amount" data-sort-type="number" tabindex="0" aria-sort="none">月累计返点(元)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="total_base_salary" data-sort-type="number" tabindex="0" aria-sort="none">月累计底薪(元)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="total_profit" data-sort-type="number" tabindex="0" aria-sort="none">月累计毛利(元)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
           </tr>
         </thead>
         <tbody id="monthly-details-body"></tbody>
@@ -402,6 +428,41 @@
   font-weight: 600;
 }
 
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  position: relative;
+}
+
+.sortable-header:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.sort-indicator {
+  display: inline-flex;
+  margin-left: 4px;
+  font-size: 12px;
+  opacity: 0.45;
+}
+
+.sortable-header.is-sorted .sort-indicator {
+  opacity: 0.9;
+}
+
+.sortable-header.is-sorted-asc .sort-indicator::before {
+  content: '▲';
+}
+
+.sortable-header.is-sorted-desc .sort-indicator::before {
+  content: '▼';
+}
+
+.sortable-header:not(.is-sorted) .sort-indicator::before {
+  content: '↕';
+}
+
 
 @media (max-width: 768px) {
   .date-navigation {
@@ -470,6 +531,8 @@
   const chartModalClose = document.getElementById('metricChartClose');
   const chartCanvas = document.getElementById('metricChartCanvas');
   const chartMetricSwitcher = document.getElementById('chartMetricSwitcher');
+  const reportTable = document.querySelector('.report-table');
+  const sortableHeaders = reportTable ? Array.from(reportTable.querySelectorAll('th[data-sort-key]')) : [];
 
   const rankMapping = {
     '候补机师': '候选人',
@@ -525,6 +588,9 @@
   let currentMetricKey = null;
 
   let currentMonth = app.dataset.reportMonth;
+  let currentDetails = [];
+  let currentDetailsMonth = '';
+  let currentSort = { key: null, direction: 'desc', type: null };
   let currentOwner = app.dataset.selectedOwner || 'all';
   let currentMode = app.dataset.selectedMode || 'all';
   const emptyFallbackText = emptyStateText ? emptyStateText.textContent : '';
@@ -613,6 +679,116 @@
       previous = current;
     });
     return values;
+  }
+
+  function initSorting() {
+    if (!sortableHeaders.length) {
+      return;
+    }
+    sortableHeaders.forEach(header => {
+      header.addEventListener('click', () => handleHeaderSort(header));
+      header.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleHeaderSort(header);
+        }
+      });
+    });
+    updateHeaderSortStates();
+  }
+
+  function handleHeaderSort(header) {
+    if (!header || !currentDetails.length) {
+      return;
+    }
+    const sortKey = header.dataset.sortKey;
+    if (!sortKey) {
+      return;
+    }
+    const sortType = header.dataset.sortType || 'string';
+    let direction = 'asc';
+    if (currentSort.key === sortKey) {
+      direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else if (sortType === 'number') {
+      direction = 'desc';
+    }
+    currentSort = { key: sortKey, direction, type: sortType };
+    updateHeaderSortStates();
+    renderSortedDetails();
+  }
+
+  function updateHeaderSortStates() {
+    if (!sortableHeaders.length) {
+      return;
+    }
+    sortableHeaders.forEach(header => {
+      const isActive = currentSort.key && header.dataset.sortKey === currentSort.key;
+      header.classList.toggle('is-sorted', Boolean(isActive));
+      header.classList.toggle('is-sorted-asc', Boolean(isActive && currentSort.direction === 'asc'));
+      header.classList.toggle('is-sorted-desc', Boolean(isActive && currentSort.direction === 'desc'));
+      header.setAttribute('aria-sort', isActive ? (currentSort.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+    });
+  }
+
+  function extractSortValue(value, type) {
+    if (type === 'number') {
+      const numeric = Number(value);
+      return Number.isNaN(numeric) ? 0 : numeric;
+    }
+    return (value || '').toString();
+  }
+
+  function sortDetailsData(dataset) {
+    if (!currentSort.key) {
+      return dataset;
+    }
+    const { key, direction, type } = currentSort;
+    const multiplier = direction === 'asc' ? 1 : -1;
+    dataset.sort((a, b) => {
+      const valueA = extractSortValue(a[key], type);
+      const valueB = extractSortValue(b[key], type);
+      if (type === 'number') {
+        if (valueA === valueB) {
+          return 0;
+        }
+        return (valueA > valueB ? 1 : -1) * multiplier;
+      }
+      return valueA.localeCompare(valueB, 'zh-CN', { sensitivity: 'base' }) * multiplier;
+    });
+    return dataset;
+  }
+
+  function buildDetailRows(details, monthStr) {
+    return details.map(detail => {
+      const profitClass = detail.total_profit !== null && detail.total_profit < 0 ? 'text-danger' : '';
+      const monthParam = monthStr ? encodeURIComponent(monthStr) : '';
+      const pilotUrl = pilotPerformanceTemplate.replace('__PID__', detail.pilot_id) + `?from=monthly_report&month=${monthParam}`;
+      return `<tr>
+        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td>${detail.gender_age || ''}</td>
+        <td>${detail.owner || ''}</td>
+        <td>${normalizeRank(detail.rank)}</td>
+        <td>${detail.records_count || 0}</td>
+        <td>${formatHours(detail.avg_duration)}</td>
+        <td>${formatMoney(detail.total_revenue)}</td>
+        <td>${formatMoney(detail.total_pilot_share)}</td>
+        <td>${formatMoney(detail.total_company_share)}</td>
+        <td>${formatRate(detail.rebate_rate)}</td>
+        <td>${formatMoney(detail.rebate_amount)}</td>
+        <td>${formatMoney(detail.total_base_salary)}</td>
+        <td class="${profitClass}">${formatMoney(detail.total_profit)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderSortedDetails() {
+    if (!currentDetails.length) {
+      return;
+    }
+    const monthStr = currentDetailsMonth || currentMonth || '';
+    const dataset = [...currentDetails];
+    sortDetailsData(dataset);
+    detailsBody.innerHTML = buildDetailRows(dataset, monthStr);
   }
 
   function handleSummaryCardClick(event) {
@@ -808,39 +984,22 @@
   }
 
   function renderDetails(details, monthStr) {
-    if (!details || details.length === 0) {
+    currentDetailsMonth = monthStr || currentMonth || '';
+    currentDetails = Array.isArray(details) ? details.slice() : [];
+    if (!currentDetails.length) {
       detailsBody.innerHTML = '';
       tableContainer.style.display = 'none';
       if (emptyStateText) {
         emptyStateText.textContent = emptyFallbackText;
       }
       emptyState.style.display = 'block';
+      updateHeaderSortStates();
       return;
     }
-
-    const rows = details.map(detail => {
-      const profitClass = detail.total_profit !== null && detail.total_profit < 0 ? 'text-danger' : '';
-      const pilotUrl = pilotPerformanceTemplate.replace('__PID__', detail.pilot_id) + `?from=monthly_report&month=${encodeURIComponent(monthStr)}`;
-      return `<tr>
-        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
-        <td>${detail.gender_age || ''}</td>
-        <td>${detail.owner || ''}</td>
-        <td>${normalizeRank(detail.rank)}</td>
-        <td>${detail.records_count || 0}</td>
-        <td>${formatHours(detail.avg_duration)}</td>
-        <td>${formatMoney(detail.total_revenue)}</td>
-        <td>${formatMoney(detail.total_pilot_share)}</td>
-        <td>${formatMoney(detail.total_company_share)}</td>
-        <td>${formatRate(detail.rebate_rate)}</td>
-        <td>${formatMoney(detail.rebate_amount)}</td>
-        <td>${formatMoney(detail.total_base_salary)}</td>
-        <td class="${profitClass}">${formatMoney(detail.total_profit)}</td>
-      </tr>`;
-    }).join('');
-
-    detailsBody.innerHTML = rows;
     emptyState.style.display = 'none';
     tableContainer.style.display = 'block';
+    updateHeaderSortStates();
+    renderSortedDetails();
   }
 
   function showLoading() {
@@ -972,6 +1131,7 @@
 
   (async function init() {
     await loadOwnerOptions();
+    initSorting();
     await loadMonthlyReport();
   })();
 })();
