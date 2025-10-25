@@ -7,8 +7,9 @@ from flask import Blueprint, jsonify, request
 
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.new_report_fast_calculations import calculate_monthly_details_fast, calculate_monthly_summary_fast
-from utils.new_report_serializers import create_error_response, create_success_response, serialize_monthly_details, serialize_monthly_summary
+from utils.new_report_fast_calculations import calculate_monthly_report_fast
+from utils.new_report_serializers import (create_error_response, create_success_response, serialize_monthly_daily_series, serialize_monthly_details,
+                                          serialize_monthly_summary)
 from utils.new_report_calculations import get_local_month_from_string
 from utils.timezone_helper import get_current_utc_time, utc_to_local
 
@@ -53,8 +54,7 @@ def monthly_report_data_fast():
 
     logger.info('获取开播新月报（加速版）数据，月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
 
-    summary_raw = calculate_monthly_summary_fast(report_month.year, report_month.month, owner_id, mode)
-    details_raw = calculate_monthly_details_fast(report_month.year, report_month.month, owner_id, mode)
+    summary_raw, details_raw, daily_series_raw = calculate_monthly_report_fast(report_month.year, report_month.month, owner_id, mode)
 
     prev_month_ref = (report_month.replace(day=1) - timedelta(days=1)).replace(day=1)
     next_month_ref = (report_month.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -69,6 +69,7 @@ def monthly_report_data_fast():
         'month': pagination['month'],
         'summary': serialize_monthly_summary(summary_raw),
         'details': serialize_monthly_details(details_raw),
+        'daily_series': serialize_monthly_daily_series(daily_series_raw),
         'pagination': pagination,
     }
 

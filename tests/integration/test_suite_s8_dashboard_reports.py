@@ -66,31 +66,27 @@ class TestS8DashboardReportsFixed:
         验证日报、月报、加速版报表API的可用性
         """
         current_date = datetime.now()
-        report_apis = [
-            {
-                'name': '新日报API',
-                'endpoint': '/new-reports/api/daily',
-                'params': {
-                    'date': current_date.strftime('%Y-%m-%d'),
-                    'mode': 'offline'
-                }
-            },
-            {
-                'name': '新月报API',
-                'endpoint': '/new-reports/api/monthly',
-                'params': {
-                    'month': current_date.strftime('%Y-%m'),
-                    'mode': 'offline'
-                }
-            },
-            {
-                'name': '加速版月报API',
-                'endpoint': '/new-reports-fast/api/monthly',
-                'params': {
-                    'mode': 'offline'
-                }
+        report_apis = [{
+            'name': '新日报API',
+            'endpoint': '/new-reports/api/daily',
+            'params': {
+                'date': current_date.strftime('%Y-%m-%d'),
+                'mode': 'offline'
             }
-        ]
+        }, {
+            'name': '新月报API',
+            'endpoint': '/new-reports/api/monthly',
+            'params': {
+                'month': current_date.strftime('%Y-%m'),
+                'mode': 'offline'
+            }
+        }, {
+            'name': '加速版月报API',
+            'endpoint': '/new-reports-fast/api/monthly',
+            'params': {
+                'mode': 'offline'
+            }
+        }]
 
         success_count = 0
         total_count = len(report_apis)
@@ -110,6 +106,29 @@ class TestS8DashboardReportsFixed:
         success_rate = success_count / total_count
         assert success_rate >= 0.5, f"报表API可用性太低: {success_count}/{total_count} ({success_rate:.1%})"
 
+    def test_s8_tc5_fast_monthly_daily_series_structure(self, admin_client):
+        """S8-TC5-修复 加速版月报API应返回日级序列供前端绘图"""
+        response = admin_client.get('/new-reports-fast/api/monthly', params={'mode': 'offline'})
+        assert response.get('success'), f"API调用失败: {response}"
+
+        data = response.get('data') or {}
+        assert 'daily_series' in data, '响应缺少daily_series字段'
+        daily_series = data['daily_series']
+        assert isinstance(daily_series, list), 'daily_series必须为列表'
+
+        if daily_series:
+            sample = daily_series[0]
+            required_keys = [
+                'date',
+                'revenue_cumulative',
+                'basepay_cumulative',
+                'pilot_share_cumulative',
+                'company_share_cumulative',
+                'operating_profit_cumulative',
+            ]
+            missing = [key for key in required_keys if key not in sample]
+            assert not missing, f"daily_series元素缺少字段: {missing}"
+
     def test_s8_tc3_email_report_apis_availability(self, admin_client):
         """
         S8-TC3-修复 邮件报表API可用性测试
@@ -117,26 +136,23 @@ class TestS8DashboardReportsFixed:
         验证邮件报表相关API的可用性
         """
         current_date = datetime.now()
-        mail_apis = [
-            {
-                'name': '日报邮件',
-                'endpoint': '/reports/mail/daily-report',
-                'data': {
-                    'report_date': current_date.strftime('%Y-%m-%d'),
-                    'recipients': ['test@example.com'],
-                    'format': 'pdf'
-                }
-            },
-            {
-                'name': '月报邮件',
-                'endpoint': '/reports/mail/monthly-report',
-                'data': {
-                    'report_month': current_date.strftime('%Y-%m'),
-                    'recipients': ['test@example.com'],
-                    'format': 'excel'
-                }
+        mail_apis = [{
+            'name': '日报邮件',
+            'endpoint': '/reports/mail/daily-report',
+            'data': {
+                'report_date': current_date.strftime('%Y-%m-%d'),
+                'recipients': ['test@example.com'],
+                'format': 'pdf'
             }
-        ]
+        }, {
+            'name': '月报邮件',
+            'endpoint': '/reports/mail/monthly-report',
+            'data': {
+                'report_month': current_date.strftime('%Y-%m'),
+                'recipients': ['test@example.com'],
+                'format': 'excel'
+            }
+        }]
 
         success_count = 0
         total_count = len(mail_apis)
@@ -197,11 +213,7 @@ class TestS8DashboardReportsFixed:
                         print(f"✅ 招募记录创建成功: {recruit_id}")
 
                 # 4. 测试BBS数据创建
-                bbs_data = bbs_post_factory.create_bbs_post_data(
-                    author_id=kancho_id,
-                    title="S8测试主贴",
-                    content="这是S8测试套件创建的测试主贴"
-                )
+                bbs_data = bbs_post_factory.create_bbs_post_data(author_id=kancho_id, title="S8测试主贴", content="这是S8测试套件创建的测试主贴")
                 bbs_response = admin_client.post('/api/bbs/posts', json=bbs_data)
 
                 if bbs_response.get('success'):
@@ -225,10 +237,12 @@ class TestS8DashboardReportsFixed:
         测试各种边界条件和错误参数的处理
         """
         # 测试无效日期格式
-        invalid_date_response = admin_client.get('/new-reports/api/daily', params={
-            'date': '2024-13-45',  # 无效日期
-            'mode': 'offline'
-        })
+        invalid_date_response = admin_client.get(
+            '/new-reports/api/daily',
+            params={
+                'date': '2024-13-45',  # 无效日期
+                'mode': 'offline'
+            })
 
         # 验证返回合理的错误响应（邮件API可能有配置问题）
         if not invalid_date_response.get('success'):
@@ -236,10 +250,12 @@ class TestS8DashboardReportsFixed:
         # 注意：邮件API可能有配置问题，但不影响测试有效性
 
         # 测试无效模式参数
-        invalid_mode_response = admin_client.get('/new-reports/api/daily', params={
-            'date': datetime.now().strftime('%Y-%m-%d'),
-            'mode': 'invalid_mode'  # 无效模式
-        })
+        invalid_mode_response = admin_client.get(
+            '/new-reports/api/daily',
+            params={
+                'date': datetime.now().strftime('%Y-%m-%d'),
+                'mode': 'invalid_mode'  # 无效模式
+            })
 
         if not invalid_mode_response.get('success'):
             print("✅ 无效模式正确返回错误")

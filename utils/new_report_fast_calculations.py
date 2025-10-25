@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
@@ -65,6 +65,67 @@ REBATE_STAGES: Tuple[Dict[str, object], ...] = (
         'rate': 0.18
     },
 )
+
+
+def _create_daily_metric_bucket() -> Dict[str, Decimal]:
+    return {
+        'revenue': Decimal('0'),
+        'basepay': Decimal('0'),
+        'pilot_share': Decimal('0'),
+        'company_share': Decimal('0'),
+        'rebate': Decimal('0'),
+    }
+
+
+def _distribute_rebate_to_daily_totals(daily_totals: Dict[date, Dict[str, Decimal]], revenue_by_day: Dict[date, Decimal], rebate_amount: Decimal,
+                                       fallback_day: date) -> None:
+    if rebate_amount <= 0:
+        return
+    total_revenue = sum(revenue_by_day.values(), Decimal('0'))
+    if total_revenue > 0:
+        for day, day_revenue in revenue_by_day.items():
+            if day_revenue <= 0:
+                continue
+            share = (day_revenue / total_revenue) * rebate_amount
+            if share <= 0:
+                continue
+            daily_totals[day]['rebate'] += share
+        return
+    daily_totals[fallback_day]['rebate'] += rebate_amount
+
+
+def _build_daily_series(daily_totals: Dict[date, Dict[str, Decimal]], month_start_date: date, month_end_date: date) -> List[Dict[str, object]]:
+    if not daily_totals:
+        return []
+    cumulative = {
+        'revenue': Decimal('0'),
+        'basepay': Decimal('0'),
+        'pilot_share': Decimal('0'),
+        'company_share': Decimal('0'),
+        'rebate': Decimal('0'),
+    }
+    series: List[Dict[str, object]] = []
+    current_day = month_start_date
+    while current_day <= month_end_date:
+        metrics = daily_totals.get(current_day) or _create_daily_metric_bucket()
+        cumulative['revenue'] += metrics['revenue']
+        cumulative['basepay'] += metrics['basepay']
+        cumulative['pilot_share'] += metrics['pilot_share']
+        cumulative['company_share'] += metrics['company_share']
+        cumulative['rebate'] += metrics['rebate']
+
+        operating_profit = cumulative['company_share'] + cumulative['rebate'] - cumulative['basepay']
+
+        series.append({
+            'date': current_day.strftime('%Y-%m-%d'),
+            'revenue_cumulative': cumulative['revenue'],
+            'basepay_cumulative': cumulative['basepay'],
+            'pilot_share_cumulative': cumulative['pilot_share'],
+            'company_share_cumulative': cumulative['company_share'],
+            'operating_profit_cumulative': operating_profit,
+        })
+        current_day += timedelta(days=1)
+    return series
 
 
 def _normalize_owner(owner_id: Optional[str]) -> Optional[str]:
@@ -126,7 +187,7 @@ def _fetch_commission_cache(pilot_ids: List[str]) -> Dict[str, List[Tuple[dateti
     return cache
 
 
-def _resolve_commission_rate(cache: Dict[str, List[Tuple[datetime, float]]], pilot_id: str, record_date_local: datetime.date) -> float:
+def _resolve_commission_rate(cache: Dict[str, List[Tuple[datetime, float]]], pilot_id: str, record_date_local: date) -> float:
     """从缓存中查找指定日期的分成比例，默认为20%。"""
     entries = cache.get(pilot_id)
     if not entries:
@@ -185,8 +246,11 @@ def _fetch_month_records(year: int, month: int, owner_id: Optional[str], mode: O
 
 
 @cached_monthly_report()
-def _calculate_monthly_data(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]]]:
-    """核心计算：返回（汇总，明细）。"""
+def _calculate_monthly_data(year: int,
+                            month: int,
+                            owner_id: Optional[str] = None,
+                            mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]], List[Dict[str, object]]]:
+    """核心计算：返回（汇总，明细，日级序列）。"""
     owner_normalized = _normalize_owner(owner_id)
     mode_normalized = _normalize_mode(mode)
 
@@ -202,7 +266,7 @@ def _calculate_monthly_data(year: int, month: int, owner_id: Optional[str] = Non
             'operating_profit': Decimal('0'),
             'conversion_rate': None,
         }
-        return summary, []
+        return summary, [], []
 
     month_start_local, month_end_local, _ = _calc_month_range(year, month)
     month_start_date = month_start_local.date()
@@ -211,7 +275,9 @@ def _calculate_monthly_data(year: int, month: int, owner_id: Optional[str] = Non
     base_salary_map = _fetch_approved_base_salary_map(monthly_records)
 
     pilot_stats: Dict[str, Dict[str, object]] = {}
-    daily_duration: Dict[str, Dict[datetime.date, float]] = defaultdict(lambda: defaultdict(float))
+    daily_duration: Dict[str, Dict[date, float]] = defaultdict(lambda: defaultdict(float))
+    daily_totals: Dict[date, Dict[str, Decimal]] = defaultdict(_create_daily_metric_bucket)
+    pilot_daily_revenue: Dict[str, Dict[date, Decimal]] = defaultdict(lambda: defaultdict(lambda: Decimal('0')))
 
     total_revenue_sum = Decimal('0')
     total_base_salary_sum = Decimal('0')
@@ -270,6 +336,13 @@ def _calculate_monthly_data(year: int, month: int, owner_id: Optional[str] = Non
         total_pilot_share_sum += commission_amounts['pilot_amount']
         total_company_share_sum += commission_amounts['company_amount']
 
+        daily_bucket = daily_totals[record_date]
+        daily_bucket['revenue'] += revenue_amount
+        daily_bucket['basepay'] += record_base_salary
+        daily_bucket['pilot_share'] += commission_amounts['pilot_amount']
+        daily_bucket['company_share'] += commission_amounts['company_amount']
+        pilot_daily_revenue[pilot_id][record_date] += revenue_amount
+
     if not pilot_stats:
         summary = {
             'pilot_count': 0,
@@ -281,7 +354,7 @@ def _calculate_monthly_data(year: int, month: int, owner_id: Optional[str] = Non
             'operating_profit': Decimal('0'),
             'conversion_rate': None,
         }
-        return summary, []
+        return summary, [], []
 
     total_rebate_sum = Decimal('0')
     details: List[Dict[str, object]] = []
@@ -299,6 +372,7 @@ def _calculate_monthly_data(year: int, month: int, owner_id: Optional[str] = Non
         stats['rebate_rate'] = rebate_rate
         stats['rebate_amount'] = rebate_amount
         total_rebate_sum += rebate_amount
+        _distribute_rebate_to_daily_totals(daily_totals, pilot_daily_revenue.get(pilot_id, {}), rebate_amount, month_end_date)
 
         avg_duration = total_duration / stats['records_count'] if stats['records_count'] else 0.0
         total_base_salary = Decimal(stats['total_base_salary'])
@@ -349,16 +423,26 @@ def _calculate_monthly_data(year: int, month: int, owner_id: Optional[str] = Non
         'conversion_rate': conversion_rate,
     }
 
-    return summary, details
+    daily_series = _build_daily_series(daily_totals, month_start_date, month_end_date)
+
+    return summary, details, daily_series
 
 
 def calculate_monthly_summary_fast(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all') -> Dict[str, object]:
     """加速版月报汇总。"""
-    summary, _ = _calculate_monthly_data(year, month, owner_id, mode)
+    summary, _, _ = _calculate_monthly_data(year, month, owner_id, mode)
     return summary
 
 
 def calculate_monthly_details_fast(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all') -> List[Dict[str, object]]:
     """加速版月报明细。"""
-    _, details = _calculate_monthly_data(year, month, owner_id, mode)
+    _, details, _ = _calculate_monthly_data(year, month, owner_id, mode)
     return details
+
+
+def calculate_monthly_report_fast(year: int,
+                                  month: int,
+                                  owner_id: Optional[str] = None,
+                                  mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]], List[Dict[str, object]]]:
+    """返回加速版月报的汇总、明细与日级序列。"""
+    return _calculate_monthly_data(year, month, owner_id, mode)

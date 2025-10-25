@@ -33,6 +33,16 @@
   - 页面标题与文案（新增「新」字样以示区分）。
 - 页面入口路由：`/new-reports/daily` 等。
 
+### 开播新月报（加速版）前端增强（2025-10-25）
+- 月报 REST API `/new-reports-fast/api/monthly` 新增 `daily_series` 字段，内容为完整的自然日日累计序列；字段包括：
+  - `date`：`YYYY-MM-DD`
+  - `revenue_cumulative`、`basepay_cumulative`、`pilot_share_cumulative`、`company_share_cumulative`、`operating_profit_cumulative`
+- 计算服务在单次扫描中同时累计每日值，并根据各主播流水占比分摊返点，确保折线与汇总口径一致。
+- 前端摘要卡片引入 Chart.js：
+  - 「累计流水 / 底薪 / 主播分成 / 公司分成」以“当日柱状 + 累计折线”混合图展示。
+  - 「运营利润估算」仅展示累计折线（允许负值，并动态扩展 Y 轴范围防止被裁剪）。
+  - 数据完全复用 `daily_series`，无需额外接口。
+
 ### 注册与路由
 - 在 `app.py` 中注册新蓝图，URL 前缀分别为 `/new-reports` 与 `/new-reports/api`。
 - 不改动旧 `reports` 注册顺序，避免影响现有使用者。

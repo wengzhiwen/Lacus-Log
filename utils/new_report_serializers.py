@@ -164,3 +164,18 @@ def serialize_weekly_details(items: List[Dict[str, Any]]) -> List[Dict[str, Any]
 
 def serialize_monthly_details(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [serialize_monthly_detail(item) for item in items]
+
+
+def serialize_monthly_daily_series(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """序列化月报日级序列，用于前端折线图。"""
+    serialized: List[Dict[str, Any]] = []
+    for item in items:
+        serialized.append({
+            'date': item.get('date'),
+            'revenue_cumulative': _decimal_to_float(item.get('revenue_cumulative')),
+            'basepay_cumulative': _decimal_to_float(item.get('basepay_cumulative')),
+            'pilot_share_cumulative': _decimal_to_float(item.get('pilot_share_cumulative')),
+            'company_share_cumulative': _decimal_to_float(item.get('company_share_cumulative')),
+            'operating_profit_cumulative': _decimal_to_float(item.get('operating_profit_cumulative')),
+        })
+    return serialized

@@ -76,6 +76,17 @@
   </div>
 </div>
 
+<div class="chart-modal" id="metricChartModal" aria-hidden="true">
+  <div class="chart-modal__dialog">
+    <button type="button" class="chart-modal__close" id="metricChartClose" aria-label="关闭图表">×</button>
+    <h3 class="chart-modal__title" id="chartModalTitle"></h3>
+    <div class="chart-modal__canvas">
+      <canvas id="metricChartCanvas"></canvas>
+    </div>
+    <p class="chart-modal__hint">注：曲线为按自然日累计值，和当前过滤条件保持一致</p>
+  </div>
+</div>
+
 <style>
 
 .date-navigation {
@@ -194,6 +205,19 @@
   transition: box-shadow 0.2s ease;
 }
 
+.summary-card-clickable {
+  cursor: pointer;
+  position: relative;
+}
+
+.summary-card-clickable::after {
+  content: '📈';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 16px;
+}
+
 .summary-card:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
@@ -277,6 +301,66 @@
   color: var(--muted);
 }
 
+.chart-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 2000;
+}
+
+.chart-modal.is-visible {
+  display: flex;
+}
+
+.chart-modal__dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 720px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
+  position: relative;
+}
+
+.chart-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.chart-modal__title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chart-modal__canvas {
+  width: 100%;
+  height: 320px;
+}
+
+.chart-modal__canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.chart-modal__hint {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+}
+
 
 .pilot-link {
   color: var(--brand);
@@ -336,6 +420,7 @@
 }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 (function() {
   const app = document.getElementById('monthlyReportApp');
@@ -356,6 +441,10 @@
   const monthlyApi = '{{ url_for('new_reports_fast_api.monthly_report_data_fast') }}';
   const reportPageUrl = '{{ url_for('new_report_fast.monthly_report_fast') }}';
   const pilotPerformanceTemplate = '{{ url_for('pilot.pilot_performance', pilot_id='__PID__') }}';
+  const chartModal = document.getElementById('metricChartModal');
+  const chartModalTitle = document.getElementById('chartModalTitle');
+  const chartModalClose = document.getElementById('metricChartClose');
+  const chartCanvas = document.getElementById('metricChartCanvas');
 
   const rankMapping = {
     '候补机师': '候选人',
@@ -364,10 +453,74 @@
     '正式机师': '正式主播'
   };
 
+  const metricConfigs = {
+    revenue: {
+      field: 'revenue_cumulative',
+      label: '累计流水',
+      color: '#2563eb',
+      background: 'rgba(37, 99, 235, 0.15)',
+      barColor: 'rgba(37, 99, 235, 0.25)',
+      showDaily: true,
+    },
+    basepay: {
+      field: 'basepay_cumulative',
+      label: '累计底薪支出',
+      color: '#f97316',
+      background: 'rgba(249, 115, 22, 0.15)',
+      barColor: 'rgba(249, 115, 22, 0.25)',
+      showDaily: true,
+    },
+    pilot_share: {
+      field: 'pilot_share_cumulative',
+      label: '累计主播分成',
+      color: '#7c3aed',
+      background: 'rgba(124, 58, 237, 0.15)',
+      barColor: 'rgba(124, 58, 237, 0.25)',
+      showDaily: true,
+    },
+    company_share: {
+      field: 'company_share_cumulative',
+      label: '累计公司分成',
+      color: '#059669',
+      background: 'rgba(5, 150, 105, 0.15)',
+      barColor: 'rgba(5, 150, 105, 0.25)',
+      showDaily: true,
+    },
+    operating_profit: {
+      field: 'operating_profit_cumulative',
+      label: '运营利润估算',
+      color: '#b91c1c',
+      background: 'rgba(185, 28, 28, 0.15)',
+      showDaily: false,
+    }
+  };
+
+  let metricChartInstance = null;
+  let dailySeries = [];
+
   let currentMonth = app.dataset.reportMonth;
   let currentOwner = app.dataset.selectedOwner || 'all';
   let currentMode = app.dataset.selectedMode || 'all';
   const emptyFallbackText = emptyStateText ? emptyStateText.textContent : '';
+
+  if (summaryCards) {
+    summaryCards.addEventListener('click', handleSummaryCardClick);
+  }
+  if (chartModalClose) {
+    chartModalClose.addEventListener('click', closeMetricModal);
+  }
+  if (chartModal) {
+    chartModal.addEventListener('click', function(event) {
+      if (event.target === chartModal) {
+        closeMetricModal();
+      }
+    });
+  }
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      closeMetricModal();
+    }
+  });
 
   function formatMoney(value) {
     if (value === null || value === undefined) {
@@ -408,28 +561,189 @@
     return `${parts[0]}年${parts[1]}月`;
   }
 
+  function updateDailySeries(series) {
+    dailySeries = Array.isArray(series) ? series : [];
+  }
+
+  function buildDailyValues(field) {
+    const values = [];
+    let previous = 0;
+    dailySeries.forEach(item => {
+      const current = Number(item[field] || 0);
+      const delta = current - previous;
+      values.push(delta < 0 ? 0 : delta);
+      previous = current;
+    });
+    return values;
+  }
+
+  function handleSummaryCardClick(event) {
+    const card = event.target.closest('.summary-card[data-metric]');
+    if (!card) {
+      return;
+    }
+    if (!dailySeries.length) {
+      alert('当前筛选条件暂无可绘制数据');
+      return;
+    }
+    const metricKey = card.dataset.metric;
+    const metricConfig = metricConfigs[metricKey];
+    if (!metricConfig) {
+      return;
+    }
+    const label = card.dataset.label || metricConfig.label;
+    openMetricModal(metricKey, label);
+  }
+
+  function openMetricModal(metricKey, label) {
+    if (!chartModal || !chartModalTitle) {
+      return;
+    }
+    chartModalTitle.textContent = `${label} - 按日累计趋势`;
+    chartModal.classList.add('is-visible');
+    chartModal.setAttribute('aria-hidden', 'false');
+    renderMetricChart(metricKey);
+  }
+
+  function closeMetricModal() {
+    if (!chartModal) {
+      return;
+    }
+    chartModal.classList.remove('is-visible');
+    chartModal.setAttribute('aria-hidden', 'true');
+    destroyMetricChart();
+  }
+
+  function destroyMetricChart() {
+    if (metricChartInstance) {
+      metricChartInstance.destroy();
+      metricChartInstance = null;
+    }
+  }
+
+  function renderMetricChart(metricKey) {
+    if (!chartCanvas || typeof Chart === 'undefined') {
+      return;
+    }
+    const config = metricConfigs[metricKey];
+    if (!config) {
+      return;
+    }
+    const labels = dailySeries.map(item => item.date);
+    const cumulativeValues = dailySeries.map(item => Number(item[config.field] || 0));
+    const dailyValues = config.showDaily === false ? [] : buildDailyValues(config.field);
+    if (!labels.length) {
+      return;
+    }
+    destroyMetricChart();
+    const ctx = chartCanvas.getContext('2d');
+    const datasets = [];
+    if (config.showDaily !== false) {
+      datasets.push({
+        type: 'bar',
+        label: `${config.label}（当日）`,
+        data: dailyValues,
+        backgroundColor: config.barColor,
+        borderColor: config.color,
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: 0.8,
+        categoryPercentage: 0.7,
+        order: 1,
+      });
+    }
+    datasets.push({
+      type: 'line',
+      label: `${config.label}（累计）`,
+      data: cumulativeValues,
+      fill: true,
+      borderColor: config.color,
+      backgroundColor: config.background,
+      borderWidth: 2,
+      pointRadius: 2.5,
+      tension: 0.25,
+      order: 2,
+    });
+
+    const combinedValues = [...cumulativeValues];
+    if (config.showDaily !== false) {
+      combinedValues.push(...dailyValues);
+    }
+    const minValue = combinedValues.length ? Math.min(...combinedValues) : 0;
+    const maxValue = combinedValues.length ? Math.max(...combinedValues) : 0;
+
+    metricChartInstance = new Chart(ctx, {
+      data: {
+        labels,
+        datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const value = context.parsed.y ?? context.parsed;
+                const dsLabel = context.dataset && context.dataset.label ? context.dataset.label : config.label;
+                return `${dsLabel}: ${formatMoney(value)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              autoSkip: true,
+              maxRotation: 0,
+              minRotation: 0
+            }
+          },
+          y: {
+            ticks: {
+              callback(value) {
+                return formatMoney(value);
+              }
+            },
+            suggestedMin: Math.min(0, minValue * 1.05),
+            suggestedMax: Math.max(0, maxValue * 1.05),
+          }
+        }
+      }
+    });
+  }
+
   function buildSummaryCards(summary) {
     const rebateSum = summary.rebate_sum || 0;
     const operatingProfit = summary.operating_profit || 0;
 
     const items = [
       { label: '总主播数量', value: (summary.pilot_count || 0).toLocaleString('zh-CN') },
-      { label: '累计流水', value: formatMoney(summary.revenue_sum || 0) },
+      { label: '累计流水', value: formatMoney(summary.revenue_sum || 0), chartMetric: 'revenue' },
       {
         label: '累计底薪支出',
         value: formatMoney(summary.basepay_sum || 0),
-        sub: summary.conversion_rate !== null && summary.conversion_rate !== undefined ? `转换率${summary.conversion_rate}%` : ''
+        sub: summary.conversion_rate !== null && summary.conversion_rate !== undefined ? `转换率${summary.conversion_rate}%` : '',
+        chartMetric: 'basepay'
       },
       { label: '累计返点', value: formatMoney(rebateSum) },
-      { label: '累计主播分成', value: formatMoney(summary.pilot_share_sum || 0) },
-      { label: '累计公司分成', value: formatMoney(summary.company_share_sum || 0) },
-      { label: '运营利润估算', value: formatMoney(operatingProfit), danger: operatingProfit < 0 }
+      { label: '累计主播分成', value: formatMoney(summary.pilot_share_sum || 0), chartMetric: 'pilot_share' },
+      { label: '累计公司分成', value: formatMoney(summary.company_share_sum || 0), chartMetric: 'company_share' },
+      { label: '运营利润估算', value: formatMoney(operatingProfit), danger: operatingProfit < 0, chartMetric: 'operating_profit' }
     ];
 
     summaryCards.innerHTML = items.map(item => {
       const dangerClass = item.danger ? ' danger-outline' : '';
+      const clickableClass = item.chartMetric ? ' summary-card-clickable' : '';
+      const metricAttr = item.chartMetric ? ` data-metric="${item.chartMetric}" data-label="${item.label}"` : '';
       const subHtml = item.sub ? `<div class="card-sub">${item.sub}</div>` : '';
-      return `<div class="summary-card${dangerClass}">
+      return `<div class="summary-card${dangerClass}${clickableClass}"${metricAttr}>
         <div class="card-label">${item.label}</div>
         <div class="card-value">${item.value}</div>
         ${subHtml}
@@ -568,6 +882,7 @@
       content.style.display = 'block';
 
       summaryTitle.textContent = `${formatMonthDisplay(currentMonth)} 月度汇总`;
+      updateDailySeries(data.daily_series || []);
       buildSummaryCards(data.summary || {});
       renderDetails(data.details || [], currentMonth);
     } catch (error) {
