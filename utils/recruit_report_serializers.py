@@ -66,6 +66,20 @@ def serialize_average_block(averages: Dict[str, float]) -> Dict[str, float]:
     }
 
 
+def serialize_daily_series(series: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """序列化近14日趋势数据。"""
+    serialized = []
+    for item in series or []:
+        serialized.append({
+            'date': item.get('date'),
+            'appointments': int(item.get('appointments', 0) or 0),
+            'interviews': int(item.get('interviews', 0) or 0),
+            'trials': int(item.get('trials', 0) or 0),
+            'new_recruits': int(item.get('new_recruits', 0) or 0),
+        })
+    return serialized
+
+
 def build_daily_summary_payload(report_date: datetime, raw_stats: Dict[str, Any]) -> Dict[str, Any]:
     """构建日报汇总响应数据。"""
     summary = {
@@ -84,6 +98,7 @@ def build_daily_summary_payload(report_date: datetime, raw_stats: Dict[str, Any]
         'date': report_date.strftime('%Y-%m-%d'),
         'summary': summary,
         'averages': averages,
+        'daily_series': serialize_daily_series(raw_stats.get('daily_series', [])),
     }
 
 

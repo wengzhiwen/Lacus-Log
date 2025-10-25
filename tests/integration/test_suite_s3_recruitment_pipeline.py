@@ -507,9 +507,33 @@ class TestS3RecruitmentPipeline:
                     if item_id.startswith('recruit_'):
                         recruit_id = item_id.replace('recruit_', '')
                         # admin_client.delete(f'/api/recruits/{recruit_id}')  # DELETE接口不存在，跳过删除
-                        pass
                     elif item_id.startswith('pilot_'):
                         pilot_id = item_id.replace('pilot_', '')
                         admin_client.put(f'/api/pilots/{pilot_id}', json={'status': '未招募'})
                 except Exception:  # pylint: disable=broad-except
                     pass
+
+    def test_s3_tc8_recruit_daily_summary_contains_trend_series(self, admin_client):
+        """
+        S3-TC8 招募日报汇总返回近14天趋势数据
+
+        验证 /api/recruit-reports/daily?view=summary 响应中包含 daily_series，长度为14，且每项带有四类指标。
+        """
+        response = admin_client.get('/api/recruit-reports/daily', params={'view': 'summary'})
+        assert response.get('success') is True, f"接口返回失败: {response}"
+        data = response.get('data') or {}
+        daily_series = data.get('daily_series')
+        assert isinstance(daily_series, list), "daily_series 应为列表"
+        assert len(daily_series) == 14, f"daily_series 长度应为14，当前为 {len(daily_series)}"
+        summary = data.get('summary') or {}
+        metrics = ['appointments', 'interviews', 'trials', 'new_recruits']
+        for key in metrics:
+            prev = -1
+            for point in daily_series:
+                assert key in point, f"daily_series 项缺少 {key}"
+                value = point[key]
+                assert value >= prev, f"{key} 累计值出现下降 {value} < {prev}"
+                prev = value
+            expected_total = ((summary.get('last_14_days') or {}).get(key))
+            if expected_total is not None:
+                assert prev == expected_total, f"{key} 累计末值应等于近14日统计"

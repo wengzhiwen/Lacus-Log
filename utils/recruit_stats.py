@@ -163,7 +163,34 @@ def calculate_recruit_daily_stats(report_date: datetime, recruiter_id: str = Non
     last_7_days_stats = calculate_recruit_period_stats(last_7_days_start_utc, report_day_end_utc, recruiter_id)
     last_14_days_stats = calculate_recruit_period_stats(last_14_days_start_utc, report_day_end_utc, recruiter_id)
 
-    statistics = {'report_day': report_day_stats, 'last_7_days': last_7_days_stats, 'last_14_days': last_14_days_stats}
+    trend_start_date = report_date - timedelta(days=13)
+    daily_series = []
+    cumulative_totals = {
+        'appointments': 0,
+        'interviews': 0,
+        'trials': 0,
+        'new_recruits': 0,
+    }
+    for index in range(14):
+        day_start = trend_start_date + timedelta(days=index)
+        day_end = day_start + timedelta(days=1)
+        day_stats = calculate_recruit_period_stats(local_to_utc(day_start), local_to_utc(day_end), recruiter_id)
+        for key in cumulative_totals:
+            cumulative_totals[key] += day_stats.get(key, 0)
+        daily_series.append({
+            'date': day_start.strftime('%Y-%m-%d'),
+            'appointments': cumulative_totals['appointments'],
+            'interviews': cumulative_totals['interviews'],
+            'trials': cumulative_totals['trials'],
+            'new_recruits': cumulative_totals['new_recruits'],
+        })
+
+    statistics = {
+        'report_day': report_day_stats,
+        'last_7_days': last_7_days_stats,
+        'last_14_days': last_14_days_stats,
+        'daily_series': daily_series,
+    }
 
     averages = {'last_7_days': {}, 'last_14_days': {}}
 
@@ -298,7 +325,6 @@ def calculate_recruit_monthly_stats(recruiter_id: str = None) -> Dict[str, Any]:
 
     # 计算趋势
     trends = calculate_trends(current_stats, previous_stats)
-
 
     return {
         'current_window': {
