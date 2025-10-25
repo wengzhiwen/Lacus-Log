@@ -54,22 +54,22 @@
 <div class="stats-section" id="stats-section" style="display: none;">
   <div class="summary-section">
     <h2 class="section-title">本月统计（全月 / 月初至报表日）</h2>
-    <div class="summary-cards">
+    <div class="summary-cards" id="month-summary-cards">
       <div class="summary-card">
         <div class="card-label">开播记录数</div>
         <div class="card-value" id="month-record-count">-</div>
       </div>
-      <div class="summary-card" id="month-hours-card">
+      <div class="summary-card summary-card-clickable" id="month-hours-card" data-metric="hours" data-label="累计开播时数">
         <div class="card-label">开播时数</div>
         <div class="card-value" id="month-total-hours">-h</div>
         <div class="card-sub" id="month-avg-hours">-h/记录</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card summary-card-clickable" data-metric="revenue" data-label="累计流水">
         <div class="card-label">累计流水</div>
         <div class="card-value" id="month-total-revenue">¥-</div>
         <div class="card-sub" id="month-daily-avg-revenue">日均¥-</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card summary-card-clickable" data-metric="basepay" data-label="累计底薪">
         <div class="card-label">累计底薪</div>
         <div class="card-value" id="month-total-basepay">¥-</div>
         <div class="card-sub" id="month-daily-avg-basepay">日均¥-</div>
@@ -78,11 +78,11 @@
         <div class="card-label">累计返点</div>
         <div class="card-value" id="month-total-rebate">¥-</div>
       </div>
-      <div class="summary-card">
+      <div class="summary-card summary-card-clickable" data-metric="company_share" data-label="累计公司分成">
         <div class="card-label">累计公司分成</div>
         <div class="card-value" id="month-total-company-share">¥-</div>
       </div>
-      <div class="summary-card" id="month-operating-profit-card">
+      <div class="summary-card summary-card-clickable" data-metric="operating_profit" data-label="运营利润估算" id="month-operating-profit-card">
         <div class="card-label">运营利润估算</div>
         <div class="card-value" id="month-operating-profit">¥-</div>
         <div class="card-sub" id="month-daily-avg-operating-profit">日均¥-</div>
@@ -180,6 +180,18 @@
   <h2 class="section-title">最近开播记录</h2>
   <div class="record-cards" id="recent-records-container">
     <!-- 记录将通过JavaScript动态加载 -->
+  </div>
+</div>
+
+<div class="chart-modal" id="metricChartModal" aria-hidden="true">
+  <div class="chart-modal__dialog">
+    <button type="button" class="chart-modal__close" id="metricChartClose" aria-label="关闭图表">×</button>
+    <h3 class="chart-modal__title" id="chartModalTitle"></h3>
+    <div class="chart-modal__canvas">
+      <canvas id="metricChartCanvas"></canvas>
+    </div>
+    <div class="chart-modal__switcher" id="chartMetricSwitcher"></div>
+    <p class="chart-modal__hint">注：曲线为按自然日累计值，柱状为当日新增。</p>
   </div>
 </div>
 
@@ -339,6 +351,19 @@
   padding: 16px;
   text-align: center;
   transition: box-shadow 0.2s ease;
+}
+
+.summary-card-clickable {
+  cursor: pointer;
+  position: relative;
+}
+
+.summary-card-clickable::after {
+  content: '📈';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 16px;
 }
 
 .summary-card:hover {
@@ -502,6 +527,89 @@
   color: var(--muted);
 }
 
+.chart-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 2000;
+}
+
+.chart-modal.is-visible {
+  display: flex;
+}
+
+.chart-modal__dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 720px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
+  position: relative;
+}
+
+.chart-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.chart-modal__title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chart-modal__canvas {
+  width: 100%;
+  height: 320px;
+}
+
+.chart-modal__canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.chart-modal__hint {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.chart-modal__switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chart-switcher__btn {
+  border: 1px solid var(--gray);
+  background: #fff;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chart-switcher__btn.is-active {
+  border-color: var(--brand);
+  background: rgba(54, 79, 199, 0.1);
+  color: var(--brand);
+}
+
 .empty-icon {
   font-size: 48px;
   margin-bottom: 16px;
@@ -616,6 +724,7 @@
   });
 </script>
 <script src="{{ url_for('static', filename='js/bbs_post_detail.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 // 主播业绩页面JavaScript - 完全REST化版本
 // 从URL中获取pilot_id
@@ -629,6 +738,59 @@ const dateParam = urlParams.get('date');
 const ownerParam = urlParams.get('owner');
 const monthParam = urlParams.get('month');
 const recordIdParam = urlParams.get('record_id');
+const chartModal = document.getElementById('metricChartModal');
+const chartModalTitle = document.getElementById('chartModalTitle');
+const chartModalClose = document.getElementById('metricChartClose');
+const chartCanvas = document.getElementById('metricChartCanvas');
+const chartMetricSwitcher = document.getElementById('chartMetricSwitcher');
+const monthSummaryCards = document.getElementById('month-summary-cards');
+
+const metricConfigs = {
+  hours: {
+    field: 'hours_cumulative',
+    label: '累计开播时数',
+    color: '#4f46e5',
+    background: 'rgba(79, 70, 229, 0.15)',
+    barColor: 'rgba(79, 70, 229, 0.25)',
+    showDaily: true,
+    format: 'hours',
+  },
+  revenue: {
+    field: 'revenue_cumulative',
+    label: '累计流水',
+    color: '#2563eb',
+    background: 'rgba(37, 99, 235, 0.15)',
+    barColor: 'rgba(37, 99, 235, 0.25)',
+    showDaily: true,
+  },
+  basepay: {
+    field: 'basepay_cumulative',
+    label: '累计底薪',
+    color: '#f97316',
+    background: 'rgba(249, 115, 22, 0.15)',
+    barColor: 'rgba(249, 115, 22, 0.25)',
+    showDaily: true,
+  },
+  company_share: {
+    field: 'company_share_cumulative',
+    label: '累计公司分成',
+    color: '#059669',
+    background: 'rgba(5, 150, 105, 0.15)',
+    barColor: 'rgba(5, 150, 105, 0.25)',
+    showDaily: true,
+  },
+  operating_profit: {
+    field: 'operating_profit_cumulative',
+    label: '运营利润估算',
+    color: '#b91c1c',
+    background: 'rgba(185, 28, 28, 0.15)',
+    showDaily: false,
+  }
+};
+
+let monthDailySeries = [];
+let metricChartInstance = null;
+let currentMetricKey = null;
 
 // 格式化金额
 function formatCurrency(amount) {
@@ -637,6 +799,187 @@ function formatCurrency(amount) {
   }
   const numeric = Number(amount);
   return '¥' + numeric.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function setMonthDailySeries(series) {
+  monthDailySeries = Array.isArray(series) ? series : [];
+}
+
+function formatMetricValue(metricKey, value) {
+  const config = metricConfigs[metricKey];
+  if (config && config.format === 'hours') {
+    return `${Number(value || 0).toFixed(1)}小时`;
+  }
+  return formatCurrency(value);
+}
+
+function buildDailyValues(field) {
+  const values = [];
+  let previous = 0;
+  monthDailySeries.forEach(item => {
+    const current = Number(item[field] || 0);
+    const delta = current - previous;
+    values.push(delta < 0 ? 0 : delta);
+    previous = current;
+  });
+  return values;
+}
+
+function handleMetricCardClick(event) {
+  const card = event.target.closest('.summary-card[data-metric]');
+  if (!card) {
+    return;
+  }
+  if (!monthDailySeries.length) {
+    alert('当前月份暂无可绘制的数据');
+    return;
+  }
+  const metricKey = card.dataset.metric;
+  const metricConfig = metricConfigs[metricKey];
+  if (!metricConfig) {
+    return;
+  }
+  const label = card.dataset.label || metricConfig.label;
+  openMetricModal(metricKey, label);
+}
+
+function openMetricModal(metricKey, label) {
+  if (!chartModal || !chartModalTitle) {
+    return;
+  }
+  currentMetricKey = metricKey;
+  chartModalTitle.textContent = `${label} - 日累计趋势`;
+  chartModal.classList.add('is-visible');
+  chartModal.setAttribute('aria-hidden', 'false');
+  renderMetricChart(metricKey);
+}
+
+function closeMetricModal() {
+  if (!chartModal) {
+    return;
+  }
+  chartModal.classList.remove('is-visible');
+  chartModal.setAttribute('aria-hidden', 'true');
+  destroyMetricChart();
+}
+
+function destroyMetricChart() {
+  if (metricChartInstance) {
+    metricChartInstance.destroy();
+    metricChartInstance = null;
+  }
+}
+
+function renderChartMetricSwitcher(activeKey) {
+  if (!chartMetricSwitcher) {
+    return;
+  }
+  const metricKeys = ['hours', 'revenue', 'basepay', 'company_share', 'operating_profit'].filter((key) => metricConfigs[key]);
+  chartMetricSwitcher.innerHTML = metricKeys
+    .map(key => `<button type="button" class="chart-switcher__btn${key === activeKey ? ' is-active' : ''}" data-metric="${key}">${metricConfigs[key].label}</button>`)
+    .join('');
+}
+
+function renderMetricChart(metricKey) {
+  if (!chartCanvas || typeof Chart === 'undefined') {
+    return;
+  }
+  const config = metricConfigs[metricKey];
+  if (!config) {
+    return;
+  }
+  const labels = monthDailySeries.map(item => item.date);
+  const cumulativeValues = monthDailySeries.map(item => Number(item[config.field] || 0));
+  const dailyValues = config.showDaily === false ? [] : buildDailyValues(config.field);
+  if (!labels.length) {
+    return;
+  }
+
+  destroyMetricChart();
+  currentMetricKey = metricKey;
+  renderChartMetricSwitcher(metricKey);
+  const datasets = [];
+  if (config.showDaily !== false) {
+    datasets.push({
+      type: 'bar',
+      label: `${config.label}（当日）`,
+      data: dailyValues,
+      backgroundColor: config.barColor,
+      borderColor: config.color,
+      borderWidth: 1,
+      borderRadius: 4,
+      barPercentage: 0.8,
+      categoryPercentage: 0.7,
+      order: 1,
+    });
+  }
+  datasets.push({
+    type: 'line',
+    label: `${config.label}（累计）`,
+    data: cumulativeValues,
+    fill: true,
+    borderColor: config.color,
+    backgroundColor: config.background,
+    borderWidth: 2,
+    pointRadius: 2.5,
+    tension: 0.25,
+    order: 2,
+  });
+
+  const combinedValues = [...cumulativeValues];
+  if (config.showDaily !== false) {
+    combinedValues.push(...dailyValues);
+  }
+  const minValue = combinedValues.length ? Math.min(...combinedValues) : 0;
+  const maxValue = combinedValues.length ? Math.max(...combinedValues) : 0;
+  const formatValue = (value) => formatMetricValue(metricKey, value);
+
+  const ctx = chartCanvas.getContext('2d');
+  metricChartInstance = new Chart(ctx, {
+    data: {
+      labels,
+      datasets,
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              const value = context.parsed.y ?? context.parsed;
+              const dsLabel = context.dataset && context.dataset.label ? context.dataset.label : config.label;
+              return `${dsLabel}: ${formatValue(value)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            autoSkip: true,
+            maxRotation: 0,
+            minRotation: 0
+          }
+        },
+        y: {
+          ticks: {
+            callback(value) {
+              return formatValue(value);
+            }
+          },
+          suggestedMin: Math.min(0, minValue * 1.05),
+          suggestedMax: Math.max(0, maxValue * 1.05)
+        }
+      }
+    }
+  });
 }
 
 // 格式化时间
@@ -934,6 +1277,7 @@ async function loadPerformanceData() {
     console.log('week_stats:', data.week_stats);
     console.log('three_day_stats:', data.three_day_stats);
     
+    setMonthDailySeries(data.daily_series || []);
     updateStatsCard('month', data.month_stats);
     updateStatsCard('week', data.week_stats);
     updateStatsCard('three-day', data.three_day_stats);
@@ -958,7 +1302,38 @@ async function loadPerformanceData() {
 document.addEventListener('DOMContentLoaded', function() {
   // 生成返回按钮
   generateBackButton();
-  
+
+  if (monthSummaryCards) {
+    monthSummaryCards.addEventListener('click', handleMetricCardClick);
+  }
+  if (chartModalClose) {
+    chartModalClose.addEventListener('click', closeMetricModal);
+  }
+  if (chartModal) {
+    chartModal.addEventListener('click', (event) => {
+      if (event.target === chartModal) {
+        closeMetricModal();
+      }
+    });
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeMetricModal();
+    }
+  });
+  if (chartMetricSwitcher) {
+    chartMetricSwitcher.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-metric]');
+      if (!button) {
+        return;
+      }
+      const metric = button.dataset.metric;
+      if (metric && metric !== currentMetricKey) {
+        renderMetricChart(metric);
+      }
+    });
+  }
+
   // 加载业绩数据
   loadPerformanceData();
 

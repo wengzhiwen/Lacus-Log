@@ -5,16 +5,20 @@
 # pylint: disable=no-member,too-many-locals
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Tuple
 
 from models.battle_record import (BaseSalaryApplication, BaseSalaryApplicationStatus, BattleRecord)
 from models.pilot import Pilot
 from utils.logging_setup import get_logger
-from utils.timezone_helper import get_current_local_time
+from utils.timezone_helper import get_current_local_time, local_to_utc, utc_to_local
 
 logger = get_logger('pilot_performance')
+
+
+def _create_daily_bucket() -> Dict[str, Decimal]:
+    return {'revenue': Decimal('0'), 'basepay': Decimal('0'), 'company_share': Decimal('0'), 'hours': Decimal('0')}
 
 
 def calculate_pilot_performance_stats(pilot: Pilot, report_date: datetime = None) -> Dict[str, Any]:
@@ -31,7 +35,7 @@ def calculate_pilot_performance_stats(pilot: Pilot, report_date: datetime = None
         report_date = get_current_local_time()
 
     # 计算本月统计
-    month_stats = _calculate_month_stats(pilot, report_date)
+    month_stats, month_daily_series = _calculate_month_stats(pilot, report_date)
 
     # 计算近7日统计
     week_stats = _calculate_week_stats(pilot)
@@ -42,18 +46,22 @@ def calculate_pilot_performance_stats(pilot: Pilot, report_date: datetime = None
     # 获取最近开播记录并附带底薪申请信息
     recent_records = _get_recent_records_with_applications(pilot, limit=30)
 
-    return {'month_stats': month_stats, 'week_stats': week_stats, 'three_day_stats': three_day_stats, 'recent_records': recent_records}
+    return {
+        'month_stats': month_stats,
+        'month_daily_series': month_daily_series,
+        'week_stats': week_stats,
+        'three_day_stats': three_day_stats,
+        'recent_records': recent_records
+    }
 
 
-def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Dict[str, Any]:
-    """计算本月统计"""
+def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """计算本月统计并返回日级序列"""
     # 本月开始时间（本地时间）
     month_start = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     # 本月结束时间（本地时间）
     month_end = report_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    # 转换为UTC时间
-    from utils.timezone_helper import local_to_utc
     month_start_utc = local_to_utc(month_start)
     month_end_utc = local_to_utc(month_end)
 
@@ -61,28 +69,47 @@ def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Dict[str, Any
     records = list(BattleRecord.objects(pilot=pilot, start_time__gte=month_start_utc, start_time__lte=month_end_utc).order_by('start_time'))
 
     approved_map, _ = _build_base_salary_maps(records)
+    daily_totals: Dict[date, Dict[str, Decimal]] = defaultdict(_create_daily_bucket)
 
     # 计算统计数据
     record_count = len(records)
     total_hours = round(sum(record.duration_hours for record in records if record.duration_hours), 1)
     avg_hours = round(total_hours / record_count, 1) if record_count > 0 else 0
 
-    total_revenue = sum((record.revenue_amount or Decimal('0')) for record in records)
-    total_basepay = sum((approved_map.get(str(record.id), Decimal('0')) for record in records), Decimal('0'))
+    total_revenue = Decimal('0')
+    total_basepay = Decimal('0')
+    total_company_share = Decimal('0')
+
+    for record in records:
+        revenue_amount = Decimal(record.revenue_amount or Decimal('0'))
+        basepay_amount = approved_map.get(str(record.id), Decimal('0'))
+        company_share_amount = revenue_amount * Decimal('0.3')
+        duration_hours = Decimal(str(record.duration_hours or 0))
+
+        total_revenue += revenue_amount
+        total_basepay += basepay_amount
+        total_company_share += company_share_amount
+
+        if record.start_time:
+            local_day = utc_to_local(record.start_time).date()
+            bucket = daily_totals[local_day]
+            bucket['revenue'] += revenue_amount
+            bucket['basepay'] += basepay_amount
+            bucket['company_share'] += company_share_amount
+            bucket['hours'] += duration_hours
 
     # 计算日均数据（分母为开播记录数）
     daily_avg_revenue = total_revenue / record_count if record_count > 0 else Decimal('0')
     daily_avg_basepay = total_basepay / record_count if record_count > 0 else Decimal('0')
 
-    # 计算公司分成和返点（简化计算，实际应该根据分成比例计算）
-    total_company_share = total_revenue * Decimal('0.3')  # 假设公司分成30%
-    total_rebate = Decimal('0')  # 返点计算较复杂，暂时设为0
+    # 返点暂不统计
+    total_rebate = Decimal('0')
 
     # 运营利润估算
     operating_profit = total_company_share + total_rebate - total_basepay
     daily_avg_operating_profit = operating_profit / record_count if record_count > 0 else Decimal('0')
 
-    return {
+    stats = {
         'record_count': record_count,
         'total_hours': total_hours,
         'avg_hours': avg_hours,
@@ -95,6 +122,10 @@ def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Dict[str, Any
         'operating_profit': operating_profit,
         'daily_avg_operating_profit': daily_avg_operating_profit
     }
+
+    month_daily_series = _build_month_daily_series(daily_totals, month_start.date(), month_end.date())
+
+    return stats, month_daily_series
 
 
 def _calculate_week_stats(pilot: Pilot) -> Dict[str, Any]:
@@ -153,6 +184,34 @@ def _calculate_stats_from_records(records, approved_map=None) -> Dict[str, Any]:
         'operating_profit': operating_profit,
         'daily_avg_operating_profit': daily_avg_operating_profit
     }
+
+
+def _build_month_daily_series(daily_totals: Dict[date, Dict[str, Decimal]], month_start_date: date, month_end_date: date) -> List[Dict[str, Any]]:
+    if month_start_date > month_end_date:
+        return []
+
+    cumulative = {'revenue': Decimal('0'), 'basepay': Decimal('0'), 'company_share': Decimal('0'), 'hours': Decimal('0')}
+    series: List[Dict[str, Any]] = []
+    current_day = month_start_date
+    while current_day <= month_end_date:
+        metrics = daily_totals.get(current_day) or _create_daily_bucket()
+        cumulative['revenue'] += metrics['revenue']
+        cumulative['basepay'] += metrics['basepay']
+        cumulative['company_share'] += metrics['company_share']
+        cumulative['hours'] += metrics['hours']
+
+        operating_profit = cumulative['company_share'] - cumulative['basepay']
+
+        series.append({
+            'date': current_day.strftime('%Y-%m-%d'),
+            'revenue_cumulative': cumulative['revenue'],
+            'basepay_cumulative': cumulative['basepay'],
+            'company_share_cumulative': cumulative['company_share'],
+            'operating_profit_cumulative': operating_profit,
+            'hours_cumulative': cumulative['hours'],
+        })
+        current_day += timedelta(days=1)
+    return series
 
 
 def _get_recent_records(pilot: Pilot, limit: int = 30) -> List[BattleRecord]:

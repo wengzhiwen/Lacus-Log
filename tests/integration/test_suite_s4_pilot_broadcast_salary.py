@@ -259,6 +259,82 @@ class TestS4PilotBroadcastSalary:
             except Exception:  # pylint: disable=broad-except
                 pass
 
+    def test_s4_tc4a_pilot_performance_daily_series(self, admin_client):
+        """S4-TC4A 主播业绩API返回日级累计序列"""
+        created_ids = {}
+        try:
+            pilot_data = pilot_factory.create_pilot_data()
+            pilot_response = admin_client.post('/api/pilots', json=pilot_data)
+            assert pilot_response.get('success'), '创建主播失败'
+            pilot_id = pilot_response['data']['id']
+            created_ids['pilot_id'] = pilot_id
+
+            now = datetime.now()
+            records_payload = [{
+                'start_time': (now - timedelta(days=3)).replace(hour=10, minute=0, second=0, microsecond=0).isoformat(),
+                'end_time': (now - timedelta(days=3)).replace(hour=12, minute=0, second=0, microsecond=0).isoformat(),
+                'revenue_amount': '150.00',
+            }, {
+                'start_time': (now - timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0).isoformat(),
+                'end_time': (now - timedelta(days=1)).replace(hour=17, minute=0, second=0, microsecond=0).isoformat(),
+                'revenue_amount': '300.00',
+            }]
+
+            for payload in records_payload:
+                record_body = {
+                    'pilot': pilot_id,
+                    'start_time': payload['start_time'],
+                    'end_time': payload['end_time'],
+                    'work_mode': '线上',
+                    'x_coord': 'A',
+                    'y_coord': 'B',
+                    'z_coord': '1',
+                    'revenue_amount': payload['revenue_amount'],
+                    'base_salary': '0'
+                }
+                battle_response = admin_client.post('/battle-records/api/battle-records', json=record_body)
+                assert battle_response.get('success'), '创建开播记录失败'
+                created_ids.setdefault('battle_record_ids', []).append(battle_response['data']['id'])
+
+            perf_response = admin_client.get(f'/api/pilots/{pilot_id}/performance')
+            assert perf_response.get('success'), '获取主播业绩失败'
+            perf_data = perf_response['data']
+
+            daily_series = perf_data.get('daily_series')
+            assert isinstance(daily_series, list), 'daily_series必须为列表'
+            assert daily_series, 'daily_series不应为空'
+
+            required_fields = [
+                'date',
+                'revenue_cumulative',
+                'basepay_cumulative',
+                'company_share_cumulative',
+                'operating_profit_cumulative',
+                'hours_cumulative',
+            ]
+            for item in daily_series:
+                if item['revenue_cumulative'] > 0:
+                    missing = [field for field in required_fields if field not in item]
+                    assert not missing, f'日级序列缺少字段: {missing}'
+                    break
+
+            last_entry = daily_series[-1]
+            expected_revenue = 450.0
+            expected_company_share = expected_revenue * 0.3
+            assert pytest.approx(last_entry['revenue_cumulative'], rel=1e-3) == expected_revenue
+            assert pytest.approx(last_entry['company_share_cumulative'], rel=1e-3) == expected_company_share
+            assert pytest.approx(last_entry['operating_profit_cumulative'], rel=1e-3) == expected_company_share
+            assert pytest.approx(last_entry['hours_cumulative'], rel=1e-3) == 5.0
+
+        finally:
+            try:
+                for record_id in created_ids.get('battle_record_ids', []):
+                    admin_client.delete(f'/battle-records/api/battle-records/{record_id}')
+                if created_ids.get('pilot_id'):
+                    admin_client.put(f"/api/pilots/{created_ids['pilot_id']}", json={'status': '未招募'})
+            except Exception:  # pylint: disable=broad-except
+                pass
+
     def test_s4_tc4_broadcast_record_edit_conflict(self, admin_client):
         """
         S4-TC4 开播记录编辑冲突

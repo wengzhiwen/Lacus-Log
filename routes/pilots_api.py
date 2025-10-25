@@ -688,13 +688,15 @@ def get_pilot_performance(pilot_id):
         month_stats = convert_decimal_to_float(performance_data['month_stats'])
         week_stats = convert_decimal_to_float(performance_data['week_stats'])
         three_day_stats = convert_decimal_to_float(performance_data['three_day_stats'])
+        month_daily_series = convert_decimal_to_float(performance_data.get('month_daily_series', []))
 
         response_data = {
             'pilot_info': pilot_info,
             'month_stats': month_stats,
             'week_stats': week_stats,
             'three_day_stats': three_day_stats,
-            'recent_records': recent_records
+            'recent_records': recent_records,
+            'daily_series': month_daily_series
         }
 
         logger.info('获取主播业绩数据成功：%s', pilot.nickname)
