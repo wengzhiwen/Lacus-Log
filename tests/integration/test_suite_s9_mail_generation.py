@@ -313,6 +313,80 @@ class TestS9MailGeneration:
             os.environ['MAIL_DEBUG'] = original_mail_debug
             print("✅ S9-TC3边界情况邮件生成测试完成")
 
+    def test_s9_tc4_new_pilot_warning_mail_on_5th_and_6th_basepay(self, admin_client):
+        """
+        S9-TC4：新主播生存警告邮件
+
+        当同一主播的底薪申请第5/6次确认发放时，应该生成“拉科斯警告 这是一个活到了第n天的新主播”邮件文件。
+        """
+        print("🔍 开始S9-TC4新主播生存警告邮件测试...")
+
+        original_mail_debug = os.getenv('MAIL_DEBUG', 'false')
+        os.environ['MAIL_DEBUG'] = 'true'
+
+        known_mail_files = set(self._get_generated_mail_files())
+        created_records = []
+        created_applications = []
+        pilot_id = None
+
+        try:
+            pilot_data = pilot_factory.create_pilot_data(nickname="S9-新主播监控")
+            pilot_response = admin_client.post('/api/pilots', json=pilot_data)
+            if not pilot_response.get('success'):
+                pytest.skip("创建主播接口不可用，跳过S9-TC4")
+
+            pilot_id = pilot_response['data']['id']
+
+            # 为该主播创建6条开播记录与底薪申请
+            for index in range(6):
+                start_time = datetime.now() - timedelta(days=6 - index, hours=2)
+                end_time = start_time + timedelta(hours=3)
+                battle_payload = {
+                    'pilot': pilot_id,
+                    'start_time': start_time.isoformat(),
+                    'end_time': end_time.isoformat(),
+                    'work_mode': '线下',
+                    'x_coord': f'NP{index}',
+                    'y_coord': f'SEC{index}',
+                    'z_coord': 'Z1',
+                    'revenue_amount': '180.00',
+                    'base_salary': '120.00',
+                    'notes': f'S9新主播邮件测试第{index + 1}次'
+                }
+                battle_response = admin_client.post('/battle-records/api/battle-records', json=battle_payload)
+                if not battle_response.get('success'):
+                    pytest.skip("创建开播记录接口不可用，跳过S9-TC4")
+
+                record_id = battle_response['data']['id']
+                created_records.append(record_id)
+
+                application_payload = {'pilot_id': pilot_id, 'battle_record_id': record_id, 'settlement_type': 'daily_base', 'base_salary_amount': '120.00'}
+                application_response = admin_client.post('/api/base-salary-applications', json=application_payload)
+                if not application_response.get('success'):
+                    pytest.skip("创建底薪申请接口不可用，跳过S9-TC4")
+
+                created_applications.append(application_response['data']['id'])
+
+            milestone_hits = []
+
+            for idx, application_id in enumerate(created_applications, start=1):
+                approval_response = admin_client.patch(f'/api/base-salary-applications/{application_id}/status', json={'status': 'approved'})
+                if not approval_response.get('success'):
+                    pytest.skip("底薪审批接口不可用，跳过S9-TC4")
+
+                if idx in (5, 6):
+                    keyword = f"第{idx}天"
+                    matched_file = self._wait_for_new_pilot_warning_mail(keyword, known_mail_files)
+                    assert matched_file, f"未找到包含{keyword}的新主播生存警告邮件"
+                    milestone_hits.append(idx)
+
+            assert milestone_hits == [5, 6], f"未捕获所有新主播邮件，实际={milestone_hits}"
+
+        finally:
+            os.environ['MAIL_DEBUG'] = original_mail_debug
+            self._cleanup_test_data(admin_client, record_ids=created_records, pilot_ids=[pilot_id] if pilot_id else None)
+            print("✅ S9-TC4新主播生存警告邮件测试完成")
+
     def _get_generated_mail_files(self):
         """获取log/mail目录中生成的邮件文件"""
         mail_dir = 'log/mail'
@@ -368,6 +442,29 @@ class TestS9MailGeneration:
                 print(f"❌ 读取边界邮件文件失败: {str(e)}")
                 return False
         return False
+
+    def _wait_for_new_pilot_warning_mail(self, keyword, known_files, timeout=12):
+        """等待新主播生存警告邮件生成"""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            current_files = set(self._get_generated_mail_files())
+            new_files = [path for path in current_files if path not in known_files]
+            if not new_files:
+                time.sleep(1)
+                continue
+
+            for file_path in new_files:
+                known_files.add(file_path)
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as file_obj:
+                        content = file_obj.read()
+                        if keyword in content and '新主播生存警告' in content:
+                            print(f"✅ 捕获新主播邮件文件: {file_path}")
+                            return file_path
+                except Exception as exc:  # pylint: disable=broad-except
+                    print(f"⚠️ 读取新主播邮件失败: {file_path} - {exc}")
+            time.sleep(1)
+        return None
 
     def _cleanup_mail_files(self):
         """清理log/mail目录中的测试邮件文件"""

@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 # pylint: disable=no-member
-from models.battle_record import BaseSalaryApplicationStatus
+from models.battle_record import (BaseSalaryApplication, BaseSalaryApplicationStatus)
 from models.pilot import Gender
 from models.recruit import Recruit
 from models.user import User
@@ -279,6 +279,74 @@ def build_james_alert_email_content(pilot_info, pilot_stats):
         return f"# 邮件内容生成失败\n\n主播：{pilot_info.get('nickname', '未知')}\n\n错误信息：{e}"
 
 
+def build_new_pilot_warning_email_content(pilot_info, pilot_stats, milestone):
+    """构建新主播生存警告邮件"""
+    week_stats = pilot_stats.get('week_stats', {})
+    recent_records = pilot_stats.get('recent_records', [])[:7]
+
+    age_value = pilot_info.get('age', '未知')
+    age_display = f"{age_value}岁" if isinstance(age_value, int) else str(age_value)
+    gender_icon = pilot_info.get('gender_icon', '?')
+    hometown = pilot_info.get('hometown', '未知')
+    rank = pilot_info.get('rank', '未知')
+    commission_rate = pilot_info.get('commission_rate', 0) or 0
+    owner = pilot_info.get('owner', '无')
+    recruiter_name = pilot_info.get('recruiter_name', '未知')
+    status_display = pilot_info.get('status', '未知')
+
+    content = f"""# {pilot_info['nickname']}（{pilot_info['real_name']}）正在接受新主播生存警告
+
+> 第{milestone}笔底薪确认发放，詹姆斯建议运营重点关注该新主播的近7日表现
+
+## 基本信息
+
+- **年龄（性别icon）籍贯**：{age_display}{gender_icon} {hometown}
+- **主播分类**：{rank}
+- **分成比例**：{format_number(commission_rate)}%
+- **直属运营**：{owner}
+- **招募负责人**：{recruiter_name}
+- **主播状态**：{status_display}
+"""
+
+    content += """
+## 近7日统计
+
+| 指标 | 数值 |
+|------|------|
+"""
+
+    metrics = [('开播记录数', f"{week_stats.get('record_count', 0)}条"),
+               ('总播时', f"{format_duration(week_stats.get('total_hours', 0))}小时 [平均{format_duration(week_stats.get('avg_hours', 0))}小时]"),
+               ('累计流水', f"{format_number(week_stats.get('total_revenue', 0))}元 [日均{format_number(week_stats.get('daily_avg_revenue', 0))}元]"),
+               ('累计底薪', f"{format_number(week_stats.get('total_basepay', 0))}元 [日均{format_number(week_stats.get('daily_avg_basepay', 0))}元]"),
+               ('累计公司分成', f"{format_number(week_stats.get('total_company_share', 0))}元"),
+               ('运营利润估算', f"{format_number(week_stats.get('operating_profit', 0))}元 [日均{format_number(week_stats.get('daily_avg_operating_profit', 0))}元]")]
+
+    for label, value in metrics:
+        content += f"| {label} | {value} |\n"
+
+    content += """
+## 近7日明细
+
+| 开播时间 | 结束时间 | 播时 | 流水 | 底薪 | 备注 |
+|----------|----------|------|------|------|------|
+"""
+
+    if not recent_records:
+        content += "| - | - | - | - | - | - |\n"
+    else:
+        for record in recent_records:
+            start_time = utc_to_local(record.start_time).strftime('%Y-%m-%d %H:%M') if getattr(record, 'start_time', None) else '-'
+            end_time = utc_to_local(record.end_time).strftime('%Y-%m-%d %H:%M') if getattr(record, 'end_time', None) else '-'
+            duration = format_duration(record.duration_hours or 0)
+            revenue = format_number(record.revenue_amount or 0)
+            base_salary_display = render_record_base_salary(record)
+            notes = record.notes or '-'
+            content += f"| {start_time} | {end_time} | {duration}小时 | {revenue}元 | {base_salary_display} | {notes} |\n"
+
+    return content
+
+
 def get_alert_recipients():
     """
     获取告警邮件收件人列表
@@ -337,6 +405,47 @@ def send_james_alert_email(pilot_info, pilot_stats):
     except Exception as e:
         logger.error(f"发送詹姆斯关注警告邮件时发生异常: {e}")
         return False
+
+
+def send_new_pilot_warning_email(pilot_info, pilot_stats, milestone):
+    """发送新主播生存警告邮件"""
+    try:
+        recipients = get_alert_recipients()
+        if not recipients:
+            logger.warning("没有找到新主播生存警告邮件收件人，跳过发送")
+            return False
+
+        email_content = build_new_pilot_warning_email_content(pilot_info, pilot_stats, milestone)
+        subject = f"拉科斯警告 这是一个活到了第{milestone}天的新主播"
+        success = send_email_md(recipients, subject, email_content)
+
+        if success:
+            logger.info("新主播生存警告邮件发送成功：主播%s，第%s笔底薪，收件人数=%s", pilot_info['nickname'], milestone, len(recipients))
+        else:
+            logger.error("新主播生存警告邮件发送失败：主播%s，第%s笔底薪", pilot_info['nickname'], milestone)
+
+        return success
+
+    except Exception as exc:
+        logger.error("发送新主播生存警告邮件时发生异常: %s", exc)
+        return False
+
+
+def get_new_pilot_warning_milestone(pilot):
+    """计算主播当前已发放底薪次数，判断是否触发5/6笔提醒"""
+    try:
+        if not pilot:
+            return None
+
+        approved_count = BaseSalaryApplication.objects(pilot_id=pilot, status=BaseSalaryApplicationStatus.APPROVED).count()
+        logger.debug("主播%s当前已发放底薪%s笔", getattr(pilot, 'nickname', '未知'), approved_count)
+
+        if approved_count in (5, 6):
+            return approved_count
+        return None
+    except Exception as exc:
+        logger.error("统计主播%s底薪笔数失败: %s", getattr(pilot, 'nickname', '未知'), exc)
+        return None
 
 
 def process_james_alert_async(application):
@@ -402,6 +511,52 @@ def process_james_alert_async(application):
     thread.start()
 
 
+def process_new_pilot_warning_async(application):
+    """异步处理新主播生存警告逻辑"""
+
+    def _process():
+        try:
+            try:
+                application.reload()
+            except Exception:  # noqa: BLE001
+                pass
+
+            battle_record = getattr(application, 'battle_record_id', None)
+            pilot = getattr(application, 'pilot_id', None) or (battle_record.pilot if battle_record else None)
+
+            if not pilot:
+                logger.info("底薪申请%s缺少主播信息，跳过新主播生存警告检查", getattr(application, 'id', '未知'))
+                return
+
+            milestone = get_new_pilot_warning_milestone(pilot)
+            if milestone not in (5, 6):
+                logger.info("主播%s当前第%s笔底薪，未达到新主播生存警告阈值", getattr(pilot, 'nickname', '未知'), milestone or 0)
+                return
+
+            from utils.pilot_performance import calculate_pilot_performance_stats
+
+            now_local = get_current_local_time()
+            performance_data = calculate_pilot_performance_stats(pilot, now_local)
+            pilot_stats = {'week_stats': performance_data.get('week_stats', {}), 'recent_records': performance_data.get('recent_records', [])}
+            pilot_info = get_pilot_basic_info(pilot)
+
+            logger.debug("主播%s第%s笔底薪近7日统计: %s", getattr(pilot, 'nickname', '未知'), milestone, pilot_stats['week_stats'])
+
+            success = send_new_pilot_warning_email(pilot_info, pilot_stats, milestone)
+            application_id = getattr(application, 'id', '未知')
+            if success:
+                logger.info("底薪申请%s触发的新主播生存警告邮件已发送", application_id)
+            else:
+                logger.error("底薪申请%s触发的新主播生存警告邮件发送失败", application_id)
+
+        except Exception as exc:
+            logger.error("处理新主播生存警告邮件时发生异常: %s", exc, exc_info=True)
+
+    thread = threading.Thread(target=_process)
+    thread.daemon = True
+    thread.start()
+
+
 def trigger_james_alert_for_application(application, old_status=None):
     """
     当底薪申请确认发放后，触发詹姆斯关注检查。
@@ -424,6 +579,7 @@ def trigger_james_alert_for_application(application, old_status=None):
             return
 
         process_james_alert_async(application)
+        process_new_pilot_warning_async(application)
 
     except Exception as e:
         logger.error("触发詹姆斯关注警告检查时发生异常: %s", e, exc_info=True)
