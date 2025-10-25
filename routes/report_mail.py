@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from math import floor
 from typing import Dict, List
 
-from flask import (Blueprint, jsonify, redirect, render_template, request, url_for)
+from flask import (Blueprint, jsonify, redirect, render_template, request,
+                   url_for)
 from flask_security import current_user, roles_required
 
 from models.announcement import Announcement
@@ -17,9 +18,16 @@ from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
-from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, calculate_monthly_details, calculate_monthly_summary)
-from utils.new_report_serializers import (serialize_daily_details, serialize_daily_summary, serialize_monthly_details, serialize_monthly_summary)
-from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
+from utils.new_report_calculations import (calculate_daily_details,
+                                           calculate_daily_summary,
+                                           calculate_monthly_details,
+                                           calculate_monthly_summary)
+from utils.new_report_serializers import (serialize_daily_details,
+                                          serialize_daily_summary,
+                                          serialize_monthly_details,
+                                          serialize_monthly_summary)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc,
+                                   utc_to_local)
 
 logger = get_logger('report_mail')
 
@@ -393,14 +401,13 @@ def _build_online_pilot_unstarted_markdown(items: List[dict], report_date: str, 
     if not items:
         return f'# 线上主播未开播提醒\n\n**报表日期：** {report_date}\n\n检查结果显示：所有线上主播在{check_day}均有正常开播记录，无遗漏情况。\n\n---\n*本报表由 Lacus-Log 系统自动生成*'
 
-    header = ("| 主播昵称 | 真实姓名 | 直属运营-主播分类 | 最近开播日期 | 开播地点 | 开播方式 | 近3天线上次数 | 检查日 | 备注 |\n"
-              "| --- | --- | --- | --- | --- | --- | ---: | --- | --- |")
+    header = ("| 主播昵称 | 真实姓名 | 直属运营-主播分类 | 最近开播日期 | 近3天线上次数 | 检查日 | 备注 |\n"
+              "| --- | --- | --- | --- | ---: | --- | --- |")
 
     lines = [header]
     for it in items:
         line = (f"| {it['pilot_name']} | {it['real_name']} | {it['owner_rank']} | "
-                f"{it['latest_date']} | {it['location']} | {it['work_mode']} | "
-                f"{it['recent_online_count']} | {it['check_day']} | {it['note']} |")
+                f"{it['latest_date']} | {it['recent_online_count']} | {it['check_day']} | {it['note']} |")
         lines.append(line)
 
     table_content = "\n".join(lines)
@@ -726,12 +733,8 @@ def run_online_pilot_unstarted_report_job(triggered_by: str = 'scheduler') -> di
         if latest_record:
             latest_date_local = utc_to_local(latest_record.start_time)
             latest_date_str = latest_date_local.strftime('%Y-%m-%d')
-            location = latest_record.battle_location
-            work_mode = latest_record.get_work_mode_display()
         else:
             latest_date_str = '无记录'
-            location = '未知'
-            work_mode = '未知'
 
         # 获取主播信息
         owner_display = ''
@@ -756,8 +759,6 @@ def run_online_pilot_unstarted_report_job(triggered_by: str = 'scheduler') -> di
             'real_name': getattr(pilot, 'real_name', ''),
             'owner_rank': f"{owner_display}-{rank_display}".strip('-'),
             'latest_date': latest_date_str,
-            'location': location,
-            'work_mode': work_mode,
             'recent_online_count': recent_online_count,
             'check_day': check_day_local.strftime('%Y-%m-%d'),
             'note': f'{check_day_local.strftime("%m月%d日")}未登记开播记录，请确认是否漏记'
