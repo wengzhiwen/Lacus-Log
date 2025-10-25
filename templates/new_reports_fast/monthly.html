@@ -83,6 +83,7 @@
     <div class="chart-modal__canvas">
       <canvas id="metricChartCanvas"></canvas>
     </div>
+    <div class="chart-modal__switcher" id="chartMetricSwitcher"></div>
     <p class="chart-modal__hint">注：曲线为按自然日累计值，和当前过滤条件保持一致</p>
   </div>
 </div>
@@ -361,6 +362,29 @@
   text-align: right;
 }
 
+.chart-modal__switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chart-switcher__btn {
+  border: 1px solid var(--gray);
+  background: #fff;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chart-switcher__btn.is-active {
+  border-color: var(--brand);
+  background: rgba(54, 79, 199, 0.1);
+  color: var(--brand);
+}
+
 
 .pilot-link {
   color: var(--brand);
@@ -445,6 +469,7 @@
   const chartModalTitle = document.getElementById('chartModalTitle');
   const chartModalClose = document.getElementById('metricChartClose');
   const chartCanvas = document.getElementById('metricChartCanvas');
+  const chartMetricSwitcher = document.getElementById('chartMetricSwitcher');
 
   const rankMapping = {
     '候补机师': '候选人',
@@ -497,6 +522,7 @@
 
   let metricChartInstance = null;
   let dailySeries = [];
+  let currentMetricKey = null;
 
   let currentMonth = app.dataset.reportMonth;
   let currentOwner = app.dataset.selectedOwner || 'all';
@@ -521,6 +547,18 @@
       closeMetricModal();
     }
   });
+  if (chartMetricSwitcher) {
+    chartMetricSwitcher.addEventListener('click', function(event) {
+      const button = event.target.closest('button[data-metric]');
+      if (!button) {
+        return;
+      }
+      const metric = button.dataset.metric;
+      if (metric && metric !== currentMetricKey) {
+        renderMetricChart(metric);
+      }
+    });
+  }
 
   function formatMoney(value) {
     if (value === null || value === undefined) {
@@ -599,6 +637,7 @@
     if (!chartModal || !chartModalTitle) {
       return;
     }
+    currentMetricKey = metricKey;
     chartModalTitle.textContent = `${label} - 按日累计趋势`;
     chartModal.classList.add('is-visible');
     chartModal.setAttribute('aria-hidden', 'false');
@@ -621,6 +660,17 @@
     }
   }
 
+  function renderChartMetricSwitcher(activeKey) {
+    if (!chartMetricSwitcher) {
+      return;
+    }
+    const metricOrder = ['revenue', 'basepay', 'pilot_share', 'company_share', 'operating_profit'];
+    chartMetricSwitcher.innerHTML = metricOrder.filter(key => metricConfigs[key]).map(key => {
+      const activeClass = key === activeKey ? ' is-active' : '';
+      return `<button type="button" class="chart-switcher__btn${activeClass}" data-metric="${key}">${metricConfigs[key].label}</button>`;
+    }).join('');
+  }
+
   function renderMetricChart(metricKey) {
     if (!chartCanvas || typeof Chart === 'undefined') {
       return;
@@ -636,6 +686,8 @@
       return;
     }
     destroyMetricChart();
+    currentMetricKey = metricKey;
+    renderChartMetricSwitcher(metricKey);
     const ctx = chartCanvas.getContext('2d');
     const datasets = [];
     if (config.showDaily !== false) {
