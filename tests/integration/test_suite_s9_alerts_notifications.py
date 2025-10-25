@@ -11,9 +11,7 @@
 """
 import pytest
 from datetime import datetime, timedelta
-from tests.fixtures.factories import (
-    pilot_factory, james_alert_factory, battle_record_factory, bbs_post_factory
-)
+from tests.fixtures.factories import (pilot_factory, james_alert_factory, battle_record_factory, bbs_post_factory)
 
 
 @pytest.mark.suite("S9")
@@ -45,8 +43,7 @@ class TestS9AlertsNotifications:
                     status='COMPLETED',
                     income=5000,  # 很低的收入，可能触发告警
                     work_mode='线下',
-                    platform='快手'
-                )
+                    platform='快手')
 
                 battle_response = admin_client.post('/api/battle-records', json=low_income_record)
 
@@ -57,12 +54,7 @@ class TestS9AlertsNotifications:
                 # 3. 创建另一个可能触发连续未开播告警的情况
                 # 创建很久以前的开播记录，然后没有新记录
                 old_record_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d %H:%M:%S')
-                old_record = battle_record_factory.create_battle_record_data(
-                    pilot_id=pilot_id,
-                    start_time=old_record_date,
-                    status='COMPLETED',
-                    income=30000
-                )
+                old_record = battle_record_factory.create_battle_record_data(pilot_id=pilot_id, start_time=old_record_date, status='COMPLETED', income=30000)
 
                 old_battle_response = admin_client.post('/api/battle-records', json=old_record)
 
@@ -71,11 +63,7 @@ class TestS9AlertsNotifications:
                     created_ids['old_record_id'] = old_record_id
 
             # 4. 查询詹姆斯告警
-            alerts_endpoints = [
-                '/api/james-alerts',
-                '/api/alerts',
-                '/api/pilots/alerts'
-            ]
+            alerts_endpoints = ['/api/james-alerts', '/api/alerts', '/api/pilots/alerts']
 
             for endpoint in alerts_endpoints:
                 alerts_response = admin_client.get(endpoint)
@@ -99,12 +87,10 @@ class TestS9AlertsNotifications:
 
             # 5. 手动创建告警（如果支持）
             if 'pilot_id' in created_ids:
-                manual_alert_data = james_alert_factory.create_alert_data(
-                    pilot_id=created_ids['pilot_id'],
-                    alert_type='收入异常',
-                    alert_level='HIGH',
-                    message='手动创建的测试告警：主播收入低于预期'
-                )
+                manual_alert_data = james_alert_factory.create_alert_data(pilot_id=created_ids['pilot_id'],
+                                                                          alert_type='收入异常',
+                                                                          alert_level='HIGH',
+                                                                          message='手动创建的测试告警：主播收入低于预期')
 
                 manual_alert_response = admin_client.post('/api/james-alerts', json=manual_alert_data)
 
@@ -146,13 +132,15 @@ class TestS9AlertsNotifications:
                 pilot_id = pilot_response['data']['id']
                 created_ids['pilot_id'] = pilot_id
 
-                post_data = bbs_post_factory.create_post_data(
-                    author_id=kancho_client.get('/api/users/me')['data']['id'],
-                    pilot_ids=[pilot_id],
-                    title='邮件通知测试主贴',
-                    content='这个主贴用于测试邮件通知功能',
-                    category='主播反馈'
-                )
+                kancho_me = kancho_client.get('/api/auth/me')
+                assert kancho_me.get('success'), '获取运营身份失败'
+                kancho_id = kancho_me['data']['user']['id']
+
+                post_data = bbs_post_factory.create_bbs_post_data(author_id=kancho_id,
+                                                                  pilot_ids=[pilot_id],
+                                                                  title='邮件通知测试主贴',
+                                                                  content='这个主贴用于测试邮件通知功能',
+                                                                  category='主播反馈')
 
                 post_response = admin_client.post('/api/bbs/posts', json=post_data)
 
@@ -162,10 +150,7 @@ class TestS9AlertsNotifications:
                     created_ids['post_id'] = post_id
 
                     # 2. 添加回复，可能触发邮件通知
-                    reply_data = {
-                        'content': '这是一个测试回复，可能触发邮件通知',
-                        'author_id': admin_client.get('/api/users/me')['data']['id']
-                    }
+                    reply_data = {'content': '这是一个测试回复，可能触发邮件通知', 'author_id': admin_client.get('/api/users/me')['data']['id']}
 
                     reply_response = admin_client.post(f'/api/bbs/posts/{post_id}/replies', json=reply_data)
 
@@ -174,17 +159,10 @@ class TestS9AlertsNotifications:
                         created_ids['reply_id'] = reply_id
 
                         # 3. 查询邮件日志
-                        mail_log_endpoints = [
-                            '/api/mail/logs',
-                            '/api/notifications/logs',
-                            '/api/mail/history'
-                        ]
+                        mail_log_endpoints = ['/api/mail/logs', '/api/notifications/logs', '/api/mail/history']
 
                         for endpoint in mail_log_endpoints:
-                            log_response = admin_client.get(endpoint, params={
-                                'post_id': post_id,
-                                'limit': 10
-                            })
+                            log_response = admin_client.get(endpoint, params={'post_id': post_id, 'limit': 10})
 
                             if log_response.get('success'):
                                 logs = log_response['data']
@@ -238,12 +216,7 @@ class TestS9AlertsNotifications:
         """
         try:
             # 1. 测试SSE通知流接口
-            sse_endpoints = [
-                '/api/notifications/stream',
-                '/api/events/stream',
-                '/api/alerts/stream',
-                '/api/bbs/notifications/stream'
-            ]
+            sse_endpoints = ['/api/notifications/stream', '/api/events/stream', '/api/alerts/stream', '/api/bbs/notifications/stream']
 
             for endpoint in sse_endpoints:
                 try:
@@ -260,17 +233,15 @@ class TestS9AlertsNotifications:
                     continue
 
             # 2. 测试长轮询通知接口
-            long_polling_endpoints = [
-                '/api/notifications/poll',
-                '/api/events/poll',
-                '/api/alerts/check'
-            ]
+            long_polling_endpoints = ['/api/notifications/poll', '/api/events/poll', '/api/alerts/check']
 
             for endpoint in long_polling_endpoints:
-                poll_response = admin_client.get(endpoint, params={
-                    'timeout': 5,  # 5秒超时
-                    'since': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                })
+                poll_response = admin_client.get(
+                    endpoint,
+                    params={
+                        'timeout': 5,  # 5秒超时
+                        'since': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    })
 
                 if poll_response.get('success'):
                     notifications = poll_response['data']
@@ -294,10 +265,11 @@ class TestS9AlertsNotifications:
 
                 # 立即再次查询通知，看是否有新事件
                 for endpoint in long_polling_endpoints:
-                    poll_response = admin_client.get(endpoint, params={
-                        'timeout': 2,
-                        'since': (datetime.now() - timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')
-                    })
+                    poll_response = admin_client.get(endpoint,
+                                                     params={
+                                                         'timeout': 2,
+                                                         'since': (datetime.now() - timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')
+                                                     })
 
                     if poll_response.get('success'):
                         notifications = poll_response['data']
@@ -342,10 +314,7 @@ class TestS9AlertsNotifications:
                 assert created_rule['threshold'] == 10000
 
                 # 3. 更新告警规则
-                update_response = admin_client.put(f'/api/james-alerts/rules/{created_rule["id"]}', json={
-                    'threshold': 15000,
-                    'alert_level': 'HIGH'
-                })
+                update_response = admin_client.put(f'/api/james-alerts/rules/{created_rule["id"]}', json={'threshold': 15000, 'alert_level': 'HIGH'})
 
                 if update_response.get('success'):
                     updated_rule = update_response['data']

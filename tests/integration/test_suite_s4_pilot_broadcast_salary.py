@@ -272,11 +272,11 @@ class TestS4PilotBroadcastSalary:
             now = datetime.now()
             records_payload = [{
                 'start_time': (now - timedelta(days=3)).replace(hour=10, minute=0, second=0, microsecond=0).isoformat(),
-                'end_time': (now - timedelta(days=3)).replace(hour=12, minute=0, second=0, microsecond=0).isoformat(),
+                'end_time': (now - timedelta(days=3)).replace(hour=18, minute=0, second=0, microsecond=0).isoformat(),
                 'revenue_amount': '150.00',
             }, {
                 'start_time': (now - timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0).isoformat(),
-                'end_time': (now - timedelta(days=1)).replace(hour=17, minute=0, second=0, microsecond=0).isoformat(),
+                'end_time': (now - timedelta(days=1)).replace(hour=22, minute=0, second=0, microsecond=0).isoformat(),
                 'revenue_amount': '300.00',
             }]
 
@@ -290,7 +290,8 @@ class TestS4PilotBroadcastSalary:
                     'y_coord': 'B',
                     'z_coord': '1',
                     'revenue_amount': payload['revenue_amount'],
-                    'base_salary': '0'
+                    'base_salary': '0',
+                    'notes': 'TDD-auto'
                 }
                 battle_response = admin_client.post('/battle-records/api/battle-records', json=record_body)
                 assert battle_response.get('success'), '创建开播记录失败'
@@ -324,7 +325,7 @@ class TestS4PilotBroadcastSalary:
             assert pytest.approx(last_entry['revenue_cumulative'], rel=1e-3) == expected_revenue
             assert pytest.approx(last_entry['company_share_cumulative'], rel=1e-3) == expected_company_share
             assert pytest.approx(last_entry['operating_profit_cumulative'], rel=1e-3) == expected_company_share
-            assert pytest.approx(last_entry['hours_cumulative'], rel=1e-3) == 5.0
+            assert pytest.approx(last_entry['hours_cumulative'], rel=1e-3) == 16.0
 
         finally:
             try:
