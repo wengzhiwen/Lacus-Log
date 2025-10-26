@@ -9,8 +9,11 @@
 3. 测试主播管理和开播记录
 4. 验证底薪申请和BBS集成
 """
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
 import pytest
-from datetime import datetime, timedelta
+
 from tests.fixtures.factories import pilot_factory
 
 
@@ -812,5 +815,76 @@ class TestS4PilotBroadcastSalary:
             for record_id in created_record_ids:
                 try:
                     admin_client.delete(f'/battle-records/api/battle-records/{record_id}')
+                except Exception:  # pylint: disable=broad-except
+                    pass
+
+    def test_s4_tc11_active_pilot_priority_in_dropdown(self, admin_client, kancho_client):  # pylint: disable=too-many-locals
+        """
+        S4-TC11 活跃主播优先排序于开播记录登录下拉框
+
+        步骤：创建两个主播并仅让其中一个在48小时内拥有开播记录，
+              调用 /battle-records/api/pilots-filtered 验证活跃主播排在非活跃主播之前。
+        """
+        # 获取kancho用户ID作为owner
+        me_resp = kancho_client.get('/api/auth/me')
+        kancho_id = me_resp['data']['user']['id']
+
+        suffix = uuid4().hex[:6]
+        inactive_nickname = f'AlphaInactive_{suffix}'
+        active_nickname = f'ZuluActive_{suffix}'
+
+        base_kwargs = {'status': '已招募', 'rank': '正式主播', 'work_mode': '线下', 'platform': '快手', 'owner_id': kancho_id}
+        inactive_data = pilot_factory.create_pilot_data(nickname=inactive_nickname, **base_kwargs)
+        active_data = pilot_factory.create_pilot_data(nickname=active_nickname, **base_kwargs)
+
+        created_pilots = []
+        battle_record_id = None
+
+        try:
+            inactive_resp = admin_client.post('/api/pilots', json=inactive_data)
+            assert inactive_resp.get('success'), f'创建非活跃主播失败: {inactive_resp.get("error")}'
+            inactive_pilot_id = inactive_resp['data']['id']
+            created_pilots.append(inactive_pilot_id)
+
+            active_resp = admin_client.post('/api/pilots', json=active_data)
+            assert active_resp.get('success'), f'创建活跃主播失败: {active_resp.get("error")}'
+            active_pilot_id = active_resp['data']['id']
+            created_pilots.append(active_pilot_id)
+
+            start_time = datetime.now(timezone.utc) - timedelta(hours=3)
+            end_time = datetime.now(timezone.utc) - timedelta(hours=1)
+
+            battle_record_payload = {
+                'pilot': active_pilot_id,
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat(),
+                'work_mode': '线下',
+                'x_coord': 'A基地',
+                'y_coord': '1号场',
+                'z_coord': '01',
+                'revenue_amount': '100.00',
+                'base_salary': '0',
+                'notes': '用于验证活跃主播排序的测试记录'
+            }
+
+            battle_response = admin_client.post('/battle-records/api/battle-records', json=battle_record_payload)
+            assert battle_response.get('success'), f'创建开播记录失败: {battle_response.get("error")}'
+            battle_record_id = battle_response['data']['id']
+
+            list_response = admin_client.get('/battle-records/api/pilots-filtered')
+            assert list_response['success'] is True
+            items = list_response['data'].get('items', [])
+            id_to_index = {item['id']: idx for idx, item in enumerate(items)}
+
+            assert active_pilot_id in id_to_index, '活跃主播未出现在下拉列表中'
+            assert inactive_pilot_id in id_to_index, '非活跃主播未出现在下拉列表中'
+            assert id_to_index[active_pilot_id] < id_to_index[inactive_pilot_id], '活跃主播未被排在前面'
+
+        finally:
+            if battle_record_id:
+                admin_client.delete(f'/battle-records/api/battle-records/{battle_record_id}')
+            for pilot_id in created_pilots:
+                try:
+                    admin_client.put(f'/api/pilots/{pilot_id}', json={'status': '未招募'})
                 except Exception:  # pylint: disable=broad-except
                     pass

@@ -10,27 +10,22 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, make_response, request, url_for
-from flask_security import current_user, roles_accepted
+from flask_security import current_user
 from mongoengine import DoesNotExist, ValidationError
 
-from models.announcement import (Announcement, AnnouncementChangeLog,
-                                 RecurrenceType)
+from models.announcement import (Announcement, AnnouncementChangeLog, RecurrenceType)
 from models.battle_area import BattleArea
 from models.pilot import Pilot, Rank, Status
 from models.user import User
 from routes.announcement import _get_client_ip, _record_changes
-from utils.announcement_serializers import (create_error_response,
-                                            create_success_response,
-                                            serialize_announcement_detail,
-                                            serialize_announcement_summary,
+from utils.announcement_serializers import (create_error_response, create_success_response, serialize_announcement_detail, serialize_announcement_summary,
                                             serialize_change_logs)
 from utils.filter_state import persist_and_restore_filters
-from utils.jwt_roles import jwt_roles_accepted, jwt_roles_required
+from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.timezone_helper import (format_local_datetime,
-                                   get_current_local_time, local_to_utc,
-                                   parse_local_date_to_end_datetime,
-                                   parse_local_datetime, utc_to_local)
+from utils.pilot_activity import sort_pilots_with_active_priority
+from utils.timezone_helper import (format_local_datetime, get_current_local_time, local_to_utc, parse_local_date_to_end_datetime, parse_local_datetime,
+                                   utc_to_local)
 
 announcements_api_bp = Blueprint('announcements_api', __name__)
 
@@ -773,7 +768,7 @@ def get_filtered_pilots_api():
         if rank:
             query = _apply_rank_filter(query, rank)
 
-        pilots = query.order_by('owner', 'rank', 'nickname')
+        pilots = sort_pilots_with_active_priority(list(query.order_by('nickname')))
 
         result = []
         for pilot in pilots:

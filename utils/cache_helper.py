@@ -19,6 +19,8 @@ monthly_report_cache = TTLCache(maxsize=1000, ttl=900)  # 900秒 = 15分钟
 
 pilot_performance_cache = TTLCache(maxsize=500, ttl=300)  # 300秒 = 5分钟
 
+active_pilot_cache = TTLCache(maxsize=10, ttl=3600)  # 3600秒 = 60分钟
+
 
 def generate_cache_key(func_name: str, *args, **kwargs) -> str:
     """生成缓存键
@@ -117,6 +119,25 @@ def clear_pilot_performance_cache():
     """清空主播业绩缓存"""
     pilot_performance_cache.clear()
     logger.info('主播业绩缓存已清空')
+
+
+def get_cached_active_pilots(cache_key: str, builder: Callable[[], Any]) -> Any:
+    """获取活跃主播缓存结果，未命中时执行builder构建数据"""
+    if cache_key in active_pilot_cache:
+        logger.debug('活跃主播缓存命中：%s', cache_key)
+        return active_pilot_cache[cache_key]
+
+    result = builder()
+    active_pilot_cache[cache_key] = result
+    size = len(result) if hasattr(result, '__len__') else '未知'
+    logger.debug('活跃主播缓存构建完成：%s，数量：%s', cache_key, size)
+    return result
+
+
+def clear_active_pilot_cache():
+    """清空活跃主播缓存"""
+    active_pilot_cache.clear()
+    logger.info('活跃主播缓存已清空')
 
 
 def get_cache_info() -> Dict[str, Any]:

@@ -23,6 +23,7 @@ from utils.csrf_helper import CSRFError, validate_csrf_header
 from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
+from utils.pilot_activity import sort_pilots_with_active_priority
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('battle_records_api')
@@ -795,7 +796,7 @@ def pilots_filtered():
                 except ValueError:
                     logger.warning('无效的rank参数：%s', rank_value)
 
-            pilots = list(query.order_by('nickname'))
+            pilots = sort_pilots_with_active_priority(list(query.order_by('nickname')))
 
         items = []
         for pilot in pilots:
