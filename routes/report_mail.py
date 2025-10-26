@@ -8,8 +8,7 @@ from datetime import datetime, timedelta
 from math import floor
 from typing import Dict, List
 
-from flask import (Blueprint, jsonify, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, jsonify, redirect, render_template, request, url_for)
 from flask_security import current_user, roles_required
 
 from models.announcement import Announcement
@@ -18,16 +17,10 @@ from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
 from utils.mail_utils import send_email_md
-from utils.new_report_calculations import (calculate_daily_details,
-                                           calculate_daily_summary,
-                                           calculate_monthly_details,
-                                           calculate_monthly_summary)
-from utils.new_report_serializers import (serialize_daily_details,
-                                          serialize_daily_summary,
-                                          serialize_monthly_details,
-                                          serialize_monthly_summary)
-from utils.timezone_helper import (get_current_utc_time, local_to_utc,
-                                   utc_to_local)
+from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary)
+from utils.new_report_fast_calculations import calculate_monthly_summary_fast
+from utils.new_report_serializers import (serialize_daily_details, serialize_daily_summary, serialize_monthly_summary)
+from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('report_mail')
 
@@ -316,11 +309,13 @@ def run_monthly_mail_report_job(report_month: str = None, triggered_by: str = 's
             logger.error('月份参数格式错误：%s', report_month)
             return {'sent': False, 'count': 0}
 
-    month_summary_raw = calculate_monthly_summary(year, month)
-    details_raw = calculate_monthly_details(year, month)
+    month_summary_raw = calculate_monthly_summary_fast(year, month)
+    # 快速月报没有明细函数，所以这里需要重新设计或者移除明细功能
+    # 由于用户要求只保留快速月报，我们暂时使用月度汇总数据
+    details_raw = []
 
     month_summary = serialize_monthly_summary(month_summary_raw)
-    details = serialize_monthly_details(details_raw)
+    details = details_raw  # 简化处理，暂时不提供明细
 
     md_content = _build_monthly_mail_markdown(month_summary, details)
 

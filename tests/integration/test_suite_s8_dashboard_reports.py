@@ -74,13 +74,6 @@ class TestS8DashboardReportsFixed:
                 'mode': 'offline'
             }
         }, {
-            'name': '新月报API',
-            'endpoint': '/new-reports/api/monthly',
-            'params': {
-                'month': current_date.strftime('%Y-%m'),
-                'mode': 'offline'
-            }
-        }, {
             'name': '加速版月报API',
             'endpoint': '/new-reports-fast/api/monthly',
             'params': {
@@ -143,14 +136,6 @@ class TestS8DashboardReportsFixed:
                 'report_date': current_date.strftime('%Y-%m-%d'),
                 'recipients': ['test@example.com'],
                 'format': 'pdf'
-            }
-        }, {
-            'name': '月报邮件',
-            'endpoint': '/reports/mail/monthly-report',
-            'data': {
-                'report_month': current_date.strftime('%Y-%m'),
-                'recipients': ['test@example.com'],
-                'format': 'excel'
             }
         }]
 

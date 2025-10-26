@@ -30,7 +30,6 @@ from routes.recruit_monthly_reports import recruit_monthly_reports_bp
 from routes.recruit_monthly_reports_api import recruit_monthly_reports_api_bp
 from routes.recruits_api import recruits_api_bp
 from routes.report import report_bp
-from routes.reports_api import reports_api_bp
 from routes.report_mail import report_mail_bp
 from routes.new_report import new_report_bp
 from routes.new_report_fast import new_report_fast_bp
@@ -166,7 +165,6 @@ def create_app() -> Flask:
     flask_app.register_blueprint(bbs_bp)
     flask_app.register_blueprint(calendar_api_bp, url_prefix='/calendar/api')
     flask_app.register_blueprint(calendar_bp, url_prefix='/calendar')
-    flask_app.register_blueprint(reports_api_bp, url_prefix='/reports/api')
     flask_app.register_blueprint(report_bp, url_prefix='/reports')
     flask_app.register_blueprint(new_reports_api_bp, url_prefix='/new-reports/api')
     flask_app.register_blueprint(new_report_bp, url_prefix='/new-reports')

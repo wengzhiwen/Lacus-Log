@@ -10,9 +10,9 @@ from flask import Blueprint, Response, render_template, request
 from flask_security import roles_accepted
 
 from utils.logging_setup import get_logger
-from utils.new_report_calculations import (calculate_daily_details, calculate_weekly_details, calculate_weekly_summary, calculate_monthly_details,
-                                           calculate_monthly_summary, get_default_week_start_for_now_prev_week, get_local_date_from_string,
-                                           get_local_date_from_string_safe, get_local_month_from_string, get_week_start_tuesday)
+from utils.new_report_calculations import (calculate_daily_details, calculate_weekly_details, calculate_weekly_summary,
+                                           get_default_week_start_for_now_prev_week, get_local_date_from_string, get_local_date_from_string_safe,
+                                           get_local_month_from_string, get_week_start_tuesday)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
 
 logger = get_logger('new_report')
@@ -198,96 +198,6 @@ def export_weekly_csv():
     output.close()
 
     filename = f"开播新周报_{week_start_local.strftime('%Y%m%d')}.csv"
-    encoded_filename = quote(filename.encode('utf-8'))
-
-    response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
-    return response
-
-
-@new_report_bp.route('/monthly')
-@roles_accepted('gicho', 'kancho')
-def monthly_report():
-    """开播新月报页面。"""
-    month_str = request.args.get('month')
-    if not month_str:
-        now_utc = get_current_utc_time()
-        today_local = utc_to_local(now_utc)
-        report_month = today_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        report_month = get_local_month_from_string(month_str)
-        if not report_month:
-            logger.error('无效的新月报月份参数：%s', month_str)
-            return '无效的月份格式', 400
-        report_month = report_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    owner_id = _parse_owner_param()
-    mode = _parse_mode_param()
-
-    logger.info('访问开播新月报页面，月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
-
-    pagination = {
-        'month': report_month.strftime('%Y-%m'),
-        'prev_month': (report_month - timedelta(days=1)).replace(day=1).strftime('%Y-%m'),
-        'next_month': (report_month + timedelta(days=31)).replace(day=1).strftime('%Y-%m')
-    }
-
-    return render_template('new_reports/monthly.html', pagination=pagination, selected_owner=owner_id, selected_mode=mode)
-
-
-@new_report_bp.route('/monthly/export.csv')
-@roles_accepted('gicho', 'kancho')
-def export_monthly_csv():
-    """导出开播新月报 CSV。"""
-    month_str = request.args.get('month')
-    if not month_str:
-        now_utc = get_current_utc_time()
-        today_local = utc_to_local(now_utc)
-        report_month = today_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        report_month = get_local_month_from_string(month_str)
-        if not report_month:
-            logger.error('无效的新月报月份参数：%s', month_str)
-            return '无效的月份格式', 400
-        report_month = report_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    owner_id = _parse_owner_param()
-    mode = _parse_mode_param()
-
-    logger.info('导出开播新月报 CSV，月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
-
-    summary = calculate_monthly_summary(report_month.year, report_month.month, owner_id, mode)
-    details = calculate_monthly_details(report_month.year, report_month.month, owner_id, mode)
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    output.write('\ufeff')
-
-    writer.writerow(['汇总指标'])
-    writer.writerow(['主播数', summary['pilot_count']])
-    writer.writerow(['总流水(元)', f"{summary['revenue_sum']:.2f}"])
-    writer.writerow(['总底薪(元)', f"{summary['basepay_sum']:.2f}"])
-    writer.writerow(['总返点(元)', f"{summary['rebate_sum']:.2f}"])
-    writer.writerow(['主播分成(元)', f"{summary['pilot_share_sum']:.2f}"])
-    writer.writerow(['公司分成(元)', f"{summary['company_share_sum']:.2f}"])
-    writer.writerow(['经营毛利(元)', f"{summary['operating_profit']:.2f}"])
-    writer.writerow(['底薪转化率(%)', summary['conversion_rate'] or ''])
-    writer.writerow([])
-
-    headers = ['主播', '性别年龄', '直属运营', '主播分类', '月累计开播记录数', '月均播时(小时)', '月累计流水(元)', '月累计主播分成(元)', '月累计公司分成(元)', '月最新返点比例(%)', '月累计返点(元)', '月累计底薪(元)', '月累计毛利(元)']
-    writer.writerow(headers)
-
-    for detail in details:
-        row = [
-            detail['pilot_display'], detail['gender_age'], detail['owner'], detail['rank'], detail['records_count'], f"{detail['avg_duration']:.1f}",
-            f"{detail['total_revenue']:.2f}", f"{detail['total_pilot_share']:.2f}", f"{detail['total_company_share']:.2f}",
-            f"{(detail['rebate_rate'] or 0) * 100:.0f}", f"{detail['rebate_amount']:.2f}", f"{detail['total_base_salary']:.2f}", f"{detail['total_profit']:.2f}"
-        ]
-        writer.writerow(row)
-
-    csv_content = output.getvalue()
-    output.close()
-
-    filename = f"开播新月报_{report_month.strftime('%Y%m')}.csv"
     encoded_filename = quote(filename.encode('utf-8'))
 
     response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})

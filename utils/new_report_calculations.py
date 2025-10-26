@@ -356,7 +356,6 @@ def calculate_pilot_monthly_rebate_stats(pilot: Pilot, year: int, month: int, ow
 # —— 报表主逻辑 ——
 
 
-@cached_monthly_report()
 def calculate_daily_summary(report_date: datetime, owner_id: Optional[str] = None, mode: str = 'all') -> Dict[str, Any]:
     """计算新日报汇总信息。"""
     day_start = report_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -409,7 +408,6 @@ def calculate_daily_summary(report_date: datetime, owner_id: Optional[str] = Non
     }
 
 
-@cached_monthly_report()
 # pylint: disable=too-many-statements
 def calculate_daily_details(report_date: datetime, owner_id: Optional[str] = None, mode: str = 'all') -> List[Dict[str, Any]]:
     """计算新日报明细列表。"""
@@ -539,7 +537,6 @@ def calculate_daily_details(report_date: datetime, owner_id: Optional[str] = Non
     return details
 
 
-@cached_monthly_report()
 def calculate_weekly_summary(week_start_local: datetime, owner_id: Optional[str] = None, mode: str = 'all') -> Dict[str, Any]:
     """计算新周报汇总信息（周二至次周一）。"""
     week_end_local = week_start_local + timedelta(days=7) - timedelta(microseconds=1)
@@ -580,7 +577,6 @@ def calculate_weekly_summary(week_start_local: datetime, owner_id: Optional[str]
     }
 
 
-@cached_monthly_report()
 def calculate_weekly_details(week_start_local: datetime, owner_id: Optional[str] = None, mode: str = 'all') -> List[Dict[str, Any]]:
     """计算新周报明细。"""
     week_end_local = week_start_local + timedelta(days=7) - timedelta(microseconds=1)
@@ -648,146 +644,6 @@ def calculate_weekly_details(week_start_local: datetime, owner_id: Optional[str]
             'total_base_salary': stats['total_base_salary'],
             'total_profit': total_profit,
         }
-        details.append(detail)
-
-    details.sort(key=lambda item: item['total_profit'])
-    return details
-
-
-@cached_monthly_report()
-def calculate_monthly_summary(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all') -> Dict[str, Any]:
-    """计算新月报汇总。"""
-    month_records = get_battle_records_for_month(year, month, owner_id, mode)
-    base_salary_map = _fetch_approved_base_salary_map(month_records)
-
-    pilot_ids = set()
-    total_revenue = Decimal('0')
-    total_base_salary = Decimal('0')
-    total_pilot_share = Decimal('0')
-    total_company_share = Decimal('0')
-    total_rebate = Decimal('0')
-
-    pilot_map: Dict[str, Pilot] = {}
-
-    for record in month_records:
-        pilot_id = str(record.pilot.id)
-        pilot_ids.add(pilot_id)
-        pilot_map[pilot_id] = record.pilot
-        total_revenue += record.revenue_amount
-        total_base_salary += _get_record_base_salary(record, base_salary_map)
-
-        record_date = utc_to_local(record.start_time).date()
-        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
-        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
-        total_pilot_share += commission_amounts['pilot_amount']
-        total_company_share += commission_amounts['company_amount']
-
-    rebate_cache: Dict[str, Decimal] = {}
-    for pilot_id in pilot_ids:
-        pilot = pilot_map.get(pilot_id) or Pilot.objects(id=pilot_id).first()
-        if not pilot:
-            logger.warning('月报汇总中检测到缺失的主播记录：%s', pilot_id)
-            continue
-        if pilot_id not in rebate_cache:
-            rebate_info = calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id, mode)
-            rebate_cache[pilot_id] = rebate_info['rebate_amount']
-        total_rebate += rebate_cache[pilot_id]
-
-    operating_profit = total_company_share + total_rebate - total_base_salary
-    conversion_rate = None
-    if total_base_salary > 0:
-        conversion_rate = int((total_revenue / total_base_salary) * 100)
-
-    return {
-        'pilot_count': len(pilot_ids),
-        'revenue_sum': total_revenue,
-        'basepay_sum': total_base_salary,
-        'rebate_sum': total_rebate,
-        'pilot_share_sum': total_pilot_share,
-        'company_share_sum': total_company_share,
-        'operating_profit': operating_profit,
-        'conversion_rate': conversion_rate,
-    }
-
-
-@cached_monthly_report()
-def calculate_monthly_details(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all') -> List[Dict[str, Any]]:
-    """计算新月报明细。"""
-    month_records = get_battle_records_for_month(year, month, owner_id, mode)
-    base_salary_map = _fetch_approved_base_salary_map(month_records)
-
-    pilot_stats: Dict[str, Dict[str, Any]] = {}
-
-    for record in month_records:
-        pilot_id = str(record.pilot.id)
-        stats = pilot_stats.setdefault(
-            pilot_id, {
-                'pilot': record.pilot,
-                'records_count': 0,
-                'total_duration': 0.0,
-                'total_revenue': Decimal('0'),
-                'total_base_salary': Decimal('0'),
-                'total_pilot_share': Decimal('0'),
-                'total_company_share': Decimal('0'),
-            })
-
-        stats['records_count'] += 1
-        if record.duration_hours:
-            stats['total_duration'] += record.duration_hours
-        stats['total_revenue'] += record.revenue_amount
-        stats['total_base_salary'] += _get_record_base_salary(record, base_salary_map)
-
-        record_date = utc_to_local(record.start_time).date()
-        commission_rate, _, _ = get_pilot_commission_rate_for_date(record.pilot.id, record_date)
-        commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
-        stats['total_pilot_share'] += commission_amounts['pilot_amount']
-        stats['total_company_share'] += commission_amounts['company_amount']
-
-    details: List[Dict[str, Any]] = []
-    rebate_cache: Dict[str, Dict[str, Any]] = {}
-
-    for pilot_id, stats in pilot_stats.items():
-        pilot = stats['pilot']
-        if pilot is None:
-            logger.warning('月报明细中存在缺失主播引用，pilot_id=%s', pilot_id)
-            continue
-
-        if pilot_id not in rebate_cache:
-            rebate_cache[pilot_id] = calculate_pilot_monthly_rebate_stats(pilot, year, month, owner_id, mode)
-        rebate_stats = rebate_cache[pilot_id]
-
-        pilot_display = pilot.nickname or ''
-        if pilot.real_name:
-            pilot_display += f"（{pilot.real_name}）"
-
-        gender_icon = "♂" if pilot.gender.value == 0 else "♀" if pilot.gender.value == 1 else "?"
-        current_year = datetime.now().year
-        age = current_year - pilot.birth_year if pilot.birth_year else "未知"
-        gender_age = f"{age}-{gender_icon}"
-        owner_name = pilot.owner.nickname if pilot.owner else "未知"
-        rank = pilot.rank.value
-
-        records_count = stats['records_count']
-        avg_duration = stats['total_duration'] / records_count if records_count > 0 else 0.0
-        total_profit = stats['total_company_share'] + rebate_stats['rebate_amount'] - stats['total_base_salary']
-
-        detail = {
-            'pilot_id': pilot_id,
-            'pilot_display': pilot_display,
-            'gender_age': gender_age,
-            'owner': owner_name,
-            'rank': rank,
-            'records_count': records_count,
-            'avg_duration': round(avg_duration, 1),
-            'total_revenue': stats['total_revenue'],
-            'total_pilot_share': stats['total_pilot_share'],
-            'total_company_share': stats['total_company_share'],
-            'rebate_rate': rebate_stats['rebate_rate'],
-            'rebate_amount': rebate_stats['rebate_amount'],
-            'total_base_salary': stats['total_base_salary'],
-            'total_profit': total_profit,
-        }
-
         details.append(detail)
 
     details.sort(key=lambda item: item['total_profit'])

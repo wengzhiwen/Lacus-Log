@@ -120,8 +120,16 @@ def serialize_weekly_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def serialize_daily_details(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [serialize_daily_detail(item) for item in items]
+
+
+def serialize_weekly_details(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [serialize_weekly_detail(item) for item in items]
+
+
 def serialize_monthly_summary(raw: Dict[str, Any]) -> Dict[str, Any]:
-    """序列化月报汇总数据。"""
+    """序列化月报汇总数据（快速月报使用）。"""
     return {
         'pilot_count': raw.get('pilot_count', 0),
         'revenue_sum': _decimal_to_float(raw.get('revenue_sum')),
@@ -135,7 +143,7 @@ def serialize_monthly_summary(raw: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def serialize_monthly_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
-    """序列化月报单条明细。"""
+    """序列化月报单条明细（快速月报使用）。"""
     return {
         'pilot_id': raw.get('pilot_id'),
         'pilot_display': raw.get('pilot_display', ''),
@@ -154,20 +162,12 @@ def serialize_monthly_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def serialize_daily_details(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return [serialize_daily_detail(item) for item in items]
-
-
-def serialize_weekly_details(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return [serialize_weekly_detail(item) for item in items]
-
-
 def serialize_monthly_details(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [serialize_monthly_detail(item) for item in items]
 
 
 def serialize_monthly_daily_series(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """序列化月报日级序列，用于前端折线图。"""
+    """序列化月报日级序列，用于前端折线图（快速月报使用）。"""
     serialized: List[Dict[str, Any]] = []
     for item in items:
         serialized.append({

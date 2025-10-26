@@ -8,11 +8,11 @@ from flask import Blueprint, jsonify, request
 from utils.cache_helper import clear_daily_report_cache
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, calculate_monthly_details, calculate_monthly_summary,
-                                           calculate_weekly_details, calculate_weekly_summary, get_default_week_start_for_now_prev_week,
-                                           get_local_date_from_string, get_local_date_from_string_safe, get_local_month_from_string, get_week_start_tuesday)
+from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, calculate_weekly_details, calculate_weekly_summary,
+                                           get_default_week_start_for_now_prev_week, get_local_date_from_string, get_local_date_from_string_safe,
+                                           get_local_month_from_string, get_week_start_tuesday)
 from utils.new_report_serializers import (create_error_response, create_success_response, serialize_daily_details, serialize_daily_summary,
-                                          serialize_monthly_details, serialize_monthly_summary, serialize_weekly_details, serialize_weekly_summary)
+                                          serialize_weekly_details, serialize_weekly_summary)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
 
 logger = get_logger('new_reports_api')
@@ -128,56 +128,6 @@ def weekly_report_data():
         'week_start': pagination['week_start'],
         'summary': serialize_weekly_summary(summary_raw),
         'details': serialize_weekly_details(details_raw),
-        'pagination': pagination,
-    }
-
-    meta = {
-        'filters': {
-            'owner': owner_id,
-            'mode': mode,
-        }
-    }
-
-    return jsonify(create_success_response(data, meta))
-
-
-@new_reports_api_bp.route('/monthly', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
-def monthly_report_data():
-    """返回开播新月报数据。"""
-    month_str = request.args.get('month')
-    if not month_str:
-        now_utc = get_current_utc_time()
-        today_local = utc_to_local(now_utc)
-        report_month = today_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        report_month = get_local_month_from_string(month_str)
-        if not report_month:
-            logger.error('无效的新月报月份参数：%s', month_str)
-            return jsonify(create_error_response('INVALID_MONTH', '无效的月份格式')), 400
-        report_month = report_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    owner_id = _parse_owner_param()
-    mode = _parse_mode_param()
-
-    logger.info('获取开播新月报数据，月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
-
-    summary_raw = calculate_monthly_summary(report_month.year, report_month.month, owner_id, mode)
-    details_raw = calculate_monthly_details(report_month.year, report_month.month, owner_id, mode)
-
-    prev_month_ref = (report_month.replace(day=1) - timedelta(days=1)).replace(day=1)
-    next_month_ref = (report_month.replace(day=28) + timedelta(days=4)).replace(day=1)
-
-    pagination = {
-        'month': report_month.strftime('%Y-%m'),
-        'prev_month': prev_month_ref.strftime('%Y-%m'),
-        'next_month': next_month_ref.strftime('%Y-%m'),
-    }
-
-    data = {
-        'month': pagination['month'],
-        'summary': serialize_monthly_summary(summary_raw),
-        'details': serialize_monthly_details(details_raw),
         'pagination': pagination,
     }
 
