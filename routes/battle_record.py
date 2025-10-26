@@ -8,15 +8,36 @@ from flask_security import current_user, roles_accepted
 
 from models.announcement import Announcement
 from models.battle_record import BattleRecord, BattleRecordChangeLog
-from models.pilot import WorkMode
+from models.pilot import Settlement, SettlementType, WorkMode
 from utils.csrf_helper import ensure_csrf_token
 from utils.filter_state import persist_and_restore_filters
 from utils.logging_setup import get_logger
-from utils.timezone_helper import get_current_utc_time, utc_to_local
+from utils.timezone_helper import get_current_utc_time, local_to_utc, utc_to_local
 
 logger = get_logger('battle_record')
 
 battle_record_bp = Blueprint('battle_record', __name__)
+
+
+def _get_effective_settlement(pilot, local_dt):
+    """获取指定日期的结算方式记录"""
+    if not pilot or not local_dt:
+        return None
+
+    query_local = local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    query_utc = local_to_utc(query_local)
+    if query_utc is None:
+        return None
+
+    return Settlement.objects(pilot_id=pilot, effective_date__lte=query_utc, is_active=True).order_by('-effective_date').first()
+
+
+def _get_default_base_salary(pilot, local_dt):
+    """根据结算方式确定底薪默认值"""
+    settlement = _get_effective_settlement(pilot, local_dt)
+    if settlement and settlement.settlement_type in (SettlementType.DAILY_BASE, SettlementType.MONTHLY_BASE):
+        return Decimal('150')
+    return Decimal('0')
 
 
 def validate_notes_required(start_time, end_time, revenue_amount, base_salary, related_announcement, notes):  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -131,17 +152,19 @@ def new_battle_record():
     if announcement_id:
         try:
             related_announcement = Announcement.objects.get(id=announcement_id)
+            announcement_start_local = utc_to_local(related_announcement.start_time)
+            announcement_end_local = utc_to_local(related_announcement.end_time)
             default_data.update({
                 'pilot': related_announcement.pilot,
                 'related_announcement': related_announcement,
-                'start_time': utc_to_local(related_announcement.start_time),
-                'end_time': utc_to_local(related_announcement.end_time),
+                'start_time': announcement_start_local,
+                'end_time': announcement_end_local,
                 'x_coord': related_announcement.x_coord,
                 'y_coord': related_announcement.y_coord,
                 'z_coord': related_announcement.z_coord,
                 'work_mode': WorkMode.OFFLINE,
                 'owner_snapshot': related_announcement.pilot.owner,
-                'base_salary': Decimal('150'),  # 从通告新建时底薪默认150元
+                'base_salary': _get_default_base_salary(related_announcement.pilot, announcement_start_local),
             })
             logger.debug(f"从通告 {announcement_id} 预填作战记录数据")
         except Announcement.DoesNotExist:

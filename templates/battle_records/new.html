@@ -165,6 +165,21 @@
                 </div>
             </div>
 
+            <div class="form-section" id="settlement-info-section">
+                <h3>结算方式参考</h3>
+                <div class="info-banner" id="settlement-info-banner" style="display:none;"></div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>当前结算方式</label>
+                        <div class="readonly-value" id="settlement_type_display">请选择主播</div>
+                    </div>
+                    <div class="form-group">
+                        <label>生效日期</label>
+                        <div class="readonly-value" id="settlement_effective_date_display">-</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-section">
                 <h3>备注信息</h3>
                 
@@ -458,6 +473,9 @@ const pageState = {
         baseSalary: '0',
     },
     prefillLabel: '',
+    settlementCache: new Map(),
+    settlementFetchToken: 0,
+    baseSalaryTouched: false,
 };
 
 const prefillBanner = document.getElementById('prefill_banner');
@@ -481,6 +499,10 @@ const workModeSelect = document.getElementById('work_mode');
 const revenueInput = document.getElementById('revenue_amount');
 const baseSalaryInput = document.getElementById('base_salary');
 const notesInput = document.getElementById('notes');
+const settlementEffectiveUrlTemplate = "{{ url_for('settlements_api.get_effective_settlement', pilot_id='__PILOT_ID__') }}";
+const settlementTypeDisplay = document.getElementById('settlement_type_display');
+const settlementEffectiveDisplay = document.getElementById('settlement_effective_date_display');
+const settlementInfoBanner = document.getElementById('settlement-info-banner');
 
 function roundToHalfHour(date) {
     const rounded = new Date(date);
@@ -524,6 +546,135 @@ function formatAnnouncementLabel(data) {
         parts.push(`@${coords}`);
     }
     return parts.filter(Boolean).join(' ').trim();
+}
+
+if (baseSalaryInput) {
+    baseSalaryInput.addEventListener('input', () => {
+        pageState.baseSalaryTouched = true;
+    });
+}
+
+function getLocalDateFromInputValue(value) {
+    if (!value) return '';
+    const [datePart] = value.split('T');
+    return datePart || '';
+}
+
+function applyBaseSalaryDefault(value, forceUpdate = false) {
+    pageState.defaults.baseSalary = value;
+    if (forceUpdate) {
+        pageState.baseSalaryTouched = false;
+    }
+    if ((forceUpdate || !pageState.baseSalaryTouched) && baseSalaryInput) {
+        baseSalaryInput.value = value;
+        validateNotesRequired();
+        updateSubmitButtonState();
+    }
+}
+
+function renderSettlementInfo(settlementData) {
+    if (settlementInfoBanner) {
+        if (!settlementData) {
+            settlementInfoBanner.style.display = 'block';
+            settlementInfoBanner.textContent = '请选择主播后可查看当前生效的结算方式信息，用于辅助填写底薪。';
+        } else {
+            settlementInfoBanner.style.display = 'none';
+            settlementInfoBanner.textContent = '';
+        }
+    }
+    if (!settlementTypeDisplay || !settlementEffectiveDisplay) return;
+    if (!settlementData) {
+        settlementTypeDisplay.textContent = '请选择主播';
+        settlementEffectiveDisplay.textContent = '-';
+        return;
+    }
+    const display = settlementData.settlement_type_display || (settlementData.settlement_type === 'none' ? '无底薪' : '-');
+    settlementTypeDisplay.textContent = display;
+    settlementEffectiveDisplay.textContent = settlementData.effective_date || '--';
+}
+
+async function fetchSettlementDataForDate(pilotId, localDate) {
+    const cacheKey = `${pilotId}_${localDate}`;
+    if (pageState.settlementCache.has(cacheKey)) {
+        return pageState.settlementCache.get(cacheKey);
+    }
+    const requestUrl = `${settlementEffectiveUrlTemplate.replace('__PILOT_ID__', pilotId)}?date=${encodeURIComponent(localDate)}`;
+    try {
+        const response = await apiFetch(requestUrl);
+        const payload = await response.json();
+        if (!payload.success) {
+            return { settlement_type: 'none', settlement_type_display: '无底薪', effective_date: '' };
+        }
+        const raw = payload.data || {};
+        const normalized = {
+            settlement_type: raw.settlement_type || 'none',
+            settlement_type_display: raw.settlement_type_display || (raw.settlement_type === 'none' ? '无底薪' : ''),
+            effective_date: raw.effective_date || '',
+        };
+        pageState.settlementCache.set(cacheKey, normalized);
+        return normalized;
+    } catch (error) {
+        console.error('查询结算方式失败:', error);
+        return { settlement_type: 'none', settlement_type_display: '结算方式获取失败', effective_date: '' };
+    }
+}
+
+async function updateBaseSalaryBySettlement(pilotId, localDate, options = {}) {
+    const { force = false } = options;
+    if (!pilotId || !localDate) {
+        if (pilotId && !localDate) {
+            renderSettlementInfo({ settlement_type: 'none', settlement_type_display: '请先填写开始时间', effective_date: '' });
+        } else {
+            renderSettlementInfo(null);
+        }
+        applyBaseSalaryDefault('0', force);
+        return;
+    }
+
+    const cacheKey = `${pilotId}_${localDate}`;
+    const currentToken = ++pageState.settlementFetchToken;
+    try {
+        let settlementData = pageState.settlementCache.get(cacheKey);
+        if (!settlementData) {
+            settlementData = await fetchSettlementDataForDate(pilotId, localDate);
+        }
+
+        if (currentToken !== pageState.settlementFetchToken) {
+            return;
+        }
+
+        const settlementType = settlementData?.settlement_type;
+        const defaultValue = (settlementType === 'daily_base' || settlementType === 'monthly_base') ? '150' : '0';
+        renderSettlementInfo(settlementData);
+        applyBaseSalaryDefault(defaultValue, force);
+    } catch (error) {
+        console.error('根据结算方式设置底薪失败:', error);
+        renderSettlementInfo({ settlement_type: 'none', settlement_type_display: '结算方式获取失败', effective_date: '' });
+    }
+}
+
+async function recalcBaseSalary(reason = 'time-change', pilotIdOverride = '') {
+    const pilotId = pilotIdOverride || (pilotHiddenInput ? pilotHiddenInput.value : '') || pageState.defaults.pilotId;
+    if (!pilotId) {
+        if (reason !== 'time-change') {
+            applyBaseSalaryDefault('0', true);
+        }
+        return;
+    }
+
+    const startValue = startTimeInput ? (startTimeInput.value || pageState.defaults.startTime) : pageState.defaults.startTime;
+    const dateStr = getLocalDateFromInputValue(startValue);
+    await updateBaseSalaryBySettlement(pilotId, dateStr, { force: reason !== 'time-change' });
+}
+
+if (startTimeInput) {
+    startTimeInput.addEventListener('input', function() {
+        pageState.defaults.startTime = this.value;
+    });
+    startTimeInput.addEventListener('change', async function() {
+        pageState.defaults.startTime = this.value;
+        await recalcBaseSalary('time-change');
+    });
 }
 
 function initializeDefaultTimes() {
@@ -847,7 +998,6 @@ async function prefillFromAnnouncement() {
         pageState.defaults.yCoord = announcement.y_coord || '';
         pageState.defaults.zCoord = announcement.z_coord || '';
         pageState.defaults.workMode = announcement.work_mode || '线下';
-        pageState.defaults.baseSalary = '150';
         const announcementLabel = formatAnnouncementLabel({
             start_time: announcement.start_time,
             end_time: announcement.end_time,
@@ -869,6 +1019,7 @@ async function prefillFromAnnouncement() {
         }
 
         await populatePilotDisplay(pageState.defaults.pilotId);
+        await recalcBaseSalary('announcement-change', pageState.defaults.pilotId);
 
         applyDefaultsToForm();
     } catch (error) {
@@ -940,6 +1091,8 @@ function setupPilotChangeListener() {
             await handlePilotChange(pilotId);
         } else {
             clearRelatedAnnouncementOptions();
+            renderSettlementInfo(null);
+            applyBaseSalaryDefault('0', true);
         }
         validateNotesRequired();
         updateSubmitButtonState();
@@ -951,6 +1104,7 @@ function setupPilotChangeListener() {
 }
 
 async function handlePilotChange(pilotId) {
+    pageState.defaults.pilotId = pilotId;
     try {
         const response = await apiFetch(`{{ url_for('battle_records_api.pilots_filtered') }}?pilot_id=${pilotId}`);
         const payload = await response.json();
@@ -969,6 +1123,7 @@ async function handlePilotChange(pilotId) {
     }
 
     await loadRelatedAnnouncementsForPilot(pilotId);
+    await recalcBaseSalary('pilot-change', pilotId);
 }
 
 function clearRelatedAnnouncementOptions() {
@@ -1003,6 +1158,7 @@ function setupRelatedAnnouncementListener() {
         const annId = this.value;
         relatedAnnouncementHidden.value = annId || '';
         if (!annId) {
+            await recalcBaseSalary('time-change');
             validateNotesRequired();
             updateSubmitButtonState();
             return;
@@ -1013,8 +1169,16 @@ function setupRelatedAnnouncementListener() {
             const result = await resp.json();
             if (!result.success) return;
             const a = result.data?.announcement || {};
-            if (startTimeInput && a.start_time) startTimeInput.value = a.start_time.slice(0, 16);
-            if (endTimeInput && a.end_time) endTimeInput.value = a.end_time.slice(0, 16);
+            if (a.start_time) {
+                const localStart = a.start_time.slice(0, 16);
+                if (startTimeInput) startTimeInput.value = localStart;
+                pageState.defaults.startTime = localStart;
+            }
+            if (a.end_time) {
+                const localEnd = a.end_time.slice(0, 16);
+                if (endTimeInput) endTimeInput.value = localEnd;
+                pageState.defaults.endTime = localEnd;
+            }
             if (workModeSelect) {
                 workModeSelect.value = '线下';
                 handleWorkModeChange();
@@ -1023,9 +1187,7 @@ function setupRelatedAnnouncementListener() {
             pageState.defaults.yCoord = a.y_coord || '';
             pageState.defaults.zCoord = a.z_coord || '';
             initializeBattleAreaSelects();
-            if (baseSalaryInput) {
-                baseSalaryInput.value = '150';
-            }
+            await recalcBaseSalary('announcement-change');
         } catch (error) {
             console.error('获取通告详情失败:', error);
         }
