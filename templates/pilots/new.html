@@ -397,7 +397,15 @@ function closeErrorAlert() {
 async function createPilot(formData) {
   // 先清除之前的错误提示
   closeErrorAlert();
-  
+
+  // 获取提交按钮并禁用
+  const submitBtn = document.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+
+  // 设置按钮为加载状态
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="btn-icon">⏳</span>创建中...';
+
   try {
     const response = await fetch('/api/pilots', {
       method: 'POST',
@@ -407,16 +415,19 @@ async function createPilot(formData) {
       credentials: 'include',
       body: JSON.stringify(formData)
     });
-    
+
     const result = await response.json();
-    
+
     if (!result.success) {
       const errorMsg = result.error?.message || '创建主播失败';
       showErrorAlert(errorMsg, 'error');
       showMessage('保存失败', 'error');
+      // 恢复按钮状态
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
       return;
     }
-    
+
     showMessage('主播创建成功', 'success');
     setTimeout(() => {
       window.location.href = `/pilots/${result.data.id}`;
@@ -425,6 +436,9 @@ async function createPilot(formData) {
     console.error('创建主播失败:', error);
     showErrorAlert(error.message || '网络错误，请重试', 'error');
     showMessage('保存失败', 'error');
+    // 恢复按钮状态
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
   }
 }
 
