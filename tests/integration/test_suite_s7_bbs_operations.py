@@ -11,9 +11,7 @@
 """
 import pytest
 from datetime import datetime, timedelta
-from tests.fixtures.factories import (
-    pilot_factory, bbs_post_factory, bbs_post_factory as bbs_factory
-)
+from tests.fixtures.factories import (pilot_factory, bbs_post_factory, bbs_post_factory as bbs_factory)
 
 
 @pytest.mark.suite("S7")
@@ -59,13 +57,7 @@ class TestS7BBSOperations:
                     try:
                         board = BBSBoard.objects(code='TEST').first()
                         if not board:
-                            board = BBSBoard(
-                                code='TEST',
-                                name='测试板块',
-                                board_type='custom',
-                                is_active=True,
-                                order=999
-                            )
+                            board = BBSBoard(code='TEST', name='测试板块', board_type='custom', is_active=True, order=999)
                             board.save()
 
                         # 再次获取板块列表
@@ -88,12 +80,7 @@ class TestS7BBSOperations:
                 created_ids['pilot_id'] = pilot_id
 
                 # 3. 管理员创建BBS主贴
-                post_data = {
-                    'board_id': board_id,
-                    'title': '管理员测试主贴',
-                    'content': '这是一个管理员创建的测试主贴，用于验证BBS功能',
-                    'pilot_ids': [pilot_id]
-                }
+                post_data = {'board_id': board_id, 'title': '管理员测试主贴', 'content': '这是一个管理员创建的测试主贴，用于验证BBS功能', 'pilot_ids': [pilot_id]}
 
                 post_response = admin_client.post('/api/bbs/posts', json=post_data)
 
@@ -118,9 +105,7 @@ class TestS7BBSOperations:
                         created_ids['pilot_id2'] = pilot_id2
 
                         # 更新帖子关联的主播
-                        associate_response = admin_client.put(f'/api/bbs/posts/{post_id}/pilots', json={
-                            'pilot_ids': [pilot_id, pilot_id2]
-                        })
+                        associate_response = admin_client.put(f'/api/bbs/posts/{post_id}/pilots', json={'pilot_ids': [pilot_id, pilot_id2]})
 
                         if associate_response.get('success'):
                             updated_data = associate_response['data']
@@ -184,11 +169,7 @@ class TestS7BBSOperations:
             board_id = boards[0]['id']
 
             # 2. 管理员创建主贴
-            admin_post_data = {
-                'board_id': board_id,
-                'title': '管理员主贴',
-                'content': '这是管理员创建的主贴'
-            }
+            admin_post_data = {'board_id': board_id, 'title': '管理员主贴', 'content': '这是管理员创建的主贴'}
 
             admin_post_response = admin_client.post('/api/bbs/posts', json=admin_post_data)
 
@@ -209,11 +190,7 @@ class TestS7BBSOperations:
                     assert error_code in ['FORBIDDEN', 'UNAUTHORIZED']
 
             # 4. 运营创建自己的主贴
-            kancho_post_data = {
-                'board_id': board_id,
-                'title': '运营主贴',
-                'content': '这是运营创建的主贴'
-            }
+            kancho_post_data = {'board_id': board_id, 'title': '运营主贴', 'content': '这是运营创建的主贴'}
 
             kancho_post_response = kancho_client.post('/api/bbs/posts', json=kancho_post_data)
 
@@ -223,10 +200,7 @@ class TestS7BBSOperations:
                 created_ids['kancho_post_id'] = kancho_post_id
 
                 # 5. 运营编辑自己的主贴（应该成功）
-                edit_response = kancho_client.patch(f'/api/bbs/posts/{kancho_post_id}', json={
-                    'title': '编辑后的运营主贴标题',
-                    'content': '编辑后的运营主贴内容'
-                })
+                edit_response = kancho_client.patch(f'/api/bbs/posts/{kancho_post_id}', json={'title': '编辑后的运营主贴标题', 'content': '编辑后的运营主贴内容'})
 
                 if edit_response.get('success'):
                     edited_post = edit_response['data']
@@ -237,9 +211,7 @@ class TestS7BBSOperations:
 
             # 6. 管理员可以置顶任何人的主贴
             if 'kancho_post_id' in created_ids:
-                admin_pin_response = admin_client.post(f'/api/bbs/posts/{created_ids["kancho_post_id"]}/pin', json={
-                    'is_pinned': True
-                })
+                admin_pin_response = admin_client.post(f'/api/bbs/posts/{created_ids["kancho_post_id"]}/pin', json={'is_pinned': True})
 
                 # 管理员置顶应该成功
                 assert admin_pin_response.get('success') is True
@@ -295,11 +267,7 @@ class TestS7BBSOperations:
 
             board_id = boards[0]['id']
 
-            post_data = {
-                'board_id': board_id,
-                'title': '楼中楼测试主贴',
-                'content': '用于测试楼中楼回复功能的主贴'
-            }
+            post_data = {'board_id': board_id, 'title': '楼中楼测试主贴', 'content': '用于测试楼中楼回复功能的主贴'}
 
             post_response = admin_client.post('/api/bbs/posts', json=post_data)
 
@@ -310,9 +278,7 @@ class TestS7BBSOperations:
                 created_ids['post_id'] = post_id
 
                 # 2. 添加一级回复
-                first_reply_data = create_reply_data(
-                    content='这是一级回复'
-                )
+                first_reply_data = create_reply_data(content='这是一级回复')
 
                 first_reply_response = admin_client.post(f'/api/bbs/posts/{post_id}/replies', json=first_reply_data)
 
@@ -325,10 +291,7 @@ class TestS7BBSOperations:
                         created_ids['first_reply_id'] = first_reply_id
 
                         # 3. 添加二级回复（楼中楼）
-                        second_reply_data = create_reply_data(
-                            content='这是二级回复（楼中楼）',
-                            parent_reply_id=first_reply_id
-                        )
+                        second_reply_data = create_reply_data(content='这是二级回复（楼中楼）', parent_reply_id=first_reply_id)
 
                         second_reply_response = admin_client.post(f'/api/bbs/posts/{post_id}/replies', json=second_reply_data)
 
@@ -347,9 +310,7 @@ class TestS7BBSOperations:
                                 created_ids['second_reply_id'] = second_reply_id
 
                                 # 4. 再添加一个一级回复
-                                third_reply_data = create_reply_data(
-                                    content='这是另一个一级回复'
-                                )
+                                third_reply_data = create_reply_data(content='这是另一个一级回复')
 
                                 third_reply_response = admin_client.post(f'/api/bbs/posts/{post_id}/replies', json=third_reply_data)
 
@@ -530,20 +491,11 @@ class TestS7BBSOperations:
                 pytest.skip("没有可用的BBS板块")
 
             # 2. 创建不同板块的主贴
-            post_titles = [
-                ('运营公告测试主贴', '这是运营公告类别的测试主贴'),
-                ('主播反馈测试主贴', '这是主播反馈类别的测试主贴'),
-                ('通告协调测试主贴', '这是通告协调类别的测试主贴'),
-                ('其他测试主贴', '这是其他类别的测试主贴')
-            ]
+            post_titles = [('运营公告测试主贴', '这是运营公告类别的测试主贴'), ('主播反馈测试主贴', '这是主播反馈类别的测试主贴'), ('通告协调测试主贴', '这是通告协调类别的测试主贴'), ('其他测试主贴', '这是其他类别的测试主贴')]
 
             for title, content in post_titles:
                 # 使用第一个板块来创建不同标题的帖子
-                post_data = {
-                    'board_id': boards[0]['id'],
-                    'title': title,
-                    'content': content
-                }
+                post_data = {'board_id': boards[0]['id'], 'title': title, 'content': content}
 
                 post_response = admin_client.post('/api/bbs/posts', json=post_data)
 
@@ -551,9 +503,7 @@ class TestS7BBSOperations:
                     created_posts.append(post_response['data']['id'])
 
             # 3. 测试关键词搜索功能
-            search_response = admin_client.get('/api/bbs/posts', params={
-                'keyword': '测试主贴'
-            })
+            search_response = admin_client.get('/api/bbs/posts', params={'keyword': '测试主贴'})
 
             if search_response.get('success'):
                 search_results = search_response['data']['items']
@@ -563,9 +513,7 @@ class TestS7BBSOperations:
             # 4. 测试按作者过滤
             admin_info = admin_client.get('/api/users/me')
             if admin_info and admin_info.get('success'):
-                author_filter_response = admin_client.get('/api/bbs/posts', params={
-                    'mine': 'true'
-                })
+                author_filter_response = admin_client.get('/api/bbs/posts', params={'mine': 'true'})
 
                 if author_filter_response.get('success'):
                     author_posts = author_filter_response['data']['items']
@@ -574,10 +522,7 @@ class TestS7BBSOperations:
                         assert post['author']['id'] == admin_info['data']['id']
 
             # 5. 测试组合过滤（关键词 + 作者）
-            combo_response = admin_client.get('/api/bbs/posts', params={
-                'keyword': '测试',
-                'mine': 'true'
-            })
+            combo_response = admin_client.get('/api/bbs/posts', params={'keyword': '测试', 'mine': 'true'})
 
             if combo_response.get('success') and admin_info and admin_info.get('success'):
                 combo_results = combo_response['data']['items']
@@ -588,9 +533,7 @@ class TestS7BBSOperations:
                     assert '测试' in post['title'] or '测试' in post['content']
 
             # 6. 测试状态过滤（如果系统支持状态筛选）
-            status_filter_response = admin_client.get('/api/bbs/posts', params={
-                'status': 'published'
-            })
+            status_filter_response = admin_client.get('/api/bbs/posts', params={'status': 'published'})
 
             if status_filter_response.get('success'):
                 status_posts = status_filter_response['data']['items']
@@ -604,5 +547,101 @@ class TestS7BBSOperations:
                 try:
                     # BBS系统没有直接的删除API，使用隐藏操作代替
                     admin_client.post(f'/api/bbs/posts/{post_id}/hide', json={})
+                except:
+                    pass
+
+    def test_s7_tc6_unread_notifications_and_filter(self, admin_client, kancho_client):
+        """
+        S7-TC6 未读提醒与筛选
+
+        步骤：管理员建贴 → 运营回复触发管理员未读 → 管理员查看详情清空 → 管理员回复触发运营未读 → 运营查看详情清空。
+
+        断言：仅相关用户出现未读，GET /api/bbs/posts?unread=1 返回准确列表。
+        """
+        created_post_id = None
+
+        def ensure_csrf(client):
+            """获取并缓存CSRF token。"""
+            page = client.client.get('/bbs/')
+            html = page.get_data(as_text=True)
+            import re
+
+            token = None
+            if 'data-csrf=' in html:
+                match = re.search(r'data-csrf="([^"]+)"', html)
+                if match:
+                    token = match.group(1)
+            if not token and 'csrfToken:' in html:
+                match = re.search(r'csrfToken:\s*["\']([^"\']+)["\']', html)
+                if match:
+                    token = match.group(1)
+            if token:
+                client.csrf_token = token
+
+        try:
+            ensure_csrf(admin_client)
+            ensure_csrf(kancho_client)
+
+            boards_response = admin_client.get('/api/bbs/boards')
+            if not boards_response.get('success'):
+                pytest.skip("获取BBS板块列表失败")
+
+            boards = boards_response['data']['items']
+            if not boards:
+                pytest.skip("没有可用的BBS板块")
+
+            board_id = boards[0]['id']
+            post_response = admin_client.post('/api/bbs/posts', json={'board_id': board_id, 'title': '未读提醒测试主贴', 'content': '用于验证未读提醒逻辑'})
+            if not post_response.get('success'):
+                pytest.skip("创建测试主贴失败")
+
+            created_post_id = post_response['data']['post']['id']
+
+            unread_before = admin_client.get('/api/bbs/posts', params={'unread': '1'})
+            assert unread_before.get('success') is True
+            assert unread_before['data']['items'] == []
+
+            first_reply = kancho_client.post(f'/api/bbs/posts/{created_post_id}/replies', json={'content': '运营回复触发管理员未读'})
+            assert first_reply.get('success') is True
+
+            admin_unread = admin_client.get('/api/bbs/posts', params={'unread': '1'})
+            assert admin_unread.get('success') is True
+            admin_items = admin_unread['data']['items']
+            assert len(admin_items) == 1
+            assert admin_items[0]['id'] == created_post_id
+            assert admin_items[0].get('is_unread') is True
+
+            kancho_unread_initial = kancho_client.get('/api/bbs/posts', params={'unread': '1'})
+            assert kancho_unread_initial.get('success') is True
+            assert kancho_unread_initial['data']['items'] == []
+
+            detail_response = admin_client.get(f'/api/bbs/posts/{created_post_id}')
+            assert detail_response.get('success') is True
+
+            unread_after_detail = admin_client.get('/api/bbs/posts', params={'unread': '1'})
+            assert unread_after_detail.get('success') is True
+            assert unread_after_detail['data']['items'] == []
+
+            second_reply = admin_client.post(f'/api/bbs/posts/{created_post_id}/replies', json={'content': '管理员回复触发运营未读'})
+            assert second_reply.get('success') is True
+
+            kancho_unread_after = kancho_client.get('/api/bbs/posts', params={'unread': '1'})
+            assert kancho_unread_after.get('success') is True
+            kancho_items = kancho_unread_after['data']['items']
+            assert len(kancho_items) == 1
+            assert kancho_items[0]['id'] == created_post_id
+            assert kancho_items[0].get('is_unread') is True
+
+            kancho_detail = kancho_client.get(f'/api/bbs/posts/{created_post_id}')
+            assert kancho_detail.get('success') is True
+
+            kancho_unread_cleared = kancho_client.get('/api/bbs/posts', params={'unread': '1'})
+            assert kancho_unread_cleared.get('success') is True
+            assert kancho_unread_cleared['data']['items'] == []
+
+        finally:
+            if created_post_id:
+                try:
+                    admin_client.post(f'/api/bbs/posts/{created_post_id}/hide', json={})
                 except:
                     pass

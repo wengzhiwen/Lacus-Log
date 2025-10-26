@@ -9,6 +9,7 @@
   const searchInput = document.getElementById('bbs-search-input');
   const searchBtn = document.getElementById('bbs-search-btn');
   const filterMineEl = document.getElementById('bbs-filter-mine');
+  const filterUnreadEl = document.getElementById('bbs-filter-unread');
   const createBtn = document.getElementById('bbs-create-post-btn');
 
   const editorPanel = document.getElementById('bbs-editor-panel');
@@ -27,6 +28,7 @@
     perPage: 20,
     keyword: '',
     mineOnly: false,
+    unreadOnly: false,
     loadingBoards: false,
     loadingPosts: false
   };
@@ -123,6 +125,9 @@
       if (item.related_battle_record_missing) {
         tags.push('<span class="tag tag-warning">关联记录丢失</span>');
       }
+      if (item.is_unread) {
+        tags.push('<span class="tag tag-unread">未读</span>');
+      }
 
       const lastReply = item.last_reply
         ? `<span>最后回复：${item.last_reply.author?.display_name || '-'} · ${item.last_reply.time?.display || '-'}</span>`
@@ -218,6 +223,7 @@
     params.set('per_page', state.perPage);
     if (state.keyword) params.set('keyword', state.keyword);
     if (state.mineOnly) params.set('mine', '1');
+    if (state.unreadOnly) params.set('unread', '1');
     try {
       const res = await request(`/api/bbs/posts?${params.toString()}`);
       renderPosts(res.data.items || [], res.meta);
@@ -299,6 +305,11 @@
     });
     filterMineEl?.addEventListener('change', () => {
       state.mineOnly = filterMineEl.checked;
+      state.page = 1;
+      loadPosts();
+    });
+    filterUnreadEl?.addEventListener('change', () => {
+      state.unreadOnly = filterUnreadEl.checked;
       state.page = 1;
       loadPosts();
     });

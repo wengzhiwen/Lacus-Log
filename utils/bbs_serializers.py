@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# pylint: disable=no-member
+# pylint: disable=no-member,too-many-arguments,too-many-positional-arguments,too-many-locals
 
 import logging
 from datetime import datetime
@@ -90,9 +90,12 @@ def serialize_board_list(boards: Iterable[BBSBoard]) -> List[Dict[str, Any]]:
 def serialize_post_summary(post: BBSPost,
                            reply_count: int = 0,
                            last_reply_user: Optional[Dict[str, Any]] = None,
-                           last_reply_time: Optional[datetime] = None) -> Dict[str, Any]:
+                           last_reply_time: Optional[datetime] = None,
+                           current_user_id: Optional[str] = None) -> Dict[str, Any]:
     """序列化用于列表展示的帖子摘要。"""
     record_info = _safe_related_record(post)
+    pending = post.pending_reviewers or []
+    is_unread = bool(current_user_id and current_user_id in pending)
     return {
         'id': str(post.id),
         'board_id': str(post.board.id) if post.board else None,
@@ -114,6 +117,7 @@ def serialize_post_summary(post: BBSPost,
             'author': _serialize_author(last_reply_user),
             'time': _format_timestamp(last_reply_time)
         } if last_reply_time else None,
+        'is_unread': is_unread,
     }
 
 
@@ -136,9 +140,12 @@ def serialize_post_detail(post: BBSPost,
                           replies: Iterable[BBSReply],
                           pilot_refs: Optional[Iterable[BBSPostPilotRef]] = None,
                           latest_reply_time: Optional[datetime] = None,
-                          latest_reply_author: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                          latest_reply_author: Optional[Dict[str, Any]] = None,
+                          current_user_id: Optional[str] = None) -> Dict[str, Any]:
     """序列化帖子详情（包含回复树与关联主播）。"""
     record_info = _safe_related_record(post)
+    pending = post.pending_reviewers or []
+    is_unread = bool(current_user_id and current_user_id in pending)
     top_level: Dict[str, Dict[str, Any]] = {}
     for reply in replies:
         if reply.parent_reply:
@@ -187,6 +194,7 @@ def serialize_post_detail(post: BBSPost,
                 'author': _serialize_author(latest_reply_author),
                 'time': _format_timestamp(latest_reply_time)
             } if latest_reply_time else None,
+            'is_unread': is_unread,
         },
         'replies': reply_list,
         'pilots': pilot_list,

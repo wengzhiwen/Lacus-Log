@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from mongoengine import (CASCADE, BooleanField, DateTimeField, DictField, Document, EnumField, IntField, ReferenceField, StringField)
+from mongoengine import (CASCADE, BooleanField, DateTimeField, DictField, Document, EnumField, IntField, ListField, ReferenceField, StringField)
 
 from utils.timezone_helper import get_current_utc_time
 
@@ -87,6 +87,7 @@ class BBSPost(Document):
     status = EnumField(BBSPostStatus, default=BBSPostStatus.PUBLISHED, required=True)
     is_pinned = BooleanField(default=False)
     related_battle_record = ReferenceField(BattleRecord, required=False)
+    pending_reviewers = ListField(StringField(max_length=32), default=list)
     last_active_at = DateTimeField(default=get_current_utc_time)
 
     created_at = DateTimeField(default=get_current_utc_time)
@@ -107,6 +108,9 @@ class BBSPost(Document):
             },
             {
                 'fields': ['author']
+            },
+            {
+                'fields': ['pending_reviewers']
             },
         ],
     }

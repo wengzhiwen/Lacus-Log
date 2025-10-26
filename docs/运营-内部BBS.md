@@ -40,6 +40,7 @@
 | status | 枚举 | `published`/`hidden` |
 | is_pinned | 布尔 | 是否置顶（板块内独立排序） |
 | related_battle_record_id | ObjectId | 关联开播记录，可为空 |
+| pending_reviewers | 数组 | 待阅用户ID列表（字符串形式的ObjectId） |
 | last_active_at | 时间戳 | 最近更新时间/回复时间，列表排序字段 |
 | created_at/updated_at | 时间戳 | UTC |
 
@@ -73,7 +74,7 @@
 | 接口 | 方法 | 描述 | 额外说明 |
 | --- | --- | --- | --- |
 | `/api/bbs/boards` | GET | 获取板块列表 | 支持`is_active`筛选 |
-| `/api/bbs/posts` | GET | 获取主贴列表 | 筛选：`board_id`、`keyword`、`status`、`pilot_id`；排序：置顶优先，其次`last_active_at`逆序 |
+| `/api/bbs/posts` | GET | 获取主贴列表 | 筛选：`board_id`、`keyword`、`status`、`pilot_id`、`mine`、`unread`；排序：置顶优先，其次`last_active_at`逆序 |
 | `/api/bbs/posts` | POST | 新建主贴 | body需包含`board_id/title/content` |
 | `/api/bbs/posts/<id>` | GET | 获取主贴详情 | 返回主贴+回复、关联开播记录/主播信息 |
 | `/api/bbs/posts/<id>` | PATCH | 编辑主贴 | 限作者或管理员 |
@@ -115,6 +116,15 @@
 - 自动联动提醒：当开播记录满足自动发帖条件并成功创建主贴时，若关联主播存在直属运营且其邮箱有效，则向该运营发送提醒邮件，说明触发的开播记录信息与帖子入口。
 - 邮件内容均以Markdown渲染，包含事件类型、帖子标题、所属板块、回复/备注摘要、触发人、创建时间，以及系统入口链接路径，确保收件人能迅速定位上下文。
 - 邮件发送复用 `utils.mail_utils.send_email_md`，失败会在`bbs`模块日志中记录WARNING级别信息；未配置邮箱的用户自动跳过，不会重试。
+
+### 6. 未读提醒
+- `bbs_posts.pending_reviewers` 记录“待我查看”的用户ID，仅覆盖与自己强相关的事件，范围为：
+  1. 我的主贴被其他人回复（任意层级）；
+  2. 某个主贴我曾回复过，当出现新回复时该主贴进入待阅。
+- 回复写入后会把主贴作者与历史回复者（排除当前回复者）加入 `pending_reviewers`，前端在卡片上展示“未读”标签。
+- 查看帖子详情（`GET /api/bbs/posts/<id>`）会立即移除当前用户的待阅标记；无需额外“全部已读”入口。
+- 列表接口新增 `unread=1` 参数，仅返回仍在 `pending_reviewers` 列表中的帖子；响应体新增 `is_unread` 字段，列表与详情统一展示。
+- BBS 页面提供“仅看未读”复选框，切换时直接调用 `GET /api/bbs/posts?unread=1`（可与板块、关键词等筛选组合）。
 
 ## 与开播记录的联动
 

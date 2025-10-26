@@ -2,11 +2,13 @@ from __future__ import annotations
 
 # pylint: disable=no-member,too-many-return-statements,too-many-branches,too-many-locals
 
-from typing import Dict, List
+from typing import Dict, Iterable, List, Optional, Set
 
 from flask import Blueprint, jsonify, request
 from mongoengine import DoesNotExist, ValidationError
 from mongoengine.queryset.visitor import Q
+
+from bson import ObjectId
 
 from models.bbs import (BBSBoard, BBSPost, BBSPostStatus, BBSReply, BBSReplyStatus, BBSPostPilotRef)
 from models.battle_record import BattleRecord
@@ -33,6 +35,72 @@ def _is_admin(user) -> bool:
     return 'gicho' in role_names
 
 
+def _to_user_id(value) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, ObjectId):
+        return str(value)
+    if hasattr(value, 'id'):
+        return str(value.id)
+    if hasattr(value, 'pk'):
+        return str(value.pk)
+    return str(value)
+
+
+def _get_current_user_id(user) -> Optional[str]:
+    return _to_user_id(user)
+
+
+def _add_pending_reviewers(post: BBSPost, reviewer_ids: Iterable[str]) -> None:
+    pending = set(post.pending_reviewers or [])
+    added = False
+    for reviewer_id in reviewer_ids:
+        if not reviewer_id:
+            continue
+        if reviewer_id in pending:
+            continue
+        pending.add(reviewer_id)
+        added = True
+    if added:
+        post.pending_reviewers = list(pending)
+
+
+def _collect_unread_targets(post: BBSPost, reply_author_id: str) -> Set[str]:
+    targets: Set[str] = set()
+    post_author_id = _to_user_id(getattr(post, 'author', None))
+    if post_author_id and post_author_id != reply_author_id:
+        targets.add(post_author_id)
+
+    author_ids = BBSReply.objects(post=post, status=BBSReplyStatus.PUBLISHED).distinct('author')  # type: ignore[attr-defined]
+    for author in author_ids:
+        candidate = _to_user_id(author)
+        if candidate and candidate != reply_author_id:
+            targets.add(candidate)
+    return targets
+
+
+def _apply_unread_targets(post: BBSPost, reply: BBSReply) -> None:
+    reply_author_id = _to_user_id(getattr(reply, 'author', None))
+    if not reply_author_id:
+        return
+    targets = _collect_unread_targets(post, reply_author_id)
+    _add_pending_reviewers(post, targets)
+
+
+def _mark_post_as_read(post: BBSPost, user) -> None:
+    user_id = _get_current_user_id(user)
+    if not user_id:
+        return
+    pending = post.pending_reviewers or []
+    if user_id not in pending:
+        return
+    try:
+        pending.remove(user_id)
+    except ValueError:
+        pass
+    BBSPost.objects(id=post.id).update(pull__pending_reviewers=user_id)  # type: ignore[attr-defined]
+
+
 @bbs_api_bp.route('/boards', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho')
 def list_boards():
@@ -54,6 +122,7 @@ def list_boards():
 def list_posts():
     """帖子列表。"""
     current_user = get_jwt_user()
+    current_user_id = _get_current_user_id(current_user)
     page = max(int(request.args.get('page', 1) or 1), 1)
     per_page = max(min(int(request.args.get('per_page', 20) or 20), 100), 1)
     skip = (page - 1) * per_page
@@ -80,6 +149,10 @@ def list_posts():
     if mine_flag in {'1', 'true'} and current_user:
         query = query.filter(author=current_user)
 
+    unread_flag = request.args.get('unread')
+    if unread_flag in {'1', 'true'} and current_user_id:
+        query = query.filter(pending_reviewers=current_user_id)
+
     pilot_id = (request.args.get('pilot_id') or '').strip()
     if pilot_id:
         post_ids = BBSPostPilotRef.objects(pilot=pilot_id).distinct('post')  # type: ignore[attr-defined]
@@ -97,7 +170,7 @@ def list_posts():
         reply_count = len(replies)
         last_reply_time = replies[-1].created_at if replies else None
         last_reply_author = replies[-1].author_snapshot if replies else None
-        items.append(serialize_post_summary(post, reply_count, last_reply_author, last_reply_time))
+        items.append(serialize_post_summary(post, reply_count, last_reply_author, last_reply_time, current_user_id))
 
     meta = {
         'page': page,
@@ -146,6 +219,9 @@ def create_post():
     current_user = get_jwt_user()
     if not current_user:
         return jsonify(create_error_response('UNAUTHORIZED', '未认证')), 401
+    current_user_id = _get_current_user_id(current_user)
+    current_user_id = _get_current_user_id(current_user)
+    current_user_id = _get_current_user_id(current_user)
 
     related_record = None
     if related_record_id:
@@ -172,7 +248,7 @@ def create_post():
     ensure_manual_pilot_refs(post, pilot_ids)
 
     replies = []
-    post_detail = serialize_post_detail(post, replies, [])
+    post_detail = serialize_post_detail(post, replies, [], current_user_id=current_user_id)
     return jsonify(create_success_response(post_detail)), 201
 
 
@@ -186,8 +262,11 @@ def get_post_detail(post_id: str):
         return jsonify(create_error_response('POST_NOT_FOUND', '帖子不存在')), 404
 
     current_user = get_jwt_user()
+    current_user_id = _get_current_user_id(current_user)
     if not user_can_view_post(current_user, post):
         return jsonify(create_error_response('FORBIDDEN', '没有权限查看该帖子')), 403
+
+    _mark_post_as_read(post, current_user)
 
     replies_query = BBSReply.objects(post=post).order_by('created_at')  # type: ignore[attr-defined]
     replies_query = filter_replies_for_user(replies_query, current_user)
@@ -195,7 +274,7 @@ def get_post_detail(post_id: str):
 
     pilot_refs = list(BBSPostPilotRef.objects(post=post))  # type: ignore[attr-defined]
     latest_reply, latest_author = get_last_reply_info(post)
-    detail = serialize_post_detail(post, replies, pilot_refs, latest_reply.created_at if latest_reply else None, latest_author)
+    detail = serialize_post_detail(post, replies, pilot_refs, latest_reply.created_at if latest_reply else None, latest_author, current_user_id=current_user_id)
     return jsonify(create_success_response(detail))
 
 
@@ -216,6 +295,7 @@ def update_post(post_id: str):
     current_user = get_jwt_user()
     if not current_user:
         return jsonify(create_error_response('UNAUTHORIZED', '未认证')), 401
+    current_user_id = _get_current_user_id(current_user)
 
     is_admin = _is_admin(current_user)
     is_author = str(post.author.id) == str(current_user.id)
@@ -249,7 +329,7 @@ def update_post(post_id: str):
     replies = list(filter_replies_for_user(BBSReply.objects(post=post).order_by('created_at'), current_user))  # type: ignore[attr-defined]
     pilot_refs = list(BBSPostPilotRef.objects(post=post))  # type: ignore[attr-defined]
     latest_reply, latest_author = get_last_reply_info(post)
-    detail = serialize_post_detail(post, replies, pilot_refs, latest_reply.created_at if latest_reply else None, latest_author)
+    detail = serialize_post_detail(post, replies, pilot_refs, latest_reply.created_at if latest_reply else None, latest_author, current_user_id=current_user_id)
     return jsonify(create_success_response(detail))
 
 
@@ -341,6 +421,7 @@ def add_reply(post_id: str):
         return jsonify(create_error_response('POST_NOT_FOUND', '帖子不存在')), 404
 
     current_user = get_jwt_user()
+    current_user_id = _get_current_user_id(current_user)
     if not current_user or not user_can_view_post(current_user, post):
         return jsonify(create_error_response('FORBIDDEN', '没有权限回复该帖子')), 403
 
@@ -373,6 +454,7 @@ def add_reply(post_id: str):
     except ValidationError as exc:
         return jsonify(create_error_response('VALIDATION_FAILED', str(exc))), 400
 
+    _apply_unread_targets(post, reply)
     post.touch()
     notify_post_author_new_reply(post, reply)
     if parent_reply:
@@ -381,7 +463,12 @@ def add_reply(post_id: str):
     replies_query = filter_replies_for_user(BBSReply.objects(post=post).order_by('created_at'), current_user)  # type: ignore[attr-defined]
     pilot_refs = list(BBSPostPilotRef.objects(post=post))  # type: ignore[attr-defined]
     latest_reply, latest_author = get_last_reply_info(post)
-    detail = serialize_post_detail(post, list(replies_query), pilot_refs, latest_reply.created_at if latest_reply else None, latest_author)
+    detail = serialize_post_detail(post,
+                                   list(replies_query),
+                                   pilot_refs,
+                                   latest_reply.created_at if latest_reply else None,
+                                   latest_author,
+                                   current_user_id=current_user_id)
     return jsonify(create_success_response(detail))
 
 
@@ -400,6 +487,7 @@ def update_reply(reply_id: str):
         return jsonify(create_error_response('REPLY_NOT_FOUND', '回复不存在')), 404
 
     current_user = get_jwt_user()
+    current_user_id = _get_current_user_id(current_user)
     if not current_user:
         return jsonify(create_error_response('UNAUTHORIZED', '未认证')), 401
 
@@ -424,7 +512,12 @@ def update_reply(reply_id: str):
     replies_query = filter_replies_for_user(BBSReply.objects(post=post).order_by('created_at'), current_user)  # type: ignore[attr-defined]
     pilot_refs = list(BBSPostPilotRef.objects(post=post))  # type: ignore[attr-defined]
     latest_reply, latest_author = get_last_reply_info(post)
-    detail = serialize_post_detail(post, list(replies_query), pilot_refs, latest_reply.created_at if latest_reply else None, latest_author)
+    detail = serialize_post_detail(post,
+                                   list(replies_query),
+                                   pilot_refs,
+                                   latest_reply.created_at if latest_reply else None,
+                                   latest_author,
+                                   current_user_id=current_user_id)
     return jsonify(create_success_response(detail))
 
 
@@ -491,6 +584,7 @@ def update_post_pilots(post_id: str):
 def recent_posts_for_pilot(pilot_id: str):
     """获取主播最近活跃的帖子。"""
     current_user = get_jwt_user()
+    current_user_id = _get_current_user_id(current_user)
     try:
         pilot = Pilot.objects.get(id=pilot_id)  # type: ignore[attr-defined]
     except DoesNotExist:
@@ -513,6 +607,6 @@ def recent_posts_for_pilot(pilot_id: str):
         reply_count = len(replies)
         last_reply_time = replies[-1].created_at if replies else None
         last_reply_author = replies[-1].author_snapshot if replies else None
-        items.append(serialize_post_summary(post, reply_count, last_reply_author, last_reply_time))
+        items.append(serialize_post_summary(post, reply_count, last_reply_author, last_reply_time, current_user_id))
 
     return jsonify(create_success_response({'items': items}))
