@@ -34,6 +34,15 @@ def _parse_mode_param() -> str:
     return mode
 
 
+def _parse_status_param() -> str:
+    status = request.args.get('status', 'all') or 'all'
+    valid_statuses = ('all', 'not_recruited', 'not_recruiting', 'recruited', 'contracted', 'fallen')
+    if status not in valid_statuses:
+        logger.warning('非法状态参数：%s，已回退为 all', status)
+        return 'all'
+    return status
+
+
 @new_report_fast_bp.route('/monthly')
 @roles_accepted('gicho', 'kancho')
 def monthly_report_fast():
@@ -52,8 +61,9 @@ def monthly_report_fast():
 
     owner_id = _parse_owner_param()
     mode = _parse_mode_param()
+    status = _parse_status_param()
 
-    logger.info('访问开播新月报（加速版）页面，月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
+    logger.info('访问开播新月报（加速版）页面，月份：%s，直属运营：%s，开播方式：%s，主播状态：%s', report_month.strftime('%Y-%m'), owner_id, mode, status)
 
     pagination = {
         'month': report_month.strftime('%Y-%m'),
@@ -61,7 +71,7 @@ def monthly_report_fast():
         'next_month': (report_month + timedelta(days=31)).replace(day=1).strftime('%Y-%m')
     }
 
-    return render_template('new_reports_fast/monthly.html', pagination=pagination, selected_owner=owner_id, selected_mode=mode)
+    return render_template('new_reports_fast/monthly.html', pagination=pagination, selected_owner=owner_id, selected_mode=mode, selected_status=status)
 
 
 @new_report_fast_bp.route('/monthly/export.csv')
@@ -82,11 +92,12 @@ def export_monthly_fast_csv():
 
     owner_id = _parse_owner_param()
     mode = _parse_mode_param()
+    status = _parse_status_param()
 
-    logger.info('导出开播新月报（加速版）CSV，月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
+    logger.info('导出开播新月报（加速版）CSV，月份：%s，直属运营：%s，开播方式：%s，主播状态：%s', report_month.strftime('%Y-%m'), owner_id, mode, status)
 
-    summary = calculate_monthly_summary_fast(report_month.year, report_month.month, owner_id, mode)
-    details = calculate_monthly_details_fast(report_month.year, report_month.month, owner_id, mode)
+    summary = calculate_monthly_summary_fast(report_month.year, report_month.month, owner_id, mode, status)
+    details = calculate_monthly_details_fast(report_month.year, report_month.month, owner_id, mode, status)
 
     output = io.StringIO()
     writer = csv.writer(output)

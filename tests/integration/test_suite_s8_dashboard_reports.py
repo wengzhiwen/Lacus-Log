@@ -122,6 +122,74 @@ class TestS8DashboardReportsFixed:
             missing = [key for key in required_keys if key not in sample]
             assert not missing, f"daily_series元素缺少字段: {missing}"
 
+    def test_s8_tc6_fast_monthly_status_filtering(self, admin_client):
+        """S8-TC6-修复 快速月报按主播状态筛选功能"""
+        # 测试所有状态筛选参数
+        status_options = ['all', 'not_recruited', 'not_recruiting', 'recruited', 'contracted', 'fallen']
+
+        for status in status_options:
+            response = admin_client.get('/new-reports-fast/api/monthly', params={'status': status})
+            assert response.get('success'), f"状态筛选 {status} 失败: {response}"
+
+            data = response.get('data') or {}
+            meta = response.get('meta') or {}
+            filters = meta.get('filters') or {}
+
+            # 验证筛选参数正确返回
+            assert filters.get('status') == status, f"状态参数 {status} 未正确返回"
+
+            # 验证响应结构完整
+            required_fields = ['summary', 'details', 'daily_series', 'pagination']
+            missing_fields = [field for field in required_fields if field not in data]
+            assert not missing_fields, f"状态筛选 {status} 缺少字段: {missing_fields}"
+
+            # 验证汇总数据结构
+            summary = data.get('summary') or {}
+            required_summary_fields = ['pilot_count', 'revenue_sum', 'basepay_sum', 'rebate_sum',
+                                     'pilot_share_sum', 'company_share_sum', 'operating_profit']
+            missing_summary_fields = [field for field in required_summary_fields if field not in summary]
+            assert not missing_summary_fields, f"状态筛选 {status} 汇总数据缺少字段: {missing_summary_fields}"
+
+    def test_s8_tc7_fast_monthly_status_filtering_invalid_param(self, admin_client):
+        """S8-TC7-修复 快速月报无效状态参数处理"""
+        # 测试无效状态参数
+        invalid_statuses = ['invalid_status', '', None]
+
+        for invalid_status in invalid_statuses:
+            params = {}
+            if invalid_status is not None:
+                params['status'] = invalid_status
+
+            response = admin_client.get('/new-reports-fast/api/monthly', params=params)
+            assert response.get('success'), f"无效状态参数 {invalid_status} 应回退到默认值: {response}"
+
+            # 验证无效参数时回退到 'all'
+            meta = response.get('meta') or {}
+            filters = meta.get('filters') or {}
+            assert filters.get('status') == 'all', f"无效状态参数 {invalid_status} 未回退到 'all'"
+
+    def test_s8_tc8_fast_monthly_combined_filtering(self, admin_client):
+        """S8-TC8-修复 快速月报多条件组合筛选"""
+        # 测试状态与现有筛选条件的组合
+        filter_combinations = [
+            {'mode': 'online', 'status': 'contracted'},
+            {'mode': 'offline', 'status': 'recruited'},
+            {'status': 'fallen'},
+            {'mode': 'online', 'status': 'not_recruited'},
+        ]
+
+        for filters in filter_combinations:
+            response = admin_client.get('/new-reports-fast/api/monthly', params=filters)
+            assert response.get('success'), f"组合筛选 {filters} 失败: {response}"
+
+            data = response.get('data') or {}
+            meta = response.get('meta') or {}
+            returned_filters = meta.get('filters') or {}
+
+            # 验证所有筛选参数正确返回
+            for key, expected_value in filters.items():
+                assert returned_filters.get(key) == expected_value, f"筛选参数 {key}={expected_value} 未正确返回"
+
     def test_s8_tc3_email_report_apis_availability(self, admin_client):
         """
         S8-TC3-修复 邮件报表API可用性测试

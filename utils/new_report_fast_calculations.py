@@ -18,7 +18,7 @@ from bson import ObjectId
 from mongoengine import DoesNotExist, QuerySet
 
 from models.battle_record import BattleRecord
-from models.pilot import Pilot, PilotCommission, WorkMode
+from models.pilot import Pilot, PilotCommission, WorkMode, Status
 from models.user import User
 from utils.cache_helper import cached_monthly_report
 from utils.commission_helper import calculate_commission_amounts
@@ -145,6 +145,23 @@ def _normalize_mode(mode: Optional[str]) -> Optional[WorkMode]:
     return None
 
 
+def _normalize_status(status: Optional[str]) -> Optional[Status]:
+    if status in (None, '', 'all'):
+        return None
+    status_mapping = {
+        'not_recruited': Status.NOT_RECRUITED,
+        'not_recruiting': Status.NOT_RECRUITING,
+        'recruited': Status.RECRUITED,
+        'contracted': Status.CONTRACTED,
+        'fallen': Status.FALLEN
+    }
+    normalized = status_mapping.get(status)
+    if not normalized:
+        logger.warning('非法状态参数：%s，已回退为 all', status)
+        return None
+    return normalized
+
+
 def _calc_month_range(year: int, month: int) -> Tuple[datetime, datetime, datetime]:
     """返回（月起始，本月统计用结束，本月报表参考日）。"""
     month_start = datetime(year, month, 1, 0, 0, 0, 0)
@@ -213,7 +230,11 @@ def _evaluate_rebate(valid_days: int, total_duration: float, total_revenue: Deci
     return rate, rebate_amount
 
 
-def _fetch_month_records(year: int, month: int, owner_id: Optional[str], mode: Optional[WorkMode]) -> Tuple[List[BattleRecord], List[BattleRecord], datetime]:
+def _fetch_month_records(year: int,
+                         month: int,
+                         owner_id: Optional[str],
+                         mode: Optional[WorkMode],
+                         status: Optional[Status] = None) -> Tuple[List[BattleRecord], List[BattleRecord], datetime]:
     """获取扩展时间窗内的开播记录，返回（全部记录列表、当月记录列表、报表参考日期）。"""
     month_start_local, month_end_local, report_date = _calc_month_range(year, month)
     window_start_utc = local_to_utc(month_start_local)
@@ -240,7 +261,17 @@ def _fetch_month_records(year: int, month: int, owner_id: Optional[str], mode: O
         query = query.filter(work_mode=mode)
 
     records = list(query.select_related())  # 预取关联，减少后续访问
-    logger.debug('加速版月报加载记录数量：%d', len(records))
+    logger.debug('加速版月报加载记录数量（状态筛选前）：%d', len(records))
+
+    # 按主播当前状态筛选
+    if status:
+        filtered_records = []
+        for record in records:
+            pilot = record.pilot
+            if pilot and pilot.status == status:
+                filtered_records.append(record)
+        records = filtered_records
+        logger.debug('状态筛选后记录数量：%d', len(records))
 
     return records, records, report_date
 
@@ -249,12 +280,14 @@ def _fetch_month_records(year: int, month: int, owner_id: Optional[str], mode: O
 def _calculate_monthly_data(year: int,
                             month: int,
                             owner_id: Optional[str] = None,
-                            mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]], List[Dict[str, object]]]:
+                            mode: str = 'all',
+                            status: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]], List[Dict[str, object]]]:
     """核心计算：返回（汇总，明细，日级序列）。"""
     owner_normalized = _normalize_owner(owner_id)
     mode_normalized = _normalize_mode(mode)
+    status_normalized = _normalize_status(status)
 
-    window_records, monthly_records, _ = _fetch_month_records(year, month, owner_normalized, mode_normalized)
+    window_records, monthly_records, _ = _fetch_month_records(year, month, owner_normalized, mode_normalized, status_normalized)
     if not monthly_records:
         summary = {
             'pilot_count': 0,
@@ -428,21 +461,22 @@ def _calculate_monthly_data(year: int,
     return summary, details, daily_series
 
 
-def calculate_monthly_summary_fast(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all') -> Dict[str, object]:
+def calculate_monthly_summary_fast(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all', status: str = 'all') -> Dict[str, object]:
     """加速版月报汇总。"""
-    summary, _, _ = _calculate_monthly_data(year, month, owner_id, mode)
+    summary, _, _ = _calculate_monthly_data(year, month, owner_id, mode, status)
     return summary
 
 
-def calculate_monthly_details_fast(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all') -> List[Dict[str, object]]:
+def calculate_monthly_details_fast(year: int, month: int, owner_id: Optional[str] = None, mode: str = 'all', status: str = 'all') -> List[Dict[str, object]]:
     """加速版月报明细。"""
-    _, details, _ = _calculate_monthly_data(year, month, owner_id, mode)
+    _, details, _ = _calculate_monthly_data(year, month, owner_id, mode, status)
     return details
 
 
 def calculate_monthly_report_fast(year: int,
                                   month: int,
                                   owner_id: Optional[str] = None,
-                                  mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]], List[Dict[str, object]]]:
+                                  mode: str = 'all',
+                                  status: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]], List[Dict[str, object]]]:
     """返回加速版月报的汇总、明细与日级序列。"""
-    return _calculate_monthly_data(year, month, owner_id, mode)
+    return _calculate_monthly_data(year, month, owner_id, mode, status)

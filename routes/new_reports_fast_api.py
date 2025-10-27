@@ -33,6 +33,15 @@ def _parse_mode_param() -> str:
     return mode
 
 
+def _parse_status_param() -> str:
+    status = request.args.get('status', 'all') or 'all'
+    valid_statuses = ('all', 'not_recruited', 'not_recruiting', 'recruited', 'contracted', 'fallen')
+    if status not in valid_statuses:
+        logger.warning('非法状态参数：%s，已回退到 all', status)
+        return 'all'
+    return status
+
+
 @new_reports_fast_api_bp.route('/monthly', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho')
 def monthly_report_data_fast():
@@ -51,10 +60,11 @@ def monthly_report_data_fast():
 
     owner_id = _parse_owner_param()
     mode = _parse_mode_param()
+    status = _parse_status_param()
 
-    logger.info('获取开播新月报（加速版）数据，月份：%s，直属运营：%s，开播方式：%s', report_month.strftime('%Y-%m'), owner_id, mode)
+    logger.info('获取开播新月报（加速版）数据，月份：%s，直属运营：%s，开播方式：%s，主播状态：%s', report_month.strftime('%Y-%m'), owner_id, mode, status)
 
-    summary_raw, details_raw, daily_series_raw = calculate_monthly_report_fast(report_month.year, report_month.month, owner_id, mode)
+    summary_raw, details_raw, daily_series_raw = calculate_monthly_report_fast(report_month.year, report_month.month, owner_id, mode, status)
 
     prev_month_ref = (report_month.replace(day=1) - timedelta(days=1)).replace(day=1)
     next_month_ref = (report_month.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -77,6 +87,7 @@ def monthly_report_data_fast():
         'filters': {
             'owner': owner_id,
             'mode': mode,
+            'status': status,
         }
     }
 

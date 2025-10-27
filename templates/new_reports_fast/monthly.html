@@ -3,19 +3,19 @@
 {% block title %}开播新月报 - {{ pagination.month }}{% endblock %}
 
 {% block content %}
-<div id="monthlyReportApp" data-report-month="{{ pagination.month }}" data-selected-owner="{{ selected_owner }}" data-selected-mode="{{ selected_mode }}">
+<div id="monthlyReportApp" data-report-month="{{ pagination.month }}" data-selected-owner="{{ selected_owner }}" data-selected-mode="{{ selected_mode }}" data-selected-status="{{ selected_status }}">
   <div class="page-header">
     <h1 class="page-title">📒 开播新月报</h1>
   </div>
 
   <div class="date-navigation">
     <div class="date-controls">
-      <a href="{{ url_for('new_report_fast.monthly_report_fast', month=pagination.prev_month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">← 上个月</a>
+      <a href="{{ url_for('new_report_fast.monthly_report_fast', month=pagination.prev_month, owner=selected_owner, mode=selected_mode, status=selected_status) }}" class="btn btn-secondary btn-sm">← 上个月</a>
       <input type="month" id="monthSelector" value="{{ pagination.month }}" class="date-input">
-      <a href="{{ url_for('new_report_fast.monthly_report_fast', month=pagination.next_month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">下个月 →</a>
+      <a href="{{ url_for('new_report_fast.monthly_report_fast', month=pagination.next_month, owner=selected_owner, mode=selected_mode, status=selected_status) }}" class="btn btn-secondary btn-sm">下个月 →</a>
     </div>
     <div class="export-actions">
-      <a href="{{ url_for('new_report_fast.export_monthly_fast_csv', month=pagination.month, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+      <a href="{{ url_for('new_report_fast.export_monthly_fast_csv', month=pagination.month, owner=selected_owner, mode=selected_mode, status=selected_status) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
     </div>
   </div>
 
@@ -31,6 +31,16 @@
         <option value="all" {% if selected_mode == 'all' %}selected{% endif %}>全部</option>
         <option value="online" {% if selected_mode == 'online' %}selected{% endif %}>线上</option>
         <option value="offline" {% if selected_mode == 'offline' %}selected{% endif %}>线下</option>
+      </select>
+
+      <label for="statusSelector" class="filter-label">主播状态：</label>
+      <select id="statusSelector" class="filter-select">
+        <option value="all" {% if selected_status == 'all' %}selected{% endif %}>全部</option>
+        <option value="not_recruited" {% if selected_status == 'not_recruited' %}selected{% endif %}>未招募</option>
+        <option value="not_recruiting" {% if selected_status == 'not_recruiting' %}selected{% endif %}>不招募</option>
+        <option value="recruited" {% if selected_status == 'recruited' %}selected{% endif %}>已招募</option>
+        <option value="contracted" {% if selected_status == 'contracted' %}selected{% endif %}>已签约</option>
+        <option value="fallen" {% if selected_status == 'fallen' %}selected{% endif %}>流失</option>
       </select>
     </div>
   </div>
@@ -515,6 +525,7 @@
 
   const ownerSelector = document.getElementById('ownerSelector');
   const modeSelector = document.getElementById('modeSelector');
+  const statusSelector = document.getElementById('statusSelector');
   const monthSelector = document.getElementById('monthSelector');
   const summaryTitle = document.getElementById('monthly-summary-title');
   const summaryCards = document.getElementById('monthly-summary-cards');
@@ -593,6 +604,7 @@
   let currentSort = { key: null, direction: 'desc', type: null };
   let currentOwner = app.dataset.selectedOwner || 'all';
   let currentMode = app.dataset.selectedMode || 'all';
+  let currentStatus = app.dataset.selectedStatus || 'all';
   const emptyFallbackText = emptyStateText ? emptyStateText.textContent : '';
 
   if (summaryCards) {
@@ -1065,6 +1077,9 @@
     if (currentMode && currentMode !== 'all') {
       params.set('mode', currentMode);
     }
+    if (currentStatus && currentStatus !== 'all') {
+      params.set('status', currentStatus);
+    }
     return `${monthlyApi}?${params.toString()}`;
   }
 
@@ -1082,10 +1097,12 @@
       if (filters) {
         currentOwner = filters.owner || 'all';
         currentMode = filters.mode || 'all';
+        currentStatus = filters.status || 'all';
       }
       monthSelector.value = currentMonth;
       ownerSelector.value = currentOwner;
       modeSelector.value = currentMode;
+      statusSelector.value = currentStatus;
       // 隐藏loading状态，显示内容
       const loadingState = document.getElementById('monthly-loading-state');
       const content = document.getElementById('monthly-content');
@@ -1107,11 +1124,13 @@
     const targetMonth = params.month || currentMonth;
     const targetOwner = params.owner !== undefined ? params.owner : currentOwner;
     const targetMode = params.mode !== undefined ? params.mode : currentMode;
+    const targetStatus = params.status !== undefined ? params.status : currentStatus;
     if (targetMonth) {
       url.searchParams.set('month', targetMonth);
     }
     url.searchParams.set('owner', targetOwner || 'all');
     url.searchParams.set('mode', targetMode || 'all');
+    url.searchParams.set('status', targetStatus || 'all');
     window.location.href = url.toString();
   }
 
@@ -1127,6 +1146,10 @@
 
   modeSelector.addEventListener('change', function() {
     navigate({ mode: this.value || 'all' });
+  });
+
+  statusSelector.addEventListener('change', function() {
+    navigate({ status: this.value || 'all' });
   });
 
   (async function init() {
