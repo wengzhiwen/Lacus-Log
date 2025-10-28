@@ -18,6 +18,7 @@ from utils.logging_setup import get_logger
 from utils.new_report_calculations import (calculate_daily_summary, calculate_weekly_summary)
 from utils.new_report_fast_calculations import calculate_monthly_summary_fast
 from utils.recruit_stats import calculate_recruit_today_stats
+from utils.rebate_calculator import get_rebate_stage_info
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('report')
@@ -381,61 +382,8 @@ def calculate_pilot_rebate(pilot, report_date, owner_id=None, mode: str = 'all')
                 valid_days.add(record_date)
         total_revenue += record.revenue_amount
     valid_days_count = len(valid_days)
-    rebate_stages = [{
-        'stage': 1,
-        'min_days': 12,
-        'min_hours': 42,
-        'min_revenue': Decimal('1000'),
-        'rate': 0.05
-    }, {
-        'stage': 2,
-        'min_days': 18,
-        'min_hours': 100,
-        'min_revenue': Decimal('5000'),
-        'rate': 0.07
-    }, {
-        'stage': 3,
-        'min_days': 18,
-        'min_hours': 100,
-        'min_revenue': Decimal('10000'),
-        'rate': 0.11
-    }, {
-        'stage': 4,
-        'min_days': 22,
-        'min_hours': 130,
-        'min_revenue': Decimal('30000'),
-        'rate': 0.14
-    }, {
-        'stage': 5,
-        'min_days': 22,
-        'min_hours': 130,
-        'min_revenue': Decimal('80000'),
-        'rate': 0.18
-    }]
-    qualified_stages = [
-        s for s in rebate_stages if valid_days_count >= s['min_days'] and total_duration >= s['min_hours'] and total_revenue >= s['min_revenue']
-    ]
-    if qualified_stages:
-        best_stage = max(qualified_stages, key=lambda x: x['stage'])
-        rebate_amount = total_revenue * Decimal(str(best_stage['rate']))
-        return {
-            'rebate_amount': rebate_amount,
-            'rebate_rate': best_stage['rate'],
-            'rebate_stage': best_stage['stage'],
-            'valid_days_count': valid_days_count,
-            'total_duration': total_duration,
-            'total_revenue': total_revenue,
-            'qualified_stages': qualified_stages
-        }
-    return {
-        'rebate_amount': Decimal('0'),
-        'rebate_rate': 0,
-        'rebate_stage': 0,
-        'valid_days_count': valid_days_count,
-        'total_duration': total_duration,
-        'total_revenue': total_revenue,
-        'qualified_stages': []
-    }
+    # 使用统一的返点计算工具
+    return get_rebate_stage_info(valid_days_count, total_duration, total_revenue)
 
 
 def calculate_pilot_monthly_stats(pilot, report_date, owner_id=None, mode: str = 'all'):

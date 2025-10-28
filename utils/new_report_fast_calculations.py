@@ -25,46 +25,9 @@ from utils.commission_helper import calculate_commission_amounts
 from utils.logging_setup import get_logger
 from utils.new_report_calculations import _fetch_approved_base_salary_map  # pylint: disable=protected-access
 from utils.timezone_helper import get_current_utc_time, local_to_utc, utc_to_local
+from utils.rebate_calculator import calculate_pilot_rebate
 
 logger = get_logger('new_report_fast_calculations')
-
-REBATE_STAGES: Tuple[Dict[str, object], ...] = (
-    {
-        'stage': 1,
-        'min_days': 12,
-        'min_hours': 42,
-        'min_revenue': Decimal('1000'),
-        'rate': 0.05
-    },
-    {
-        'stage': 2,
-        'min_days': 18,
-        'min_hours': 100,
-        'min_revenue': Decimal('5000'),
-        'rate': 0.07
-    },
-    {
-        'stage': 3,
-        'min_days': 18,
-        'min_hours': 100,
-        'min_revenue': Decimal('10000'),
-        'rate': 0.11
-    },
-    {
-        'stage': 4,
-        'min_days': 22,
-        'min_hours': 130,
-        'min_revenue': Decimal('30000'),
-        'rate': 0.14
-    },
-    {
-        'stage': 5,
-        'min_days': 22,
-        'min_hours': 130,
-        'min_revenue': Decimal('80000'),
-        'rate': 0.18
-    },
-)
 
 
 def _create_daily_metric_bucket() -> Dict[str, Decimal]:
@@ -217,17 +180,8 @@ def _resolve_commission_rate(cache: Dict[str, List[Tuple[datetime, float]]], pil
     return 20.0
 
 
-def _evaluate_rebate(valid_days: int, total_duration: float, total_revenue: Decimal) -> Tuple[float, Decimal]:
-    """根据返点阶梯计算返点比例与金额。"""
-    qualified = [
-        stage for stage in REBATE_STAGES if valid_days >= stage['min_days'] and total_duration >= stage['min_hours'] and total_revenue >= stage['min_revenue']
-    ]
-    if not qualified:
-        return 0.0, Decimal('0')
-    best_stage = max(qualified, key=lambda item: item['stage'])  # type: ignore[arg-type]
-    rate = float(best_stage['rate'])
-    rebate_amount = total_revenue * Decimal(str(rate))
-    return rate, rebate_amount
+# 使用统一的返点计算工具，移除重复的 _evaluate_rebate 函数
+# _evaluate_rebate 函数已被 utils.rebate_calculator.calculate_pilot_rebate 替代
 
 
 def _fetch_month_records(year: int,
@@ -401,7 +355,7 @@ def _calculate_monthly_data(year: int,
         total_duration = float(stats['total_duration'])
         total_revenue = Decimal(stats['total_revenue'])
 
-        rebate_rate, rebate_amount = _evaluate_rebate(valid_days, total_duration, total_revenue)
+        rebate_rate, rebate_amount = calculate_pilot_rebate(valid_days, total_duration, total_revenue)
         stats['rebate_rate'] = rebate_rate
         stats['rebate_amount'] = rebate_amount
         total_rebate_sum += rebate_amount

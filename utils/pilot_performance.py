@@ -11,7 +11,9 @@ from typing import Any, Dict, List, Tuple
 
 from models.battle_record import (BaseSalaryApplication, BaseSalaryApplicationStatus, BattleRecord)
 from models.pilot import Pilot
+from utils.commission_helper import calculate_commission_amounts, get_pilot_commission_rate_for_date
 from utils.logging_setup import get_logger
+from utils.rebate_calculator import calculate_pilot_rebate
 from utils.timezone_helper import get_current_local_time, local_to_utc, utc_to_local
 
 logger = get_logger('pilot_performance')
@@ -83,7 +85,13 @@ def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Tuple[Dict[st
     for record in records:
         revenue_amount = Decimal(record.revenue_amount or Decimal('0'))
         basepay_amount = approved_map.get(str(record.id), Decimal('0'))
-        company_share_amount = revenue_amount * Decimal('0.3')
+
+        # 使用正确的分成计算
+        record_date = utc_to_local(record.start_time).date() if record.start_time else None
+        commission_rate = get_pilot_commission_rate_for_date(str(pilot.id), record_date)[0] if record_date else 20.0
+        commission_amounts = calculate_commission_amounts(revenue_amount, commission_rate)
+        company_share_amount = commission_amounts['company_amount']
+
         duration_hours = Decimal(str(record.duration_hours or 0))
 
         total_revenue += revenue_amount
@@ -102,8 +110,23 @@ def _calculate_month_stats(pilot: Pilot, report_date: datetime) -> Tuple[Dict[st
     daily_avg_revenue = total_revenue / record_count if record_count > 0 else Decimal('0')
     daily_avg_basepay = total_basepay / record_count if record_count > 0 else Decimal('0')
 
-    # 返点暂不统计
+    # 计算返点
     total_rebate = Decimal('0')
+    if records:
+        # 计算有效开播天数（播时≥1小时的天数）
+        daily_duration_map = defaultdict(float)
+        for record in records:
+            if record.start_time:
+                local_day = utc_to_local(record.start_time).date()
+                daily_duration_map[local_day] += float(record.duration_hours or 0)
+
+        valid_days = sum(1 for duration in daily_duration_map.values() if duration >= 1.0)
+        total_duration_float = float(total_hours)
+
+        # 使用统一返点计算器
+        rebate_rate, total_rebate = calculate_pilot_rebate(valid_days, total_duration_float, total_revenue)
+        logger.debug('主播 %s 月度返点计算 - 有效天数: %d, 总播时: %.1f, 总流水: %s, 返点比例: %.2f%%, 返点金额: %s', pilot.id, valid_days, total_duration_float, total_revenue,
+                     rebate_rate * 100, total_rebate)
 
     # 运营利润估算
     operating_profit = total_company_share + total_rebate - total_basepay
@@ -163,9 +186,35 @@ def _calculate_stats_from_records(records, approved_map=None) -> Dict[str, Any]:
     daily_avg_revenue = total_revenue / record_count if record_count > 0 else Decimal('0')
     daily_avg_basepay = total_basepay / record_count if record_count > 0 else Decimal('0')
 
-    # 计算公司分成（简化计算）
-    total_company_share = total_revenue * Decimal('0.3')  # 假设公司分成30%
-    total_rebate = Decimal('0')  # 返点计算较复杂，暂时设为0
+    # 使用正确的公司分成计算
+    total_company_share = Decimal('0')
+    if records:
+        pilot_id = str(records[0].pilot.id) if records[0].pilot else None
+        for record in records:
+            revenue_amount = Decimal(record.revenue_amount or Decimal('0'))
+            record_date = utc_to_local(record.start_time).date() if record.start_time else None
+            commission_rate = get_pilot_commission_rate_for_date(pilot_id, record_date)[0] if record_date and pilot_id else 20.0
+            commission_amounts = calculate_commission_amounts(revenue_amount, commission_rate)
+            total_company_share += commission_amounts['company_amount']
+
+    # 计算返点
+    total_rebate = Decimal('0')
+    if records:
+        # 计算有效开播天数（播时≥1小时的天数）
+        daily_duration_map = defaultdict(float)
+        for record in records:
+            if record.start_time:
+                local_day = utc_to_local(record.start_time).date()
+                daily_duration_map[local_day] += float(record.duration_hours or 0)
+
+        valid_days = sum(1 for duration in daily_duration_map.values() if duration >= 1.0)
+        total_duration_float = float(total_hours)
+
+        # 使用统一返点计算器
+        rebate_rate, total_rebate = calculate_pilot_rebate(valid_days, total_duration_float, total_revenue)
+        pilot_id = records[0].pilot.id if records and records[0].pilot else 'unknown'
+        logger.debug('主播 %s 近期返点计算 - 有效天数: %d, 总播时: %.1f, 总流水: %s, 返点比例: %.2f%%, 返点金额: %s', pilot_id, valid_days, total_duration_float, total_revenue,
+                     rebate_rate * 100, total_rebate)
 
     # 运营利润估算
     operating_profit = total_company_share + total_rebate - total_basepay
