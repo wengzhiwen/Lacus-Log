@@ -8,9 +8,9 @@ from flask import Blueprint, jsonify, request
 from utils.cache_helper import clear_daily_report_cache
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, calculate_weekly_details, calculate_weekly_summary,
-                                           get_default_week_start_for_now_prev_week, get_local_date_from_string, get_local_date_from_string_safe,
+from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, get_default_week_start_for_now_prev_week, get_local_date_from_string, get_local_date_from_string_safe,
                                            get_local_month_from_string, get_week_start_tuesday)
+from utils.new_report_fast_weekly_calculations import (calculate_weekly_details_fast, calculate_weekly_summary_fast)
 from utils.new_report_serializers import (create_error_response, create_success_response, serialize_daily_details, serialize_daily_summary,
                                           serialize_weekly_details, serialize_weekly_summary)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
@@ -115,8 +115,8 @@ def weekly_report_data():
 
     logger.info('获取开播新周报数据，周二起始：%s，直属运营：%s，开播方式：%s', week_start_local.strftime('%Y-%m-%d'), owner_id, mode)
 
-    summary_raw = calculate_weekly_summary(week_start_local, owner_id, mode)
-    details_raw = calculate_weekly_details(week_start_local, owner_id, mode)
+    summary_raw = calculate_weekly_summary_fast(week_start_local, owner_id, mode)
+    details_raw = calculate_weekly_details_fast(week_start_local, owner_id, mode)
 
     pagination = {
         'week_start': week_start_local.strftime('%Y-%m-%d'),

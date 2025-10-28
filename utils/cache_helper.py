@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 monthly_report_cache = TTLCache(maxsize=1000, ttl=900)  # 900秒 = 15分钟
 
+weekly_report_cache = TTLCache(maxsize=1000, ttl=900)  # 900秒 = 15分钟
+
 pilot_performance_cache = TTLCache(maxsize=500, ttl=300)  # 300秒 = 5分钟
 
 active_pilot_cache = TTLCache(maxsize=10, ttl=3600)  # 3600秒 = 60分钟
@@ -41,7 +43,7 @@ def generate_cache_key(func_name: str, *args, **kwargs) -> str:
 
 def cached_monthly_report(ttl: int = 900):  # pylint: disable=unused-argument
     """开播月报缓存装饰器
-    
+
     Args:
         ttl: 缓存过期时间（秒），默认15分钟
     """
@@ -69,6 +71,36 @@ def cached_monthly_report(ttl: int = 900):  # pylint: disable=unused-argument
     return decorator
 
 
+def cached_weekly_report(ttl: int = 900):  # pylint: disable=unused-argument
+    """开播周报缓存装饰器
+
+    Args:
+        ttl: 缓存过期时间（秒），默认15分钟
+    """
+
+    def decorator(func: Callable) -> Callable:
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            cache_key = generate_cache_key(func.__name__, *args, **kwargs)
+
+            if cache_key in weekly_report_cache:
+                logger.debug('缓存命中：%s', func.__name__)
+                return weekly_report_cache[cache_key]
+
+            logger.debug('缓存未命中，开始计算：%s', func.__name__)
+            result = func(*args, **kwargs)
+
+            weekly_report_cache[cache_key] = result
+            logger.debug('计算结果已缓存：%s', func.__name__)
+
+            return result
+
+        return wrapper
+
+    return decorator
+
+
 def _clear_report_cache(log_message: str):
     """统一清空报告缓存并记录日志"""
     monthly_report_cache.clear()
@@ -83,6 +115,11 @@ def clear_monthly_report_cache():
 def clear_daily_report_cache():
     """清空开播日报缓存"""
     _clear_report_cache('开播日报缓存已清空')
+
+
+def clear_weekly_report_cache():
+    """清空开播周报缓存"""
+    _clear_report_cache('开播周报缓存已清空')
 
 
 def cached_pilot_performance(ttl: int = 300):  # pylint: disable=unused-argument
