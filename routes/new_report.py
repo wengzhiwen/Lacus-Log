@@ -13,7 +13,7 @@ from utils.logging_setup import get_logger
 from utils.new_report_calculations import (calculate_daily_details, calculate_weekly_details, calculate_weekly_summary,
                                            get_default_week_start_for_now_prev_week, get_local_date_from_string, get_local_date_from_string_safe,
                                            get_local_month_from_string, get_week_start_tuesday)
-from utils.timezone_helper import get_current_utc_time, utc_to_local
+from utils.timezone_helper import get_current_utc_time, get_current_local_time, utc_to_local
 
 logger = get_logger('new_report')
 
@@ -112,10 +112,20 @@ def export_daily_csv():
     csv_content = output.getvalue()
     output.close()
 
-    filename = f"开播新日报_{report_date.strftime('%Y%m%d')}.csv"
+    # 添加时间戳避免缓存问题
+    now = get_current_local_time()
+    timestamp = now.strftime('%Y%m%d_%H%M%S')
+    filename = f"开播新日报_{report_date.strftime('%Y%m%d')}_{timestamp}.csv"
     encoded_filename = quote(filename.encode('utf-8'))
 
-    response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
+    response = Response(csv_content,
+                        mimetype='text/csv; charset=utf-8',
+                        headers={
+                            'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}',
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        })
     return response
 
 
@@ -197,8 +207,18 @@ def export_weekly_csv():
     csv_content = output.getvalue()
     output.close()
 
-    filename = f"开播新周报_{week_start_local.strftime('%Y%m%d')}.csv"
+    # 添加时间戳避免缓存问题
+    now = get_current_local_time()
+    timestamp = now.strftime('%Y%m%d_%H%M%S')
+    filename = f"开播新周报_{week_start_local.strftime('%Y%m%d')}_{timestamp}.csv"
     encoded_filename = quote(filename.encode('utf-8'))
 
-    response = Response(csv_content, mimetype='text/csv; charset=utf-8', headers={'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'})
+    response = Response(csv_content,
+                        mimetype='text/csv; charset=utf-8',
+                        headers={
+                            'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}',
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        })
     return response
