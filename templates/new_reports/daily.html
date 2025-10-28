@@ -15,7 +15,7 @@
       <a href="{{ url_for('new_report.daily_report', date=pagination.next_date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-secondary btn-sm">后一日 →</a>
     </div>
     <div class="export-actions">
-      <a href="{{ url_for('new_report.export_daily_csv', date=pagination.date, owner=selected_owner, mode=selected_mode) }}" class="btn btn-warning btn-sm">📥 导出CSV</a>
+      <a href="#" id="exportCsvBtn" class="btn btn-warning btn-sm">📥 导出CSV</a>
     </div>
   </div>
 
@@ -949,6 +949,35 @@
   modeSelector.addEventListener('change', function() {
     navigate({ mode: this.value || 'all' });
   });
+
+  // CSV导出按钮事件处理器 - 添加时间戳避免CDN缓存
+  const exportCsvBtn = document.getElementById('exportCsvBtn');
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+
+      // 构建基础导出URL
+      const exportUrl = '{{ url_for("new_report.export_daily_csv") }}';
+      const url = new URL(exportUrl, window.location.origin);
+
+      // 添加当前筛选参数
+      url.searchParams.set('date', currentDate);
+      url.searchParams.set('owner', currentOwner || 'all');
+      url.searchParams.set('mode', currentMode || 'all');
+
+      // 添加时间戳参数避免CDN缓存
+      const timestamp = Date.now();
+      url.searchParams.set('_t', timestamp.toString());
+
+      // 创建临时下载链接
+      const tempLink = document.createElement('a');
+      tempLink.href = url.toString();
+      tempLink.style.display = 'none';
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
+    });
+  }
 
   (async function init() {
     await loadOwnerOptions();
