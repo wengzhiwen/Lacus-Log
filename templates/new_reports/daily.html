@@ -56,6 +56,38 @@
               主播
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
+            <th class="sortable-header" data-sort-key="status" data-sort-type="string" tabindex="0" aria-sort="none">
+              状态
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="duration" data-sort-type="number" tabindex="0" aria-sort="none">
+              播时
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="revenue" data-sort-type="number" tabindex="0" aria-sort="none">
+              流水
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="daily_profit" data-sort-type="number" tabindex="0" aria-sort="none">
+              当日毛利
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="three_day_avg_revenue" data-sort-type="number" tabindex="0" aria-sort="none">
+              3日平均流水
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="base_salary" data-sort-type="number" tabindex="0" aria-sort="none">
+              底薪
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="rank" data-sort-type="string" tabindex="0" aria-sort="none">
+              主播分类
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="commission_rate" data-sort-type="number" tabindex="0" aria-sort="none">
+              当前分成比例
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
             <th class="sortable-header" data-sort-key="gender_age" data-sort-type="string" tabindex="0" aria-sort="none">
               性别年龄
               <span class="sort-indicator" aria-hidden="true"></span>
@@ -64,28 +96,8 @@
               直属运营
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
-            <th class="sortable-header" data-sort-key="rank" data-sort-type="string" tabindex="0" aria-sort="none">
-              主播分类
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="location" data-sort-type="string" tabindex="0" aria-sort="none">
+            <th class="sortable-header" data-sort-key="battle_area" data-sort-type="string" tabindex="0" aria-sort="none">
               开播地点
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="duration" data-sort-type="number" tabindex="0" aria-sort="none">
-              播时
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="status" data-sort-type="string" tabindex="0" aria-sort="none">
-              状态
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="revenue" data-sort-type="number" tabindex="0" aria-sort="none">
-              流水
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="pilot_rate" data-sort-type="number" tabindex="0" aria-sort="none">
-              当前分成比例
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
             <th class="sortable-header" data-sort-key="pilot_share" data-sort-type="number" tabindex="0" aria-sort="none">
@@ -94,18 +106,6 @@
             </th>
             <th class="sortable-header" data-sort-key="company_share" data-sort-type="number" tabindex="0" aria-sort="none">
               公司分成
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="base_salary" data-sort-type="number" tabindex="0" aria-sort="none">
-              底薪
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="daily_profit" data-sort-type="number" tabindex="0" aria-sort="none">
-              当日毛利
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="avg_3day_revenue" data-sort-type="number" tabindex="0" aria-sort="none">
-              3日平均流水
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
           </tr>
@@ -736,19 +736,19 @@
       const statusInfo = formatStatus(detail.status, detail.status_display);
       return `<tr>
         <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
-        <td>${detail.gender_age || ''}</td>
-        <td>${detail.owner || ''}</td>
-        <td>${normalizeRank(detail.rank)}</td>
-        <td>${detail.battle_area || ''}</td>
-        <td>${formatHours(detail.duration)}</td>
         <td class="${statusInfo.class}">${statusInfo.text}</td>
+        <td>${formatHours(detail.duration)}</td>
         <td>${formatMoney(detail.revenue)}</td>
-        <td>${commissionRate}</td>
-        <td>${formatMoney(detail.pilot_share)}</td>
-        <td>${formatMoney(detail.company_share)}</td>
-        <td>${formatMoney(detail.base_salary)}</td>
         <td class="${profitClass}">${formatMoney(detail.daily_profit)}</td>
         <td>${avgRevenue}</td>
+        <td>${formatMoney(detail.base_salary)}</td>
+        <td>${normalizeRank(detail.rank)}</td>
+        <td>${commissionRate}</td>
+        <td>${detail.gender_age || ''}</td>
+        <td>${detail.owner || ''}</td>
+        <td>${detail.battle_area || ''}</td>
+        <td>${formatMoney(detail.pilot_share)}</td>
+        <td>${formatMoney(detail.company_share)}</td>
       </tr>`;
     }).join('');
 
@@ -800,19 +800,19 @@
       const statusInfo = formatStatus(detail.status, detail.status_display);
       return `<tr>
         <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
-        <td>${detail.gender_age || ''}</td>
-        <td>${detail.owner || ''}</td>
-        <td>${normalizeRank(detail.rank)}</td>
-        <td>${detail.battle_area || ''}</td>
-        <td>${formatHours(detail.duration)}</td>
         <td class="${statusInfo.class}">${statusInfo.text}</td>
+        <td>${formatHours(detail.duration)}</td>
         <td>${formatMoney(detail.revenue)}</td>
-        <td>${commissionRate}</td>
-        <td>${formatMoney(detail.pilot_share)}</td>
-        <td>${formatMoney(detail.company_share)}</td>
-        <td>${formatMoney(detail.base_salary)}</td>
         <td class="${profitClass}">${formatMoney(detail.daily_profit)}</td>
         <td>${avgRevenue}</td>
+        <td>${formatMoney(detail.base_salary)}</td>
+        <td>${normalizeRank(detail.rank)}</td>
+        <td>${commissionRate}</td>
+        <td>${detail.gender_age || ''}</td>
+        <td>${detail.owner || ''}</td>
+        <td>${detail.battle_area || ''}</td>
+        <td>${formatMoney(detail.pilot_share)}</td>
+        <td>${formatMoney(detail.company_share)}</td>
       </tr>`;
     }).join('');
 
