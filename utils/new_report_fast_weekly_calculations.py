@@ -24,8 +24,7 @@ from models.user import User
 from utils.cache_helper import cached_weekly_report
 from utils.commission_helper import calculate_commission_amounts
 from utils.logging_setup import get_logger
-from utils.new_report_calculations import (_fetch_approved_base_salary_map, get_battle_records_for_date_range,
-                                            get_pilot_commission_rate_for_date)
+from utils.new_report_calculations import (_fetch_approved_base_salary_map, get_battle_records_for_date_range, get_pilot_commission_rate_for_date)
 from utils.timezone_helper import get_current_utc_time, local_to_utc, utc_to_local
 
 logger = get_logger('new_report_fast_weekly_calculations')
@@ -92,14 +91,18 @@ def _resolve_commission_rate(cache: Dict[str, List[Tuple[datetime, float]]], pil
     return 20.0
 
 
-def _fetch_week_records(week_start_local: datetime, owner_id: Optional[str], mode: Optional[WorkMode]) -> List[BattleRecord]:
-    """获取周记录，使用优化查询。"""
+def _fetch_two_weeks_records(week_start_local: datetime, owner_id: Optional[str], mode: Optional[WorkMode]) -> List[BattleRecord]:
+    """获取两周记录（前一周+当前周），使用优化查询。"""
+    # 计算前一周的开始和结束时间
+    prev_week_start_local = week_start_local - timedelta(days=7)
     week_end_local = week_start_local + timedelta(days=7) - timedelta(microseconds=1)
-    week_start_utc = local_to_utc(week_start_local)
+
+    # 查询两周的数据范围
+    prev_week_start_utc = local_to_utc(prev_week_start_local)
     week_end_exclusive_local = week_end_local + timedelta(microseconds=1)
     week_end_exclusive_utc = local_to_utc(week_end_exclusive_local)
 
-    query: QuerySet[BattleRecord] = BattleRecord.objects(start_time__gte=week_start_utc, start_time__lt=week_end_exclusive_utc)  # type: ignore[attr-defined]
+    query: QuerySet[BattleRecord] = BattleRecord.objects(start_time__gte=prev_week_start_utc, start_time__lt=week_end_exclusive_utc)  # type: ignore[attr-defined]
 
     owner_user = None
     owner_pilot_ids: List[ObjectId] = []
@@ -119,18 +122,31 @@ def _fetch_week_records(week_start_local: datetime, owner_id: Optional[str], mod
         query = query.filter(work_mode=mode)
 
     records = list(query.select_related())  # 预取关联，减少后续访问
-    logger.debug('加速版周报加载记录数量：%d', len(records))
+    logger.debug('加速版周报加载两周记录数量：%d', len(records))
     return records
+
+
+def _create_week_stats() -> Dict[str, object]:
+    """创建周统计数据结构。"""
+    return {
+        'pilot': None,
+        'records_count': 0,
+        'total_duration': 0.0,
+        'total_revenue': Decimal('0'),
+        'total_base_salary': Decimal('0'),
+        'total_pilot_share': Decimal('0'),
+        'total_company_share': Decimal('0'),
+    }
 
 
 @cached_weekly_report()
 def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] = None, mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]]]:
-    """核心计算：返回（汇总，明细）。"""
+    """核心计算：返回（汇总，明细），包含当前周和前一周数据。"""
     owner_normalized = _normalize_owner(owner_id)
     mode_normalized = _normalize_mode(mode)
 
-    week_records = _fetch_week_records(week_start_local, owner_normalized, mode_normalized)
-    if not week_records:
+    two_weeks_records = _fetch_two_weeks_records(week_start_local, owner_normalized, mode_normalized)
+    if not two_weeks_records:
         summary = {
             'pilot_count': 0,
             'revenue_sum': Decimal('0'),
@@ -142,9 +158,11 @@ def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] =
         }
         return summary, []
 
-    base_salary_map = _fetch_approved_base_salary_map(week_records)
+    base_salary_map = _fetch_approved_base_salary_map(two_weeks_records)
 
-    pilot_stats: Dict[str, Dict[str, object]] = {}
+    # 分别存储当前周和前一周的统计数据
+    current_week_stats: Dict[str, Dict[str, object]] = {}
+    prev_week_stats: Dict[str, Dict[str, object]] = {}
 
     total_revenue_sum = Decimal('0')
     total_base_salary_sum = Decimal('0')
@@ -152,27 +170,33 @@ def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] =
     total_company_share_sum = Decimal('0')
 
     # 预取分成比例
-    pilot_ids = list({str(record.pilot.id) for record in week_records if record.pilot})
+    pilot_ids = list({str(record.pilot.id) for record in two_weeks_records if record.pilot})
     commission_cache = _fetch_commission_cache(pilot_ids)
 
-    for record in week_records:
+    # 计算时间范围
+    week_end_local = week_start_local + timedelta(days=7) - timedelta(microseconds=1)
+    prev_week_start_local = week_start_local - timedelta(days=7)
+
+    for record in two_weeks_records:
         pilot = record.pilot
         if not pilot:
             continue
         pilot_id = str(pilot.id)
 
-        stats = pilot_stats.setdefault(
-            pilot_id, {
-                'pilot': pilot,
-                'records_count': 0,
-                'total_duration': 0.0,
-                'total_revenue': Decimal('0'),
-                'total_base_salary': Decimal('0'),
-                'total_pilot_share': Decimal('0'),
-                'total_company_share': Decimal('0'),
-            })
-
+        # 判断记录属于哪一周
         record_date = utc_to_local(record.start_time).date()
+        if prev_week_start_local.date() <= record_date <= (prev_week_start_local + timedelta(days=6)).date():
+            # 前一周
+            stats = prev_week_stats.setdefault(pilot_id, _create_week_stats())
+            stats['pilot'] = pilot
+        elif week_start_local.date() <= record_date <= week_end_local.date():
+            # 当前周
+            stats = current_week_stats.setdefault(pilot_id, _create_week_stats())
+            stats['pilot'] = pilot
+        else:
+            # 超出两周范围，跳过
+            continue
+
         commission_rate = _resolve_commission_rate(commission_cache, pilot_id, record_date)
         commission_amounts = calculate_commission_amounts(record.revenue_amount, commission_rate)
 
@@ -186,12 +210,14 @@ def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] =
         stats['total_pilot_share'] += commission_amounts['pilot_amount']
         stats['total_company_share'] += commission_amounts['company_amount']
 
-        total_revenue_sum += record.revenue_amount
-        total_base_salary_sum += record_base_salary
-        total_pilot_share_sum += commission_amounts['pilot_amount']
-        total_company_share_sum += commission_amounts['company_amount']
+        # 只将当前周的数据计入汇总
+        if stats in current_week_stats.values():
+            total_revenue_sum += record.revenue_amount
+            total_base_salary_sum += record_base_salary
+            total_pilot_share_sum += commission_amounts['pilot_amount']
+            total_company_share_sum += commission_amounts['company_amount']
 
-    if not pilot_stats:
+    if not current_week_stats:
         summary = {
             'pilot_count': 0,
             'revenue_sum': Decimal('0'),
@@ -206,14 +232,23 @@ def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] =
     details: List[Dict[str, object]] = []
     current_year = datetime.now().year
 
-    for pilot_id, stats in pilot_stats.items():
-        pilot: Pilot = stats['pilot']  # type: ignore[assignment]
-        total_duration = float(stats['total_duration'])
-        records_count = stats['records_count']
+    for pilot_id, current_stats in current_week_stats.items():
+        pilot: Pilot = current_stats['pilot']  # type: ignore[assignment]
+        total_duration = float(current_stats['total_duration'])
+        records_count = current_stats['records_count']
         avg_duration = total_duration / records_count if records_count > 0 else 0.0
-        total_base_salary = Decimal(stats['total_base_salary'])
-        total_company_share = Decimal(stats['total_company_share'])
+        total_base_salary = Decimal(current_stats['total_base_salary'])
+        total_company_share = Decimal(current_stats['total_company_share'])
         total_profit = total_company_share - total_base_salary
+
+        # 获取前一周数据
+        prev_stats = prev_week_stats.get(pilot_id, _create_week_stats())
+        prev_records_count = prev_stats['records_count']
+        prev_avg_duration = float(prev_stats['total_duration']) / prev_records_count if prev_records_count > 0 else 0.0
+        prev_total_revenue = prev_stats['total_revenue']
+        prev_total_base_salary = prev_stats['total_base_salary']
+        prev_total_company_share = prev_stats['total_company_share']
+        prev_total_profit = prev_total_company_share - prev_total_base_salary
 
         pilot_display = pilot.nickname or ''
         if pilot.real_name:
@@ -231,12 +266,16 @@ def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] =
             'owner': owner_name,
             'rank': rank_value,
             'records_count': records_count,
+            'prev_week_records_count': prev_records_count,
             'avg_duration': round(avg_duration, 1),
-            'total_revenue': stats['total_revenue'],
-            'total_pilot_share': Decimal(stats['total_pilot_share']),
+            'prev_week_avg_duration': round(prev_avg_duration, 1),
+            'total_revenue': current_stats['total_revenue'],
+            'prev_week_total_revenue': prev_total_revenue,
+            'total_pilot_share': Decimal(current_stats['total_pilot_share']),
             'total_company_share': total_company_share,
             'total_base_salary': total_base_salary,
             'total_profit': total_profit,
+            'prev_week_total_profit': prev_total_profit,
         })
 
     details.sort(key=lambda item: item['total_profit'])
@@ -247,7 +286,7 @@ def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] =
         conversion_rate = int((total_revenue_sum / total_base_salary_sum) * 100)
 
     summary = {
-        'pilot_count': len(pilot_stats),
+        'pilot_count': len(current_week_stats),
         'revenue_sum': total_revenue_sum,
         'basepay_sum': total_base_salary_sum,
         'pilot_share_sum': total_pilot_share_sum,
@@ -271,6 +310,8 @@ def calculate_weekly_details_fast(week_start_local: datetime, owner_id: Optional
     return details
 
 
-def calculate_weekly_report_fast(week_start_local: datetime, owner_id: Optional[str] = None, mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]]]:
+def calculate_weekly_report_fast(week_start_local: datetime,
+                                 owner_id: Optional[str] = None,
+                                 mode: str = 'all') -> Tuple[Dict[str, object], List[Dict[str, object]]]:
     """返回加速版周报的汇总与明细。"""
     return _calculate_weekly_data(week_start_local, owner_id, mode)

@@ -111,12 +111,16 @@ def serialize_weekly_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'owner': raw.get('owner', ''),
         'rank': raw.get('rank', ''),
         'records_count': raw.get('records_count', 0),
+        'prev_week_records_count': raw.get('prev_week_records_count', 0),
         'avg_duration': _decimal_to_float(raw.get('avg_duration')),
+        'prev_week_avg_duration': _decimal_to_float(raw.get('prev_week_avg_duration')),
         'total_revenue': _decimal_to_float(raw.get('total_revenue')),
+        'prev_week_total_revenue': _decimal_to_float(raw.get('prev_week_total_revenue')),
         'total_pilot_share': _decimal_to_float(raw.get('total_pilot_share')),
         'total_company_share': _decimal_to_float(raw.get('total_company_share')),
         'total_base_salary': _decimal_to_float(raw.get('total_base_salary')),
         'total_profit': _decimal_to_float(raw.get('total_profit')),
+        'prev_week_total_profit': _decimal_to_float(raw.get('prev_week_total_profit')),
     }
 
 
