@@ -153,12 +153,13 @@ def serialize_monthly_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'records_count': raw.get('records_count', 0),
         'avg_duration': _decimal_to_float(raw.get('avg_duration')),
         'total_revenue': _decimal_to_float(raw.get('total_revenue')),
+        'daily_avg_profit': _decimal_to_float(raw.get('daily_avg_profit')),
+        'total_profit': _decimal_to_float(raw.get('total_profit')),
         'total_pilot_share': _decimal_to_float(raw.get('total_pilot_share')),
         'total_company_share': _decimal_to_float(raw.get('total_company_share')),
         'rebate_rate': _decimal_to_float(raw.get('rebate_rate')),
         'rebate_amount': _decimal_to_float(raw.get('rebate_amount')),
         'total_base_salary': _decimal_to_float(raw.get('total_base_salary')),
-        'total_profit': _decimal_to_float(raw.get('total_profit')),
     }
 
 

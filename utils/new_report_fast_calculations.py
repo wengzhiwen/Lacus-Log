@@ -412,6 +412,11 @@ def _calculate_monthly_data(year: int,
         total_company_share = Decimal(stats['total_company_share'])
         total_profit = total_company_share + rebate_amount - total_base_salary
 
+        # 计算日均毛利：月累计毛利 ÷ 有效开播天数（播时≥1小时的天数）
+        daily_avg_profit = Decimal('0')
+        if valid_days > 0:
+            daily_avg_profit = total_profit / Decimal(str(valid_days))
+
         pilot_display = pilot.nickname or ''
         if pilot.real_name:
             pilot_display += f"（{pilot.real_name}）"
@@ -430,6 +435,7 @@ def _calculate_monthly_data(year: int,
             'records_count': stats['records_count'],
             'avg_duration': round(avg_duration, 1),
             'total_revenue': total_revenue,
+            'daily_avg_profit': daily_avg_profit,
             'total_pilot_share': Decimal(stats['total_pilot_share']),
             'total_company_share': total_company_share,
             'rebate_rate': rebate_rate,

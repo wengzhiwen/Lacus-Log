@@ -83,6 +83,12 @@
             <th class="sortable-header" data-sort-key="total_revenue" data-sort-type="number" tabindex="0" aria-sort="none">月累计流水(元)
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
+            <th class="sortable-header" data-sort-key="daily_avg_profit" data-sort-type="number" tabindex="0" aria-sort="none">日均毛利（元）
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+            <th class="sortable-header" data-sort-key="total_profit" data-sort-type="number" tabindex="0" aria-sort="none">月累计毛利(元)
+              <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
             <th class="sortable-header" data-sort-key="total_pilot_share" data-sort-type="number" tabindex="0" aria-sort="none">月累计主播分成(元)
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
@@ -96,9 +102,6 @@
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
             <th class="sortable-header" data-sort-key="total_base_salary" data-sort-type="number" tabindex="0" aria-sort="none">月累计底薪(元)
-              <span class="sort-indicator" aria-hidden="true"></span>
-            </th>
-            <th class="sortable-header" data-sort-key="total_profit" data-sort-type="number" tabindex="0" aria-sort="none">月累计毛利(元)
               <span class="sort-indicator" aria-hidden="true"></span>
             </th>
           </tr>
@@ -773,6 +776,7 @@
   function buildDetailRows(details, monthStr) {
     return details.map(detail => {
       const profitClass = detail.total_profit !== null && detail.total_profit < 0 ? 'text-danger' : '';
+      const dailyProfitClass = detail.daily_avg_profit !== null && detail.daily_avg_profit < 0 ? 'text-danger' : '';
       const monthParam = monthStr ? encodeURIComponent(monthStr) : '';
       const pilotUrl = pilotPerformanceTemplate.replace('__PID__', detail.pilot_id) + `?from=monthly_report&month=${monthParam}`;
       return `<tr>
@@ -783,12 +787,13 @@
         <td>${detail.records_count || 0}</td>
         <td>${formatHours(detail.avg_duration)}</td>
         <td>${formatMoney(detail.total_revenue)}</td>
+        <td class="${dailyProfitClass}">${formatMoney(detail.daily_avg_profit)}</td>
+        <td class="${profitClass}">${formatMoney(detail.total_profit)}</td>
         <td>${formatMoney(detail.total_pilot_share)}</td>
         <td>${formatMoney(detail.total_company_share)}</td>
         <td>${formatRate(detail.rebate_rate)}</td>
         <td>${formatMoney(detail.rebate_amount)}</td>
         <td>${formatMoney(detail.total_base_salary)}</td>
-        <td class="${profitClass}">${formatMoney(detail.total_profit)}</td>
       </tr>`;
     }).join('');
   }
