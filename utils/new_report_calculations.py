@@ -528,7 +528,9 @@ def calculate_daily_details(report_date: datetime, owner_id: Optional[str] = Non
             'monthly_stats': monthly_stats,
             'monthly_commission_stats': monthly_commission_stats,
             'status': record.current_status.value,
-            'status_display': record.get_status_display() or ''
+            'status_display': record.get_status_display() or '',
+            'pilot_status': pilot.status.value,
+            'pilot_status_display': pilot.status_display
         }
 
         details.append(detail)
@@ -643,6 +645,8 @@ def calculate_weekly_details(week_start_local: datetime, owner_id: Optional[str]
             'total_company_share': stats['total_company_share'],
             'total_base_salary': stats['total_base_salary'],
             'total_profit': total_profit,
+            'status': pilot.status.value,
+            'status_display': pilot.status.value
         }
         details.append(detail)
 

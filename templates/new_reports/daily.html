@@ -333,6 +333,17 @@
   text-decoration: underline;
 }
 
+.pilot-link-fallen {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pilot-link-fallen:hover {
+  color: #545b62;
+  text-decoration: underline;
+}
+
 /* 排序相关样式 */
 .sortable-header {
   cursor: pointer;
@@ -734,8 +745,17 @@
       const commissionRate = formatPercent(detail.commission_rate);
       const pilotUrl = pilotPerformanceTemplate.replace('__PID__', pilotId) + `?from=daily_report&date=${encodeURIComponent(currentDate)}&owner=${encodeURIComponent(ownerParam)}`;
       const statusInfo = formatStatus(detail.status, detail.status_display);
+
+      // 根据主播状态设置链接样式：流失状态的主播使用灰色链接
+      const isPilotFallen = detail.pilot_status === 'fallen' ||
+                           detail.pilot_status === '流失' ||
+                           detail.pilot_status === '已阵亡' ||
+                           detail.pilot_status_display === '流失' ||
+                           detail.pilot_status_display === '已阵亡';
+      const pilotLinkClass = isPilotFallen ? 'pilot-link-fallen' : 'pilot-link';
+
       return `<tr>
-        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td class="fixed-col"><a href="${pilotUrl}" class="${pilotLinkClass}">${detail.pilot_display || ''}</a></td>
         <td class="${statusInfo.class}">${statusInfo.text}</td>
         <td>${formatHours(detail.duration)}</td>
         <td>${formatMoney(detail.revenue)}</td>
@@ -798,8 +818,17 @@
       const commissionRate = formatPercent(detail.commission_rate);
       const pilotUrl = pilotPerformanceTemplate.replace('__PID__', pilotId) + `?from=daily_report&date=${encodeURIComponent(dateStr)}&owner=${encodeURIComponent(ownerParam)}`;
       const statusInfo = formatStatus(detail.status, detail.status_display);
+
+      // 根据主播状态设置链接样式：流失状态的主播使用灰色链接
+      const isPilotFallen = detail.pilot_status === 'fallen' ||
+                           detail.pilot_status === '流失' ||
+                           detail.pilot_status === '已阵亡' ||
+                           detail.pilot_status_display === '流失' ||
+                           detail.pilot_status_display === '已阵亡';
+      const pilotLinkClass = isPilotFallen ? 'pilot-link-fallen' : 'pilot-link';
+
       return `<tr>
-        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td class="fixed-col"><a href="${pilotUrl}" class="${pilotLinkClass}">${detail.pilot_display || ''}</a></td>
         <td class="${statusInfo.class}">${statusInfo.text}</td>
         <td>${formatHours(detail.duration)}</td>
         <td>${formatMoney(detail.revenue)}</td>

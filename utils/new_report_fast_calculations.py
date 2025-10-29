@@ -396,6 +396,8 @@ def _calculate_monthly_data(year: int,
             'rebate_amount': rebate_amount,
             'total_base_salary': total_base_salary,
             'total_profit': total_profit,
+            'status': pilot.status.value,
+            'status_display': pilot.status.value
         })
 
     details.sort(key=lambda item: item['total_profit'])

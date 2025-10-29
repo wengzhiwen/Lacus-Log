@@ -436,6 +436,17 @@
   text-decoration: underline;
 }
 
+.pilot-link-fallen {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pilot-link-fallen:hover {
+  color: #545b62;
+  text-decoration: underline;
+}
+
 .text-danger {
   color: #dc3545 !important;
   font-weight: 600;
@@ -779,8 +790,13 @@
       const dailyProfitClass = detail.daily_avg_profit !== null && detail.daily_avg_profit < 0 ? 'text-danger' : '';
       const monthParam = monthStr ? encodeURIComponent(monthStr) : '';
       const pilotUrl = pilotPerformanceTemplate.replace('__PID__', detail.pilot_id) + `?from=monthly_report&month=${monthParam}`;
+
+      // 根据主播状态设置链接样式：流失状态的主播使用灰色链接
+      const isPilotFallen = detail.status === 'fallen' || detail.status === '流失' || detail.status === '已阵亡';
+      const pilotLinkClass = isPilotFallen ? 'pilot-link-fallen' : 'pilot-link';
+
       return `<tr>
-        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td class="fixed-col"><a href="${pilotUrl}" class="${pilotLinkClass}">${detail.pilot_display || ''}</a></td>
         <td>${detail.gender_age || ''}</td>
         <td>${detail.owner || ''}</td>
         <td>${normalizeRank(detail.rank)}</td>

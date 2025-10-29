@@ -85,7 +85,9 @@ def serialize_daily_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'monthly_stats': serialize_month_snapshot(raw.get('monthly_stats', {})),
         'monthly_commission_stats': serialize_month_commission_snapshot(raw.get('monthly_commission_stats', {})),
         'status': _enum_to_str(raw.get('status')),
-        'status_display': _enum_to_str(raw.get('status_display'))
+        'status_display': _enum_to_str(raw.get('status_display')),
+        'pilot_status': _enum_to_str(raw.get('pilot_status')),
+        'pilot_status_display': raw.get('pilot_status_display')
     }
 
 
@@ -121,6 +123,10 @@ def serialize_weekly_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'total_base_salary': _decimal_to_float(raw.get('total_base_salary')),
         'total_profit': _decimal_to_float(raw.get('total_profit')),
         'prev_week_total_profit': _decimal_to_float(raw.get('prev_week_total_profit')),
+        'status': raw.get('status'),
+        'status_display': raw.get('status_display'),
+        'pilot_status': raw.get('pilot_status'),
+        'pilot_status_display': raw.get('pilot_status_display')
     }
 
 
@@ -164,6 +170,10 @@ def serialize_monthly_detail(raw: Dict[str, Any]) -> Dict[str, Any]:
         'rebate_rate': _decimal_to_float(raw.get('rebate_rate')),
         'rebate_amount': _decimal_to_float(raw.get('rebate_amount')),
         'total_base_salary': _decimal_to_float(raw.get('total_base_salary')),
+        'status': raw.get('status'),
+        'status_display': raw.get('status_display'),
+        'pilot_status': raw.get('pilot_status'),
+        'pilot_status_display': raw.get('pilot_status_display')
     }
 
 

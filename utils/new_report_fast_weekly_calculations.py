@@ -102,7 +102,8 @@ def _fetch_two_weeks_records(week_start_local: datetime, owner_id: Optional[str]
     week_end_exclusive_local = week_end_local + timedelta(microseconds=1)
     week_end_exclusive_utc = local_to_utc(week_end_exclusive_local)
 
-    query: QuerySet[BattleRecord] = BattleRecord.objects(start_time__gte=prev_week_start_utc, start_time__lt=week_end_exclusive_utc)  # type: ignore[attr-defined]
+    query: QuerySet[BattleRecord] = BattleRecord.objects(start_time__gte=prev_week_start_utc,
+                                                         start_time__lt=week_end_exclusive_utc)  # type: ignore[attr-defined]
 
     owner_user = None
     owner_pilot_ids: List[ObjectId] = []
@@ -276,6 +277,10 @@ def _calculate_weekly_data(week_start_local: datetime, owner_id: Optional[str] =
             'total_base_salary': total_base_salary,
             'total_profit': total_profit,
             'prev_week_total_profit': prev_total_profit,
+            'status': 'weekly',  # 周报不使用开播记录状态
+            'status_display': '',
+            'pilot_status': pilot.status.value,
+            'pilot_status_display': pilot.status_display
         })
 
     details.sort(key=lambda item: item['total_profit'])
