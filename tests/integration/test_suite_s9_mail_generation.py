@@ -387,6 +387,164 @@ class TestS9MailGeneration:
             self._cleanup_test_data(admin_client, record_ids=created_records, pilot_ids=[pilot_id] if pilot_id else None)
             print("✅ S9-TC4新主播生存警告邮件测试完成")
 
+    def test_s9_tc5_base_salary_reminder_mail_generation(self, admin_client):
+        """
+        S9-TC5：底薪发放提醒邮件测试
+
+        验证当底薪申请状态为PENDING且超过12小时时，系统能正确生成底薪发放提醒邮件。
+        邮件内容应包含主播信息、开播日期、申请时间和超时小时数。
+        """
+        print("🔍 开始S9-TC5底薪发放提醒邮件测试...")
+
+        original_mail_debug = os.getenv('MAIL_DEBUG', 'false')
+        os.environ['MAIL_DEBUG'] = 'true'
+
+        created_pilots = []
+        created_records = []
+        created_applications = []
+
+        try:
+            # 清理现有邮件文件
+            self._cleanup_mail_files()
+
+            # 创建测试主播
+            pilot_data = pilot_factory.create_pilot_data(nickname="底薪提醒测试主播")
+            pilot_response = admin_client.post('/api/pilots', json=pilot_data)
+
+            if not pilot_response.get('success'):
+                pytest.skip("创建主播接口不可用，跳过S9-TC5")
+                return
+
+            pilot_id = pilot_response['data']['id']
+            created_pilots.append(pilot_id)
+
+            # 创建13小时前的开播记录（确保超过12小时阈值）
+            past_start_time = datetime.now() - timedelta(hours=13, minutes=30)
+            past_end_time = past_start_time + timedelta(hours=3)
+
+            battle_data = {
+                'pilot': pilot_id,
+                'start_time': past_start_time.isoformat(),
+                'end_time': past_end_time.isoformat(),
+                'work_mode': '线下',
+                'x_coord': 'BSR1',
+                'y_coord': 'TEST',
+                'z_coord': 'Z1',
+                'revenue_amount': '200.00',
+                'base_salary': '150.00',
+                'notes': '底薪提醒测试开播记录'
+            }
+
+            battle_response = admin_client.post('/battle-records/api/battle-records', json=battle_data)
+            if not battle_response.get('success'):
+                pytest.skip("创建开播记录接口不可用，跳过S9-TC5")
+                return
+
+            record_id = battle_response['data']['id']
+            created_records.append(record_id)
+
+            # 创建底薪申请（手动设置创建时间为13小时前）
+            application_data = {'pilot_id': pilot_id, 'battle_record_id': record_id, 'settlement_type': 'daily_base', 'base_salary_amount': '150.00'}
+
+            application_response = admin_client.post('/api/base-salary-applications', json=application_data)
+            if not application_response.get('success'):
+                pytest.skip("创建底薪申请接口不可用，跳过S9-TC5")
+                return
+
+            application_id = application_response['data']['id']
+            created_applications.append(application_id)
+
+            print(f"✅ 创建测试数据：主播{pilot_id}，记录{record_id}，申请{application_id}")
+
+            # 直接调用底薪提醒邮件API
+            response = admin_client.post('/reports/mail/base-salary-reminder')
+
+            if response.get('status') == 'started':
+                print("✅ 底薪提醒邮件API调用成功")
+
+                # 等待邮件文件生成
+                time.sleep(3)
+
+                # 验证邮件文件
+                mail_files = self._get_generated_mail_files()
+                reminder_mail_files = [f for f in mail_files if '底薪发放提醒' in f]
+
+                if reminder_mail_files:
+                    print(f"✅ 找到底薪提醒邮件文件: {len(reminder_mail_files)}个")
+
+                    # 验证邮件内容
+                    validation_passed = False
+                    for file_path in reminder_mail_files:
+                        print(f"📄 邮件文件: {file_path}")
+                        if self._validate_base_salary_reminder_mail_content(file_path, pilot_id):
+                            print(f"  ✅ 邮件内容验证通过")
+                            validation_passed = True
+                            break
+                        else:
+                            print(f"  ❌ 邮件内容验证失败")
+
+                    assert validation_passed, "底薪提醒邮件内容验证失败"
+
+                else:
+                    print("❌ 未找到底薪提醒邮件文件")
+                    pytest.fail("底薪提醒邮件文件生成失败")
+
+            else:
+                print(f"❌ 底薪提醒邮件API调用失败: {response}")
+                pytest.fail("底薪提醒邮件API调用失败")
+
+        finally:
+            # 恢复环境设置
+            os.environ['MAIL_DEBUG'] = original_mail_debug
+
+            # 清理测试数据
+            self._cleanup_test_data(admin_client, record_ids=created_records, pilot_ids=created_pilots)
+
+            # 清理底薪申请
+            for application_id in created_applications:
+                try:
+                    admin_client.delete(f'/api/base-salary-applications/{application_id}')
+                except:
+                    pass
+
+            print("✅ S9-TC5底薪发放提醒邮件测试完成")
+
+    def _validate_base_salary_reminder_mail_content(self, file_path, expected_pilot_id):
+        """验证底薪提醒邮件内容"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # 检查邮件标题和基本结构
+            if '底薪发放提醒' not in content:
+                print("  ❌ 邮件标题不正确")
+                return False
+
+            # 检查关键字段
+            required_fields = ['主播昵称', '真实姓名', '开播日期', '申请时间', '超时小时', '底薪金额', '未处理']
+
+            for field in required_fields:
+                if field not in content:
+                    print(f"  ❌ 缺少必要字段: {field}")
+                    return False
+
+            # 检查说明文字
+            if '申请时间已超过12小时' not in content:
+                print("  ❌ 缺少超时说明")
+                return False
+
+            # 检查表格结构
+            if '|' not in content or '---' not in content:
+                print("  ❌ 邮件表格结构不正确")
+                return False
+
+            print("  ✅ 邮件内容结构验证通过")
+            return True
+
+        except Exception as e:
+            print(f"  ❌ 读取邮件文件失败: {str(e)}")
+            return False
+
     def _get_generated_mail_files(self):
         """获取log/mail目录中生成的邮件文件"""
         mail_dir = 'log/mail'

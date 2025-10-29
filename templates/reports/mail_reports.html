@@ -54,6 +54,22 @@
 
 <div class="card">
   <div class="card-header">
+    <h2 class="card-title">底薪发放提醒</h2>
+    <div class="card-icon">💰</div>
+  </div>
+  <div class="card-body">
+    {% if next_times and next_times.base_salary_reminder %}
+    <div class="text-muted" style="margin-bottom:8px;">下次触发（GMT+8）：{{ next_times.base_salary_reminder }}</div>
+    {% endif %}
+    <div class="text-muted" style="margin-bottom:8px; font-size: 12px;">
+      说明：筛选状态为"未处理"且申请时间已超过12小时的底薪申请，提醒管理员及时审核
+    </div>
+    <button id="btnBaseSalaryReminder" class="btn btn-primary" style="width:100%" type="button" aria-label="触发底薪发放提醒邮件发送">开始发送</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
     <h2 class="card-title">主播招募日报</h2>
     <div class="card-icon">📊</div>
   </div>
@@ -111,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnUnstarted = document.getElementById('btnUnstarted');
   const btnLiveOvertime = document.getElementById('btnLiveOvertime');
   const btnOnlinePilotUnstarted = document.getElementById('btnOnlinePilotUnstarted');
+  const btnBaseSalaryReminder = document.getElementById('btnBaseSalaryReminder');
   const btnRecruitDaily = document.getElementById('btnRecruitDaily');
   const btnDailyReport = document.getElementById('btnDailyReport');
   const btnMonthlyMailReport = document.getElementById('btnMonthlyMailReport');
@@ -188,6 +205,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       } else {
         result.textContent = `线上主播未开播提醒触发失败：${data && data.error ? data.error : '未知错误'}`;
+      }
+    } catch (e) {
+      result.textContent = '网络异常或服务器错误。';
+    }
+  }
+
+  async function postBaseSalaryReminder() {
+    result.textContent = '底薪发放提醒已开始运算...';
+    try {
+      const resp = await fetch("{{ url_for('report_mail.trigger_base_salary_reminder_report') }}", {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        if (data.sent) {
+          result.textContent = `底薪发放提醒已触发发送，共 ${data.count} 条申请。`;
+        } else {
+          result.textContent = `底薪发放提醒无可发送内容（或未配置收件人）。`;
+        }
+      } else {
+        result.textContent = `底薪发放提醒触发失败：${data && data.error ? data.error : '未知错误'}`;
       }
     } catch (e) {
       result.textContent = '网络异常或服务器错误。';
@@ -294,6 +337,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (btnOnlinePilotUnstarted) {
     btnOnlinePilotUnstarted.addEventListener('click', postOnlinePilotUnstarted);
+  }
+
+  if (btnBaseSalaryReminder) {
+    btnBaseSalaryReminder.addEventListener('click', postBaseSalaryReminder);
   }
 
   if (btnRecruitDaily) {

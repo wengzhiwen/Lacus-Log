@@ -57,6 +57,9 @@ def init_scheduled_jobs(flask_app) -> None:
     # 开播邮件月报：每日 GMT+8 15:02 触发（UTC 07:02），发送"前一自然日所在月"的月报
     monthly_mail_report_trigger = CronTrigger(hour=7, minute=2, timezone='UTC')
 
+    # 底薪发放提醒：每日 GMT+8 18:00 触发（UTC 10:00）
+    base_salary_reminder_trigger = CronTrigger(hour=10, minute=0, timezone='UTC')
+
     def _next_fire_utc(trigger) -> datetime:
         now_utc = get_current_utc_time()
         next_dt = trigger.get_next_fire_time(previous_fire_time=None, now=now_utc)
@@ -136,6 +139,17 @@ def init_scheduled_jobs(flask_app) -> None:
             logger.info('定时任务 run_monthly_mail_report_job 完成：%s', result)
         plan_fire('daily_monthly_mail_report', _next_fire_utc(monthly_mail_report_trigger))
 
+    def run_base_salary_reminder_wrapper():
+        from routes.report_mail import run_base_salary_reminder_job
+        fire_dt_utc = get_current_utc_time().replace(second=0, microsecond=0)
+        if not consume_fire('daily_base_salary_reminder', fire_dt_utc):
+            logger.info('跳过执行：daily_base_salary_reminder（计划令牌不存在）')
+            return
+        with flask_app.app_context():
+            result = run_base_salary_reminder_job(triggered_by='scheduler@daily-18:00+08')
+            logger.info('定时任务 run_base_salary_reminder_job 完成：%s', result)
+        plan_fire('daily_base_salary_reminder', _next_fire_utc(base_salary_reminder_trigger))
+
     sched.add_job(run_unstarted_wrapper, unstarted_trigger, id='daily_unstarted_report', replace_existing=True, max_instances=1)
     try:
         plan_fire('daily_unstarted_report', _next_fire_utc(unstarted_trigger))
@@ -176,6 +190,13 @@ def init_scheduled_jobs(flask_app) -> None:
         plan_fire('daily_monthly_mail_report', _next_fire_utc(monthly_mail_report_trigger))
     except Exception as exc:  # pylint: disable=broad-except
         logger.error('写入开播邮件月报下一次计划失败：%s', exc)
+
+    # 新增：底薪发放提醒（每日18:00发送）
+    sched.add_job(run_base_salary_reminder_wrapper, base_salary_reminder_trigger, id='daily_base_salary_reminder', replace_existing=True, max_instances=1)
+    try:
+        plan_fire('daily_base_salary_reminder', _next_fire_utc(base_salary_reminder_trigger))
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error('写入底薪发放提醒下一次计划失败：%s', exc)
 
     if not sched.running:
         sched.start(paused=False)

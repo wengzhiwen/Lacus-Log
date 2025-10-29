@@ -12,7 +12,7 @@ from flask import (Blueprint, jsonify, redirect, render_template, request, url_f
 from flask_security import current_user, roles_required
 
 from models.announcement import Announcement
-from models.battle_record import BattleRecord, BattleRecordStatus
+from models.battle_record import BattleRecord, BattleRecordStatus, BaseSalaryApplication, BaseSalaryApplicationStatus
 from models.user import User
 from utils.job_token import JobPlan
 from utils.logging_setup import get_logger
@@ -432,6 +432,52 @@ def _build_online_pilot_unstarted_markdown(items: List[dict], report_date: str, 
 """
 
 
+def _build_base_salary_reminder_markdown(items: List[dict]) -> str:
+    """将底薪发放提醒数据渲染为Markdown格式。
+
+    Args:
+        items: 底薪发放提醒数据列表
+
+    Returns:
+        str: Markdown格式的邮件内容
+    """
+    if not items:
+        return "# 底薪发放提醒\n\n当前没有需要处理的底薪申请。\n\n---\n*本报表由 Lacus-Log 系统自动生成*"
+
+    header = ("| 主播昵称 | 真实姓名 | 直属运营-主播分类 | 开播日期 | 申请时间 | 超时小时 | 底薪金额 | 备注 |\n"
+              "| --- | --- | --- | --- | --- | ---: | ---: | --- |")
+
+    lines = [header]
+    for it in items:
+        line = (f"| {it['pilot_name']} | {it['real_name']} | {it['owner_rank']} | "
+                f"{it['battle_date']} | {it['apply_time']} | {it['overdue_hours']} | "
+                f"¥{it['base_salary']:,.2f} | {it['note']} |")
+        lines.append(line)
+
+    table_content = "\n".join(lines)
+
+    summary = f"""
+**提醒说明：**
+- 筛选条件：状态为"未处理"且申请时间已超过12小时的底薪申请
+- 提醒时间：每天18:00（GMT+8）
+- 处理方式：请管理员及时在结算管理中审核相关申请
+
+**统计结果：**
+- 需要处理的申请数量：{len(items)}条
+"""
+
+    return f"""
+# 底薪发放提醒
+
+{summary}
+
+{table_content}
+
+---
+*本报表由 Lacus-Log 系统自动生成*
+"""
+
+
 @report_mail_bp.route('/mail')
 @roles_required('gicho')
 def mail_reports_page():
@@ -460,6 +506,13 @@ def mail_reports_page():
             fire_dt_utc = datetime.strptime(online_pilot_unstarted_plan.fire_minute, '%Y%m%d%H%M')
             online_pilot_unstarted_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
 
+        base_salary_reminder_plan = (JobPlan.objects(job_code='daily_base_salary_reminder', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
+            JobPlan.objects(job_code='daily_base_salary_reminder').order_by('-fire_minute').first())
+        base_salary_reminder_next_local = None
+        if base_salary_reminder_plan:
+            fire_dt_utc = datetime.strptime(base_salary_reminder_plan.fire_minute, '%Y%m%d%H%M')
+            base_salary_reminder_next_local = utc_to_local(fire_dt_utc).strftime('%Y-%m-%d %H:%M')
+
         recruit_plan = (JobPlan.objects(job_code='daily_recruit_daily_report', fire_minute__gte=now_minute).order_by('fire_minute').first()) or (
             JobPlan.objects(job_code='daily_recruit_daily_report').order_by('-fire_minute').first())
         recruit_next_local = None
@@ -486,6 +539,7 @@ def mail_reports_page():
         unstarted_next_local = None
         live_overtime_next_local = None
         online_pilot_unstarted_next_local = None
+        base_salary_reminder_next_local = None
         recruit_next_local = None
         daily_next_local = None
         monthly_mail_next_local = None
@@ -494,6 +548,7 @@ def mail_reports_page():
         'unstarted': unstarted_next_local,
         'live_overtime': live_overtime_next_local,
         'online_pilot_unstarted': online_pilot_unstarted_next_local,
+        'base_salary_reminder': base_salary_reminder_next_local,
         'recruit_daily': recruit_next_local,
         'daily_report': daily_next_local,
         'monthly_mail_report': monthly_mail_next_local
@@ -793,6 +848,103 @@ def run_online_pilot_unstarted_report_job(triggered_by: str = 'scheduler') -> di
     return {'sent': False, 'count': len(unstarted_online_pilots)}
 
 
+def run_base_salary_reminder_job(triggered_by: str = 'scheduler') -> dict:
+    """执行底薪发放提醒邮件发送任务。
+
+    筛选状态为"未处理"且创建时间超过12小时的底薪申请，发送邮件提醒。
+
+    Args:
+        triggered_by: 触发来源
+
+    Returns:
+        dict: {"sent": bool, "count": int}
+    """
+    logger.info('触发底薪发放提醒邮件发送，来源：%s', triggered_by or '未知')
+
+    now_utc = get_current_utc_time()
+    threshold_utc = now_utc - timedelta(hours=12)
+
+    # 查询状态为PENDING且创建时间超过12小时的底薪申请
+    pending_applications = BaseSalaryApplication.objects.filter(status=BaseSalaryApplicationStatus.PENDING,
+                                                                created_at__lte=threshold_utc).order_by('created_at')
+
+    logger.debug('符合条件的底薪申请数量：%d', pending_applications.count())
+
+    reminder_items: List[dict] = []
+    sample_logged = 0
+
+    for app in pending_applications:
+        pilot = app.pilot_id
+        battle_record = app.battle_record_id
+
+        # 获取申请和超时时间信息
+        created_utc = app.created_at
+        created_local = utc_to_local(created_utc)
+        overdue_delta = now_utc - created_utc
+        overdue_hours = floor(overdue_delta.total_seconds() / 3600)
+
+        # 获取开播记录日期
+        battle_date_local = utc_to_local(battle_record.start_time).strftime('%Y-%m-%d')
+
+        # 获取主播信息
+        owner_display = ''
+        try:
+            if getattr(pilot, 'owner', None):
+                owner_display = getattr(pilot.owner, 'nickname', None) or getattr(pilot.owner, 'username', '')
+        except Exception:
+            owner_display = ''
+
+        rank_display = ''
+        try:
+            rank_display = pilot.rank.value if getattr(pilot, 'rank', None) else ''
+        except Exception:
+            rank_display = ''
+
+        item = {
+            'pilot_name': getattr(pilot, 'nickname', ''),
+            'real_name': getattr(pilot, 'real_name', ''),
+            'owner_rank': f"{owner_display}-{rank_display}".strip('-'),
+            'battle_date': battle_date_local,
+            'apply_time': created_local.strftime('%Y-%m-%d %H:%M'),
+            'overdue_hours': overdue_hours,
+            'base_salary': float(app.base_salary_amount),
+            'note': f'申请已超过{overdue_hours}小时未处理，请及时审核'
+        }
+
+        if sample_logged < 5:
+            logger.debug('底薪发放提醒样例：%s', item)
+            sample_logged += 1
+
+        reminder_items.append(item)
+
+    recipients = []
+    recipients.extend(User.get_emails_by_role(role_name='gicho', only_active=True))  # 管理员
+    recipients.extend(User.get_emails_by_role(role_name='kancho', only_active=True))  # 运营
+
+    if not recipients:
+        logger.error('收件人为空，未找到任何运营或管理员的邮箱')
+        return {'sent': False, 'count': 0}
+
+    recipients = list(set(recipients))
+
+    current_time_str = utc_to_local(now_utc).strftime('%Y-%m-%d %H:%M')
+    subject = f"[Lacus-Log] 底薪发放提醒 - {current_time_str}"
+
+    if not reminder_items:
+        logger.info('无需要处理的底薪申请，已跳过发送。来源：%s', triggered_by or '未知')
+        return {'sent': False, 'count': 0}
+
+    md = _build_base_salary_reminder_markdown(reminder_items)
+
+    ok = send_email_md(recipients, subject, md)
+    if ok:
+        logger.info('底薪发放提醒已发送，共%d条；收件人：%s', len(reminder_items), ', '.join(recipients))
+        return {'sent': True, 'count': len(reminder_items)}
+
+    logger.error('底薪发放提醒发送失败；主题：%s；收件人：%s', subject, ', '.join(recipients))
+    return {'sent': False, 'count': len(reminder_items)}
+
+
 @report_mail_bp.route('/mail/unstarted', methods=['POST'])
 @roles_required('gicho')
 def trigger_unstarted_report():
@@ -865,5 +1017,16 @@ def trigger_online_pilot_unstarted_report():
     username = getattr(current_user, 'username', '未知')
 
     result = run_online_pilot_unstarted_report_job(triggered_by=username)
+    status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
+    return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
+
+
+@report_mail_bp.route('/mail/base-salary-reminder', methods=['POST'])
+@roles_required('gicho')
+def trigger_base_salary_reminder_report():
+    """触发底薪发放提醒邮件发送。"""
+    username = getattr(current_user, 'username', '未知')
+
+    result = run_base_salary_reminder_job(triggered_by=username)
     status = {'status': 'started', 'sent': result.get('sent', False), 'count': result.get('count', 0)}
     return jsonify(status), (200 if result.get('sent') or result.get('count') == 0 else 500)
