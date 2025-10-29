@@ -154,6 +154,8 @@
 .empty-state { text-align: center; padding: 40px; color: var(--muted); }
 .pilot-link { color: var(--brand); text-decoration: none; font-weight: 600; }
 .pilot-link:hover { color: var(--brand-dark); text-decoration: underline; }
+.pilot-link-fallen { color: #6c757d; text-decoration: none; font-weight: 600; }
+.pilot-link-fallen:hover { color: #545b62; text-decoration: underline; }
 .text-danger { color: #dc3545 !important; font-weight: 600; }
 .sortable-header {
   cursor: pointer;
@@ -320,8 +322,20 @@
       const profitClass = detail.total_profit !== null && detail.total_profit < 0 ? 'text-danger' : '';
       const prevProfitClass = detail.prev_week_total_profit !== null && detail.prev_week_total_profit < 0 ? 'text-danger' : '';
       const pilotUrl = pilotPerformanceTemplate.replace('__PID__', detail.pilot_id) + `?from=weekly_report&week_start=${encodeURIComponent(dateStr)}`;
+
+      // 根据主播状态设置链接样式：流失状态的主播使用灰色链接
+      const isPilotFallen = detail.pilot_status === 'fallen' ||
+                           detail.pilot_status === '流失' ||
+                           detail.pilot_status === '已阵亡' ||
+                           detail.pilot_status_display === '流失' ||
+                           detail.pilot_status_display === '已阵亡' ||
+                           detail.status === 'fallen' ||
+                           detail.status === '流失' ||
+                           detail.status === '已阵亡';
+      const pilotLinkClass = isPilotFallen ? 'pilot-link-fallen' : 'pilot-link';
+
       return `<tr>
-        <td class="fixed-col"><a href="${pilotUrl}" class="pilot-link">${detail.pilot_display || ''}</a></td>
+        <td class="fixed-col"><a href="${pilotUrl}" class="${pilotLinkClass}">${detail.pilot_display || ''}</a></td>
         <td>${detail.records_count || 0}</td>
         <td>${detail.prev_week_records_count || 0}</td>
         <td>${formatHours(detail.avg_duration)}</td>
