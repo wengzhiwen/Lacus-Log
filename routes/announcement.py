@@ -85,7 +85,7 @@ def _get_pilot_choices():
 
 
 @announcement_bp.route('/')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def list_announcements():
     """通告列表页面"""
     filters = persist_and_restore_filters(
@@ -102,21 +102,21 @@ def list_announcements():
 
 
 @announcement_bp.route('/cleanup')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def cleanup_page():
     """渲染通告清理页面。"""
     return render_template('announcements/cleanup.html')
 
 
 @announcement_bp.route('/export')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def export_page():
     """渲染通告导出页面。"""
     return render_template('announcements/export.html')
 
 
 @announcement_bp.route('/<announcement_id>')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def announcement_detail(announcement_id):
     """通告详情页面（REST API版本）"""
     try:
@@ -130,7 +130,7 @@ def announcement_detail(announcement_id):
 
 
 @announcement_bp.route('/new', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def new_announcement():
     """新建通告"""
     context = {
@@ -141,7 +141,7 @@ def new_announcement():
 
 
 @announcement_bp.route('/<announcement_id>/edit', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def edit_announcement(announcement_id):
     """编辑通告"""
     try:
@@ -158,7 +158,7 @@ def edit_announcement(announcement_id):
 
 
 @announcement_bp.route('/export/view')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def export_view_page():
     """渲染通告导出的打印视图页面。"""
     return render_template('announcements/export_view.html')

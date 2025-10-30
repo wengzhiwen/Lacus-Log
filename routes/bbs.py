@@ -7,7 +7,7 @@ bbs_bp = Blueprint('bbs', __name__, url_prefix='/bbs')
 
 
 @bbs_bp.route('/')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def bbs_index():
     """内部BBS列表页。"""
     csrf_token = ensure_csrf_token()
@@ -15,7 +15,7 @@ def bbs_index():
 
 
 @bbs_bp.route('/posts/<post_id>')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def bbs_post_entry(post_id: str):
     """直接访问某帖时，仍渲染列表页并在前端打开弹窗。"""
     csrf_token = ensure_csrf_token()

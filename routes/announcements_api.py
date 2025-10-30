@@ -149,7 +149,7 @@ def _apply_time_filter(query, time_scope: str):
 
 
 @announcements_api_bp.route('/announcements/api/announcements', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_announcements_api():
     """通告列表 API。"""
     try:
@@ -191,7 +191,7 @@ def list_announcements_api():
 
 
 @announcements_api_bp.route('/announcements/api/announcements/<announcement_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_announcement_detail_api(announcement_id: str):
     """通告详情 API。"""
     try:
@@ -281,7 +281,7 @@ def _aggregate_conflicts(instances: List[Announcement], exclude_ids: Optional[Li
 
 
 @announcements_api_bp.route('/announcements/api/check-conflicts', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def check_conflicts_api():
     """通告冲突检查。"""
     try:
@@ -402,7 +402,7 @@ def check_conflicts_api():
 
 
 @announcements_api_bp.route('/announcements/api/announcements', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def create_announcement_api():
     """创建通告。"""
     payload = request.get_json(silent=True) or {}
@@ -498,7 +498,7 @@ def _serialize_old_data(announcement: Announcement) -> Dict[str, Optional[str]]:
 
 
 @announcements_api_bp.route('/announcements/api/announcements/<announcement_id>', methods=['PATCH'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_announcement_api(announcement_id: str):
     """更新通告。"""
     payload = request.get_json(silent=True) or {}
@@ -599,7 +599,7 @@ def _cleanup_orphaned_references(announcement_id):
 
 
 @announcements_api_bp.route('/announcements/api/announcements/<announcement_id>', methods=['DELETE'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def delete_announcement_api(announcement_id: str):
     """删除通告。"""
     payload = request.get_json(silent=True) or {}
@@ -631,7 +631,7 @@ def delete_announcement_api(announcement_id: str):
 
 
 @announcements_api_bp.route('/announcements/api/announcements/<announcement_id>/changes', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_announcement_changes_api(announcement_id: str):
     """获取通告变更记录。"""
     try:
@@ -647,7 +647,7 @@ def get_announcement_changes_api(announcement_id: str):
 
 
 @announcements_api_bp.route('/api/announcements/options', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_announcement_filter_options():
     """获取通告筛选选项（统一接口）。
     
@@ -662,7 +662,7 @@ def get_announcement_filter_options():
 
 
 @announcements_api_bp.route('/announcements/api/areas/options', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_battle_area_options_api():
     """获取可选基地列表。"""
     try:
@@ -679,7 +679,7 @@ def get_battle_area_options_api():
 
 
 @announcements_api_bp.route('/announcements/api/areas/<x_coord>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_area_y_options_api(x_coord: str):
     """根据基地获取场地选项。"""
     try:
@@ -692,7 +692,7 @@ def get_area_y_options_api(x_coord: str):
 
 
 @announcements_api_bp.route('/announcements/api/areas/<x_coord>/<y_coord>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_area_z_options_api(x_coord: str, y_coord: str):
     """根据基地与场地获取坐席选项。"""
     try:
@@ -705,7 +705,7 @@ def get_area_z_options_api(x_coord: str, y_coord: str):
 
 
 @announcements_api_bp.route('/announcements/api/pilot-filters', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_pilot_filter_options_api():
     """获取主播筛选器选项。"""
     try:
@@ -749,7 +749,7 @@ def _apply_rank_filter(query, rank_value: str):
 
 
 @announcements_api_bp.route('/announcements/api/pilots-filtered', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_filtered_pilots_api():
     """根据条件筛选主播列表。"""
     try:
@@ -796,7 +796,7 @@ def get_filtered_pilots_api():
 
 
 @announcements_api_bp.route('/announcements/api/pilots/by-owner/<owner_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_pilots_by_owner_api(owner_id: str):
     """根据直属运营获取主播列表。"""
     try:
@@ -823,7 +823,7 @@ def get_pilots_by_owner_api(owner_id: str):
 
 
 @announcements_api_bp.route('/announcements/api/cleanup/fallen-pilots', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_cleanup_list_api():
     """获取有未来通告的流失主播列表 API。"""
     try:
@@ -859,7 +859,7 @@ def get_cleanup_list_api():
 
 
 @announcements_api_bp.route('/announcements/api/cleanup/by-pilot/<pilot_id>', methods=['DELETE'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def cleanup_delete_future_api(pilot_id: str):
     """删除指定主播从明天开始的所有通告 API。"""
     try:
@@ -991,7 +991,7 @@ def _generate_export_table_data(pilot, year, month):
 
 
 @announcements_api_bp.route('/announcements/api/export/pilots', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_export_pilot_options_api():
     """获取导出功能所需的主播选项 API。"""
     try:
@@ -1003,7 +1003,7 @@ def get_export_pilot_options_api():
 
 
 @announcements_api_bp.route('/announcements/api/export', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def export_announcements_api():
     """导出指定月份的通告为 CSV 文件。"""
     try:
@@ -1070,7 +1070,7 @@ def export_announcements_api():
 
 
 @announcements_api_bp.route('/announcements/api/export-data', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_export_data_api():
     """为打印视图提供通告导出数据。"""
     try:

@@ -171,7 +171,7 @@ def try_enum(enum_class, value, default=None):
 
 
 @recruits_api_bp.route('/api/recruits', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruits():
     """获取招募列表"""
     try:
@@ -286,7 +286,7 @@ def get_recruits():
 
 
 @recruits_api_bp.route('/api/recruits/grouped', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruits_grouped():
     """获取分组的招募列表（用于首页展示）"""
     try:
@@ -321,7 +321,7 @@ def get_recruits_grouped():
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruit_detail(recruit_id):
     """获取招募详情"""
     try:
@@ -352,7 +352,7 @@ def get_recruit_detail(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/changes', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruit_changes(recruit_id):
     """获取招募变更记录"""
     try:
@@ -384,7 +384,7 @@ def get_recruit_changes(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/options', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruit_options():
     """获取招募筛选器枚举选项和当前筛选器状态"""
     try:
@@ -452,7 +452,7 @@ def get_recruit_options():
 
 
 @recruits_api_bp.route('/api/recruits/filter-options', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruit_filter_options():
     """获取招募筛选选项（统一接口）。
 
@@ -474,7 +474,7 @@ def get_recruit_filter_options():
 
 
 @recruits_api_bp.route('/api/recruits/export', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def export_recruits():
     """导出招募数据"""
     logger.info('%s 请求导出招募数据', current_user.username)
@@ -572,7 +572,7 @@ def export_recruits():
 
 
 @recruits_api_bp.route('/api/recruits', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def create_recruit():
     """创建招募"""
     try:
@@ -671,7 +671,7 @@ def create_recruit():
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>', methods=['PUT'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_recruit(recruit_id):
     """更新招募（整体更新）"""
     try:
@@ -807,7 +807,7 @@ def update_recruit(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/interview-decision', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def interview_decision(recruit_id):
     """执行面试决策"""
     try:
@@ -941,7 +941,7 @@ def interview_decision(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/schedule-training', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def schedule_training(recruit_id):
     """执行预约试播"""
     try:
@@ -1052,7 +1052,7 @@ def schedule_training(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/training-decision', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def training_decision(recruit_id):
     """执行试播决策"""
     try:
@@ -1175,7 +1175,7 @@ def training_decision(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/schedule-broadcast', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def schedule_broadcast(recruit_id):
     """执行预约开播"""
     try:
@@ -1257,7 +1257,7 @@ def schedule_broadcast(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/<recruit_id>/broadcast-decision', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def broadcast_decision(recruit_id):
     """执行开播决策"""
     try:
@@ -1397,7 +1397,7 @@ def broadcast_decision(recruit_id):
 
 
 @recruits_api_bp.route('/api/recruits/check-pilot/<pilot_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def check_pilot_recruit_history(pilot_id):
     """检测指定主播的招募记录，返回最近创建的一条记录"""
     try:
@@ -1439,7 +1439,7 @@ def check_pilot_recruit_history(pilot_id):
 
 
 @recruits_api_bp.route('/api/recruits/operations', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruit_operations():
     """获取最近的招募操作记录"""
     try:
@@ -1467,7 +1467,7 @@ def get_recruit_operations():
 
 
 @recruits_api_bp.route('/api/recruits/operations/stream', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def stream_recruit_operations_sse():
     """实时推送招募操作记录（SSE）。"""
 

@@ -35,7 +35,7 @@ def _parse_mode_param() -> str:
 
 
 @new_report_bp.route('/daily')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def daily_report():
     """开播新日报页面。"""
     date_str = request.args.get('date')
@@ -65,7 +65,7 @@ def daily_report():
 
 
 @new_report_bp.route('/daily/export.csv')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def export_daily_csv():
     """导出开播新日报 CSV。"""
     date_str = request.args.get('date')

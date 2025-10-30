@@ -91,6 +91,13 @@ function renderEditForm(user) {
       <label>邮箱（可选）</label>
       <input class="input" type="email" name="email" id="email" value="${user.email || ''}" placeholder="name@example.com" />
 
+      <label>角色</label>
+      <select class="input" name="role" id="role">
+        <option value="gicho" ${user.roles && user.roles.includes('gicho') ? 'selected' : ''}>管理员</option>
+        <option value="kancho" ${user.roles && user.roles.includes('kancho') ? 'selected' : ''}>运营</option>
+        <option value="gunsou" ${user.roles && user.roles.includes('gunsou') ? 'selected' : ''}>助理运营</option>
+      </select>
+
       <div class="form-actions">
         <button class="btn btn-primary" type="submit" id="submitBtn">保存</button>
         <a class="btn btn-secondary" href="/admin/users/${user.id}">取消</a>
@@ -123,14 +130,16 @@ function bindFormSubmit(userId) {
       // 收集表单数据
       const nicknameEl = document.getElementById('nickname');
       const emailEl = document.getElementById('email');
-      
-      if (!nicknameEl || !emailEl) {
+      const roleEl = document.getElementById('role');
+
+      if (!nicknameEl || !emailEl || !roleEl) {
         throw new Error('找不到表单字段');
       }
-      
+
       const formData = {
         nickname: nicknameEl.value.trim(),
-        email: emailEl.value.trim()
+        email: emailEl.value.trim(),
+        roles: [roleEl.value.trim()]
       };
       
       // 更新用户信息

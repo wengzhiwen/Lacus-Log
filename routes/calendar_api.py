@@ -15,7 +15,7 @@ calendar_api_bp = Blueprint('calendar_api', __name__)
 
 
 @calendar_api_bp.route('/month-data')
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def month_data():
     """获取月视图数据。"""
     try:
@@ -29,7 +29,7 @@ def month_data():
 
 
 @calendar_api_bp.route('/week-data')
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def week_data():
     """获取周视图数据。"""
     try:
@@ -43,7 +43,7 @@ def week_data():
 
 
 @calendar_api_bp.route('/day-data')
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def day_data():
     """获取日视图数据。"""
     try:

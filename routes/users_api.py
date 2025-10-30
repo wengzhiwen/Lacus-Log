@@ -117,7 +117,7 @@ def create_user():
 
         # 验证角色
         # 验证角色是否有效
-        valid_roles = ['gicho', 'kancho']
+        valid_roles = ['gicho', 'kancho', 'gunsou']
         if role not in valid_roles:
             return jsonify(create_error_response('INVALID_ROLE', f'无效的角色: {role}，有效角色为: {", ".join(valid_roles)}')), 400
 
@@ -299,7 +299,7 @@ def reset_user_password(user_id: str):
 
 
 @users_api_bp.route('/api/users/operators', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_operators():
     """获取运营和管理员列表（用于下拉选择等）
     

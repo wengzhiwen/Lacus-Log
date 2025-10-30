@@ -146,14 +146,14 @@ def _get_recruiter_choices():
 
 
 @recruit_bp.route('/')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def list_recruits():
     """招募列表页面"""
     return render_template('recruits/list.html')
 
 
 @recruit_bp.route('/start/<pilot_id>')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def start_recruit_page(pilot_id):
     """启动招募页面"""
     try:
@@ -170,7 +170,7 @@ def start_recruit_page(pilot_id):
 
 
 @recruit_bp.route('/<recruit_id>')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def detail_recruit(recruit_id):
     """招募详情页面"""
     # The page is now rendered dynamically via API.
@@ -179,7 +179,7 @@ def detail_recruit(recruit_id):
 
 
 @recruit_bp.route('/<recruit_id>/edit')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def edit_recruit_page(recruit_id):
     """编辑招募页面"""
     try:
@@ -193,7 +193,7 @@ def edit_recruit_page(recruit_id):
 
 
 @recruit_bp.route('/<recruit_id>/interview')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def interview_recruit_page(recruit_id):
     """面试决策页面"""
     try:
@@ -211,7 +211,7 @@ def interview_recruit_page(recruit_id):
 
 
 @recruit_bp.route('/<recruit_id>/schedule-training')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def schedule_training_page(recruit_id):
     """预约试播页面"""
     try:
@@ -227,7 +227,7 @@ def schedule_training_page(recruit_id):
 
 
 @recruit_bp.route('/<recruit_id>/training-decision')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def training_decision_page(recruit_id):
     """试播决策页面"""
     try:
@@ -245,7 +245,7 @@ def training_decision_page(recruit_id):
 
 
 @recruit_bp.route('/<recruit_id>/schedule-broadcast')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def schedule_broadcast_page(recruit_id):
     """预约开播页面"""
     try:
@@ -263,7 +263,7 @@ def schedule_broadcast_page(recruit_id):
 
 
 @recruit_bp.route('/<recruit_id>/broadcast-decision')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def broadcast_decision_page(recruit_id):
     """开播决策页面"""
     try:
@@ -281,7 +281,7 @@ def broadcast_decision_page(recruit_id):
 
 
 @recruit_bp.route('/<recruit_id>/changes')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def recruit_changes(recruit_id):
     """招募变更记录页面"""
     try:
@@ -296,7 +296,7 @@ def recruit_changes(recruit_id):
 
 # 兼容性路由 - 重定向到新的REST API
 @recruit_bp.route('/export')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def export_recruits():
     """导出招募数据 - 重定向到REST API"""
     return redirect(url_for('recruits_api.export_recruits'))
@@ -304,7 +304,7 @@ def export_recruits():
 
 # 兼容性路由 - 重定向到新的REST API
 @recruit_bp.route('/options')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def recruit_options():
     """获取招募选项 - 重定向到REST API"""
     return redirect(url_for('recruits_api.get_recruit_options'))

@@ -7,13 +7,9 @@ from flask import Blueprint, jsonify, request
 from routes.report import get_local_date_from_string
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.recruit_report_serializers import (METRIC_LABELS, RANGE_LABELS,
-                                              build_daily_detail_payload,
-                                              build_daily_summary_payload)
-from utils.recruit_serializers import (create_error_response,
-                                       create_success_response)
-from utils.recruit_stats import (calculate_recruit_daily_stats,
-                                 get_recruit_records_for_detail)
+from utils.recruit_report_serializers import (METRIC_LABELS, RANGE_LABELS, build_daily_detail_payload, build_daily_summary_payload)
+from utils.recruit_serializers import (create_error_response, create_success_response)
+from utils.recruit_stats import (calculate_recruit_daily_stats, get_recruit_records_for_detail)
 from utils.timezone_helper import get_current_utc_time, utc_to_local
 
 logger = get_logger('recruit_reports_api')
@@ -22,7 +18,7 @@ recruit_reports_api_bp = Blueprint('recruit_reports_api', __name__)
 
 
 @recruit_reports_api_bp.route('/api/recruit-reports/daily', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_recruit_daily_report():
     """返回招募日报汇总或详情数据。"""
     date_str = request.args.get('date')

@@ -50,10 +50,10 @@ def ensure_database_indexes() -> None:
 def ensure_initial_roles_and_admin(user_datastore) -> None:
     """确保系统初始角色与默认议长存在。
 
-    - 角色：gicho（议长）、kancho（舰长）
+    - 角色：gicho（议长）、kancho（舰长）、gunsou（助理运营）
     - 默认议长：用户名 zala / 密码 plant4ever
     """
-    for role_name, desc in [('gicho', '议长'), ('kancho', '舰长')]:
+    for role_name, desc in [('gicho', '议长'), ('kancho', '舰长'), ('gunsou', '助理运营')]:
         try:
             if not Role.objects(name=role_name).first():
                 user_datastore.create_role(name=role_name, description=desc)

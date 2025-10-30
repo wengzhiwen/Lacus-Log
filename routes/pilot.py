@@ -17,28 +17,28 @@ pilot_bp = Blueprint('pilot', __name__)
 
 
 @pilot_bp.route('/')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def list_pilots():
     """主播列表页面 - REST化版本"""
     return render_template('pilots/list.html')
 
 
 @pilot_bp.route('/<pilot_id>')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_detail(pilot_id):  # pylint: disable=unused-argument
     """主播详情页面 - REST化版本"""
     return render_template('pilots/detail.html')
 
 
 @pilot_bp.route('/new', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def new_pilot():
     """新建主播页面 - REST化版本"""
     return render_template('pilots/new.html')
 
 
 @pilot_bp.route('/<pilot_id>/edit', methods=['GET'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def edit_pilot(pilot_id):  # pylint: disable=unused-argument
     """编辑主播页面 - REST化版本"""
     return render_template('pilots/edit.html')
@@ -48,7 +48,7 @@ def edit_pilot(pilot_id):  # pylint: disable=unused-argument
 
 
 @pilot_bp.route('/<pilot_id>/changes')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_changes(pilot_id):
     """主播变更记录页面"""
     try:
@@ -64,7 +64,7 @@ def pilot_changes(pilot_id):
 
 
 @pilot_bp.route('/<pilot_id>/commission/')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_commission_index(pilot_id):
     """主播分成管理首页"""
     try:
@@ -80,7 +80,7 @@ def pilot_commission_index(pilot_id):
 
 
 @pilot_bp.route('/<pilot_id>/commission/new', methods=['GET', 'POST'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_commission_new(pilot_id):
     """新建主播分成"""
     try:
@@ -93,7 +93,7 @@ def pilot_commission_new(pilot_id):
 
 
 @pilot_bp.route('/<pilot_id>/commission/<commission_id>/edit', methods=['GET', 'POST'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_commission_edit(pilot_id, commission_id):
     """编辑主播分成记录"""
     try:
@@ -108,7 +108,7 @@ def pilot_commission_edit(pilot_id, commission_id):
 
 
 @pilot_bp.route('/<pilot_id>/performance')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_performance(pilot_id):
     """主播绩效页面 - 完全REST化版本
     
@@ -127,7 +127,7 @@ def pilot_performance(pilot_id):
 
 
 @pilot_bp.route('/export')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_export():
     """兼容旧模板的导出入口：重定向到 REST 导出接口，保留查询串。"""
     query = request.query_string.decode() if request.query_string else ''
@@ -141,7 +141,7 @@ def pilot_export():
 
 
 @pilot_bp.route('/<pilot_id>/settlement/')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_settlement_index(pilot_id):
     """主播结算管理首页"""
     try:
@@ -163,7 +163,7 @@ def pilot_settlement_index(pilot_id):
 
 
 @pilot_bp.route('/<pilot_id>/settlement/new', methods=['GET', 'POST'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_settlement_new(pilot_id):
     """新增结算方式"""
     try:
@@ -176,7 +176,7 @@ def pilot_settlement_new(pilot_id):
 
 
 @pilot_bp.route('/<pilot_id>/settlement/<record_id>/edit', methods=['GET', 'POST'])
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_settlement_edit(pilot_id, record_id):
     """编辑结算方式记录"""
     try:

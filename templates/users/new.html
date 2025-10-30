@@ -13,6 +13,12 @@
     <label>邮箱（可选）</label>
     <input class="input" type="email" name="email" id="email" placeholder="name@example.com" />
 
+    <label>角色</label>
+    <select class="input" name="role" id="role" required>
+      <option value="kancho">运营</option>
+      <option value="gunsou">助理运营</option>
+    </select>
+
     <label>密码</label>
     <input class="input" type="password" name="password" id="password" required />
 
@@ -83,16 +89,18 @@ document.addEventListener('DOMContentLoaded', function() {
       const usernameEl = document.getElementById('username');
       const nicknameEl = document.getElementById('nickname');
       const emailEl = document.getElementById('email');
+      const roleEl = document.getElementById('role');
       const passwordEl = document.getElementById('password');
-      
-      if (!usernameEl || !nicknameEl || !emailEl || !passwordEl) {
+
+      if (!usernameEl || !nicknameEl || !emailEl || !roleEl || !passwordEl) {
         throw new Error('找不到表单字段');
       }
-      
+
       const formData = {
         username: usernameEl.value.trim(),
         nickname: nicknameEl.value.trim(),
         email: emailEl.value.trim(),
+        role: roleEl.value.trim(),
         password: passwordEl.value.trim()
       };
       

@@ -35,7 +35,7 @@ def _get_client_ip() -> str:
 
 
 @settlements_api_bp.route('/api/settlements/<pilot_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_settlements(pilot_id):
     """获取主播的结算方式记录列表及当前生效信息"""
     try:
@@ -78,7 +78,7 @@ def list_settlements(pilot_id):
 
 
 @settlements_api_bp.route('/api/settlements/<pilot_id>', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def create_settlement(pilot_id):
     """创建新的结算方式记录"""
     try:
@@ -144,7 +144,7 @@ def create_settlement(pilot_id):
 
 
 @settlements_api_bp.route('/api/settlements/<record_id>', methods=['PUT'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_settlement(record_id):
     """更新结算方式记录"""
     try:
@@ -203,7 +203,7 @@ def update_settlement(record_id):
 
 
 @settlements_api_bp.route('/api/settlements/<record_id>', methods=['DELETE'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def deactivate_settlement(record_id):
     """软删除结算方式记录"""
     try:
@@ -233,7 +233,7 @@ def deactivate_settlement(record_id):
 
 
 @settlements_api_bp.route('/api/settlements/<pilot_id>/effective', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_effective_settlement(pilot_id):
     """查询指定日期主播的生效结算方式"""
     try:
@@ -286,7 +286,7 @@ def get_effective_settlement(pilot_id):
 
 
 @settlements_api_bp.route('/api/settlements/<record_id>/changes', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_settlement_changes(record_id):
     """获取单条结算方式记录的变更日志"""
     try:

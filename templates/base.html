@@ -116,20 +116,24 @@
       {% if current_user.has_role('gicho') %}
       <a class="navlink" href="{{ url_for('battle_area.list_areas') }}">✈️基础-开播地点管理</a>
       {% endif %}
-      {% if current_user.has_role('gicho') or current_user.has_role('kancho') %}
+      {% if current_user.has_role('gicho') or current_user.has_role('kancho') or current_user.has_role('gunsou') %}
       <a class="navlink" href="{{ url_for('pilot.list_pilots') }}">🎤主播-主播管理</a>
       <a class="navlink" href="{{ url_for('recruit.list_recruits') }}">🎤主播-主播招募</a>
       <a class="navlink" href="{{ url_for('report.recruit_daily_report') }}">🎤主播-招募日报</a>
+      {% if current_user.has_role('gicho') or current_user.has_role('kancho') %}
       <a class="navlink" href="{{ url_for('recruit_monthly_reports.monthly_report_page') }}">🎤主播-招募月报</a>
+      {% endif %}
       <a class="navlink" href="{{ url_for('announcement.list_announcements') }}">📅通告-通告管理</a>
       <a class="navlink" href="{{ url_for('calendar.index') }}">📅通告-通告日历</a>
       <a class="navlink" href="{{ url_for('announcement.export_page') }}">📅通告-通告导出</a>
       <a class="navlink" href="{{ url_for('battle_record.list_battle_records') }}">📒开播-开播记录</a>
       <a class="navlink" href="{{ url_for('new_report.daily_report') }}">📒开播-日报</a>
+      {% if current_user.has_role('gicho') or current_user.has_role('kancho') %}
       <a class="navlink" href="{{ url_for('new_report.weekly_report') }}">📒开播-周报</a>
       <a class="navlink" href="{{ url_for('new_report_fast.monthly_report_fast') }}">📒开播-月报（加速版）</a>
       <a class="navlink" href="{{ url_for('report.base_salary_applications_list') }}">💰财务-底薪管理</a>
       <a class="navlink" href="{{ url_for('base_salary_monthly.base_salary_monthly_report') }}">💰财务-底薪月报</a>
+      {% endif %}
       {% if current_user.has_role('gicho') %}
       <a class="navlink" href="{{ url_for('report_mail.mail_reports_page') }}">📧系统-邮件报告触发</a>
       {% endif %}

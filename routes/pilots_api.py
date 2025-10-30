@@ -104,7 +104,7 @@ def try_enum(enum_class, value, default=None):
 
 
 @pilots_api_bp.route('/api/pilots', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_pilots():
     """获取主播列表"""
     try:
@@ -267,7 +267,7 @@ def get_pilots():
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_pilot_detail(pilot_id):
     """获取主播详情（不包含分成分数据，分成分数据通过独立的commission API获取）"""
     try:
@@ -303,7 +303,7 @@ def get_pilot_detail(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def create_pilot():
     """创建主播"""
     try:
@@ -384,7 +384,7 @@ def create_pilot():
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>', methods=['PUT'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_pilot(pilot_id):
     """更新主播（整体更新）"""
     try:
@@ -468,7 +468,7 @@ def update_pilot(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>/status', methods=['PATCH'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_pilot_status(pilot_id):
     """调整主播状态"""
     try:
@@ -516,7 +516,7 @@ def update_pilot_status(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>/changes', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_pilot_changes(pilot_id):
     """获取主播变更记录"""
     try:
@@ -569,7 +569,7 @@ def _persist_filters_from_request():
 
 
 @pilots_api_bp.route('/api/pilots/options', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_pilot_options():
     """获取主播筛选器枚举选项
 
@@ -615,7 +615,7 @@ def get_pilot_options():
 
 
 @pilots_api_bp.route('/api/pilots/<pilot_id>/performance', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_pilot_performance(pilot_id):
     """获取主播业绩数据"""
     try:
@@ -722,7 +722,7 @@ def get_pilot_performance(pilot_id):
 
 
 @pilots_api_bp.route('/api/pilots/export', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def export_pilots():
     """导出主播数据"""
     jwt_user = get_jwt_user()

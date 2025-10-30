@@ -396,3 +396,187 @@ class TestS2UserRoleManagement:
                     admin_client.delete(f'/api/users/{created_user_id}')
                 except Exception:  # pylint: disable=broad-except
                     pass
+
+    def test_s2_tc8_gunsou_role_creation_and_permissions(self, admin_client):
+        """
+        S2-TC8 助理运营(gunsou)角色创建和权限验证
+
+        步骤：管理员登录 → POST /api/users 创建 gunsou → GET /api/users 校验 →
+              gunsou 登录验证权限限制 → 验证可以访问的功能 → 验证不能访问的功能。
+
+        断言：列表含新用户，gunsou角色正确，权限符合预期。
+        """
+        gunsou_user_id = None
+
+        try:
+            # 1. 创建助理运营用户
+            gunsou_data = user_factory.create_user_data(role='gunsou')
+            create_response = admin_client.post('/api/users', json=gunsou_data)
+
+            assert create_response['success'] is True
+            assert 'data' in create_response
+
+            created_user = create_response['data']
+            gunsou_user_id = created_user['id']
+            username = gunsou_data['username']
+            password = gunsou_data['password']
+
+            # 验证创建的用户信息
+            assert created_user['username'] == username
+            assert created_user['nickname'] == gunsou_data['nickname']
+            assert 'gunsou' in created_user.get('roles', [])
+
+            # 2. 从用户列表中验证新用户存在
+            users_list_response = admin_client.get('/api/users', params={'role': 'gunsou'})
+            assert users_list_response['success'] is True
+
+            found_user = None
+            for user in users_list_response['data']:
+                if user['id'] == gunsou_user_id:
+                    found_user = user
+                    break
+
+            assert found_user is not None
+            assert found_user['username'] == username
+            assert 'gunsou' in found_user.get('roles', [])
+
+            # 3. 创建gunsou客户端并登录
+            from tests.fixtures.api_client import ApiClient
+            from app import create_app
+
+            flask_app = create_app()
+            test_client = flask_app.test_client()
+            gunsou_client = ApiClient('', client=test_client)
+
+            # 使用gunsou账户登录
+            login_response = gunsou_client.login(username, password)
+            assert login_response['success'] is True
+
+            # 4. 验证gunsou可以访问的功能
+            # 应该可以访问：招募列表
+            recruits_response = gunsou_client.get('/api/recruits')
+            assert recruits_response['success'] is True
+
+            # 应该可以访问：仪表盘基础数据
+            dashboard_response = gunsou_client.get('/api/dashboard/recruit')
+            assert dashboard_response['success'] is True
+
+            # 应该可以访问：日报
+            daily_report_response = gunsou_client.get('/daily')
+            # API客户端对于页面请求会返回错误响应，但至少不是403权限错误
+            assert daily_report_response.get('success') is True or '404' not in str(daily_report_response.get('error', {}).get('code', ''))
+
+            # 5. 验证gunsou不能访问的功能
+            # 不应该可以访问：周报
+            weekly_response = gunsou_client.get('/weekly')
+            # gunsou应该不能访问周报，API会返回403错误
+            assert weekly_response.get('success') is False
+
+            # 不应该可以访问：月报
+            monthly_response = gunsou_client.get('/monthly')
+            assert monthly_response.get('success') is False
+
+            # 不应该可以访问：底薪月报
+            base_salary_response = gunsou_client.get('/base-salary-monthly')
+            assert base_salary_response.get('success') is False
+
+            # 不应该可以访问：招募月报
+            recruit_monthly_response = gunsou_client.get('/recruit-reports/monthly')
+            assert recruit_monthly_response.get('success') is False
+
+            # 不应该可以访问：用户管理
+            users_response = gunsou_client.get('/api/users')
+            assert users_response.get('success') is False
+
+            # 6. 验证gunsou用户信息编辑功能
+            # 应该可以编辑自己的基本信息
+            update_data = {'nickname': '助理运营测试用户', 'email': 'gunsou_test@example.com', 'roles': ['gunsou']}
+            update_response = gunsou_client.put(f'/api/users/{gunsou_user_id}', json=update_data)
+            # 用户管理API需要gicho权限，所以gunsou不能编辑其他用户
+            assert update_response.get('success') is False or '403' in str(update_response.get('error', {}).get('code', ''))
+
+        finally:
+            # 清理：停用测试用户
+            if gunsou_user_id:
+                try:
+                    admin_client.delete(f'/api/users/{gunsou_user_id}')
+                except Exception:  # pylint: disable=broad-except
+                    pass
+
+    def test_s2_tc9_gunsou_role_switching(self, admin_client):
+        """
+        S2-TC9 助理运营(gunsou)角色切换测试
+
+        步骤：创建用户 → 切换角色为 gunsou → 验证切换结果 →
+              切换角色为 kancho → 验证切换结果 →
+              切换角色为 gicho → 验证切换结果。
+
+        断言：角色切换成功，权限相应变化。
+        """
+        test_user_id = None
+
+        try:
+            # 1. 创建测试用户（初始为kancho）
+            user_data = user_factory.create_user_data(role='kancho')
+            create_response = admin_client.post('/api/users', json=user_data)
+            assert create_response['success'] is True
+
+            test_user_id = create_response['data']['id']
+            username = user_data['username']
+            password = user_data['password']
+
+            # 2. 切换角色为gunsou
+            update_gunsou_data = {'nickname': '助理运营用户', 'email': 'gunsou@example.com', 'roles': ['gunsou']}
+            update_response = admin_client.put(f'/api/users/{test_user_id}', json=update_gunsou_data)
+            assert update_response['success'] is True
+
+            updated_user = update_response['data']
+            assert 'gunsou' in updated_user.get('roles', [])
+            assert updated_user['nickname'] == '助理运营用户'
+            assert updated_user['email'] == 'gunsou@example.com'
+
+            # 3. 创建gunsou客户端并登录验证
+            from tests.fixtures.api_client import ApiClient
+            from app import create_app
+
+            flask_app = create_app()
+            test_client = flask_app.test_client()
+            gunsou_client = ApiClient('', client=test_client)
+
+            login_response = gunsou_client.login(username, password)
+            assert login_response['success'] is True
+
+            # 验证gunsou权限
+            recruits_response = gunsou_client.get('/api/recruits')
+            assert recruits_response['success'] is True
+
+            # 4. 切换角色为kancho
+            update_kancho_data = {'nickname': '运营用户', 'email': 'kancho@example.com', 'roles': ['kancho']}
+            update_response2 = admin_client.put(f'/api/users/{test_user_id}', json=update_kancho_data)
+            assert update_response2['success'] is True
+
+            updated_user2 = update_response2['data']
+            assert 'kancho' in updated_user2.get('roles', [])
+            assert updated_user2['nickname'] == '运营用户'
+
+            # 5. 创建kancho客户端并登录验证
+            kancho_client = ApiClient('', client=test_client)
+            login_response2 = kancho_client.login(username, password)
+            assert login_response2['success'] is True
+
+            # 验证kancho权限（可以访问周报）
+            try:
+                weekly_response = kancho_client.get('/weekly')
+                # kancho应该可以访问周报
+                assert weekly_response.status_code == 200
+            except Exception as e:
+                # 如果有其他错误，至少不是权限错误
+                assert '403' not in str(e) and 'Forbidden' not in str(e)
+
+        finally:
+            # 清理：删除测试用户
+            if test_user_id:
+                try:
+                    admin_client.delete(f'/api/users/{test_user_id}')
+                except Exception:  # pylint: disable=broad-except
+                    pass

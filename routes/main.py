@@ -34,7 +34,7 @@ def home():
 
 
 @main_bp.route('/api/dashboard/recruit', methods=['GET'])
-@jwt_roles_accepted("gicho", "kancho")
+@jwt_roles_accepted("gicho", "kancho", "gunsou")
 def dashboard_recruit_data():
     """仪表盘招募统计接口。"""
     data = calculate_dashboard_recruit_metrics()
@@ -43,7 +43,7 @@ def dashboard_recruit_data():
 
 
 @main_bp.route('/api/dashboard/announcements', methods=['GET'])
-@jwt_roles_accepted("gicho", "kancho")
+@jwt_roles_accepted("gicho", "kancho", "gunsou")
 def dashboard_announcement_data():
     """仪表盘通告统计接口。"""
     data = calculate_dashboard_announcement_metrics()
@@ -52,7 +52,7 @@ def dashboard_announcement_data():
 
 
 @main_bp.route('/api/dashboard/battle-records', methods=['GET'])
-@jwt_roles_accepted("gicho", "kancho")
+@jwt_roles_accepted("gicho", "kancho", "gunsou")
 def dashboard_battle_data():
     """仪表盘开播记录统计接口。"""
     data = calculate_dashboard_battle_metrics()
@@ -118,7 +118,7 @@ def _build_last_activity_meta(post: BBSPost) -> Dict[str, Optional[str]]:
 
 
 @main_bp.route('/api/dashboard/bbs-latest', methods=['GET'])
-@jwt_roles_accepted("gicho", "kancho")
+@jwt_roles_accepted("gicho", "kancho", "gunsou")
 def dashboard_bbs_latest_data():
     """仪表盘内部BBS最新主贴。"""
     query = (BBSPost.objects.only('title', 'board', 'status', 'author', 'author_snapshot', 'created_at',
@@ -154,7 +154,7 @@ def dashboard_conversion_rate_data():
 
 
 @main_bp.route('/api/dashboard/pilot-ranking', methods=['GET'])
-@jwt_roles_accepted("gicho", "kancho")
+@jwt_roles_accepted("gicho", "kancho", "gunsou")
 def dashboard_pilot_ranking_data():
     """仪表盘昨日主播排名统计接口。"""
     data = calculate_dashboard_pilot_ranking_metrics()

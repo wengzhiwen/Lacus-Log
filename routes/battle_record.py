@@ -102,7 +102,7 @@ def get_time_rounded_to_half_hour(dt, backward=True):  # pylint: disable=unused-
 
 
 @battle_record_bp.route('/')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def list_battle_records():
     """开播记录列表页"""
     logger.info('用户 %s 访问开播记录列表', current_user.username)
@@ -127,7 +127,7 @@ def list_battle_records():
 
 
 @battle_record_bp.route('/new')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def new_battle_record():
     """新建作战记录页"""
     logger.info(f"用户 {current_user.username} 访问新建作战记录页")
@@ -174,7 +174,7 @@ def new_battle_record():
 
 
 @battle_record_bp.route('/<record_id>')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def detail_battle_record(record_id):
     """开播记录详情页"""
     try:
@@ -208,7 +208,7 @@ def detail_battle_record(record_id):
 
 
 @battle_record_bp.route('/<record_id>/edit')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def edit_battle_record(record_id):
     """编辑开播记录页"""
     try:
@@ -234,7 +234,7 @@ def edit_battle_record(record_id):
 
 
 @battle_record_bp.route('/<record_id>/base_salary_application')
-@roles_accepted('gicho', 'kancho')
+@roles_accepted('gicho', 'kancho', 'gunsou')
 def base_salary_application(record_id):
     """申请底薪页面"""
     try:

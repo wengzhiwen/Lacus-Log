@@ -8,8 +8,8 @@ from flask import Blueprint, jsonify, request
 from utils.cache_helper import clear_daily_report_cache
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
-from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, get_default_week_start_for_now_prev_week, get_local_date_from_string, get_local_date_from_string_safe,
-                                           get_local_month_from_string, get_week_start_tuesday)
+from utils.new_report_calculations import (calculate_daily_details, calculate_daily_summary, get_default_week_start_for_now_prev_week,
+                                           get_local_date_from_string, get_local_date_from_string_safe, get_local_month_from_string, get_week_start_tuesday)
 from utils.new_report_fast_weekly_calculations import (calculate_weekly_details_fast, calculate_weekly_summary_fast)
 from utils.new_report_serializers import (create_error_response, create_success_response, serialize_daily_details, serialize_daily_summary,
                                           serialize_weekly_details, serialize_weekly_summary)
@@ -36,7 +36,7 @@ def _parse_mode_param() -> str:
 
 
 @new_reports_api_bp.route('/daily', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def daily_report_data():
     """返回开播新日报数据。"""
     date_str = request.args.get('date')
@@ -83,7 +83,7 @@ def daily_report_data():
 
 
 @new_reports_api_bp.route('/daily/cache/refresh', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def refresh_daily_report_cache():
     """刷新开播新日报缓存。"""
     logger.info('收到开播新日报缓存刷新请求')
@@ -97,7 +97,7 @@ def refresh_daily_report_cache():
 
 
 @new_reports_api_bp.route('/weekly', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def weekly_report_data():
     """返回开播新周报数据（周二-次周一）。"""
     week_start_str = request.args.get('week_start')

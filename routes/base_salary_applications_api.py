@@ -147,7 +147,7 @@ def get_base_salary_applications_stats():
 
 
 @base_salary_applications_api_bp.route('/api/base-salary-applications', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_base_salary_applications():
     """获取底薪申请列表（按日期筛选，按结算方式分组）"""
     try:
@@ -318,7 +318,7 @@ def create_base_salary_application():
 
 
 @base_salary_applications_api_bp.route('/api/base-salary-applications/<application_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_base_salary_application(application_id):
     """获取单个底薪申请详情"""
     try:
@@ -383,7 +383,7 @@ def update_base_salary_application_status(application_id):
 
 
 @base_salary_applications_api_bp.route('/api/base-salary-applications/<application_id>/changes', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_base_salary_application_changes(application_id):
     """获取单个底薪申请的变更日志"""
     try:

@@ -102,7 +102,7 @@ def _mark_post_as_read(post: BBSPost, user) -> None:
 
 
 @bbs_api_bp.route('/boards', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_boards():
     """获取板块列表。"""
     ensure_base_boards_from_battle_areas()
@@ -118,7 +118,7 @@ def list_boards():
 
 
 @bbs_api_bp.route('/posts', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_posts():
     """帖子列表。"""
     current_user = get_jwt_user()
@@ -189,7 +189,7 @@ def _load_post(post_id: str) -> BBSPost:
 
 
 @bbs_api_bp.route('/posts', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def create_post():
     """创建帖子。"""
     try:
@@ -253,7 +253,7 @@ def create_post():
 
 
 @bbs_api_bp.route('/posts/<post_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_post_detail(post_id: str):
     """帖子详情。"""
     try:
@@ -279,7 +279,7 @@ def get_post_detail(post_id: str):
 
 
 @bbs_api_bp.route('/posts/<post_id>', methods=['PATCH'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_post(post_id: str):
     """编辑帖子。"""
     try:
@@ -334,7 +334,7 @@ def update_post(post_id: str):
 
 
 @bbs_api_bp.route('/posts/<post_id>/hide', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def hide_post(post_id: str):
     """隐藏帖子。"""
     try:
@@ -407,7 +407,7 @@ def pin_post(post_id: str):
 
 
 @bbs_api_bp.route('/posts/<post_id>/replies', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def add_reply(post_id: str):
     """新增回复。"""
     try:
@@ -473,7 +473,7 @@ def add_reply(post_id: str):
 
 
 @bbs_api_bp.route('/replies/<reply_id>', methods=['PATCH'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_reply(reply_id: str):
     """编辑回复。"""
     try:
@@ -522,7 +522,7 @@ def update_reply(reply_id: str):
 
 
 @bbs_api_bp.route('/replies/<reply_id>/hide', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def hide_reply(reply_id: str):
     """隐藏回复。"""
     try:
@@ -580,7 +580,7 @@ def update_post_pilots(post_id: str):
 
 
 @bbs_api_bp.route('/pilots/<pilot_id>/recent', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def recent_posts_for_pilot(pilot_id: str):
     """获取主播最近活跃的帖子。"""
     current_user = get_jwt_user()

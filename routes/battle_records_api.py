@@ -374,7 +374,7 @@ def _get_client_ip() -> str:
 
 
 @battle_records_api_bp.route('/battle-records', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_records():
     """获取开播记录列表。"""
     try:
@@ -421,7 +421,7 @@ def list_records():
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def get_record(record_id: str):
     """获取指定开播记录详情。"""
     try:
@@ -436,7 +436,7 @@ def get_record(record_id: str):
 
 
 @battle_records_api_bp.route('/battle-records', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def create_record():
     """创建开播记录。"""
     # JWT认证的API不需要CSRF验证，因为JWT cookie已有CSRF保护
@@ -550,7 +550,7 @@ def create_record():
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>', methods=['PUT'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def update_record(record_id: str):
     """更新开播记录。"""
     # JWT认证的API不需要CSRF验证，因为JWT cookie已有CSRF保护
@@ -659,7 +659,7 @@ def update_record(record_id: str):
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>', methods=['DELETE'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def delete_record(record_id: str):
     """删除开播记录。"""
     # JWT认证的API不需要CSRF验证，因为JWT cookie已有CSRF保护
@@ -678,7 +678,7 @@ def delete_record(record_id: str):
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>/rant', methods=['POST'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def rant_record(record_id: str):
     """吐槽：强制创建帖子并追加回复。"""
     try:
@@ -712,7 +712,7 @@ def rant_record(record_id: str):
 
 
 @battle_records_api_bp.route('/battle-records/<record_id>/changes', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def record_changes(record_id: str):
     """获取开播记录变更日志。"""
     try:
@@ -728,7 +728,7 @@ def record_changes(record_id: str):
 
 
 @battle_records_api_bp.route('/pilot-filters', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def pilot_filters():
     """获取主播筛选器数据。"""
     try:
@@ -761,7 +761,7 @@ def pilot_filters():
 
 
 @battle_records_api_bp.route('/pilots-filtered', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def pilots_filtered():
     """按筛选条件获取主播列表。"""
     try:
@@ -836,7 +836,7 @@ def pilots_filtered():
 
 
 @battle_records_api_bp.route('/battle-areas', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def battle_areas():
     """获取开播地点三联数据。"""
     try:
@@ -863,7 +863,7 @@ def battle_areas():
 
 
 @battle_records_api_bp.route('/announcements/<announcement_id>', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def announcement_detail(announcement_id: str):
     """获取通告详情用于预填。"""
     try:
@@ -896,7 +896,7 @@ def announcement_detail(announcement_id: str):
 
 
 @battle_records_api_bp.route('/related-announcements', methods=['GET'])
-@jwt_roles_accepted('gicho', 'kancho')
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def related_announcements():
     """根据主播获取昨天/今天/明天的通告列表。"""
     try:
