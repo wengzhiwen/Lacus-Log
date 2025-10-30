@@ -20,6 +20,7 @@ from utils.base_salary_application_serializers import (create_error_response, cr
 from utils.james_alert import trigger_james_alert_for_application
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
+from utils.request_helper import get_client_ip
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('base_salary_application')
@@ -34,11 +35,6 @@ def _safe_strip(value):
         s = value.strip()
         return s if s else None
     return None
-
-
-def _get_client_ip() -> str:
-    """获取客户端IP地址"""
-    return request.headers.get('X-Forwarded-For') or request.remote_addr or '未知'
 
 
 def _get_pilot_nickname_for_sort(application: BaseSalaryApplication) -> str:
@@ -303,7 +299,7 @@ def create_base_salary_application():
             old_value='',
             new_value=BaseSalaryApplicationStatus.PENDING.value,
             change_time=get_current_utc_time(),
-            ip_address=_get_client_ip(),
+            ip_address=get_client_ip(),
         )
         change_log.save()
 
@@ -365,7 +361,7 @@ def update_base_salary_application_status(application_id):
             new_value=new_status.value,
             remark=remark,
             change_time=get_current_utc_time(),
-            ip_address=_get_client_ip(),
+            ip_address=get_client_ip(),
         )
         change_log.save()
 

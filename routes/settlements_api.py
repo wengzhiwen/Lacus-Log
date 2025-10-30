@@ -12,6 +12,7 @@ from mongoengine import DoesNotExist, ValidationError
 from models.pilot import Pilot, Settlement, SettlementChangeLog, SettlementType
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
+from utils.request_helper import get_client_ip
 from utils.settlement_serializers import (create_error_response, create_success_response, serialize_settlement, serialize_settlement_change_log_list)
 from utils.timezone_helper import (get_current_local_time, get_current_utc_time, local_to_utc, utc_to_local)
 
@@ -27,11 +28,6 @@ def _safe_strip(value):
         s = value.strip()
         return s if s else None
     return None
-
-
-def _get_client_ip() -> str:
-    """获取客户端IP地址"""
-    return request.headers.get('X-Forwarded-For') or request.remote_addr or '未知'
 
 
 @settlements_api_bp.route('/api/settlements/<pilot_id>', methods=['GET'])
@@ -124,7 +120,7 @@ def create_settlement(pilot_id):
             field_name='created',
             old_value='',
             new_value=f'{settlement_type.value}',
-            ip_address=_get_client_ip(),
+            ip_address=get_client_ip(),
         )
         change_log.save()
 
@@ -187,7 +183,7 @@ def update_settlement(record_id):
                 field_name=field_name,
                 old_value=old_value,
                 new_value=new_value,
-                ip_address=_get_client_ip(),
+                ip_address=get_client_ip(),
             ).save()
 
         logger.info('更新结算方式记录成功，record_id=%s', record_id)
@@ -219,7 +215,7 @@ def deactivate_settlement(record_id):
                 field_name='is_active',
                 old_value='true',
                 new_value='false',
-                ip_address=_get_client_ip(),
+                ip_address=get_client_ip(),
             ).save()
 
             logger.info('软删除结算方式记录成功，record_id=%s', record_id)

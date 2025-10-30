@@ -10,6 +10,7 @@ from mongoengine import DoesNotExist
 
 from models.user import User
 from utils.logging_setup import get_logger
+from utils.request_helper import get_client_ip
 
 logger = get_logger('auth_api')
 auth_api_bp = Blueprint('auth_api', __name__)
@@ -63,15 +64,15 @@ def login():
     try:
         user = User.objects.get(username=username)  # pylint: disable=no-member
     except DoesNotExist:
-        logger.warning('登录失败：用户不存在，username=%s，IP=%s', username, request.remote_addr)
+        logger.warning('登录失败：用户不存在，username=%s，IP=%s', username, get_client_ip())
         return jsonify(create_error_response('INVALID_CREDENTIALS', '用户名或密码错误')), 401
 
     if not user.active:
-        logger.warning('登录失败：账户已停用，username=%s，IP=%s', username, request.remote_addr)
+        logger.warning('登录失败：账户已停用，username=%s，IP=%s', username, get_client_ip())
         return jsonify(create_error_response('ACCOUNT_DISABLED', '账户已停用')), 403
 
     if not user.verify_and_update_password(password):
-        logger.warning('登录失败：密码错误，username=%s，IP=%s', username, request.remote_addr)
+        logger.warning('登录失败：密码错误，username=%s，IP=%s', username, get_client_ip())
         return jsonify(create_error_response('INVALID_CREDENTIALS', '用户名或密码错误')), 401
 
     # 更新登录统计（与 Flask-Security-Too 保持一致）
@@ -79,7 +80,7 @@ def login():
     user.last_login_at = user.current_login_at
     user.current_login_at = get_current_utc_time()
     user.last_login_ip = user.current_login_ip
-    user.current_login_ip = request.remote_addr
+    user.current_login_ip = get_client_ip()
     user.login_count = (user.login_count or 0) + 1
     user.save()
 
@@ -109,7 +110,7 @@ def login():
     set_access_cookies(response, access_token)
     set_refresh_cookies(response, refresh_token)
 
-    logger.info('用户登录成功（REST API + Session）：username=%s，IP=%s', username, request.remote_addr)
+    logger.info('用户登录成功（REST API + Session）：username=%s，IP=%s', username, get_client_ip())
     return response
 
 
@@ -126,7 +127,7 @@ def logout():
     unset_jwt_cookies(response)
 
     identity = get_jwt_identity()
-    logger.info('用户登出成功（REST API）：identity=%s，IP=%s', identity, request.remote_addr)
+    logger.info('用户登出成功（REST API）：identity=%s，IP=%s', identity, get_client_ip())
     return response
 
 
@@ -141,13 +142,13 @@ def refresh():
     try:
         user = User.objects.get(fs_uniquifier=identity)  # pylint: disable=no-member
     except DoesNotExist:
-        logger.warning('Token 刷新失败：用户不存在，identity=%s，IP=%s', identity, request.remote_addr)
+        logger.warning('Token 刷新失败：用户不存在，identity=%s，IP=%s', identity, get_client_ip())
         response = make_response(jsonify(create_error_response('USER_NOT_FOUND', '用户不存在')), 404)
         unset_jwt_cookies(response)
         return response
 
     if not user.active:
-        logger.warning('Token 刷新失败：账户已停用，identity=%s，IP=%s', identity, request.remote_addr)
+        logger.warning('Token 刷新失败：账户已停用，identity=%s，IP=%s', identity, get_client_ip())
         response = make_response(jsonify(create_error_response('ACCOUNT_DISABLED', '账户已停用')), 403)
         unset_jwt_cookies(response)
         return response
@@ -160,7 +161,7 @@ def refresh():
 
     set_access_cookies(response, access_token)
 
-    logger.info('Token 刷新成功：identity=%s，IP=%s', identity, request.remote_addr)
+    logger.info('Token 刷新成功：identity=%s，IP=%s', identity, get_client_ip())
     return response
 
 
@@ -236,5 +237,5 @@ def logout_with_jwt():
     except Exception:  # pylint: disable=broad-except
         pass
 
-    logger.info('用户登出（传统页面）：IP=%s', request.remote_addr)
+    logger.info('用户登出（传统页面）：IP=%s', get_client_ip())
     return response

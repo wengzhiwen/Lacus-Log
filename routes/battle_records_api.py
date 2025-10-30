@@ -24,6 +24,7 @@ from utils.filter_state import persist_and_restore_filters
 from utils.jwt_roles import jwt_roles_accepted
 from utils.logging_setup import get_logger
 from utils.pilot_activity import sort_pilots_with_active_priority
+from utils.request_helper import get_client_ip
 from utils.timezone_helper import (get_current_utc_time, local_to_utc, utc_to_local)
 
 logger = get_logger('battle_records_api')
@@ -369,10 +370,6 @@ def _collect_change_fields(record: BattleRecord) -> Dict[str, object]:
     }
 
 
-def _get_client_ip() -> str:
-    return request.headers.get('X-Forwarded-For') or request.remote_addr or '未知'
-
-
 @battle_records_api_bp.route('/battle-records', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def list_records():
@@ -642,7 +639,7 @@ def update_record(record_id: str):
         except Exception as exc:  # pylint: disable=broad-except
             logger.error('自动创建BBS帖子失败：record=%s error=%s', record.id, exc, exc_info=True)
 
-        client_ip = _get_client_ip()
+        client_ip = get_client_ip()
         for field_name, old_value in old_values.items():
             new_value = getattr(record, field_name)
             if old_value != new_value:
