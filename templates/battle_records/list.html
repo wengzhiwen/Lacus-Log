@@ -175,20 +175,69 @@
   margin-bottom: 8px;
 }
 
-.record-time {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
+.pilot-info {
+  flex: 1;
 }
 
-.record-time .start-time {
+.pilot-name {
   font-size: 16px;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
-.record-time .duration {
+.pilot-details {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pilot-details .real-name {
+  color: var(--muted);
+}
+
+.pilot-details .rank {
+  background: var(--table-header);
+  color: var(--brand);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pilot-details .owner {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pilot-details .status {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.time-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.time-info .start-time {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.time-info .duration {
   font-size: 12px;
   color: var(--muted);
 }
@@ -201,7 +250,6 @@
   font-weight: 500;
   padding: 2px 6px;
   border-radius: 3px;
-  margin-left: 6px;
   animation: pulse 2s infinite;
 }
 
@@ -211,26 +259,26 @@
   100% { opacity: 1; }
 }
 
-.record-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  text-align: right;
-  align-items: flex-end;
+.record-body {
+  margin-bottom: 8px;
 }
 
-.pilot-name {
+.coords {
+  margin-bottom: 8px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  line-height: 1.2;
-  margin-bottom: 2px;
 }
 
-.record-info .meta-line {
-  font-size: 12px;
+.coord-label {
   color: var(--muted);
-  line-height: 1.1;
+  font-weight: 500;
+}
+
+.coords-value {
+  color: var(--text);
+  font-family: monospace;
+  background: var(--table-header);
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .record-card .card-footer {
@@ -314,8 +362,9 @@
 
 @media (max-width: 768px) {
   .filter-form { grid-template-columns: repeat(2, 1fr); }
-  .record-card .card-header { flex-direction: row; align-items: flex-start; gap: 8px; }
-  .record-info { text-align: right; align-items: flex-end; }
+  .record-card .card-header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .time-info { align-items: flex-start; }
+  .pilot-details { flex-direction: column; align-items: flex-start; gap: 4px; }
   .footbar .inner { flex-wrap: wrap; }
 }
 
@@ -420,7 +469,6 @@ function applyFilterOptions(options) {
 
 function buildRecordCard(record) {
   const genderIcon = record.pilot.gender === 0 ? '♂' : (record.pilot.gender === 1 ? '♀' : '?');
-  const agePart = record.pilot.age ? `(${record.pilot.age})` : '';
   const status = record.pilot.status || '';
   const rank = record.pilot.rank || '';
   const revenue = record.revenue_amount || '0';
@@ -428,6 +476,10 @@ function buildRecordCard(record) {
   const startDisplay = record.start_time?.display || '';
   const detailUrl = record.links?.detail || `/battle-records/${record.id}`;
   const isLive = record.status === 'live';
+  const ownerDisplay = record.owner_display && record.owner_display !== '无' ? `- ${record.owner_display}` : '';
+
+  // 构建开播地点显示
+  const coords = record.location?.display || '--';
 
   const card = document.createElement('a');
   card.className = 'record-card';
@@ -436,17 +488,27 @@ function buildRecordCard(record) {
 
   card.innerHTML = `
     <div class="card-header">
-      <div class="record-time">
+      <div class="pilot-info">
+        <div class="pilot-name">${record.pilot.nickname || ''}${genderIcon}</div>
+        <div class="pilot-details">
+          ${record.pilot.real_name ? `<span class="real-name">[${record.pilot.real_name}]</span>` : ''}
+          <span class="rank">${rank}</span>
+          ${ownerDisplay ? `<span class="owner">${ownerDisplay}</span>` : ''}
+          ${status ? `<span class="status">[${status}]</span>` : ''}
+        </div>
+      </div>
+      <div class="time-info">
         <div class="start-time">
           ${startDisplay}
           ${isLive ? '<span class="live-indicator">开播中</span>' : ''}
         </div>
         <div class="duration">${duration}</div>
       </div>
-      <div class="record-info">
-        <div class="pilot-name">${record.pilot.nickname || ''}${agePart}[${status}]${genderIcon}</div>
-        <span class="real-name" style="display:none;">${record.pilot.real_name || ''}</span>
-        <div class="meta-line">[${record.owner_display || '无'}][${rank}]</div>
+    </div>
+    <div class="record-body">
+      <div class="coords">
+        <span class="coord-label">开播地点：</span>
+        <span class="coords-value">${coords}</span>
       </div>
     </div>
     <div class="card-footer">

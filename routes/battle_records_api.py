@@ -176,6 +176,12 @@ def _serialize_battle_record_summary(record: BattleRecord, base_salary_summary: 
             'iso': start_local.isoformat() if start_local else None,
             'display': start_local.strftime('%m月%d日 %H:%M') if start_local else '',
         },
+        'location': {
+            'x': record.x_coord or '',
+            'y': record.y_coord or '',
+            'z': record.z_coord or '',
+            'display': f"{record.x_coord}-{record.y_coord}-{record.z_coord}" if (record.x_coord or record.y_coord or record.z_coord) else '--'
+        },
         'links': {
             'detail': url_for('battle_record.detail_battle_record', record_id=record.id)
         },
