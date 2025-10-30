@@ -638,6 +638,17 @@ def get_pilot_performance(pilot_id):
         else:
             gender_icon = '?'
 
+        # 获取招募负责人信息（取最后更新的招募记录）
+        recruit_manager = '--'
+        try:
+            from models.recruit import Recruit
+            recruits = Recruit.objects(pilot=pilot).order_by('-updated_at').limit(1)
+            if recruits and recruits[0].recruiter:
+                recruit_manager = recruits[0].recruiter.nickname or recruits[0].recruiter.username
+        except Exception as e:
+            logger.warning(f'获取主播{pilot.id}招募负责人失败: {e}')
+            recruit_manager = '--'
+
         pilot_info = {
             'nickname': pilot.nickname,
             'real_name': pilot.real_name,
@@ -646,7 +657,8 @@ def get_pilot_performance(pilot_id):
             'hometown': pilot.hometown,
             'owner': pilot.owner.nickname if pilot.owner else None,
             'rank': pilot.rank.value if pilot.rank else None,
-            'status': pilot.status.value if pilot.status else None
+            'status': pilot.status.value if pilot.status else None,
+            'recruit_manager': recruit_manager
         }
 
         # 序列化最近开播记录

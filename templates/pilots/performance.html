@@ -22,6 +22,7 @@
       <span class="age-gender"><span id="pilot-age">-</span>岁<span id="pilot-gender-icon">-</span></span>
       <span class="hometown" id="pilot-hometown" style="display: none;"><span id="pilot-hometown-value"></span></span>
       <span class="owner-rank">直属运营：<span id="pilot-owner">-</span> <br />
+        招募负责人：<span id="pilot-recruit-manager">-</span> <br />
         主播分类：<span id="pilot-rank">-</span> <br />
         主播状态：<span id="pilot-status">-</span></span>
     </div>
@@ -1054,30 +1055,33 @@ function updatePilotInfo(pilotInfo) {
   // 更新所有昵称显示
   const nicknameElements = document.querySelectorAll('#pilot-nickname, #pilot-nickname-link');
   nicknameElements.forEach(el => el.textContent = pilotInfo.nickname);
-  
+
   // 更新详情页链接
   const detailLink = document.getElementById('pilot-detail-link');
   detailLink.href = `/pilots/${pilotId}?from=performance`;
-  
+
   // 更新真实姓名
   if (pilotInfo.real_name) {
     document.getElementById('pilot-real-name-value').textContent = pilotInfo.real_name;
     document.getElementById('pilot-real-name').style.display = 'inline';
   }
-  
+
   // 更新年龄和性别图标
   document.getElementById('pilot-age').textContent = pilotInfo.age || '-';
   document.getElementById('pilot-gender-icon').textContent = pilotInfo.gender_icon || '?';
-  
+
   // 更新籍贯
   if (pilotInfo.hometown) {
     document.getElementById('pilot-hometown-value').textContent = pilotInfo.hometown;
     document.getElementById('pilot-hometown').style.display = 'inline';
   }
-  
+
   // 更新直属运营
   document.getElementById('pilot-owner').textContent = pilotInfo.owner || '未知';
-  
+
+  // 更新招募负责人
+  document.getElementById('pilot-recruit-manager').textContent = pilotInfo.recruit_manager || '--';
+
   // 更新主播分类和状态（应用规范化）
   document.getElementById('pilot-rank').textContent = normalizeRank(pilotInfo.rank || '-');
   document.getElementById('pilot-status').textContent = normalizeStatus(pilotInfo.status || '-');
