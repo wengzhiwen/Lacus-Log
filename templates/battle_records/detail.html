@@ -28,9 +28,10 @@
         <div class="detail-item">
           <label>主播</label>
           <div class="value">
-            {% set age_str = '(' ~ battle_record.pilot.age ~ ')' if battle_record.pilot.age else '' %}
+            {% set real_name_str = '(' ~ battle_record.pilot.real_name ~ ')' if battle_record.pilot.real_name else '' %}
+            {% set age_str = ' ' ~ battle_record.pilot.age ~ ' ' if battle_record.pilot.age else '' %}
             {% set gender_icon = '♂' if battle_record.pilot.gender.value == 0 else ('♀' if battle_record.pilot.gender.value == 1 else '?') %}
-            <span><a href="{{ url_for('pilot.pilot_detail', pilot_id=battle_record.pilot.id, from='battle_record_detail', record_id=battle_record.id) }}">{{ battle_record.pilot.nickname }}</a>{{ age_str }}[{{ battle_record.pilot.status.value }}]{{ gender_icon }}</span>
+            <span><a href="{{ url_for('pilot.pilot_detail', pilot_id=battle_record.pilot.id, from='battle_record_detail', record_id=battle_record.id) }}">{{ battle_record.pilot.nickname }}</a>{{ real_name_str }}[{{ battle_record.pilot.status.value }}]{{ age_str }}{{ gender_icon }}</span>
             <a href="{{ url_for('pilot.pilot_performance', pilot_id=battle_record.pilot.id, from='battle_record_detail', record_id=battle_record.id) }}" class="performance-link">业绩查看</a>
           </div>
         </div>
