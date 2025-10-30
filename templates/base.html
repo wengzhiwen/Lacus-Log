@@ -129,8 +129,9 @@
       <a class="navlink" href="{{ url_for('new_report.weekly_report') }}">📒开播-周报</a>
       <a class="navlink" href="{{ url_for('new_report_fast.monthly_report_fast') }}">📒开播-月报（加速版）</a>
       <a class="navlink" href="{{ url_for('report.base_salary_applications_list') }}">💰财务-底薪管理</a>
+      <a class="navlink" href="{{ url_for('base_salary_monthly.base_salary_monthly_report') }}">💰财务-底薪月报</a>
       {% if current_user.has_role('gicho') %}
-      <a class="navlink" href="{{ url_for('report_mail.mail_reports_page') }}">📧邮件报告</a>
+      <a class="navlink" href="{{ url_for('report_mail.mail_reports_page') }}">📧系统-邮件报告触发</a>
       {% endif %}
       {% endif %}
       <a class="navlink" href="{{ url_for('main.change_password') }}">🔒修改密码</a>

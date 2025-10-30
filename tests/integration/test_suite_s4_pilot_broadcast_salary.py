@@ -888,3 +888,141 @@ class TestS4PilotBroadcastSalary:
                     admin_client.put(f'/api/pilots/{pilot_id}', json={'status': '未招募'})
                 except Exception:  # pylint: disable=broad-except
                     pass
+                admin_client.delete(f'/api/pilots/{pilot_id}')
+
+    def test_s4_tc9_base_salary_monthly_report(self, admin_client):
+        """
+        S4-TC9 底薪月报API测试
+
+        步骤：创建主播和开播记录 → 创建底薪申请 → 测试底薪月报API功能。
+        """
+        created_pilots = []
+        created_records = []
+        created_applications = []
+
+        try:
+            # 1. 创建主播
+            pilot_data = pilot_factory.create_pilot_data(platform='快手', work_mode='线下', rank='签约主播', status='已签约', real_name='测试主播真实姓名')
+
+            pilot_resp = admin_client.post('/api/pilots', json=pilot_data)
+            assert pilot_resp.get('success'), f'创建主播失败: {pilot_resp.get("error")}'
+            pilot_id = pilot_resp['data']['id']
+            created_pilots.append(pilot_id)
+
+            # 2. 创建开播记录（当前月份）
+            now = datetime.now(timezone.utc)
+            start_time = now.replace(day=1, hour=10, minute=0, second=0, microsecond=0)  # 当月1号
+            end_time = start_time + timedelta(hours=2)
+
+            battle_record_data = {
+                'pilot': pilot_id,
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat(),
+                'work_mode': '线下',
+                'x_coord': '测试基地',
+                'y_coord': '测试场地',
+                'z_coord': '01',
+                'revenue_amount': '500.00',
+                'base_salary': '0',
+                'notes': '底薪月报测试记录'
+            }
+
+            record_resp = admin_client.post('/battle-records/api/battle-records', json=battle_record_data)
+            assert record_resp.get('success'), f'创建开播记录失败: {record_resp.get("error")}'
+            record_id = record_resp['data']['id']
+            created_records.append(record_id)
+
+            # 3. 创建底薪申请
+            application_data = {'battle_record_id': record_id, 'settlement_type': 'monthly_base', 'base_salary_amount': '150.00', 'remark': '底薪月报测试申请'}
+
+            app_resp = admin_client.post('/api/base-salary-applications', json=application_data)
+            assert app_resp.get('success'), f'创建底薪申请失败: {app_resp.get("error")}'
+            application_id = app_resp['data']['id']
+            created_applications.append(application_id)
+
+            # 4. 测试底薪月报API
+            month_str = now.strftime('%Y-%m')
+
+            # 测试基础API调用
+            report_resp = admin_client.get(f'/api/base-salary-monthly?month={month_str}&mode=offline&settlement=monthly_base')
+            assert report_resp.get('success'), f'获取底薪月报失败: {report_resp.get("error")}'
+
+            data = report_resp['data']
+            assert data['month'] == month_str
+            assert 'summary' in data
+            assert 'details' in data
+            assert 'pagination' in data
+
+            # 验证汇总数据
+            summary = data['summary']
+            assert summary['total_records'] >= 1
+            assert summary['application_count'] >= 1
+            assert summary['total_revenue'] >= 500.00
+            assert summary['total_base_salary'] >= 150.00
+
+            # 验证明细数据
+            details = data['details']
+            assert len(details) >= 1
+
+            # 找到我们的测试记录
+            test_record = None
+            for detail in details:
+                if detail['record_id'] == record_id:
+                    test_record = detail
+                    break
+
+            assert test_record is not None, '未找到测试记录'
+            assert test_record['pilot_nickname'] == pilot_data['nickname']
+            assert test_record['pilot_real_name'] == pilot_data['real_name']
+            assert test_record['application_amount'] == 150.00
+            assert test_record['settlement_type'] == '月结底薪'
+            assert test_record['application_status'] == '未处理'
+            assert test_record['is_duplicate'] is False
+
+            # 5. 测试筛选功能
+            # 测试不同筛选条件
+            all_resp = admin_client.get(f'/api/base-salary-monthly?month={month_str}&mode=all&settlement=all')
+            assert all_resp.get('success')
+            assert all_resp['data']['summary']['total_records'] >= summary['total_records']
+
+            # 6. 测试CSV导出
+            csv_resp = admin_client.get(f'/api/base-salary-monthly/export.csv?month={month_str}&mode=offline&settlement=monthly_base')
+            assert csv_resp.status_code == 200
+            assert 'text/csv' in csv_resp.headers.get('Content-Type', '')
+            assert 'attachment' in csv_resp.headers.get('Content-Disposition', '')
+
+            # 验证CSV内容包含测试数据
+            csv_content = csv_resp.data.decode('utf-8')
+            assert pilot_data['nickname'] in csv_content
+            assert pilot_data['real_name'] in csv_content
+            assert '150.00' in csv_content
+
+            # 7. 测试分页功能
+            page_resp = admin_client.get(f'/api/base-salary-monthly?month={month_str}&mode=offline&settlement=monthly_base&page=1&per_page=10')
+            assert page_resp.get('success')
+            pagination = page_resp['data']['pagination']
+            assert pagination['page'] == 1
+            assert pagination['per_page'] == 10
+            assert 'total' in pagination
+            assert 'pages' in pagination
+
+        finally:
+            # 清理测试数据
+            for app_id in created_applications:
+                try:
+                    admin_client.delete(f'/api/base-salary-applications/{app_id}')
+                except Exception:  # pylint: disable=broad-except
+                    pass
+
+            for record_id in created_records:
+                try:
+                    admin_client.delete(f'/battle-records/api/battle-records/{record_id}')
+                except Exception:  # pylint: disable=broad-except
+                    pass
+
+            for pilot_id in created_pilots:
+                try:
+                    admin_client.put(f'/api/pilots/{pilot_id}', json={'status': '未招募'})
+                except Exception:  # pylint: disable=broad-except
+                    pass
+                admin_client.delete(f'/api/pilots/{pilot_id}')

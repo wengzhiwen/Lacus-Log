@@ -38,6 +38,8 @@ from routes.new_reports_fast_api import new_reports_fast_api_bp
 from routes.users_api import users_api_bp
 from routes.base_salary_applications_api import base_salary_applications_api_bp
 from routes.settlements_api import settlements_api_bp
+from routes.base_salary_monthly import base_salary_monthly_bp
+from routes.base_salary_monthly_api import base_salary_monthly_api_bp
 from utils.bootstrap import (ensure_database_indexes, ensure_initial_roles_and_admin)
 from utils.logging_setup import init_logging
 from utils.scheduler import init_scheduled_jobs
@@ -170,6 +172,8 @@ def create_app() -> Flask:
     flask_app.register_blueprint(new_report_bp, url_prefix='/new-reports')
     flask_app.register_blueprint(new_reports_fast_api_bp, url_prefix='/new-reports-fast/api')
     flask_app.register_blueprint(new_report_fast_bp, url_prefix='/new-reports-fast')
+    flask_app.register_blueprint(base_salary_monthly_api_bp, url_prefix='/api')
+    flask_app.register_blueprint(base_salary_monthly_bp, url_prefix='/base-salary-monthly')
     flask_app.register_blueprint(report_mail_bp, url_prefix='/reports')
 
     flask_app.logger.info('已完全禁用Flask-WTF的全局CSRF保护，使用JWT认证统一管理安全')
