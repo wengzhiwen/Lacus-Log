@@ -739,6 +739,8 @@ const dateParam = urlParams.get('date');
 const ownerParam = urlParams.get('owner');
 const monthParam = urlParams.get('month');
 const recordIdParam = urlParams.get('record_id');
+const applicationIdParam = urlParams.get('application_id');
+const announcementIdParam = urlParams.get('announcement_id');
 const chartModal = document.getElementById('metricChartModal');
 const chartModalTitle = document.getElementById('chartModalTitle');
 const chartModalClose = document.getElementById('metricChartClose');
@@ -1024,13 +1026,17 @@ function normalizeStatus(value) {
 function generateBackButton() {
   const backNav = document.getElementById('back-nav');
   let backHtml = '';
-  
+
   if (fromParam === 'daily_report' && dateParam && ownerParam) {
-    backHtml = `<a class="btn btn-secondary" href="/reports/daily?date=${dateParam}&owner=${ownerParam}">
+    backHtml = `<a class="btn btn-secondary" href="/new-reports/daily?date=${dateParam}&owner=${ownerParam}">
       <span>←</span> 返回
     </a>`;
   } else if (fromParam === 'monthly_report' && monthParam) {
-    backHtml = `<a class="btn btn-secondary" href="/reports/monthly?month=${monthParam}">
+    backHtml = `<a class="btn btn-secondary" href="/new-reports-fast/monthly?month=${monthParam}">
+      <span>←</span> 返回
+    </a>`;
+  } else if (fromParam === 'weekly_report' && dateParam) {
+    backHtml = `<a class="btn btn-secondary" href="/new-reports/weekly?start_date=${dateParam}">
       <span>←</span> 返回
     </a>`;
   } else if (fromParam === 'pilot_detail') {
@@ -1041,12 +1047,20 @@ function generateBackButton() {
     backHtml = `<a class="btn btn-secondary" href="/battle-records/${recordIdParam}">
       <span>←</span> 返回
     </a>`;
+  } else if (fromParam === 'base_salary_detail' && applicationIdParam) {
+    backHtml = `<a class="btn btn-secondary" href="/reports/base-salary-application-detail?application_id=${applicationIdParam}">
+      <span>←</span> 返回
+    </a>`;
+  } else if (fromParam === 'announcement_detail' && announcementIdParam) {
+    backHtml = `<a class="btn btn-secondary" href="/announcements/${announcementIdParam}">
+      <span>←</span> 返回
+    </a>`;
   } else {
     backHtml = `<a class="btn btn-secondary" href="/pilots/">
       <span>←</span> 返回
     </a>`;
   }
-  
+
   backNav.innerHTML = backHtml;
 }
 
