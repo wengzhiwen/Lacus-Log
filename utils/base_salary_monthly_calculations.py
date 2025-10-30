@@ -88,10 +88,11 @@ def calculate_base_salary_monthly_report(year: int,
             if settlement not in ('all', 'none'):
                 continue
         else:
-            # 有申请记录：检查是否有符合筛选条件的申请
-            has_matching_app = any(app.settlement_type == settlement for app in record_applications)
-            if not has_matching_app:
-                continue
+            # 有申请记录：当筛选"全部"时显示所有申请，其他时只显示符合条件的申请
+            if settlement != 'all':
+                has_matching_app = any(app.settlement_type == settlement for app in record_applications)
+                if not has_matching_app:
+                    continue
 
         # 计算开播时长
         duration_seconds = (record.end_time - record.start_time).total_seconds()
