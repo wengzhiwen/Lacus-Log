@@ -1,13 +1,14 @@
 """
 套件S4：主播、开播记录与底薪测试
 
-覆盖 API：/api/pilots, /api/battle-records/*, /api/base-salary-applications/*, /api/bbs/posts
+覆盖 API：/api/pilots, /api/battle-records/*, /api/base-salary-applications/*, /api/bbs/posts, /api/pilots/check-duplicate
 
 测试原则：
 1. 不直接操作数据库
 2. 所有操作通过REST API
 3. 测试主播管理和开播记录
 4. 验证底薪申请和BBS集成
+5. 验证主播重名检查功能
 """
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -1026,3 +1027,195 @@ class TestS4PilotBroadcastSalary:
                 except Exception:  # pylint: disable=broad-except
                     pass
                 admin_client.delete(f'/api/pilots/{pilot_id}')
+
+    def test_s4_tc11_duplicate_real_name_check(self, admin_client):
+        """
+        S4-TC11 主播真实姓名重名检查
+
+        步骤：创建两个同真实姓名主播 → 检查重名API返回重名信息 → 验证重名主播信息格式正确
+        """
+        created_pilots = []
+
+        try:
+            # 1. 创建第一个主播
+            pilot1_data = pilot_factory.create_pilot_data(
+                nickname='主播A',
+                real_name='同名测试主播',
+                gender=0,
+                birth_year=1995,
+                platform='快手',
+                work_mode='线下',
+                rank='候选人',
+                status='未招募'
+            )
+
+            resp1 = admin_client.post('/api/pilots', json=pilot1_data)
+            assert resp1.get('success'), f'创建第一个主播失败: {resp1.get("error")}'
+            pilot1_id = resp1['data']['id']
+            created_pilots.append(pilot1_id)
+
+            # 2. 创建第二个主播（不同昵称，相同真实姓名）
+            pilot2_data = pilot_factory.create_pilot_data(
+                nickname='主播B',  # 不同昵称
+                real_name='同名测试主播',  # 相同真实姓名
+                gender=1,
+                birth_year=1998,
+                platform='抖音',
+                work_mode='线上',
+                rank='试播主播',
+                status='已招募'
+            )
+
+            resp2 = admin_client.post('/api/pilots', json=pilot2_data)
+            # 相同真实姓名的主播应该创建成功（真实姓名不是唯一字段）
+            assert resp2.get('success'), f'创建第二个主播失败: {resp2.get("error")}'
+            pilot2_id = resp2['data']['id']
+            created_pilots.append(pilot2_id)
+
+            # 3. 测试重名检查API - 通过真实姓名检查
+            check_resp = admin_client.get('/api/pilots/check-duplicate?real_name=同名测试主播')
+            assert check_resp.get('success'), f'重名检查失败: {check_resp.get("error")}'
+
+            check_data = check_resp['data']
+            assert check_data['has_duplicates'] is True
+            assert len(check_data['duplicates']) == 2  # 应该找到两个主播
+
+            # 验证两个重名主播的信息
+            nicknames = [dup['nickname'] for dup in check_data['duplicates']]
+            assert '主播A' in nicknames
+            assert '主播B' in nicknames
+
+            # 验证返回信息的格式
+            for duplicate in check_data['duplicates']:
+                assert duplicate['real_name'] == '同名测试主播'
+                assert 'age' in duplicate
+                assert 'gender_icon' in duplicate
+                assert 'updated_at' in duplicate
+
+            # 4. 测试编辑时的重名检查（排除当前主播）
+            check_resp2 = admin_client.get(f'/api/pilots/check-duplicate?real_name=同名测试主播&exclude_id={pilot1_id}')
+            assert check_resp2.get('success')
+
+            check_data2 = check_resp2['data']
+            assert check_data2['has_duplicates'] is True
+            assert len(check_data2['duplicates']) == 1  # 排除后应该只剩一个
+            assert check_data2['duplicates'][0]['nickname'] == '主播B'
+
+            # 5. 测试不存在的真实姓名
+            check_resp3 = admin_client.get('/api/pilots/check-duplicate?real_name=不存在的姓名')
+            assert check_resp3.get('success')
+            assert check_resp3['data']['has_duplicates'] is False
+            assert len(check_resp3['data']['duplicates']) == 0
+
+        finally:
+            # 清理测试数据
+            for pilot_id in created_pilots:
+                try:
+                    admin_client.delete(f'/api/pilots/{pilot_id}')
+                except Exception:  # pylint: disable=broad-except
+                    pass
+
+    def test_s4_tc12_duplicate_real_name_check(self, admin_client):
+        """
+        S4-TC12 主播真实姓名重名检查
+
+        步骤：创建两个同真实姓名主播 → 检查重名API返回重名信息 → 验证重名主播信息格式正确
+        """
+        created_pilots = []
+
+        try:
+            # 1. 创建第一个主播
+            pilot1_data = pilot_factory.create_pilot_data(
+                nickname='主播X',
+                real_name='同名测试',
+                gender=0,
+                birth_year=1990,
+                platform='快手',
+                work_mode='线下',
+                rank='候选人',
+                status='未招募'
+            )
+
+            resp1 = admin_client.post('/api/pilots', json=pilot1_data)
+            assert resp1.get('success'), f'创建第一个主播失败: {resp1.get("error")}'
+            pilot1_id = resp1['data']['id']
+            created_pilots.append(pilot1_id)
+
+            # 2. 创建第二个主播（不同昵称，相同真实姓名）
+            pilot2_data = pilot_factory.create_pilot_data(
+                nickname='主播Y',  # 不同昵称
+                real_name='同名测试',  # 相同真实姓名
+                gender=1,
+                birth_year=1992,
+                platform='抖音',
+                work_mode='线上',
+                rank='试播主播',
+                status='已招募'
+            )
+
+            resp2 = admin_client.post('/api/pilots', json=pilot2_data)
+            # 相同真实姓名的主播应该创建成功（真实姓名不是唯一字段）
+            assert resp2.get('success'), f'创建第二个主播失败: {resp2.get("error")}'
+            pilot2_id = resp2['data']['id']
+            created_pilots.append(pilot2_id)
+
+            # 3. 测试重名检查API - 通过真实姓名检查
+            check_resp = admin_client.get('/api/pilots/check-duplicate?real_name=同名测试')
+            assert check_resp.get('success'), f'重名检查失败: {check_resp.get("error")}'
+
+            check_data = check_resp['data']
+            assert check_data['has_duplicates'] is True
+            assert len(check_data['duplicates']) == 2  # 应该找到两个主播
+
+            # 验证两个重名主播的信息
+            nicknames = [dup['nickname'] for dup in check_data['duplicates']]
+            assert '主播X' in nicknames
+            assert '主播Y' in nicknames
+
+            # 4. 测试编辑时的重名检查（排除当前主播）
+            check_resp2 = admin_client.get(f'/api/pilots/check-duplicate?real_name=同名测试&exclude_id={pilot1_id}')
+            assert check_resp2.get('success')
+
+            check_data2 = check_resp2['data']
+            assert check_data2['has_duplicates'] is True
+            assert len(check_data2['duplicates']) == 1  # 排除后应该只剩一个
+            assert check_data2['duplicates'][0]['nickname'] == '主播Y'
+
+        finally:
+            # 清理测试数据
+            for pilot_id in created_pilots:
+                try:
+                    admin_client.delete(f'/api/pilots/{pilot_id}')
+                except Exception:  # pylint: disable=broad-except
+                    pass
+
+    def test_s4_tc13_duplicate_check_invalid_params(self, admin_client):
+        """
+        S4-TC13 真实姓名重名检查无效参数测试
+
+        步骤：测试各种无效参数 → 验证API正确处理错误情况
+        """
+        # 1. 测试没有参数的情况
+        resp1 = admin_client.get('/api/pilots/check-duplicate')
+        assert not resp1.get('success')
+        assert 'INVALID_PARAMS' in resp1.get('error', {}).get('code', '')
+
+        # 2. 测试空参数的情况
+        resp2 = admin_client.get('/api/pilots/check-duplicate?real_name=')
+        assert not resp2.get('success')
+        assert 'INVALID_PARAMS' in resp2.get('error', {}).get('code', '')
+
+        # 3. 测试只有空格参数的情况
+        resp3 = admin_client.get('/api/pilots/check-duplicate?real_name=   ')
+        assert not resp3.get('success')
+        assert 'INVALID_PARAMS' in resp3.get('error', {}).get('code', '')
+
+        # 4. 测试正常情况（提供真实姓名参数）
+        resp4 = admin_client.get('/api/pilots/check-duplicate?real_name=测试')
+        assert resp4.get('success')
+        assert not resp4['data']['has_duplicates']  # 应该没有重名
+
+        # 5. 测试带exclude_id的正常情况
+        resp5 = admin_client.get('/api/pilots/check-duplicate?real_name=测试&exclude_id=507f1f77bcf86cd799439011')
+        assert resp5.get('success')
+        assert not resp5['data']['has_duplicates']  # 应该没有重名

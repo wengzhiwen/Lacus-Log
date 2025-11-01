@@ -15,14 +15,23 @@
         <div class="form-grid">
           <div class="form-group">
             <label for="nickname" class="form-label">昵称 <span class="required">*</span></label>
-            <input type="text" id="nickname" name="nickname" class="form-input" 
+            <input type="text" id="nickname" name="nickname" class="form-input"
                    placeholder="请输入昵称" maxlength="20" required>
             <div class="form-help">最多20个字符，必须唯一</div>
           </div>
-          
+
           <div class="form-group">
             <label for="real_name" class="form-label">姓名</label>
-            <input type="text" id="real_name" name="real_name" class="form-input" 
+            <!-- 重名警告区域 -->
+            <div id="realNameWarning" class="duplicate-warning" style="display: none;">
+              <div class="warning-icon">⚠️</div>
+              <div class="warning-content">
+                <div class="warning-title">系统中有相同真实姓名的主播存在</div>
+                <div id="realNameWarningList" class="warning-list"></div>
+              </div>
+              <button type="button" class="warning-close" onclick="closeWarning('realName')">✕</button>
+            </div>
+            <input type="text" id="real_name" name="real_name" class="form-input"
                    placeholder="请输入真实姓名" maxlength="20">
             <div class="form-help">最多20个字符</div>
           </div>
@@ -335,6 +344,119 @@
 .error-close:hover {
   background-color: rgba(0, 0, 0, 0.05);
 }
+
+/* 重名警告样式 */
+.duplicate-warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(255, 193, 7, 0.2);
+  animation: slideDown 0.3s ease-out;
+}
+
+.warning-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  color: #856404;
+}
+
+.warning-content {
+  flex: 1;
+}
+
+.warning-title {
+  font-weight: 600;
+  color: #856404;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.warning-list {
+  font-size: 12px;
+  color: #664d03;
+}
+
+.warning-item {
+  padding: 4px 0;
+  line-height: 1.4;
+}
+
+.warning-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #856404;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.warning-close:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 确认对话框样式 */
+.confirmation-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirmation-dialog {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.confirmation-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.confirmation-content {
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.confirmation-duplicates {
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
 </style>
 
 <script>
@@ -344,6 +466,133 @@ let currentPilot = null;
 function getPilotIdFromUrl() {
   const pathParts = window.location.pathname.split('/');
   return pathParts[pathParts.length - 2]; // /pilots/<id>/edit
+}
+
+// 关闭警告提示
+function closeWarning(type) {
+  const warning = document.getElementById(type + 'Warning');
+  if (warning) {
+    warning.style.display = 'none';
+  }
+}
+
+// 检查真实姓名重名
+async function checkDuplicate(real_name, excludeId = null) {
+  try {
+    if (!real_name) {
+      return { has_duplicates: false, duplicates: [] };
+    }
+
+    const params = new URLSearchParams();
+    params.append('real_name', real_name);
+    if (excludeId) params.append('exclude_id', excludeId);
+
+    const response = await fetch(`/api/pilots/check-duplicate?${params}`);
+    const result = await response.json();
+
+    if (!result.success) {
+      console.error('检查重名失败:', result.error?.message);
+      return { has_duplicates: false, duplicates: [] };
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error('检查重名失败:', error);
+    return { has_duplicates: false, duplicates: [] };
+  }
+}
+
+// 显示真实姓名重名警告
+function showDuplicateWarning(duplicates) {
+  const warning = document.getElementById('realNameWarning');
+  const warningList = document.getElementById('realNameWarningList');
+
+  if (!warning || !warningList) return;
+
+  if (duplicates.length === 0) {
+    warning.style.display = 'none';
+    return;
+  }
+
+  // 生成警告内容
+  let warningHTML = '';
+  duplicates.forEach(pilot => {
+    const realNamePart = pilot.real_name ? `(${pilot.real_name})` : '';
+    const agePart = pilot.age ? `${pilot.age}岁` : '';
+    const ownerPart = pilot.owner ? ` 运营: ${pilot.owner}` : '';
+    const timePart = pilot.updated_at ? ` 更新: ${pilot.updated_at}` : '';
+
+    warningHTML += `
+      <div class="warning-item">
+        ${pilot.nickname}${realNamePart} ${pilot.gender_icon} ${agePart}${ownerPart}${timePart}
+      </div>
+    `;
+  });
+
+  warningList.innerHTML = warningHTML;
+  warning.style.display = 'flex';
+}
+
+// 显示确认对话框
+function showConfirmationDialog(duplicates, onConfirm) {
+  // 创建模态框
+  const modal = document.createElement('div');
+  modal.className = 'confirmation-modal';
+
+  // 生成重名主播列表
+  let duplicatesHTML = '';
+  duplicates.forEach(pilot => {
+    const realNamePart = pilot.real_name ? `(${pilot.real_name})` : '';
+    const agePart = pilot.age ? `${pilot.age}岁` : '';
+    const ownerPart = pilot.owner ? ` 运营: ${pilot.owner}` : '';
+    const timePart = pilot.updated_at ? ` 更新: ${pilot.updated_at}` : '';
+
+    duplicatesHTML += `
+      <div class="warning-item">
+        ${pilot.nickname}${realNamePart} ${pilot.gender_icon} ${agePart}${ownerPart}${timePart}
+      </div>
+    `;
+  });
+
+  modal.innerHTML = `
+    <div class="confirmation-dialog">
+      <div class="confirmation-title">⚠️ 确认修改主播</div>
+      <div class="confirmation-content">
+        系统检测到存在${duplicates.length}个相同真实姓名的主播，请确认是否继续修改：
+        <div class="confirmation-duplicates">
+          ${duplicatesHTML}
+        </div>
+        确认要继续修改吗？
+      </div>
+      <div class="confirmation-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeConfirmationModal()">取消</button>
+        <button type="button" class="btn btn-primary" onclick="confirmUpdate()">确认修改</button>
+      </div>
+    </div>
+  `;
+
+  // 添加到页面
+  document.body.appendChild(modal);
+
+  // 绑定事件
+  window.currentConfirmationCallback = onConfirm;
+  window.currentModal = modal;
+}
+
+// 关闭确认对话框
+function closeConfirmationModal() {
+  if (window.currentModal) {
+    document.body.removeChild(window.currentModal);
+    window.currentModal = null;
+    window.currentConfirmationCallback = null;
+  }
+}
+
+// 确认修改
+function confirmUpdate() {
+  if (window.currentConfirmationCallback) {
+    window.currentConfirmationCallback();
+  }
 }
 
 // 规范化枚举值
@@ -474,7 +723,27 @@ function closeErrorAlert() {
 async function updatePilot(formData) {
   // 先清除之前的错误提示
   closeErrorAlert();
-  
+
+  // 检查真实姓名重名
+  const pilotId = getPilotIdFromUrl();
+  const duplicateResult = await checkDuplicate(formData.real_name, pilotId);
+
+  if (duplicateResult.has_duplicates) {
+    // 显示确认对话框
+    showConfirmationDialog(duplicateResult.duplicates, async () => {
+      await performUpdate(formData);
+    });
+  } else {
+    // 直接更新
+    await performUpdate(formData);
+  }
+}
+
+// 执行更新操作
+async function performUpdate(formData) {
+  // 关闭确认对话框
+  closeConfirmationModal();
+
   try {
     const pilotId = getPilotIdFromUrl();
     const response = await fetch(`/api/pilots/${pilotId}`, {
@@ -485,16 +754,16 @@ async function updatePilot(formData) {
       credentials: 'include',
       body: JSON.stringify(formData)
     });
-    
+
     const result = await response.json();
-    
+
     if (!result.success) {
       const errorMsg = result.error?.message || '更新主播失败';
       showErrorAlert(errorMsg, 'error');
       showMessage('保存失败', 'error');
       return;
     }
-    
+
     showMessage('主播信息已更新', 'success');
     setTimeout(() => {
       window.location.href = `/pilots/${result.data.id}`;
@@ -508,14 +777,20 @@ async function updatePilot(formData) {
 
 document.addEventListener('DOMContentLoaded', function() {
   loadPilotDetail();
-  
+
   const form = document.querySelector('.pilot-form-content');
   const nicknameInput = document.getElementById('nickname');
+  const realNameInput = document.getElementById('real_name');
   const hometownInput = document.getElementById('hometown');
   const birthYearInput = document.getElementById('birth_year');
-  
+
+  // 实时真实姓名重名检查
+  let realNameCheckTimeout;
+
   nicknameInput.addEventListener('input', function() {
     const value = this.value.trim();
+
+    // 基本验证
     if (value.length > 20) {
       this.setCustomValidity('昵称不能超过20个字符');
     } else if (value.length === 0) {
@@ -524,7 +799,33 @@ document.addEventListener('DOMContentLoaded', function() {
       this.setCustomValidity('');
     }
   });
-  
+
+  realNameInput.addEventListener('input', function() {
+    const value = this.value.trim();
+
+    // 基本验证
+    if (value.length > 20) {
+      this.setCustomValidity('真实姓名不能超过20个字符');
+    } else if (value.length === 0) {
+      // 清除重名警告
+      closeWarning('realName');
+    } else {
+      this.setCustomValidity('');
+
+      // 防抖检查重名
+      clearTimeout(realNameCheckTimeout);
+      realNameCheckTimeout = setTimeout(async () => {
+        const pilotId = getPilotIdFromUrl();
+        const result = await checkDuplicate(value, pilotId);
+        if (result.has_duplicates) {
+          showDuplicateWarning(result.duplicates);
+        } else {
+          closeWarning('realName');
+        }
+      }, 500);
+    }
+  });
+
   hometownInput.addEventListener('input', function() {
     const value = this.value.trim();
     if (value.length > 20) {
@@ -533,7 +834,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.setCustomValidity('');
     }
   });
-  
+
   birthYearInput.addEventListener('input', function() {
     const value = parseInt(this.value);
     const currentYear = new Date().getFullYear();
@@ -543,10 +844,10 @@ document.addEventListener('DOMContentLoaded', function() {
       this.setCustomValidity('');
     }
   });
-  
+
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const formData = {
       nickname: document.getElementById('nickname').value.trim(),
       real_name: document.getElementById('real_name').value.trim() || null,
@@ -559,7 +860,7 @@ document.addEventListener('DOMContentLoaded', function() {
       rank: document.getElementById('rank').value,
       status: document.getElementById('status').value
     };
-    
+
     await updatePilot(formData);
   });
 });

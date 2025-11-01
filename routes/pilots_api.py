@@ -721,6 +721,62 @@ def get_pilot_performance(pilot_id):
         return jsonify(create_error_response('INTERNAL_ERROR', '获取主播业绩数据失败')), 500
 
 
+@pilots_api_bp.route('/api/pilots/check-duplicate', methods=['GET'])
+@jwt_roles_accepted('gicho', 'kancho', 'gunsou')
+def check_duplicate_pilots():
+    """检查主播真实姓名重名"""
+    try:
+        real_name = request.args.get('real_name', '').strip()
+        exclude_id = request.args.get('exclude_id')  # 编辑时排除当前主播
+
+        if not real_name:
+            return jsonify(create_error_response('INVALID_PARAMS', '真实姓名参数不能为空')), 400
+
+        # 构建查询条件
+        query = Pilot.objects.filter(real_name=real_name)
+
+        # 编辑时排除当前主播
+        if exclude_id:
+            query = query.filter(id__ne=exclude_id)
+
+        # 查找重名主播
+        duplicate_pilots = query.all()
+
+        if not duplicate_pilots:
+            return jsonify(create_success_response({'has_duplicates': False, 'duplicates': []}))
+
+        # 序列化重名主播信息
+        duplicates = []
+        for pilot in duplicate_pilots:
+            # 性别图标
+            gender_icon = ''
+            if pilot.gender == Gender.MALE:
+                gender_icon = '♂'
+            elif pilot.gender == Gender.FEMALE:
+                gender_icon = '♀'
+            else:
+                gender_icon = '?'
+
+            duplicates.append({
+                'id': str(pilot.id),
+                'nickname': pilot.nickname,
+                'real_name': pilot.real_name or '',
+                'age': pilot.age or 0,
+                'gender_icon': gender_icon,
+                'owner': pilot.owner.nickname if pilot.owner else None,
+                'updated_at': utc_to_local(pilot.updated_at).strftime('%Y-%m-%d %H:%M:%S') if pilot.updated_at else None
+            })
+
+        response_data = {'has_duplicates': True, 'duplicates': duplicates, 'message': f'系统中有{len(duplicates)}个相同真实姓名的主播存在'}
+
+        logger.info('检查主播真实姓名重名：%s，找到%d个重名主播', real_name, len(duplicates))
+        return jsonify(create_success_response(response_data))
+
+    except Exception as e:
+        logger.error('检查主播真实姓名重名失败: %s', str(e), exc_info=True)
+        return jsonify(create_error_response('INTERNAL_ERROR', '检查重名失败')), 500
+
+
 @pilots_api_bp.route('/api/pilots/export', methods=['GET'])
 @jwt_roles_accepted('gicho', 'kancho', 'gunsou')
 def export_pilots():
